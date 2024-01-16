@@ -3,9 +3,17 @@ import sys
 import singer_sdk._singerlib as singer
 import singer_sdk.metrics
 from singer_sdk.streams import Stream
+from singer_sdk.typing import (
+    DateTimeType,
+    IntegerType,
+    ObjectType,
+    PropertiesList,
+    Property,
+)
 import typing as t
 
 from .capture import Connector, request, response, Response
+from .flow import CaptureBinding
 from . import flow, ValidateError, init_logger
 
 logger = init_logger()
@@ -13,8 +21,72 @@ logger = init_logger()
 def write_message_panics(message: singer.Message) -> None:
     raise RuntimeError("unexpected call to singer.write_message", message.to_dict())
 
+class State(t.TypedDict):
+    bindingStateV1: dict[str, t.Any]
+    rowIds: dict[str, int] 
+
+RESOURCE_PATH_POINTER = "tap_stream_id"
+# To avoid collisions inside `bindingStateV1`
+ESTUARY_NAMESPACE = "estuary.dev"
+ROW_COUNTER_STATE_KEY = f"{ESTUARY_NAMESPACE}/rowCounter"
+
+"""
+The Meltano SDK is expecting bookmark keys to be `tap_stream_id`s. We use 
+`tap_stream_id` as the _basis_ for our state keys, but the state key for a binding
+can change over time, for example if that binding is re-backfilled. As such, we
+need to translate between `tap_stream_id`-keyed state objects for Meltano, and
+`stateKey`-keyed state objects for Flow.
+"""
+def singer_to_flow_state(state: singer.StateMessage, bindings: t.List[CaptureBinding], rowIds: dict[str, int]):
+    flow_state = {}
+    singer_state = state.value.get("bookmarks", {})
+    for binding in bindings:
+        try:
+            # Singer keys states on the `tap_stream_id`
+            singer_state_key = binding["resourceConfig"][RESOURCE_PATH_POINTER]
+            # But we want the keys inside of `bindingStateV1` to be whatever
+            # the binding's `state_key` is, so that the state key can be changed
+            # for example in the case of an update to the backfill counter
+            flow_state_key = binding["stateKey"]
+
+            state_val = singer_state.get(singer_state_key)
+            if state_val is not None:
+                # Let's stuff the row counter into the state for this binding
+                # so that it also gets blown away correctly when we change state keys
+                state_val[ROW_COUNTER_STATE_KEY] = rowIds.get(singer_state_key)
+                flow_state[flow_state_key] = state_val
+        except Exception as e:
+            logger.error(f'Error handling STATE message for binding {binding["stateKey"]}')
+            raise e
+    return State(**{"bindingStateV1": flow_state})
+
+"""
+Perform the opposite of the translation that `singer_to_flow_state` does,
+turning `stateKey`-keyed state objects into `tap_stream_id`-keyed ones.
+"""
+def flow_to_singer_state(state: State, bindings: t.List[CaptureBinding]):
+    singer_state = {}
+    rowIds: dict[str, t.List[int]] = {}
+    flow_state = state.get("bindingStateV1", {})
+
+    for i, binding in enumerate(bindings):
+        try:
+            singer_state_key = binding["resourceConfig"][RESOURCE_PATH_POINTER]
+            flow_state_key = binding["stateKey"]
+
+            state_val = flow_state.get(flow_state_key)
+            if state_val is not None:
+                singer_state[singer_state_key] = state_val
+                rowIds[singer_state_key] = [i, state_val[ROW_COUNTER_STATE_KEY]]
+        except Exception as e:
+            logger.error(f'Error handling STATE message for binding {binding["stateKey"]}')
+            raise e
+    return (
+        {"bookmarks": singer_state},
+        rowIds
+    )
 # Disable the _setup_logging routine, as it otherwise clobbers our logging setup.
-singer_sdk.metrics._setup_logging = lambda _config: None
+singer_sdk.metrics._setup_logging = lambda config: None
 # The singer-sdk uses LOGLEVEL to set up loggers instead of LOG_LEVEL.
 os.environ.setdefault("LOGLEVEL", os.environ.get("LOG_LEVEL", "INFO").upper())
 # CaptureShim instruments singer.write_message as-needed to capture message callbacks.
@@ -29,10 +101,6 @@ REPLICATION_INCREMENTAL = "INCREMENTAL"
 
 class Config(t.TypedDict):
     pass
-
-class State(t.TypedDict):
-    pass
-
 
 class DelegateFactoryCallable(t.Protocol):
     def __call__(self, config: Config, catalog: singer.Catalog | None = None, state: State | None = None) -> singer_sdk.Tap:
@@ -62,7 +130,7 @@ class CaptureShim(Connector):
             documentationUrl=DOCS_URL if DOCS_URL else "https://docs.estuary.dev",
             configSchema=self.config_schema,
             resourceConfigSchema=resource_config_schema,
-            resourcePathPointers=["/stream"],
+            resourcePathPointers=[f"/{RESOURCE_PATH_POINTER}"],
         )
 
         if self.oauth2:
@@ -187,21 +255,21 @@ class CaptureShim(Connector):
     def open(self, open: request.Open, emit: t.Callable[[Response], None]) -> None:
         catalog = singer.Catalog()
         config = t.cast(Config, open["capture"]["config"])
-        state = t.cast(State, open["state"])
+        state = t.cast(State, open["state"] or {})
 
-        # Key: tap_stream_id.
-        # Value: [binding index, next row_id].
-        index: dict[str, t.List[int]] = {}
+        # Index Key: tap_stream_id.
+        # Index Value: [binding index, next row_id].
+        (translated_state, index) = flow_to_singer_state(state, open["capture"]["bindings"])
 
         for i, binding in enumerate(open["capture"]["bindings"]):
             entry = singer.CatalogEntry.from_dict(binding["resourceConfig"])
             entry.schema = singer.Schema.from_dict(binding["collection"]["writeSchema"])
+            if not entry.tap_stream_id in index:
+                index[entry.tap_stream_id] = [i,1]
 
-            # TODO(johnny): Re-hydrate next row_id from open["state"].
-            index[entry.tap_stream_id] = [i, 1]
             catalog[entry.tap_stream_id] = entry
-
-        delegate: singer_sdk.Tap = self.delegate_factory(config=config, catalog=catalog, state=state)
+        
+        delegate: singer_sdk.Tap = self.delegate_factory(config=config, catalog=catalog, state=translated_state) # type: ignore
         emit(Response(opened=response.Opened(explicitAcknowledgements=False)))
 
         def _on_message(message: singer.Message):
@@ -228,7 +296,14 @@ class CaptureShim(Connector):
                     Response(
                         checkpoint=response.Checkpoint(
                             state=flow.ConnectorState(
-                                updated=state.to_dict(),
+                                # Translate back to Flow state keyed on `stateKey`
+                                updated=singer_to_flow_state(
+                                    state, 
+                                    open["capture"]["bindings"], 
+                                    # We don't store the binding index in the state because it could change
+                                    # Instead we key on the stateKey
+                                    {k:v[1] for k,v in index.items()}
+                                ),
                                 mergePatch=False
                             )
                         )
@@ -279,6 +354,7 @@ class CaptureShim(Connector):
 resource_config_schema = {
     "type": "object",
     "properties": {
+        # "tap_stream_id": {"type": "string"},
         "stream": {"type": "string"},
         "replication_method": {"type": "string", "enum": [REPLICATION_INCREMENTAL, REPLICATION_FULL_TABLE]},
         "replication_key": {"type": "string"}

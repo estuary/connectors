@@ -3,6 +3,7 @@
     "recommendedName": "attachments_compact",
     "resourceConfig": {
       "stream": "attachments_compact",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -45,6 +46,7 @@
     "recommendedName": "attachments",
     "resourceConfig": {
       "stream": "attachments",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -182,6 +184,7 @@
     "recommendedName": "custom_fields",
     "resourceConfig": {
       "stream": "custom_fields",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -404,6 +407,7 @@
     "recommendedName": "events",
     "resourceConfig": {
       "stream": "events",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -593,6 +597,7 @@
     "recommendedName": "portfolios_compact",
     "resourceConfig": {
       "stream": "portfolios_compact",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -629,6 +634,7 @@
     "recommendedName": "portfolios",
     "resourceConfig": {
       "stream": "portfolios",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -866,6 +872,7 @@
     "recommendedName": "portfolios_memberships",
     "resourceConfig": {
       "stream": "portfolios_memberships",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -951,6 +958,7 @@
     "recommendedName": "projects",
     "resourceConfig": {
       "stream": "projects",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -1466,6 +1474,7 @@
     "recommendedName": "sections_compact",
     "resourceConfig": {
       "stream": "sections_compact",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -1502,6 +1511,7 @@
     "recommendedName": "sections",
     "resourceConfig": {
       "stream": "sections",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -1571,6 +1581,7 @@
     "recommendedName": "stories_compact",
     "resourceConfig": {
       "stream": "stories_compact",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -1652,6 +1663,7 @@
     "recommendedName": "stories",
     "resourceConfig": {
       "stream": "stories",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -1821,6 +1833,7 @@
     "recommendedName": "tags",
     "resourceConfig": {
       "stream": "tags",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -1927,6 +1940,7 @@
     "recommendedName": "tasks",
     "resourceConfig": {
       "stream": "tasks",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -2725,6 +2739,7 @@
     "recommendedName": "teams",
     "resourceConfig": {
       "stream": "teams",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -2805,6 +2820,7 @@
     "recommendedName": "team_memberships",
     "resourceConfig": {
       "stream": "team_memberships",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -2893,6 +2909,7 @@
     "recommendedName": "users",
     "resourceConfig": {
       "stream": "users",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -3005,6 +3022,7 @@
     "recommendedName": "workspaces",
     "resourceConfig": {
       "stream": "workspaces",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {
