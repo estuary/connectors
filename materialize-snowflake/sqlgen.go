@@ -273,26 +273,6 @@ WHEN NOT MATCHED THEN
 	{{- end -}}
 );
 {{ end }}
-
-{{ define "updateFence" }}
-EXECUTE IMMEDIATE $$
-DECLARE
-    fenced_excp EXCEPTION (-20002, 'This instance was fenced off by another');
-BEGIN
-	UPDATE {{ Identifier . }}
-		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-		WHERE materialization = {{ Literal $.Materialization.String }}
-		AND   key_begin = {{ $.KeyBegin }}
-		AND   key_end   = {{ $.KeyEnd }}
-		AND   fence     = {{ $.Fence }};
-
-	IF (SQLNOTFOUND = true) THEN
-		RAISE fenced_excp;
-	END IF;
-
-  RETURN SQLROWCOUNT;
-END $$;
-{{ end }}
   `)
 
 	return map[string]*template.Template{
@@ -302,7 +282,6 @@ END $$;
 		"loadQuery":          tplAll.Lookup("loadQuery"),
 		"copyInto":           tplAll.Lookup("copyInto"),
 		"mergeInto":          tplAll.Lookup("mergeInto"),
-		"updateFence":        tplAll.Lookup("updateFence"),
 	}
 }
 
