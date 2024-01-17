@@ -63,6 +63,7 @@ def singer_to_flow_state(state: singer.StateMessage, bindings: t.List[CaptureBin
 """
 Perform the opposite of the translation that `singer_to_flow_state` does,
 turning `stateKey`-keyed state objects into `tap_stream_id`-keyed ones.
+Also calculate the correct binding-rowId index given the current binding list.
 """
 def flow_to_singer_state(state: State, bindings: t.List[CaptureBinding]):
     singer_state = {}
