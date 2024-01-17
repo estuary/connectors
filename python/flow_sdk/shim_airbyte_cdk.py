@@ -173,19 +173,19 @@ class CaptureShim(Connector):
             elif sync_mode == SyncMode.full_refresh:
                 # Synthesize a key based on the record's order within each stream refresh.
                 key = ["/_meta/row_id"]
-
-                # Extend schema with /_meta/row_id.
-                meta = stream.json_schema.setdefault("properties", {}).setdefault(
-                    "_meta", {"type": "object"}
-                )
-                meta.setdefault("properties", {})["row_id"] = {"type": "integer"}
-                meta.setdefault("required", []).append("row_id")
-                json_schema = stream.json_schema
             else:
                 raise RuntimeError(
                     "incremental stream is missing a source-defined primary key",
                     stream.name,
                 )
+
+            # Extend schema with /_meta/row_id, since we always generate it
+            meta = stream.json_schema.setdefault("properties", {}).setdefault(
+                "_meta", {"type": "object"}
+            )
+            meta.setdefault("properties", {})["row_id"] = {"type": "integer"}
+            meta.setdefault("required", []).append("row_id")
+            json_schema = stream.json_schema
 
             if self.usesSchemaInference:
                 json_schema["x-infer-schema"] = True

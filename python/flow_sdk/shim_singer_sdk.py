@@ -168,28 +168,29 @@ class CaptureShim(Connector):
                     for p in entry.key_properties
                 ]
             else:
-                logger.info(f"Stream {stream.name} does not have a primary key, using '/_meta/row_id' as the key.") 
-                
+                logger.info(f"Stream {stream.name} does not have a primary key, using '/_meta/row_id' as the key.")                 
                 key = ["/_meta/row_id"]
-                row_id_type = Property("row_id", IntegerType, required=True)
 
-                if entry.schema.properties is not None:
-                    if not "_meta" in entry.schema.properties:
-                        entry.schema.properties["_meta"] = ObjectType(row_id_type)
-                        if not entry.schema.required:
-                            entry.schema.required = []
-                        if not "_meta" in entry.schema.required:
-                            entry.schema.required.append("_meta")
-                    else:
-                        meta = entry.schema.properties["_meta"]
-                        
-                        # Just in case _meta was somehow not required
-                        meta.optional = False
-                        props: ObjectType = meta.wrapped
-                        props.wrapped["row_id"] = row_id_type
+            # Always include `_meta/row_id` in the schema, since we always set it
+            row_id_type = Property("row_id", IntegerType, required=True)
+
+            if entry.schema.properties is not None:
+                if not "_meta" in entry.schema.properties:
+                    entry.schema.properties["_meta"] = ObjectType(row_id_type)
+                    if not entry.schema.required:
+                        entry.schema.required = []
+                    if not "_meta" in entry.schema.required:
+                        entry.schema.required.append("_meta")
                 else:
-                    # We should never get here, this is just to appease type checking
-                    raise RuntimeError(f"Something unexpected happened: schema for stream {stream.name} does not have a properties field.", vars(entry.schema))
+                    meta = entry.schema.properties["_meta"]
+                    
+                    # Just in case _meta was somehow not required
+                    meta.optional = False
+                    props: ObjectType = meta.wrapped
+                    props.wrapped["row_id"] = row_id_type
+            else:
+                # We should never get here, this is just to appease type checking
+                raise RuntimeError(f"Something unexpected happened: schema for stream {stream.name} does not have a properties field.", vars(entry.schema))
 
             for bc, meta in entry.metadata.items():
                 if meta.inclusion == "available":
