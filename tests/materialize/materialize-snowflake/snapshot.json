@@ -62,7 +62,29 @@
   }
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "Queries": {
+          "duplicate_keys_delta": [],
+          "duplicate_keys_delta_exclude_flow_doc": [],
+          "duplicate_keys_standard": [],
+          "formatted_strings": [],
+          "multiple_types": [],
+          "simple": []
+        },
+        "ToDelete": {
+          "duplicate_keys_delta": [],
+          "duplicate_keys_delta_exclude_flow_doc": [],
+          "duplicate_keys_standard": [],
+          "formatted_strings": [],
+          "multiple_types": [],
+          "simple": []
+        }
+      }
+    }
+  }
 }
 {
   "loaded": {

@@ -49,7 +49,7 @@ SELECT 0, "a-schema".target_table.flow_document
 	FROM "a-schema".target_table
 	JOIN (
 		SELECT $1[0] AS key1, $1[1] AS key2
-		FROM @flow_v1/%s
+		FROM %s
 	) AS r
 	ON "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table.key2 = r.key2
 --- End "a-schema".target_table loadQuery ---
@@ -59,7 +59,7 @@ COPY INTO "a-schema".target_table (
 	key1, key2, boolean, integer, number, string, flow_document
 ) FROM (
 	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS boolean, $1[3] AS integer, $1[4] AS number, $1[5] AS string, $1[6] AS flow_document
-	FROM @flow_v1/%s
+	FROM %s
 );
 --- End "a-schema".target_table copyInto ---
 
@@ -67,7 +67,7 @@ COPY INTO "a-schema".target_table (
 MERGE INTO "a-schema".target_table AS l
 USING (
 	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS boolean, $1[3] AS integer, $1[4] AS number, $1[5] AS string, $1[6] AS flow_document
-	FROM @flow_v1/%s
+	FROM %s
 ) AS r
 ON l.key1 = r.key1 AND l.key2 = r.key2
 WHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN
@@ -112,7 +112,7 @@ COPY INTO "Delta Updates" (
 	theKey, aValue
 ) FROM (
 	SELECT $1[0] AS theKey, $1[1] AS aValue
-	FROM @flow_v1/%s
+	FROM %s
 );
 --- End "Delta Updates" copyInto ---
 
@@ -120,7 +120,7 @@ COPY INTO "Delta Updates" (
 MERGE INTO "Delta Updates" AS l
 USING (
 	SELECT $1[0] AS theKey, $1[1] AS aValue
-	FROM @flow_v1/%s
+	FROM %s
 ) AS r
 ON l.theKey = r.theKey
 WHEN MATCHED THEN
@@ -156,7 +156,7 @@ ALTER TABLE "a-schema".target_table ALTER COLUMN
 MERGE INTO target_table_no_values_materialized AS l
 USING (
 	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS flow_document
-	FROM @flow_v1/%s
+	FROM %s
 ) AS r
 ON l.key1 = r.key1 AND l.key2 = r.key2
 WHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN
@@ -168,23 +168,4 @@ WHEN NOT MATCHED THEN
 	VALUES (r.key1, r.key2, r.flow_document);
 --- End target_table_no_values_materialized mergeInto ---
 
---- Begin Fence Update ---
-EXECUTE IMMEDIATE $$
-DECLARE
-    fenced_excp EXCEPTION (-20002, 'This instance was fenced off by another');
-BEGIN
-	UPDATE path."To".checkpoints
-		SET   checkpoint = 'AAECAwQFBgcICQ=='
-		WHERE materialization = 'some/Materialization'
-		AND   key_begin = 1122867
-		AND   key_end   = 4293844428
-		AND   fence     = 123;
-
-	IF (SQLNOTFOUND = true) THEN
-		RAISE fenced_excp;
-	END IF;
-
-  RETURN SQLROWCOUNT;
-END $$;
---- End Fence Update ---
 
