@@ -33,6 +33,17 @@
             "null",
             "string"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -169,6 +180,17 @@
           "type": [
             "null",
             "boolean"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
           ]
         }
       },
@@ -392,6 +414,17 @@
             "null",
             "string"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -581,6 +614,17 @@
               }
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -616,6 +660,17 @@
           "type": [
             "null",
             "string"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
           ]
         }
       },
@@ -854,6 +909,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -939,6 +1005,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -1454,6 +1531,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -1489,6 +1577,17 @@
           "type": [
             "null",
             "string"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
           ]
         }
       },
@@ -1559,6 +1658,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -1639,6 +1749,17 @@
           "type": [
             "null",
             "string"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
           ]
         }
       },
@@ -1809,6 +1930,17 @@
             "null",
             "integer"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -1915,6 +2047,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -2713,6 +2856,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -2792,6 +2946,17 @@
           "type": [
             "null",
             "string"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
           ]
         }
       },
@@ -2881,6 +3046,17 @@
               ]
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -2993,6 +3169,17 @@
               }
             }
           }
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "x-infer-schema": true
@@ -3043,6 +3230,17 @@
           "type": [
             "null",
             "boolean"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
           ]
         }
       },
