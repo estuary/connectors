@@ -171,10 +171,6 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) remoteFilePath(file string) string {
-	return filepath.Join(f.uuid, file)
-}
-
 func (f *stagedFile) flush() (string, error) {
 	if err := f.putFile(); err != nil {
 		return "", fmt.Errorf("flush putFile: %w", err)
@@ -183,7 +179,7 @@ func (f *stagedFile) flush() (string, error) {
 	f.started = false
 
 	// Wait for all outstanding PUT requests to complete.
-	return f.uuid, f.group.Wait()
+	return fmt.Sprintf("@flow_v1/%s", f.uuid), f.group.Wait()
 }
 
 func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
