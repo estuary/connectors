@@ -6,7 +6,7 @@ set -o nounset
 
 # The dir relative to ${TEMP_DIR} for storing temp files.
 tmp_dir=tmp
-mkdir -p $(realpath ${TEMP_DIR}/${tmp_dir})
+mkdir -p ${TEMP_DIR}/${tmp_dir}
 
 # Sync data to local.
 >&2 aws s3 sync "s3://${TEST_BUCKET}" ${TEMP_DIR}/${tmp_dir}/ --endpoint-url "${LOCALSTACK_S3_LOCAL_ENDPOINT}" \
