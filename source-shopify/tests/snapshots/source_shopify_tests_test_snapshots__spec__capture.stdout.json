@@ -131,7 +131,7 @@
       }
     },
     "resourcePathPointers": [
-      "/stream"
+      "/tap_stream_id"
     ]
   }
 ]

@@ -12,6 +12,8 @@ class CaptureBinding(t.TypedDict):
     collection: CollectionSpec
     resourceConfig: dict
     resourcePath: t.List[str]
+    backfill: int
+    stateKey: str
 
 class CaptureSpec(t.TypedDict):
     name: str
