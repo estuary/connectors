@@ -141,7 +141,6 @@ func TestApplyChanges(t *testing.T) {
 	_, err = newSqlServerDriver().Apply(ctx, &pm.Request_Apply{
 		Materialization: &spec,
 		Version:         "",
-		DryRun:          false,
 	})
 	require.NoError(t, err)
 
