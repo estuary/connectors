@@ -169,8 +169,6 @@ class CaptureShim(Connector):
                 ]
             else:
                 logger.info(f"Stream {stream.name} does not have a primary key, using '/_meta/row_id' as the key.") 
-                if entry.replication_method == REPLICATION_INCREMENTAL:
-                    logger.warn(f"Stream {stream.name} is using {REPLICATION_INCREMENTAL} replication without a primary key. If this is not an append-only data source, updates to existing documents will be captured as inserts with new keys. Switch to {REPLICATION_FULL_TABLE} to fix this.")
                 
                 key = ["/_meta/row_id"]
                 row_id_type = Property("row_id", IntegerType, required=True)
