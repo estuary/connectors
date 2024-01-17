@@ -481,6 +481,7 @@ type binding struct {
 		stage     *stagedFile
 		mergeInto string
 		copyInto  string
+		mustMerge bool
 	}
 }
 
@@ -624,6 +625,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
+		if it.Exists {
+			b.store.mustMerge = true
+		}
+
 		if err := b.store.stage.start(it.Context(), d.db); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
@@ -655,10 +660,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, err
 		}
 
-		if b.target.DeltaUpdates {
-			queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
-		} else {
+		if b.store.mustMerge {
 			queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
+		} else {
+			queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
 		}
 
 		toDelete[b.target.Identifier] = []string{dir}
