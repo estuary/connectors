@@ -153,7 +153,6 @@ class CaptureShim(Connector):
 
             config: StreamResourceConfig = {
                 "stream": stream.name,
-                "namespace": stream.namespace,
                 "syncMode": sync_mode,
             }
             if stream.namespace:
