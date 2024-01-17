@@ -208,7 +208,6 @@ func applyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConf
 	req := &pm.Request_Apply{
 		Materialization: spec,
 		Version:         "someVersion",
-		DryRun:          false,
 	}
 
 	return req
