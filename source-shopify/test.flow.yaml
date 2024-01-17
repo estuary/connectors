@@ -7,6 +7,11 @@ captures:
       local:
         command:
           - python
+          # - "-m"
+          # - "debugpy"
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
           - "-m"
           - source-shopify
         config: connector_config.yaml
