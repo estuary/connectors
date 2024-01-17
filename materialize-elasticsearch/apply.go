@@ -57,16 +57,16 @@ func (e *elasticApplier) ReplaceResource(ctx context.Context, spec *pf.Materiali
 	}, nil
 }
 
-func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, applyParams boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	binding := spec.Bindings[bindingIndex]
 
 	// ElasticSearch only considers new projections, since index mappings are always nullable.
-	if len(applyParams.NewProjections) == 0 {
+	if len(bindingUpdate.NewProjections) == 0 {
 		return "", nil, nil
 	}
 
 	var actions []string
-	for _, newProjection := range applyParams.NewProjections {
+	for _, newProjection := range bindingUpdate.NewProjections {
 		prop := propForField(newProjection.Field, binding)
 		actions = append(actions, fmt.Sprintf(
 			"add mapping %q to index %q with type %q",
@@ -77,7 +77,7 @@ func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.Materializ
 	}
 
 	return strings.Join(actions, "\n"), func(ctx context.Context) error {
-		for _, newProjection := range applyParams.NewProjections {
+		for _, newProjection := range bindingUpdate.NewProjections {
 			prop := propForField(newProjection.Field, binding)
 			if err := e.client.addMappingToIndex(ctx, binding.ResourcePath[0], newProjection.Field, prop); err != nil {
 				return err
