@@ -210,19 +210,19 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 -- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
 
 {{ define "loadQuery" }}
-{{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
-	FROM {{ $.Table.Identifier }}
+{{ if $.Document -}}
+SELECT {{ $.Binding }}, {{ $.Identifier }}.{{ $.Document.Identifier }}
+	FROM {{ $.Identifier }}
 	JOIN (
-		SELECT {{ range $ind, $key := $.Table.Keys }}
+		SELECT {{ range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 		{{- end }}
-		FROM @flow_v1/%s
+		FROM %s
 	) AS r
-	ON {{ range $ind, $key := $.Table.Keys }}
+	ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
@@ -230,55 +230,55 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end }}
 
 {{ define "copyInto" }}
-COPY INTO {{ $.Table.Identifier }} (
-	{{ range $ind, $key := $.Table.Columns }}
+COPY INTO {{ $.Identifier }} (
+	{{ range $ind, $key := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier -}}
 	{{- end }}
 ) FROM (
-	SELECT {{ range $ind, $key := $.Table.Columns }}
+	SELECT {{ range $ind, $key := $.Columns }}
 	{{- if $ind }}, {{ end -}}
 	$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM @flow_v1/%s
+	FROM %s
 );
 {{ end }}
 
 
 {{ define "mergeInto" }}
-MERGE INTO {{ $.Table.Identifier }} AS l
+MERGE INTO {{ $.Identifier }} AS l
 USING (
-	SELECT {{ range $ind, $key := $.Table.Columns }}
+	SELECT {{ range $ind, $key := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM @flow_v1/%s
+	FROM %s
 ) AS r
-ON {{ range $ind, $key := $.Table.Keys }}
+ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
-{{- if $.Table.Document }}
-WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
+{{- if $.Document }}
+WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Document.Identifier }}) THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
-	UPDATE SET {{ range $ind, $key := $.Table.Values }}
+	UPDATE SET {{ range $ind, $key := $.Values }}
 	{{- if $ind }}, {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end -}}
-{{- if $.Table.Document -}}
-{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+{{- if $.Document -}}
+{{ if $.Values }}, {{ end }}l.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 {{- end }}
 WHEN NOT MATCHED THEN
 	INSERT (
-	{{- range $ind, $key := $.Table.Columns }}
+	{{- range $ind, $key := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier -}}
 	{{- end -}}
 )
 	VALUES (
-	{{- range $ind, $key := $.Table.Columns }}
+	{{- range $ind, $key := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		r.{{$key.Identifier -}}
 	{{- end -}}
@@ -290,7 +290,7 @@ EXECUTE IMMEDIATE $$
 DECLARE
     fenced_excp EXCEPTION (-20002, 'This instance was fenced off by another');
 BEGIN
-	UPDATE {{ Identifier $.TablePath }}
+	UPDATE {{ Identifier . }}
 		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
 		WHERE materialization = {{ Literal $.Materialization.String }}
 		AND   key_begin = {{ $.KeyBegin }}
@@ -325,11 +325,3 @@ FILE_FORMAT = (
 )
 COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
 ;`
-
-func RenderTableWithRandomUUIDTemplate(table sql.Table, randomUUID string, tpl *template.Template) (string, error) {
-	var w strings.Builder
-	if err := tpl.Execute(&w, &TableWithUUID{Table: &table, RandomUUID: randomUUID}); err != nil {
-		return "", err
-	}
-	return w.String(), nil
-}
