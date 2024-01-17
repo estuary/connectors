@@ -83,7 +83,7 @@ func (a *mongoApplier) ReplaceResource(ctx context.Context, spec *pf.Materializa
 	}, nil
 }
 
-func (e *mongoApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, applyParams boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (e *mongoApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	// No-op since nothing in particular is currently configured for created collection.
 	return "", nil, nil
 }

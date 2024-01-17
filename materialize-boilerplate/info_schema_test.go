@@ -102,12 +102,12 @@ func TestInfoSchema(t *testing.T) {
 		}
 
 		// Is in the selected fields.
-		got, err := is.InSelectedFields(nullableField.Name, fs)
+		got, err := is.inSelectedFields(nullableField.Name, fs)
 		require.NoError(t, err)
 		require.True(t, got)
 
 		// Isn't in the selected fields.
-		got, err = is.InSelectedFields(nonNullableField.Name, fs)
+		got, err = is.inSelectedFields(nonNullableField.Name, fs)
 		require.NoError(t, err)
 		require.False(t, got)
 
@@ -115,7 +115,7 @@ func TestInfoSchema(t *testing.T) {
 		fs = pf.FieldSelection{
 			Values: []string{untransform(nullableField.Name), untransform(nullableField.Name)},
 		}
-		got, err = is.InSelectedFields(nullableField.Name, fs)
+		got, err = is.inSelectedFields(nullableField.Name, fs)
 		require.Error(t, err)
 		require.False(t, got)
 	})
@@ -128,20 +128,20 @@ func TestInfoSchema(t *testing.T) {
 		}
 
 		// Projection exists.
-		proj, found, err := is.ExtractProjection(nullableField.Name, collection)
+		proj, found, err := is.extractProjection(nullableField.Name, collection)
 		require.NoError(t, err)
 		require.True(t, found)
 		require.Equal(t, p, proj)
 
 		// Projection doesn't exist.
-		proj, found, err = is.ExtractProjection(nonNullableField.Name, collection)
+		proj, found, err = is.extractProjection(nonNullableField.Name, collection)
 		require.NoError(t, err)
 		require.False(t, found)
 		require.Equal(t, pf.Projection{}, proj)
 
 		// Ambiguous case.
 		collection.Projections = append(collection.Projections, p)
-		proj, found, err = is.ExtractProjection(nullableField.Name, collection)
+		proj, found, err = is.extractProjection(nullableField.Name, collection)
 		require.Error(t, err)
 		require.False(t, found)
 		require.Equal(t, pf.Projection{}, proj)

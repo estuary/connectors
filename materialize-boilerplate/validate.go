@@ -127,7 +127,7 @@ func (v Validator) validateMatchesExistingBinding(
 	for _, f := range fields {
 		constraint := new(pm.Response_Validated_Constraint)
 
-		proposedProjection, inCollection, err := v.is.ExtractProjection(f.Name, boundCollection)
+		proposedProjection, inCollection, err := v.is.extractProjection(f.Name, boundCollection)
 		if err != nil {
 			return nil, fmt.Errorf("extracting projection for existing endpoint field %q: %w", f.Name, err)
 		}
@@ -210,11 +210,10 @@ func (v Validator) validateMatchesExistingBinding(
 			c := v.c.NewConstraints(&p, deltaUpdates)
 
 			// Continue to recommended any optional fields that were included in a prior spec's
-			// field selection, even if the materialized field no longer exists in the destination.
-			// This is usually functionally the same as validating the projection as a new
-			// constraint since if it was recommended before it will be recommended again, but may
-			// be useful to preserve legacy field selections if the definition of what the
-			// recommended fields are changes for a materialization.
+			// field selection, even if the materialized field is not reported to exist in the
+			// destination. This is primarily to produce more useful constraints for systems that do
+			// not have "columns" that can be inspected, but still support field selection (ex:
+			// materialize-dynamodb), so that selected fields can continue to be recommended.
 			if existing != nil &&
 				c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
 				slices.Contains(existing.FieldSelection.AllFields(), p.Field) {

@@ -109,7 +109,7 @@ type Endpoint struct {
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
-	// for changing many tables in a single publication.
+	// for changing many tables in a single apply.
 	ConcurrentApply bool
 }
 
