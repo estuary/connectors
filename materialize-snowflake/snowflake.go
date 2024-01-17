@@ -289,7 +289,7 @@ func newTransactor(
 	var cp checkpoint
 	if open.StateJson != nil {
 		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
-			return nil, fmt.Errorf("parsing driver config: %w", err)
+			return nil, fmt.Errorf("parsing state: %w", err)
 		}
 	}
 
