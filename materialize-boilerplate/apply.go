@@ -41,7 +41,7 @@ type BindingUpdate struct {
 
 // Applier represents the capabilities needed for an endpoint to apply changes to materialized
 // resources based on binding changes. Many of these functions should return an ActionApplyFn, which
-// will be executed only if the `Apply` is not a dry-run.
+// may be executed concurrently.
 type Applier interface {
 	// CreateMetaTables is called to create the tables (or the equivalent endpoint concept) that
 	// store a persisted spec and any other metadata the materialization needs to persist.
@@ -187,28 +187,24 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 	}
 
-	// TODO(whb): DryRun as a concept will no longer exist after async applies are active in the
-	// runtime.
-	if !req.DryRun {
-		if concurrent {
-			group, groupCtx := errgroup.WithContext(ctx)
-			group.SetLimit(maxConcurrentUpdateActions)
+	if concurrent {
+		group, groupCtx := errgroup.WithContext(ctx)
+		group.SetLimit(maxConcurrentUpdateActions)
 
-			for _, a := range actions {
-				a := a
-				group.Go(func() error {
-					return a(groupCtx)
-				})
-			}
+		for _, a := range actions {
+			a := a
+			group.Go(func() error {
+				return a(groupCtx)
+			})
+		}
 
-			if err := group.Wait(); err != nil {
+		if err := group.Wait(); err != nil {
+			return nil, err
+		}
+	} else {
+		for _, a := range actions {
+			if err := a(ctx); err != nil {
 				return nil, err
-			}
-		} else {
-			for _, a := range actions {
-				if err := a(ctx); err != nil {
-					return nil, err
-				}
 			}
 		}
 	}
@@ -222,10 +218,8 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 	// not in the future as we transition to runtime provided specs for apply.
 	if action != nil {
 		actionDescriptions = append(actionDescriptions, desc)
-		if !req.DryRun { // Don't actually update the spec if its a dry run.
-			if err := action(ctx); err != nil {
-				return nil, fmt.Errorf("updating persisted specification: %w", err)
-			}
+		if err := action(ctx); err != nil {
+			return nil, fmt.Errorf("updating persisted specification: %w", err)
 		}
 	}
 

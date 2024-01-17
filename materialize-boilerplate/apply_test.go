@@ -121,32 +121,17 @@ func TestApply(t *testing.T) {
 
 			req := &pm.Request_Apply{Materialization: tt.newSpec, Version: "aVersion"}
 
-			// Not a dry run, not concurrent.
-			req.DryRun = false
+			// Not concurrent.
 			got, err := ApplyChanges(ctx, req, app, is, false)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, app.getResults())
 			actions := got.ActionDescription
 
-			// Dry run, not concurrent.
-			req.DryRun = true
-			got, err = ApplyChanges(ctx, req, app, is, false)
-			require.NoError(t, err)
-			require.Equal(t, testResults{}, app.getResults())
-			require.Equal(t, actions, got.ActionDescription)
-
-			// Not a dry run, concurrent.
-			req.DryRun = false
+			// Concurrent.
 			got, err = ApplyChanges(ctx, req, app, is, true)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, app.getResults())
-			actions = got.ActionDescription
 
-			// Dry run, concurrent
-			req.DryRun = true
-			got, err = ApplyChanges(ctx, req, app, is, true)
-			require.NoError(t, err)
-			require.Equal(t, testResults{}, app.getResults())
 			require.Equal(t, actions, got.ActionDescription)
 
 			if idx > 0 {
