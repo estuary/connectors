@@ -299,7 +299,7 @@ func newTransactor(
 		}
 	}
 
-	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
+	if err = d.applyCheckpoint(ctx, cp); err != nil {
 		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
@@ -322,8 +322,7 @@ type binding struct {
 }
 
 type TableWithUUID struct {
-	Table      *sql.Table
-	RandomUUID string
+	Table *sql.Table
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
@@ -334,13 +333,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	d.load.stage = newStagedFile(os.TempDir())
 	d.store.stage = newStagedFile(os.TempDir())
 
-	if d.load.loadQuery, err = RenderTableWithRandomUUIDTemplate(target, d.load.stage.uuid, t.templates["loadQuery"]); err != nil {
+	if d.load.loadQuery, err = sql.RenderTableTemplate(target, t.templates["loadQuery"]); err != nil {
 		return fmt.Errorf("loadQuery template: %w", err)
 	}
-	if d.store.copyInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["copyInto"]); err != nil {
+	if d.store.copyInto, err = sql.RenderTableTemplate(target, t.templates["copyInto"]); err != nil {
 		return fmt.Errorf("copyInto template: %w", err)
 	}
-	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["mergeInto"]); err != nil {
+	if d.store.mergeInto, err = sql.RenderTableTemplate(target, t.templates["mergeInto"]); err != nil {
 		return fmt.Errorf("mergeInto template: %w", err)
 	}
 
@@ -378,7 +377,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			subqueries[i] = renderWithDir(b.load.loadQuery, dir)
-			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
+			toDelete = append(toDelete, dir)
 		}
 	}
 	defer d.deleteFiles(ctx, toDelete)
@@ -493,21 +492,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, err
 		}
 
-		if v, ok := queries[b.target.Identifier]; ok {
-			if b.target.DeltaUpdates {
-				queries[b.target.Identifier] = append(v, renderWithDir(b.store.copyInto, dir))
-			} else {
-				queries[b.target.Identifier] = append(v, renderWithDir(b.store.mergeInto, dir))
-			}
+		if b.target.DeltaUpdates {
+			queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
 		} else {
-			if b.target.DeltaUpdates {
-				queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
-			} else {
-				queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
-			}
+			queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
 		}
 
-		toDelete[b.target.Identifier] = []string{fmt.Sprintf("@flow_v1/%s", dir)}
+		toDelete[b.target.Identifier] = []string{dir}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
@@ -520,7 +511,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var commitOp = m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			select {
 			case <-runtimeAckCh:
-				if err := d.applyCheckpoint(ctx, cp, false); err != nil {
+				if err := d.applyCheckpoint(ctx, cp); err != nil {
 					return nil, err
 				}
 
@@ -556,7 +547,7 @@ func renderWithDir(tpl string, dir string) string {
 }
 
 // applyCheckpoint merges data from temporary table to main table
-func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
+func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
@@ -568,7 +559,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	for table, queries := range cp.Queries {
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if recovery && !d.hasTableBinding(table) {
+		if !d.hasTableBinding(table) {
 			continue
 		}
 
@@ -590,7 +581,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	for table, toDelete := range cp.ToDelete {
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if recovery && !d.hasTableBinding(table) {
+		if !d.hasTableBinding(table) {
 			continue
 		}
 
