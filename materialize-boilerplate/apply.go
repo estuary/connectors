@@ -22,8 +22,9 @@ type ActionApplyFn func(context.Context) error
 // BindingUpdate is a distilled representation of the typical kinds of changes a destination system
 // will care about in response to a new binding or change to an existing binding.
 type BindingUpdate struct {
-	// NewProjections is the projections of a proposed materialization spec that are included in the
-	// field selection but there are no fields in the materialized resource for.
+	// NewProjections are selected Projections which must be added to the materialized resource
+	// because they do not already exist. The definition for the materialized field must be computed
+	// from the Projection.
 	NewProjections []pf.Projection
 
 	// NewlyNullableFields is the fields in the endpoint that should now be made nullable, that
@@ -57,8 +58,10 @@ type Applier interface {
 	CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, ActionApplyFn, error)
 
 	// ReplaceResource replaces a resource in the endpoint so that it can start materializing from
-	// the beginning. It may be called even if the resource doesn't already exist. This is usually
-	// carried out with a "CREATE OR REPLACE ..." type of action.
+	// the beginning. It will only be called if the materialized resource exists in the destination
+	// system, the resource exists in the prior spec, and the backfill counter of the new spec is
+	// greater than the prior spec. It is usually carried out with a "CREATE OR REPLACE ..." sort of
+	// action.
 	ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, ActionApplyFn, error)
 
 	// UpdateResource updates an existing resource. The `BindingUpdate` contains specific
@@ -67,7 +70,7 @@ type Applier interface {
 	// the destination. It's called for every binding, although it may not have any `BindingUpdate`
 	// parameters. This is to allow materializations to perform additional specific actions on
 	// binding changes that are not covered by the general cases of the `BindingUpdate` parameters.
-	UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, applyParams BindingUpdate) (string, ActionApplyFn, error)
+	UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate BindingUpdate) (string, ActionApplyFn, error)
 }
 
 // ApplyChanges applies changes to an endpoint. It computes these changes from the apply request and
@@ -135,16 +138,16 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 				NewlyDeltaUpdates: existingBinding != nil && !existingBinding.DeltaUpdates && binding.DeltaUpdates,
 			}
 
-			for _, proposedField := range binding.FieldSelection.AllFields() {
-				proposedProjection := *binding.Collection.GetProjection(proposedField)
+			for _, field := range binding.FieldSelection.AllFields() {
+				projection := *binding.Collection.GetProjection(field)
 
-				if is.HasField(binding.ResourcePath, proposedField) {
-					existingField, err := is.GetField(binding.ResourcePath, proposedField)
+				if is.HasField(binding.ResourcePath, field) {
+					existingField, err := is.GetField(binding.ResourcePath, field)
 					if err != nil {
-						return nil, fmt.Errorf("getting existing field information for field %q of resource %q: %w", proposedField, binding.ResourcePath, err)
+						return nil, fmt.Errorf("getting existing field information for field %q of resource %q: %w", field, binding.ResourcePath, err)
 					}
 
-					newRequired := proposedProjection.Inference.Exists == pf.Inference_MUST && !slices.Contains(proposedProjection.Inference.Types, pf.JsonTypeNull)
+					newRequired := projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
 					if !existingField.Nullable && !newRequired {
 						// The existing field is not nullable, but the proposed projection for the
 						// field is. The existing field will need to be modified to be made
@@ -154,7 +157,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 				} else {
 					// Field does not exist in the materialized resource, so this is a new
 					// projection to add to it.
-					params.NewProjections = append(params.NewProjections, proposedProjection)
+					params.NewProjections = append(params.NewProjections, projection)
 				}
 			}
 
@@ -166,7 +169,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 			}
 
 			for _, existingField := range existingFields {
-				inFieldSelection, err := is.InSelectedFields(existingField.Name, binding.FieldSelection)
+				inFieldSelection, err := is.inSelectedFields(existingField.Name, binding.FieldSelection)
 				if err != nil {
 					return nil, fmt.Errorf("determining if existing field %q is in field selection for resource %q: %w", existingField.Name, binding.ResourcePath, err)
 				}

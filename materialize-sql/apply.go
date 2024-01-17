@@ -212,7 +212,7 @@ func (a *sqlApplier) ReplaceResource(ctx context.Context, spec *pf.Materializati
 	})
 }
 
-func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, applyParams boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	table, err := getTable(a.endpoint, spec, bindingIndex)
 	if err != nil {
 		return "", nil, err
@@ -229,10 +229,10 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 
 	alter := TableAlter{
 		Table:        table,
-		DropNotNulls: applyParams.NewlyNullableFields,
+		DropNotNulls: bindingUpdate.NewlyNullableFields,
 	}
 
-	for _, newProjection := range applyParams.NewProjections {
+	for _, newProjection := range bindingUpdate.NewProjections {
 		col, err := getColumn(newProjection.Field)
 		if err != nil {
 			return "", nil, err

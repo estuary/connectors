@@ -33,10 +33,11 @@ type TranslateFieldFn func(string) string
 // InfoSchema contains the information about materialized collections and fields that exist within
 // the endpoint.
 type InfoSchema struct {
-	// resources is a mapping of string keys representing locations within the destination system to
-	// EndpointFields. The string keys are as-reported by the endpoint, so they are necessarily
-	// "post-translation". As a convention, if the resource has multiple components (like a schema &
-	// table name), these components are joined with dots.
+	// resources is a mapping of string keys representing locations of materialized fields within
+	// the destination system to EndpointFields with their metadata. It is populated by calls to
+	// (*InfoSchema).PushField, which adds materialized fields to InfoSchema as reported by the
+	// endpoint. As a convention, if the location has multiple components (like a schema & table
+	// name), these components are joined with dots.
 	resources      map[string][]EndpointField
 	locatePath     LocatePathFn
 	translateField TranslateFieldFn
@@ -110,6 +111,13 @@ func (i *InfoSchema) HasField(resourcePath []string, fieldName string) bool {
 	return false
 }
 
+// HasResource reports whether the Flow resource path exists in the InfoSchema.
+func (i *InfoSchema) HasResource(resourcePath []string) bool {
+	rk := joinPath(i.locatePath(resourcePath))
+	_, ok := i.resources[rk]
+	return ok
+}
+
 // FieldsForResource returns all of the EndpointFields under the given Flow resource path.
 func (i *InfoSchema) FieldsForResource(resourcePath []string) ([]EndpointField, error) {
 	rk := joinPath(i.locatePath(resourcePath))
@@ -121,26 +129,19 @@ func (i *InfoSchema) FieldsForResource(resourcePath []string) ([]EndpointField, 
 	return i.resources[rk], nil
 }
 
-// HasResource reports whether the Flow resource path exists in the InfoSchema.
-func (i *InfoSchema) HasResource(resourcePath []string) bool {
-	rk := joinPath(i.locatePath(resourcePath))
-	_, ok := i.resources[rk]
-	return ok
-}
-
-// ExtractProjection finds the projection in a Flow collection spec that must correspond to a field
+// extractProjection finds the projection in a Flow collection spec that must correspond to a field
 // reported by the endpoint. Fields in the collection spec must have the same one-way translation
 // applied to them that a field does when materializing it in order to do this lookup.
-func (i *InfoSchema) ExtractProjection(efn string, collection pf.CollectionSpec) (pf.Projection, bool, error) {
+func (i *InfoSchema) extractProjection(endpointFieldName string, collection pf.CollectionSpec) (pf.Projection, bool, error) {
 	var found bool
 	var out pf.Projection
 
 	for idx := range collection.Projections {
-		matches := i.translateField(collection.Projections[idx].Field) == efn
+		matches := i.translateField(collection.Projections[idx].Field) == endpointFieldName
 		if found && matches {
 			// This should never happen since the standard constraints from `Validator` forbid it,
 			// but I'm leaving it here as a sanity check just in case.
-			return pf.Projection{}, false, fmt.Errorf("ambiguous endpoint field name when looking for projection %q", efn)
+			return pf.Projection{}, false, fmt.Errorf("ambiguous endpoint field name when looking for projection %q", endpointFieldName)
 		} else if matches {
 			found = true
 			out = collection.Projections[idx]
@@ -150,18 +151,18 @@ func (i *InfoSchema) ExtractProjection(efn string, collection pf.CollectionSpec)
 	return out, found, nil
 }
 
-// InSelectedFields returns true if the provided endpoint field name (as reported by the endpoint)
+// inSelectedFields returns true if the provided endpoint field name (as reported by the endpoint)
 // exists in the field selection for a materialization. It does a similar translation of fields from
 // the field selection as ExtractProjection in order to do this matching.
-func (i *InfoSchema) InSelectedFields(efn string, fs pf.FieldSelection) (bool, error) {
+func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelection) (bool, error) {
 	var found bool
 
 	for _, f := range fs.AllFields() {
-		matches := i.translateField(f) == efn
+		matches := i.translateField(f) == endpointFieldName
 		if found && matches {
 			// This should never happen since the standard constraints from `Validator` forbid it,
 			// but I'm leaving it here as a sanity check just in case.
-			return false, fmt.Errorf("ambiguous endpoint field name when looking for selected field %q", efn)
+			return false, fmt.Errorf("ambiguous endpoint field name when looking for selected field %q", endpointFieldName)
 		} else if matches {
 			found = true
 		}
