@@ -74,7 +74,6 @@ jobs:
         connector:
           - source-alpaca
           - source-bigquery-batch
-          - source-criteo
           - source-dynamodb
           - source-firestore
           - source-gcs
@@ -91,7 +90,6 @@ jobs:
           - source-postgres-batch
           - source-s3
           - source-sftp
-          - source-shopify
           - source-sqlserver
           - source-test
           - materialize-bigquery
