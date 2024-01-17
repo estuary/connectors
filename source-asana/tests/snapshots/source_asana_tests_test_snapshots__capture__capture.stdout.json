@@ -216,11 +216,11 @@
         "gid": "1205846102972015"
       },
       "gid": "1205846058555984",
-      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 2",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 2, 2023",
       "is_editable": false,
       "resource_subtype": "due_date_changed",
       "resource_type": "story",
-      "text": "David Yaffe changed the due date to Nov 2",
+      "text": "David Yaffe changed the due date to Nov 2, 2023",
       "type": "system",
       "ts": "redacted-timestamp"
     }
@@ -236,11 +236,11 @@
         "gid": "1205846102972015"
       },
       "gid": "1205846058555985",
-      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 3",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 3, 2023",
       "is_editable": false,
       "resource_subtype": "due_date_changed",
       "resource_type": "story",
-      "text": "David Yaffe changed the due date to Nov 3",
+      "text": "David Yaffe changed the due date to Nov 3, 2023",
       "type": "system",
       "ts": "redacted-timestamp"
     }
@@ -256,11 +256,11 @@
         "gid": "1205846102972015"
       },
       "gid": "1205846058555986",
-      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 6",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 6, 2023",
       "is_editable": false,
       "resource_subtype": "due_date_changed",
       "resource_type": "story",
-      "text": "David Yaffe changed the due date to Nov 6",
+      "text": "David Yaffe changed the due date to Nov 6, 2023",
       "type": "system",
       "ts": "redacted-timestamp"
     }

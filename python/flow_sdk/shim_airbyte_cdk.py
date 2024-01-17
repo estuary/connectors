@@ -17,6 +17,7 @@ from airbyte_protocol.models import (
 )
 
 from .capture import Connector, request, response, Response
+from .flow import CaptureBinding
 from . import flow, ValidateError, logger
 from .logger import init_logger
 
@@ -29,7 +30,10 @@ logging.getLogger("airbyte").setLevel(logger.level)
 
 DOCS_URL = os.getenv("DOCS_URL")
 
-
+@dataclass
+class StreamState:
+    state: AirbyteStateMessage
+    rowId: int
 """
 Airbyte doesn't appear to reduce state like we do. As a result,
 the Airbyte CDK is expecting its state input to look like a list of
@@ -39,31 +43,47 @@ just give Airbyte a list of all of the latest state messages on boot.
 """
 @dataclass
 class State:
-    stream_state: t.Optional[t.Dict[str, AirbyteStateMessage]] = None
-    global_state: t.Optional[AirbyteStateMessage] = None
+    bindingStateV1: t.Optional[t.Dict[str, StreamState]] = None
 
-    def handle_message(self, msg: AirbyteStateMessage):
-        if msg.type == AirbyteStateType.STREAM:
-            if msg.stream == None:
-                raise Exception(
-                    "Got a STREAM-specific state message with no stream-specific state"
-                )
-            if not self.stream_state:
-                self.stream_state = {}
-            self.stream_state[
-                f"{msg.stream.stream_descriptor.name}-{msg.stream.stream_descriptor.namespace}"
-            ] = msg
-        elif msg.type == AirbyteStateType.GLOBAL:
-            self.global_state = msg
-        elif msg.type == AirbyteStateType.LEGACY or msg.type is None:
-            raise Exception("Airbyte LEGACY state is not supported")
+    def handle_message(self, msg: AirbyteStateMessage, state_key: str):
+        if msg.stream == None:
+            raise Exception(
+                "Got a STREAM-specific state message with no stream-specific state"
+            )
+        if not self.bindingStateV1:
+            self.bindingStateV1 = {}
+        if not state_key in self.bindingStateV1:
+            self.bindingStateV1[state_key] = StreamState()
+        self.bindingStateV1[state_key].state = msg
 
     def to_airbyte_input(self):
-        if self.global_state:
-            return [self.global_state]
-        elif self.stream_state:
-            return [msg for k, msg in self.stream_state.items()]
+        return [streamState.state for k, streamState in self.bindingStateV1.items()]
+    
+    def to_flow_output(self, index: dict[t.Tuple[str | None, str], t.List[int]], bindings: t.List[CaptureBinding]):
+        for i, binding in enumerate(bindings):
+            if binding["stateKey"] in self.bindingStateV1:
+                namespace = binding["resourceConfig"].get("namespace",None)
+                stream = binding["resourceConfig"]["stream"]
+                rowId = index.get((namespace, stream), [0,1])[1]
+                self.bindingStateV1[binding["stateKey"]].rowId = rowId
 
+        return {
+            "bindingStateV1": self.bindingStateV1
+        }
+
+    @staticmethod
+    def from_flow_output(state: t.Dict[str, t.Any], bindings: t.List[CaptureBinding]):
+        state = State(**{
+            "bindingStateV1": state.get("bindingStateV1", {})
+        })
+
+        index: dict[t.Tuple[str | None, str], t.List[int]] = {}
+        for i, binding in enumerate(bindings):
+            if binding["stateKey"] in state.bindingStateV1:
+                namespace = binding["resourceConfig"].get("namespace",None)
+                stream = binding["resourceConfig"]["stream"]
+                index[(namespace, stream)] = state.bindingStateV1[binding["stateKey"]].rowId
+        return (state, index)
 
 class CaptureShim(Connector):
     delegate: Source
@@ -108,6 +128,7 @@ class CaptureShim(Connector):
 
             config: StreamResourceConfig = {
                 "stream": stream.name,
+                "namespace": stream.namespace,
                 "syncMode": sync_mode,
             }
             if stream.namespace:
@@ -176,16 +197,18 @@ class CaptureShim(Connector):
 
     def open(self, open: request.Open, emit: t.Callable[[Response], None]) -> None:
         streams: t.List[ConfiguredAirbyteStream] = []
+        bindings = open["capture"]["bindings"]
+        
+        # Index Key: (namespace, stream).
+        # Indx Value: [binding index, next row_id].
+        state, index = State.from_flow_output(open["state"] or {}, bindings)
 
-        # Key: (namespace, stream).
-        # Value: [binding index, next row_id].
-        index: dict[t.Tuple[str | None, str], t.List[int]] = {}
-
-        for i, binding in enumerate(open["capture"]["bindings"]):
+        for i, binding in enumerate(bindings):
             rc = t.cast(StreamResourceConfig, binding["resourceConfig"])
 
-            # TODO(johnny): Re-hydrate next row_id from open["state"].
-            index[(rc.get("namespace"), rc["stream"])] = [i, 1]
+            index_key = (rc.get("namespace"), rc["stream"])
+            if not index_key in index:
+                index[index_key] = [i, 1]
 
             streams.append(
                 ConfiguredAirbyteStream(
@@ -203,7 +226,6 @@ class CaptureShim(Connector):
 
         catalog = ConfiguredAirbyteCatalog(streams=streams)
         config = open["capture"]["config"]
-        state = State(**(open["state"] or {}))
 
         emit(Response(opened=response.Opened(explicitAcknowledgements=False)))
 
@@ -223,14 +245,23 @@ class CaptureShim(Connector):
 
             elif state_msg := message.state:
                 state_msg = t.cast(AirbyteStateMessage, state_msg)
+
+                if state_msg.type != AirbyteStateType.STREAM:
+                    raise Exception(
+                        f"Unsupported Airbyte state type {state_msg.type}"
+                    ) 
+
                 logger.info(f"Got a state message: {str(state_msg)}")
-                # TODO(johnny): mix in next_row_id
-                state.handle_message(state_msg)
+
+                binding_id = index[(state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name)]
+                binding = bindings[binding_id]
+
+                state.handle_message(state_msg, binding["stateKey"])
                 emit(
                     Response(
                         checkpoint=response.Checkpoint(
                             state=flow.ConnectorState(
-                                updated=asdict(state), mergePatch=False
+                                updated=state.to_flow_output(index, bindings), mergePatch=False
                             )
                         )
                     )
@@ -290,7 +321,7 @@ class CaptureShim(Connector):
         emit(
             Response(
                 checkpoint=response.Checkpoint(
-                    state=flow.ConnectorState(updated=asdict(state), mergePatch=False)
+                    state=flow.ConnectorState(updated=state.to_flow_output(index, bindings), mergePatch=False)
                 )
             )
         )
