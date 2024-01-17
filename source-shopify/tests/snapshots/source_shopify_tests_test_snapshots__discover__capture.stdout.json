@@ -137,9 +137,25 @@
             "string",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -392,9 +408,25 @@
             "string",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -607,9 +639,25 @@
         },
         "requires_shipping": {
           "type": "boolean"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -702,9 +750,25 @@
             "string",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -1031,9 +1095,25 @@
             "string",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -1243,9 +1323,25 @@
             "string",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -1891,9 +1987,25 @@
             "object",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
