@@ -220,30 +220,30 @@ func (a *testApplier) ReplaceResource(ctx context.Context, spec *pf.Materializat
 	}, nil
 }
 
-func (a *testApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, applyParams BindingUpdate) (string, ActionApplyFn, error) {
+func (a *testApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate BindingUpdate) (string, ActionApplyFn, error) {
 	binding := spec.Bindings[bindingIndex]
 
-	if len(applyParams.NewProjections) == 0 &&
-		len(applyParams.NewlyNullableFields) == 0 &&
-		!applyParams.NewlyDeltaUpdates {
+	if len(bindingUpdate.NewProjections) == 0 &&
+		len(bindingUpdate.NewlyNullableFields) == 0 &&
+		!bindingUpdate.NewlyDeltaUpdates {
 		return "", nil, nil
 	}
 
 	action := fmt.Sprintf(
 		"update resource for collection %q [new projections: %d, newly nullable fields: %d, newly delta updates: %t]",
 		binding.Collection.Name.String(),
-		len(applyParams.NewProjections),
-		len(applyParams.NewlyNullableFields),
-		applyParams.NewlyDeltaUpdates,
+		len(bindingUpdate.NewProjections),
+		len(bindingUpdate.NewlyNullableFields),
+		bindingUpdate.NewlyDeltaUpdates,
 	)
 
 	return action, func(ctx context.Context) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 
-		a.results.addedProjections += len(applyParams.NewProjections)
-		a.results.nullabledProjections += len(applyParams.NewlyNullableFields)
-		a.results.changedToDeltaUpdates = applyParams.NewlyDeltaUpdates
+		a.results.addedProjections += len(bindingUpdate.NewProjections)
+		a.results.nullabledProjections += len(bindingUpdate.NewlyNullableFields)
+		a.results.changedToDeltaUpdates = bindingUpdate.NewlyDeltaUpdates
 
 		return nil
 	}, nil

@@ -93,7 +93,7 @@ func (e *ddbApplier) ReplaceResource(ctx context.Context, spec *pf.Materializati
 	}, nil
 }
 
-func (e *ddbApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, applyParams boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (e *ddbApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	// No-op since DynamoDB only applies a schema to the key columns, and Flow doesn't allow you to
 	// change the key of an established collection, and the Validation constraints don't allow
 	// changing the type of a key field in a way that would change its materialized type.
