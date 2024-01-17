@@ -330,6 +330,11 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		if err := t.maybeUpload(); err != nil {
 			return nil, pf.FinishedOperation(err)
 		}
+
+		if len(t.driverCheckpointJSON) == 0 {
+			return nil, pf.FinishedOperation(err)
+		}
+
 		return &pf.ConnectorState{UpdatedJson: t.driverCheckpointJSON},
 			pf.FinishedOperation(err)
 	}, nil
