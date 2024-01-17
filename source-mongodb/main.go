@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -103,6 +104,15 @@ func (c *config) ToURI() string {
 type driver struct{}
 
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
+	// Mongodb atlas offers an "online-archive" service, which does not work
+	// with this connector because it doesn't support change streams. Their UI
+	// makes it really easy to grab the wrong URL, so this check exists to provide
+	// a more helpful error message in the event that someone tries to use the
+	// online-archive url instead of the regular mongodb url.
+	if strings.Contains(cfg.Address, "atlas-online-archive") {
+		return nil, fmt.Errorf("The provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
 	// Create a new client and connect to the server
 	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd", "zlib", "snappy"})
 	client, err := mongo.Connect(ctx, opts)
