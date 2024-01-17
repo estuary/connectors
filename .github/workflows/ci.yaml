@@ -73,7 +73,6 @@ jobs:
       matrix:
         connector:
           - source-alpaca
-          - source-asana
           - source-bigquery-batch
           - source-criteo
           - source-dynamodb
