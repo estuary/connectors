@@ -55,7 +55,7 @@ func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored
 			// Always skip the delay on the first round of transactions, which is often an
 			// artificially small transaction of the immediately-ready documents.
 			log.Debug("will not delay commit acknowledgement of the first transaction")
-			return nil, nil
+			return state, nil
 		}
 
 		remainingDelay := delay - time.Since(started)
@@ -69,7 +69,7 @@ func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored
 
 		if stored > storeThreshold || remainingDelay <= 0 {
 			logEntry.Debug("will acknowledge commit without further delay")
-			return nil, nil
+			return state, nil
 		}
 
 		logEntry.Debug("delaying before acknowledging commit")
