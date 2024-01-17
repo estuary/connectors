@@ -3,6 +3,7 @@
     "recommendedName": "test_base/pizzas/tblY71QcPfB7SjY1f",
     "resourceConfig": {
       "stream": "test_base/pizzas/tblY71QcPfB7SjY1f",
+      "namespace": null,
       "syncMode": "full_refresh"
     },
     "documentSchema": {

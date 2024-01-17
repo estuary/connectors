@@ -108,7 +108,7 @@
     },
     "documentationUrl": "https://docs.estuary.dev",
     "resourcePathPointers": [
-      "/stream"
+      "/tap_stream_id"
     ]
   }
 ]
