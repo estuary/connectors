@@ -87,9 +87,25 @@
             }
           },
           "type": "object"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -182,9 +198,25 @@
             "object",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -568,9 +600,25 @@
             "object",
             "null"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -692,6 +740,19 @@
             "objective",
             "spendLimit"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "title": "Campaign",
@@ -700,7 +761,8 @@
       "required": [
         "id",
         "type",
-        "attributes"
+        "attributes",
+        "_meta"
       ],
       "x-infer-schema": true
     },
@@ -848,9 +910,25 @@
         },
         "nbMatchesEmail": {
           "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -1015,9 +1093,25 @@
             }
           },
           "type": "object"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -1218,9 +1312,25 @@
         },
         "enabled": {
           "type": "boolean"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
@@ -1361,9 +1471,25 @@
         },
         "CampaignId": {
           "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": [
+                "integer"
+              ]
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "x-infer-schema": true
     },
     "key": [
