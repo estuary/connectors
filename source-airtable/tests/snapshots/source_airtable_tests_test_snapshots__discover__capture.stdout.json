@@ -55,6 +55,9 @@
           ]
         }
       },
+      "required": [
+        "_airtable_id"
+      ],
       "x-infer-schema": true
     },
     "key": [
