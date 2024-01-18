@@ -18,6 +18,7 @@
             {
               "type": "object",
               "title": "Authenticate via Asana (Oauth)",
+              "x-oauth2-provider": "asana",
               "required": [
                 "client_id",
                 "client_secret",
