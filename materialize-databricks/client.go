@@ -200,7 +200,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
 	// process however we don't want to wait 5 minutes as that does not create a good UX for the
 	// user in the UI
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	if err := c.db.PingContext(ctx); err != nil {
