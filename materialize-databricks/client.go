@@ -64,7 +64,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	schemas = slices.Compact(schemas)
 
 	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
-		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
 		from system.information_schema.columns
 		where table_catalog = %s
 		and table_schema in (%s);
@@ -84,11 +84,12 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		IsNullable             string
 		DataType               string
 		CharacterMaximumLength stdsql.NullInt64
+		ColumnDefault          stdsql.NullString
 	}
 
 	for rows.Next() {
 		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
+		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
 			return nil, fmt.Errorf("scanning column row: %w", err)
 		}
 
@@ -97,6 +98,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 			Type:               c.DataType,
 			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
+			HasDefault:         c.ColumnDefault.Valid,
 		}, c.TableSchema, c.TableName)
 	}
 

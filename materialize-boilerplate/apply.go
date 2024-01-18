@@ -148,10 +148,10 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 					}
 
 					newRequired := projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
-					if !existingField.Nullable && !newRequired {
-						// The existing field is not nullable, but the proposed projection for the
-						// field is. The existing field will need to be modified to be made
-						// nullable.
+					if !existingField.Nullable && !newRequired && !existingField.HasDefault {
+						// The existing field is not nullable and does not have a default value, but
+						// the proposed projection for the field is nullable. The existing field
+						// will need to be modified to be made nullable.
 						params.NewlyNullableFields = append(params.NewlyNullableFields, existingField)
 					}
 				} else {
