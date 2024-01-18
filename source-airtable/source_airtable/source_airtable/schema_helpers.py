@@ -87,7 +87,8 @@ class SchemaHelpers:
     @staticmethod
     def get_json_schema(table: Dict[str, Any]) -> Dict[str, str]:
         properties: Dict = {
-            "_airtable_id": SchemaTypes.string,
+            # This is primary key, shouldn't be null
+            "_airtable_id": {"type": "string"},
             "_airtable_created_time": SchemaTypes.string,
             "_airtable_table_name": SchemaTypes.string,
         }
