@@ -16,6 +16,7 @@ type EndpointField struct {
 	Nullable           bool
 	Type               string
 	CharacterMaxLength int
+	HasDefault         bool
 }
 
 // LocatePathFn takes a Flow resource path and outputs an equal-length string slice containing
