@@ -24,7 +24,7 @@ require (
 	github.com/databricks/databricks-sdk-go v0.24.0
 	github.com/databricks/databricks-sql-go v1.5.1
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.3.10-0.20231128155715-1bf50ba62135
+	github.com/estuary/flow v0.3.12-0.20240117154226-fc3f40ac5285
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/go-sql-driver/mysql v1.6.0
@@ -54,7 +54,7 @@ require (
 	github.com/tidwall/gjson v1.16.0
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
-	go.gazette.dev/core v0.89.1-0.20231121115006-0fa83a6cc072
+	go.gazette.dev/core v0.89.1-0.20231214220647-b3bd8e97cfbc
 	go.mongodb.org/mongo-driver v1.12.1
 	golang.org/x/crypto v0.14.0
 	golang.org/x/oauth2 v0.13.0
@@ -174,7 +174,6 @@ require (
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
-	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -189,7 +188,6 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
