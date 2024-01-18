@@ -13,6 +13,7 @@
           {
             "type": "object",
             "title": "OAuth2.0",
+            "x-oauth2-provider": "airtable",
             "required": ["client_id", "client_secret", "refresh_token"],
             "properties": {
               "auth_method": {
