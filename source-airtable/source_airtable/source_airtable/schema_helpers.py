@@ -132,6 +132,7 @@ class SchemaHelpers:
             "type": "object",
             "additionalProperties": True,
             "properties": properties,
+            "required": ["_airtable_id"]
         }
 
         return json_schema
