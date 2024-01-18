@@ -61,7 +61,7 @@
       "x-infer-schema": true
     },
     "key": [
-      "/_meta/row_id"
+      "/_airtable_id"
     ]
   }
 ]
