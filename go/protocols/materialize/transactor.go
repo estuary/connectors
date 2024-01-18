@@ -40,6 +40,20 @@ type Transactor interface {
 	// no-op -- for example, as in an at-least-once materialization that
 	// doesn't use a ConnectorState checkpoint.
 	Store(*StoreIterator) (StartCommitFunc, error)
+
+	// Acknowledge the commit of a completed transaction.
+	// Acknowledge is run after both a) request.Acknowledge has been received from the runtime,
+	// and also b) after an OpFuture returned by StartCommit has resolved.
+	// It takes a ConnectorState which may either be a recovered ConnectorState upon startup,
+	// or a ConnectorState which was just returned by a preceding StartCommitFunc.
+	// It returns an optional ConnectorState update which will be applied in a best-effort fashion
+	// upon its successful completion.
+	//
+	// Acknowledge may perform long-running, idempotent operations such as merging staged
+	// updates into a base table. Upon its succesful return, response.Acknowledged is sent to
+	// the runtime, allowing the next pipelined transaction to begin to close.
+	Acknowledge(context.Context, *pf.ConnectorState) (*pf.ConnectorState, error)
+
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
 }
@@ -78,7 +92,6 @@ type Transactor interface {
 type StartCommitFunc = func(
 	_ context.Context,
 	runtimeCheckpoint *pc.Checkpoint,
-	runtimeAckCh <-chan struct{},
 ) (*pf.ConnectorState, OpFuture)
 
 // RunTransactions processes materialization protocol transactions
@@ -102,6 +115,11 @@ func RunTransactions(
 		return fmt.Errorf("open is invalid: %w", err)
 	} else if err := opened.Validate(); err != nil {
 		return fmt.Errorf("opened is invalid: %w", err)
+	}
+
+	// last checkpoint, either from Open or from the last startCommit
+	var connectorCheckpoint = &pf.ConnectorState{
+		UpdatedJson: open.StateJson,
 	}
 
 	var rxRequest = pm.Request{Open: &open}
@@ -143,7 +161,7 @@ func RunTransactions(
 
 		// Wait for commit to complete, with cancellation checks.
 		select {
-		case ackState = <-ourCommitOp.Done():
+		case <-ourCommitOp.Done():
 			if err := ourCommitOp.Err(); err != nil {
 				return err
 			}
@@ -151,6 +169,11 @@ func RunTransactions(
 			// load() must have error'd, as it otherwise cannot
 			// complete until we send Acknowledged.
 			return nil
+		}
+
+		ackState, err := transactor.Acknowledge(stream.Context(), connectorCheckpoint)
+		if err != nil {
+			return err
 		}
 
 		return WriteAcknowledged(stream, ackState, &txResponse)
@@ -203,8 +226,6 @@ func RunTransactions(
 
 	// ourCommitOp is a future for the last async startCommit().
 	var ourCommitOp OpFuture = FinishedOperation(nil)
-	// runtimeCommitCh is a future for the last async runtime commit.
-	var runtimeCommitCh = make(chan struct{})
 
 	for round := 0; true; round++ {
 		var (
@@ -217,8 +238,6 @@ func RunTransactions(
 		if err = ReadAcknowledge(stream, &rxRequest); err != nil {
 			return err
 		}
-		close(runtimeCommitCh)                // Notify prior startCommit() it may proceed.
-		runtimeCommitCh = make(chan struct{}) // For next startCommit().
 
 		// Await the commit of the prior transaction, then notify the runtime.
 		// On completion, Acknowledged has been written to the stream,
@@ -278,10 +297,10 @@ func RunTransactions(
 		}
 
 		// `startCommit` may be nil to indicate a no-op commit.
-		var connectorCheckpoint *pf.ConnectorState
+		connectorCheckpoint = nil
 		if startCommit != nil {
 			connectorCheckpoint, ourCommitOp = startCommit(
-				stream.Context(), runtimeCheckpoint, runtimeCommitCh)
+				stream.Context(), runtimeCheckpoint)
 		}
 		// As a convenience, map a nil OpFuture to a pre-resolved one so the
 		// rest of our handling can ignore the nil case.
