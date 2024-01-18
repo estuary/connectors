@@ -354,7 +354,7 @@ func StdFetchInfoSchema(
 	schemas = slices.Compact(schemas)
 
 	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
-		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
 		from information_schema.columns
 		where table_catalog = %s
 		and table_schema in (%s);
@@ -374,11 +374,12 @@ func StdFetchInfoSchema(
 		IsNullable             string
 		DataType               string
 		CharacterMaximumLength sql.NullInt64
+		ColumnDefault          sql.NullString
 	}
 
 	for rows.Next() {
 		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
+		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
 			return nil, err
 		}
 
@@ -387,6 +388,7 @@ func StdFetchInfoSchema(
 			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 			Type:               c.DataType,
 			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
+			HasDefault:         c.ColumnDefault.Valid,
 		}, c.TableSchema, c.TableName)
 	}
 	if err := rows.Err(); err != nil {
