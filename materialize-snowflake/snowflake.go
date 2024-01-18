@@ -299,10 +299,6 @@ func newTransactor(
 		}
 	}
 
-	if err = d.applyCheckpoint(ctx, cp); err != nil {
-		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
-	}
-
 	return d, nil
 }
 
@@ -506,44 +502,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		toDelete[b.target.Identifier] = []string{dir}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
-			select {
-			case <-runtimeAckCh:
-				if err := d.applyCheckpoint(ctx, cp); err != nil {
-					return nil, err
-				}
 
-				// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
-				// so that a restart of the connector does not need to run the same queries again
-				// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
-				// can actually be committed
-				// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
-				// that have been committed in this transaction. The reason is that it may be the case that a binding
-				// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
-				// the binding and running the queries that are pending for its last transaction.
-				var checkpointClear = checkpoint{Queries: make(map[string][]string), ToDelete: make(map[string][]string)}
-				for _, b := range d.bindings {
-					checkpointClear.Queries[b.target.Identifier] = []string{}
-					checkpointClear.ToDelete[b.target.Identifier] = []string{}
-				}
-				checkpointJSON, err = json.Marshal(checkpointClear)
-				if err != nil {
-					return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
-				}
-				return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		})
-
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, commitOp
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 	}, nil
 }
 
@@ -552,7 +519,14 @@ func renderWithDir(tpl string, dir string) string {
 }
 
 // applyCheckpoint merges data from temporary table to main table
-func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
+func (d *transactor) Acknowledge(ctx context.Context, state *pf.ConnectorState) (*pf.ConnectorState, error) {
+	var cp checkpoint
+	if state != nil {
+		if err := json.Unmarshal(state.UpdatedJson, &cp); err != nil {
+			return nil, fmt.Errorf("parsing state: %w", err)
+		}
+	}
+
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
@@ -570,7 +544,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
 
 		for _, q := range queries {
 			if result, err := d.store.conn.ExecContext(asyncCtx, q); err != nil {
-				return fmt.Errorf("query %q failed: %w", q, err)
+				return nil, fmt.Errorf("query %q failed: %w", q, err)
 			} else {
 				results[q] = result
 			}
@@ -579,7 +553,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
 
 	for q, r := range results {
 		if _, err := r.RowsAffected(); err != nil {
-			return fmt.Errorf("query %q failed: %w", q, err)
+			return nil, fmt.Errorf("query %q failed: %w", q, err)
 		}
 	}
 
@@ -595,7 +569,24 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
 
 	log.Info("store: finished committing changes")
 
-	return nil
+	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
+	// so that a restart of the connector does not need to run the same queries again
+	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
+	// can actually be committed
+	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
+	// that have been committed in this transaction. The reason is that it may be the case that a binding
+	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
+	// the binding and running the queries that are pending for its last transaction.
+	var checkpointClear = checkpoint{Queries: make(map[string][]string), ToDelete: make(map[string][]string)}
+	for _, b := range d.bindings {
+		checkpointClear.Queries[b.target.Identifier] = []string{}
+		checkpointClear.ToDelete[b.target.Identifier] = []string{}
+	}
+	var checkpointJSON, err = json.Marshal(checkpointClear)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
 func (d *transactor) hasTableBinding(tableIdentifier string) bool {
