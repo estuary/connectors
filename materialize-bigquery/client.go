@@ -49,7 +49,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 
 	for _, ds := range datasets {
 		job, err := c.query(ctx, fmt.Sprintf(
-			"select table_schema, table_name, column_name, is_nullable, data_type from %s.%s.INFORMATION_SCHEMA.COLUMNS;",
+			"select table_schema, table_name, column_name, is_nullable, data_type, column_default from %s.%s.INFORMATION_SCHEMA.COLUMNS;",
 			bqDialect.Identifier(c.cfg.ProjectID), // Use the project containing the dataset rather than the billing project if a billing project is configured.
 			bqDialect.Identifier(ds),
 		))
@@ -63,11 +63,12 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 
 		type columnRow struct {
-			TableSchema string `bigquery:"table_schema"`
-			TableName   string `bigquery:"table_name"`
-			ColumnName  string `bigquery:"column_name"`
-			IsNullable  string `bigquery:"is_nullable"` // string YES or NO
-			DataType    string `bigquery:"data_Type"`
+			TableSchema   string `bigquery:"table_schema"`
+			TableName     string `bigquery:"table_name"`
+			ColumnName    string `bigquery:"column_name"`
+			IsNullable    string `bigquery:"is_nullable"` // string YES or NO
+			DataType      string `bigquery:"data_type"`
+			ColumnDefault string `bigquery:"column_default"` // "NULL" if no default
 		}
 
 		for {
@@ -90,6 +91,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 				Type:               c.DataType,
 				CharacterMaxLength: 0, // BigQuery does not have a character_maximum_length in its INFORMATION_SCHEMA.COLUMNS view.
+				HasDefault:         !strings.EqualFold(c.ColumnDefault, "null"),
 			}, c.TableSchema, c.TableName)
 		}
 	}
