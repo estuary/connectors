@@ -7,15 +7,15 @@ import (
 	"os"
 	"path/filepath"
 
-	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/databricks/databricks-sdk-go/service/files"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 const fileSizeLimit = 128 * 1024 * 1024
-const uploadConcurrency = 10 // that means we may use up to 1.28GB disk space
+const uploadConcurrency = 5 // that means we may use up to 640MB disk space
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
 // buffer and close the underlying file.
@@ -65,7 +65,7 @@ func (f *fileBuffer) Close() error {
 // - flush: Sends the current & final local file to the worker for staging and waits for the worker
 // to complete before returning.
 type stagedFile struct {
-	fields     []string
+	fields []string
 
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
@@ -98,9 +98,9 @@ func newStagedFile(filesAPI *files.FilesAPI, root string, fields []string) *stag
 	var tempdir = os.TempDir()
 
 	return &stagedFile{
-		fields: fields,
-		dir:  filepath.Join(tempdir, uuid),
-		root: root,
+		fields:   fields,
+		dir:      filepath.Join(tempdir, uuid),
+		root:     root,
 		filesAPI: filesAPI,
 	}
 }

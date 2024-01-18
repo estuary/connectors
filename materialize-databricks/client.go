@@ -3,17 +3,13 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"errors"
 	"fmt"
-	"net"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
-	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
-	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	databricksCatalog "github.com/databricks/databricks-sdk-go/service/catalog"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -22,9 +18,10 @@ import (
 )
 
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db       *stdsql.DB
+	cfg      *config
+	ep       *sql.Endpoint
+	wsClient *databricks.WorkspaceClient
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
@@ -35,10 +32,21 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 		return nil, err
 	}
 
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:              cfg.Credentials.PersonalAccessToken,
+		Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
+		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialising workspace client: %w", err)
+	}
+
 	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
+		db:       db,
+		cfg:      cfg,
+		ep:       ep,
+		wsClient: wsClient,
 	}, nil
 }
 
@@ -54,62 +62,38 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		c.ep.Dialect.ColumnLocator,
 	)
 
-	schemas := []string{c.ep.Dialect.Literal(c.cfg.SchemaName)}
+	schemas := []string{c.cfg.SchemaName}
 	for _, p := range resourcePaths {
 		loc := c.ep.Dialect.TableLocator(p)
-		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+		schemas = append(schemas, loc.TableSchema)
 	}
 
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
-		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
-		from system.information_schema.columns
-		where table_catalog = %s
-		and table_schema in (%s);
-	`,
-		c.ep.Dialect.Literal(c.cfg.CatalogName),
-		strings.Join(schemas, ","),
-	))
-	if err != nil {
-		return nil, fmt.Errorf("querying system.information_schema.columns: %w", err)
-	}
-	defer rows.Close()
+	for _, schema := range schemas {
+		tableInfos, err := c.wsClient.Tables.ListAll(ctx, databricksCatalog.ListTablesRequest{
+			CatalogName: c.cfg.CatalogName,
+			SchemaName:  schema,
+		})
 
-	type columnRow struct {
-		TableSchema            string
-		TableName              string
-		ColumnName             string
-		IsNullable             string
-		DataType               string
-		CharacterMaximumLength stdsql.NullInt64
-	}
-
-	for rows.Next() {
-		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
-			return nil, fmt.Errorf("scanning column row: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("fetching table metadata: %w", err)
 		}
 
-		is.PushField(boilerplate.EndpointField{
-			Name:               c.ColumnName,
-			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
-			Type:               c.DataType,
-			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
-		}, c.TableSchema, c.TableName)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err(): %w", err)
+		for _, tableInfo := range tableInfos {
+			for _, col := range tableInfo.Columns {
+				is.PushField(boilerplate.EndpointField{
+					Name:               col.Name,
+					Nullable:           col.Nullable,
+					Type:               string(col.TypeName),
+					CharacterMaxLength: 0, // FIXME
+				}, tableInfo.SchemaName, tableInfo.Name)
+			}
+		}
 	}
 
 	return is, nil
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.QueryString)
-	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -159,94 +143,35 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}, nil
 }
 
-// TODO(whb): Consider using a WorkspaceClient here exclusively to check what we can and forego the
-// ping so that a sleeping warehouse doesn't hang on Validate.
+// Given that Databricks warehouses can take a long time to start up, we avoid
+// a ping to the database since that requires the workspace to be up and running
+// instead we let the Apply RPC take care of starting up the workspace since Apply
+// runs asynchronously in the background, but Validate is presented to the user
+// and the user must wait for it to finish
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:        fmt.Sprintf("%s/%s", c.cfg.Address, c.cfg.HTTPPath),
-		Token:       c.cfg.Credentials.PersonalAccessToken,
-		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-	})
-	if err != nil {
-		errs.Err(err)
-	}
-
 	var httpPathSplit = strings.Split(c.cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
-	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
-		errs.Err(err)
-	} else {
-		switch res.State {
-		case databricksSql.StateDeleted:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is deleted, please use an active SQL warehouse."))
-		case databricksSql.StateDeleting:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is being deleted, please use an active SQL warehouse."))
-		case databricksSql.StateStarting:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is starting, please wait a couple of minutes before trying again."))
-		case databricksSql.StateStopped:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopped, please start the SQL warehouse and try again."))
-		case databricksSql.StateStopping:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again."))
-		}
-	}
-
-	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
-	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
-	// bail out well before then. Note that it is normal for Databricks warehouses to go offline
-	// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
-	// process however we don't want to wait 5 minutes as that does not create a good UX for the
-	// user in the UI
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	if err := c.db.PingContext(ctx); err != nil {
-		// Provide a more user-friendly representation of some common error causes.
-		var execErr dbsqlerr.DBExecutionError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &execErr) {
-			// See https://pkg.go.dev/github.com/databricks/databricks-sql-go/errors#pkg-constants
-			// and https://docs.databricks.com/en/error-messages/index.html
-			switch execErr.SqlState() {
-			}
-		} else if errors.As(err, &netConnErr) {
-			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
-			}
-		} else if errors.As(err, &netOpErr) {
-			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
-			}
-		}
-
+	if _, err := c.wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
 		errs.Err(err)
 	}
 
 	return errs
 }
 
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	var version, spec string
-
-	if err := c.db.QueryRowContext(
-		ctx,
-		fmt.Sprintf(
-			"SELECT version, spec FROM %s WHERE materialization = %s;",
-			specs.Identifier,
-			databricksDialect.Literal(materialization.String()),
-		),
-	).Scan(&version, &spec); err != nil {
-		return "", "", err
-	}
-
-	return spec, version, nil
-}
-
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
+}
+
+// FetchSpecAndVersion is a no-op since materialize-databricks doesn't use fencing
+func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
+	return "", "", nil
+}
+
+// PutSpec is a no-op since materialize-databricks doesn't use fencing
+func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
+	return nil
 }
 
 // InstallFence is a no-op since materialize-databricks doesn't use fencing.

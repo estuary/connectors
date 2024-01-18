@@ -62,11 +62,10 @@ func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_S
 // Validate implements the DriverServer interface.
 func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var (
-		err        error
-		endpoint   *Endpoint
-		client     Client
-		loadedSpec *pf.MaterializationSpec
-		resp       = new(pm.Response_Validated)
+		err      error
+		endpoint *Endpoint
+		client   Client
+		resp     = new(pm.Response_Validated)
 	)
 
 	if err = req.Validate(); err != nil {
@@ -77,8 +76,6 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("creating client: %w", err)
 	} else if prereqErrs := client.PreReqs(ctx); prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
-	} else if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
-		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
 	resources := make([]Resource, 0, len(req.Bindings))
@@ -117,7 +114,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			bindingSpec.Backfill,
 			bindingSpec.Collection,
 			bindingSpec.FieldConfigJsonMap,
-			loadedSpec,
+			req.LastMaterialization,
 		)
 		if err != nil {
 			return nil, err
@@ -164,8 +161,6 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 }
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
-	var loadedVersion string
-
 	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.String()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("building endpoint: %w", err)
@@ -176,18 +171,6 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tr
 		return nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 	defer client.Close()
-
-	if endpoint.MetaSpecs != nil {
-		if _, loadedVersion, err = loadSpec(ctx, client, endpoint, open.Materialization.Name); err != nil {
-			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
-		} else if loadedVersion == "" {
-			return nil, nil, fmt.Errorf("materialization has not been applied")
-		} else if loadedVersion != open.Version {
-			return nil, nil, fmt.Errorf(
-				"applied and current materializations are different versions (applied: %s vs current: %s)",
-				loadedVersion, open.Version)
-		}
-	}
 
 	var tables []Table
 	for index, spec := range open.Materialization.Bindings {
