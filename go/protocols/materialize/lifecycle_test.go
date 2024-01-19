@@ -9,6 +9,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	pb "go.gazette.dev/core/broker/protocol"
 	pc "go.gazette.dev/core/consumer/protocol"
@@ -27,17 +28,17 @@ func TestStreamLifecycle(t *testing.T) {
 	var srvRPC = &srvStream{stream: stream}
 	var cliRPC = &clientStream{stream: stream}
 
-	txRequest, err := WriteOpen(cliRPC, &Request_Open{
+	txRequest, err := WriteOpen(cliRPC, &pm.Request_Open{
 		Materialization: &spec,
 		Version:         "someVersion",
 	})
 	require.NoError(t, err)
 
-	var rxRequest Request
+	var rxRequest pm.Request
 	require.NoError(t, srvRPC.RecvMsg(&rxRequest))
 	require.NotNil(t, rxRequest.Open)
 
-	txResponse, err := WriteOpened(srvRPC, &Response_Opened{
+	txResponse, err := WriteOpened(srvRPC, &pm.Response_Opened{
 		RuntimeCheckpoint: &pc.Checkpoint{
 			Sources: map[pb.Journal]pc.Checkpoint_Source{"a/journal": {ReadThrough: 111}},
 		},
@@ -51,7 +52,7 @@ func TestStreamLifecycle(t *testing.T) {
 	require.NoError(t, WriteAcknowledge(cliRPC, &txRequest))
 	require.NoError(t, ReadAcknowledge(srvRPC, &rxRequest))
 
-	require.NoError(t, WriteAcknowledged(srvRPC, &txResponse))
+	require.NoError(t, WriteAcknowledged(srvRPC, nil, &txResponse))
 	require.NoError(t, ReadAcknowledged(cliRPC, &rxResponse))
 
 	// Runtime sends multiple Loads, then Flush.
@@ -161,7 +162,7 @@ func TestStreamLifecycle(t *testing.T) {
 	require.NoError(t, WriteAcknowledge(cliRPC, &txRequest))
 	require.NoError(t, ReadAcknowledge(srvRPC, &rxRequest))
 
-	require.NoError(t, WriteAcknowledged(srvRPC, &txResponse))
+	require.NoError(t, WriteAcknowledged(srvRPC, nil, &txResponse))
 	require.NoError(t, ReadAcknowledged(cliRPC, &rxResponse))
 
 	// Snapshot to verify driver responses.
@@ -170,9 +171,9 @@ func TestStreamLifecycle(t *testing.T) {
 
 type stream struct {
 	reqInd  int
-	req     []Request
+	req     []pm.Request
 	respInd int
-	resp    []Response
+	resp    []pm.Response
 }
 
 func (s stream) Context() context.Context { return context.Background() }
@@ -180,12 +181,12 @@ func (s stream) Context() context.Context { return context.Background() }
 type clientStream struct{ *stream }
 type srvStream struct{ *stream }
 
-func (s *clientStream) Send(r *Request) error {
+func (s *clientStream) Send(r *pm.Request) error {
 	s.req = append(s.req, *r)
 	return nil
 }
 
-func (s *srvStream) Send(r *Response) error {
+func (s *srvStream) Send(r *pm.Response) error {
 	s.resp = append(s.resp, *r)
 	return nil
 }
@@ -195,7 +196,7 @@ func (s *clientStream) RecvMsg(out interface{}) error {
 		return io.EOF
 	}
 
-	*out.(*Response) = s.resp[s.respInd]
+	*out.(*pm.Response) = s.resp[s.respInd]
 	s.respInd += 1
 	return nil
 }
@@ -205,7 +206,7 @@ func (s *srvStream) RecvMsg(out interface{}) error {
 		return io.EOF
 	}
 
-	*out.(*Request) = s.req[s.reqInd]
+	*out.(*pm.Request) = s.req[s.reqInd]
 	s.reqInd += 1
 	return nil
 }
