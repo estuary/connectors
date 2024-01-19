@@ -327,7 +327,10 @@ class CaptureShim(Connector):
         stream: Stream
         for stream in delegate.streams.values():
             if not stream.selected and not stream.has_selected_descendents:
-                delegate.logger.info("Skipping deselected stream '%s'.", stream.name)
+                delegate.logger.info(
+                    f"Skipping deselected stream '{stream.name}'.",
+                    {"stream": stream.name},
+                )
                 continue
 
             if stream.parent_stream_type:
