@@ -10,10 +10,13 @@
         "credentials": {
           "title": "Authentication",
           "type": "object",
+          "discriminator": {
+            "propertyName": "auth_method"
+          },
           "oneOf": [
             {
               "type": "object",
-              "title": "OAuth2.0",
+              "title": "OAuth2",
               "x-oauth2-provider": "airtable",
               "required": [
                 "client_id",
@@ -23,7 +26,9 @@
               "properties": {
                 "auth_method": {
                   "type": "string",
-                  "const": "oauth2.0"
+                  "const": "oauth2.0",
+                  "default": "oauth2.0",
+                  "order": 0
                 },
                 "client_id": {
                   "type": "string",
@@ -64,16 +69,15 @@
               "properties": {
                 "auth_method": {
                   "type": "string",
-                  "const": "api_key"
+                  "const": "api_key",
+                  "default": "api_key",
+                  "order": 0
                 },
                 "api_key": {
                   "type": "string",
                   "description": "The Personal Access Token for the Airtable account. See the <a href=\"https://airtable.com/developers/web/guides/personal-access-tokens\">Support Guide</a> for more information on how to obtain this token.",
                   "title": "Personal Access Token",
-                  "airbyte_secret": true,
-                  "examples": [
-                    "key1234567890"
-                  ]
+                  "airbyte_secret": true
                 }
               }
             }

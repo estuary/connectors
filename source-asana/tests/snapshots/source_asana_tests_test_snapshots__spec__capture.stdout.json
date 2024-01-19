@@ -11,8 +11,11 @@
       ],
       "properties": {
         "credentials": {
-          "title": "Authentication mechanism",
-          "description": "Choose how to authenticate to Github",
+          "title": "Authentication",
+          "description": "Choose how to authenticate to Asana",
+          "discriminator": {
+            "propertyName": "option_title"
+          },
           "type": "object",
           "oneOf": [
             {
@@ -28,8 +31,9 @@
                 "option_title": {
                   "type": "string",
                   "title": "Credentials title",
-                  "description": "OAuth Credentials",
-                  "const": "OAuth Credentials"
+                  "const": "OAuth Credentials",
+                  "default": "OAuth Credentials",
+                  "order": 0
                 },
                 "client_id": {
                   "type": "string",
@@ -61,8 +65,9 @@
                 "option_title": {
                   "type": "string",
                   "title": "Credentials title",
-                  "description": "PAT Credentials",
-                  "const": "PAT Credentials"
+                  "const": "PAT Credentials",
+                  "default": "PAT Credentials",
+                  "order": 0
                 },
                 "personal_access_token": {
                   "type": "string",
