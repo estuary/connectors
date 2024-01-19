@@ -8,6 +8,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/evanphx/json-patch/v5"
 	"github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
@@ -52,7 +53,7 @@ type Transactor interface {
 	// Acknowledge may perform long-running, idempotent operations such as merging staged
 	// updates into a base table. Upon its succesful return, response.Acknowledged is sent to
 	// the runtime, allowing the next pipelined transaction to begin to close.
-	Acknowledge(context.Context, *pf.ConnectorState) (*pf.ConnectorState, error)
+	Acknowledge(context.Context, json.RawMessage) (*pf.ConnectorState, error)
 
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
@@ -117,10 +118,9 @@ func RunTransactions(
 		return fmt.Errorf("opened is invalid: %w", err)
 	}
 
-	// last checkpoint, either from Open or from the last startCommit
-	var connectorCheckpoint = &pf.ConnectorState{
-		UpdatedJson: open.StateJson,
-	}
+	// connector state, initialised by Open and updated as a result of
+	// startCommit and Acknowledge
+	var connectorState json.RawMessage = open.StateJson
 
 	var rxRequest = pm.Request{Open: &open}
 	var txResponse, err = WriteOpened(stream, &opened)
@@ -171,9 +171,19 @@ func RunTransactions(
 			return nil
 		}
 
-		ackState, err := transactor.Acknowledge(stream.Context(), connectorCheckpoint)
+		ackState, err := transactor.Acknowledge(stream.Context(), connectorState)
 		if err != nil {
 			return err
+		}
+
+		if ackState != nil {
+			if ackState.MergePatch {
+				if connectorState, err = jsonpatch.MergePatch(connectorState, ackState.UpdatedJson); err != nil {
+					return fmt.Errorf("merging checkpoints: %w", err)
+				}
+			} else {
+				connectorState = ackState.UpdatedJson
+			}
 		}
 
 		return WriteAcknowledged(stream, ackState, &txResponse)
@@ -297,9 +307,9 @@ func RunTransactions(
 		}
 
 		// `startCommit` may be nil to indicate a no-op commit.
-		connectorCheckpoint = nil
+		var stateUpdate *pf.ConnectorState = nil
 		if startCommit != nil {
-			connectorCheckpoint, ourCommitOp = startCommit(
+			stateUpdate, ourCommitOp = startCommit(
 				stream.Context(), runtimeCheckpoint)
 		}
 		// As a convenience, map a nil OpFuture to a pre-resolved one so the
@@ -309,7 +319,7 @@ func RunTransactions(
 		}
 
 		// If startCommit returned a pre-resolved error, fail-fast and don't
-		// send StartedCommit to the runtime, as `connectorCheckpoint` may be invalid.
+		// send StartedCommit to the runtime, as `stateUpdate` may be invalid.
 		select {
 		case <-ourCommitOp.Done():
 			if err = ourCommitOp.Err(); err != nil {
@@ -318,7 +328,17 @@ func RunTransactions(
 		default:
 		}
 
-		if err = WriteStartedCommit(stream, &txResponse, connectorCheckpoint); err != nil {
+		if stateUpdate != nil {
+			if stateUpdate.MergePatch {
+				if connectorState, err = jsonpatch.MergePatch(connectorState, stateUpdate.UpdatedJson); err != nil {
+					return fmt.Errorf("merging checkpoints: %w", err)
+				}
+			} else {
+				connectorState = stateUpdate.UpdatedJson
+			}
+		}
+
+		if err = WriteStartedCommit(stream, &txResponse, stateUpdate); err != nil {
 			return err
 		}
 	}
