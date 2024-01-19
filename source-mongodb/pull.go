@@ -734,35 +734,54 @@ func eventResourceId(ev changeEvent) string {
 const maxTimeMilli = 253402300799999
 const minTimeMilli = -62167219200000
 
+func sanitizePrimitive(input interface{}) interface{} {
+	switch v := input.(type) {
+	case primitive.DateTime:
+		if v < minTimeMilli {
+			return primitive.DateTime(minTimeMilli)
+		} else if v > maxTimeMilli {
+			return primitive.DateTime(maxTimeMilli)
+		}
+	case float64:
+		if math.IsNaN(v) {
+			return "NaN"
+		} else if math.IsInf(v, +1) {
+			return "Infinity"
+		} else if math.IsInf(v, -1) {
+			return "-Infinity"
+		}
+	case map[string]interface{}:
+		return sanitizeDocument(v)
+	case primitive.M:
+		return sanitizeDocument(v)
+	case []interface{}:
+		return sanitizeArray(v)
+	case primitive.A:
+		return sanitizeArray(v)
+	}
+
+	return input
+}
+
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		// Make sure `_id` is always captured as string
 		if key == idProperty {
 			doc[key] = idToString(value)
 		} else {
-			switch v := value.(type) {
-			case primitive.DateTime:
-				if v < minTimeMilli {
-					doc[key] = primitive.DateTime(minTimeMilli)
-				} else if v > maxTimeMilli {
-					doc[key] = primitive.DateTime(maxTimeMilli)
-				}
-			case float64:
-				if math.IsNaN(v) {
-					doc[key] = "NaN"
-				} else if math.IsInf(v, +1) {
-					doc[key] = "Infinity"
-				} else if math.IsInf(v, -1) {
-					doc[key] = "-Infinity"
-				}
-			case map[string]interface{}:
-			case primitive.M:
-				doc[key] = sanitizeDocument(v)
-			}
+			doc[key] = sanitizePrimitive(value)
 		}
 	}
 
 	return doc
+}
+
+func sanitizeArray(arr []interface{}) []interface{} {
+	for i, value := range arr {
+		arr[i] = sanitizePrimitive(value)
+	}
+
+	return arr
 }
 
 func idToString(value interface{}) string {
