@@ -519,10 +519,10 @@ func renderWithDir(tpl string, dir string) string {
 }
 
 // applyCheckpoint merges data from temporary table to main table
-func (d *transactor) Acknowledge(ctx context.Context, state *pf.ConnectorState) (*pf.ConnectorState, error) {
+func (d *transactor) Acknowledge(ctx context.Context, state json.RawMessage) (*pf.ConnectorState, error) {
 	var cp checkpoint
 	if state != nil {
-		if err := json.Unmarshal(state.UpdatedJson, &cp); err != nil {
+		if err := json.Unmarshal(state, &cp); err != nil {
 			return nil, fmt.Errorf("parsing state: %w", err)
 		}
 	}
