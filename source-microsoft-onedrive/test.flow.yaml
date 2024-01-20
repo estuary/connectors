@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-microsoft-onedrive:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-microsoft-onedrive
+        config: connector_config.yaml
+    bindings: []

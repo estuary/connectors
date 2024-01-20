@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "source-microsoft-onedrive-estuary"
+version = "0.1.0"
+description = ""
+authors = []
+
+[tool.poetry.dependencies]
+airbyte-cdk = "0.51.14"
+fastavro = "^1.8.0"
+pyarrow = "^14.0.2"
+mypy = "^1.5"
+python = ">=3.11,<3.12"
+debugpy = "^1.8.0"
+source_microsoft_onedrive = { path = ".", develop = true }
+flow-sdk = { path = "../python", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
