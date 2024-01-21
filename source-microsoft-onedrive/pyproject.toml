@@ -11,7 +11,7 @@ pyarrow = "^14.0.2"
 mypy = "^1.5"
 python = ">=3.11,<3.12"
 debugpy = "^1.8.0"
-source_microsoft_onedrive = { path = ".", develop = true }
+source_microsoft_onedrive = { path = "source_microsoft_onedrive", develop = true }
 flow-sdk = { path = "../python", develop = true }
 
 [build-system]

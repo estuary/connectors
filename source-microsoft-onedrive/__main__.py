@@ -1,26 +1,22 @@
 from flow_sdk import shim_airbyte_cdk
-from flow_sdk.sources.file_based import FileBasedSource
+from .source_microsoft_onedrive.source import BaseSource
 
 shim_airbyte_cdk.CaptureShim(
-    delegate = FileBasedSource(
-        stream_reader = None,
-        spec_class = None,
-        catalog_path = None,
-    ),
+    delegate = BaseSource(),
     oauth2 = {
         "provider": "microsoft",
         "authUrlTemplate": (
             "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?"
             r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
             r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
-            "&scope=offline_access%20user.read%20mail.read"
+            "&scope=offline_access%20user.read%20mail.read%20files.read.all"
             r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
             "&response_type=code"
             "&prompt=login"
         ),
         "accessTokenBody": (
             r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-            r"&scope=offline_access%20user.read%20mail.read"
+            r"&scope=offline_access%20user.read%20mail.read%20files.read.all"
             r"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
             r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
             "&grant_type=authorization_code"

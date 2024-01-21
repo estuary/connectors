@@ -1,3 +1,6 @@
+---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-microsoft-onedrive:
     endpoint:
@@ -7,4 +10,12 @@ captures:
           - "-m"
           - source-microsoft-onedrive
         config: connector_config.yaml
-    bindings: []
+    bindings:
+      - resource:
+          stream: pasta-csv
+          syncMode: incremental
+        target: acmeCo/pasta-csv
+      - resource:
+          stream: pasta-2-csv
+          syncMode: incremental
+        target: acmeCo/pasta-2-csv
