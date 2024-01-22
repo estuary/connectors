@@ -27,9 +27,10 @@ import (
 type config struct {
 	Address    string         `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
 	Username   string         `json:"username" jsonschema:"title=Username" jsonschema_extras:"order=1"`
-	Password   string         `json:"password" jsonschema:"title=Password" jsonschema_extras:"secret=true,order=2"`
-	Directory  string         `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=3"`
-	MatchFiles string         `json:"matchFiles,omitempty" jsonschema:"title=Match Files Regex" jsonschema_extras:"order=4"`
+	Password   string         `json:"password,omitempty" jsonschema:"title=Password" jsonschema_extras:"secret=true,order=2"`
+	SSHKey     string         `json:"sshKey,omitempty" jsonschema:"title=SSH Key" jsonschema_extras:"secret=true,multiline=true,order=3"`
+	Directory  string         `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
+	MatchFiles string         `json:"matchFiles,omitempty" jsonschema:"title=Match Files Regex" jsonschema_extras:"order=5"`
 	Advanced   advancedConfig `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
 	Parser     *parser.Config `json:"parser,omitempty"`
 }
@@ -42,6 +43,8 @@ func (config) GetFieldDocString(fieldName string) string {
 		return "Username for authentication."
 	case "Password":
 		return "Password for authentication."
+	case "SSHKey":
+		return "SSH Key for authentication."
 	case "Directory":
 		return "Directory to capture files from. All files in this directory and any subdirectories will be included."
 	case "MatchFiles":
@@ -74,13 +77,16 @@ func (advancedConfig) GetFieldDocString(fieldName string) string {
 func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"username", c.Username},
-		{"password", c.Password},
 		{"directory", c.Directory},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if c.Password == "" && c.SSHKey == "" {
+		return fmt.Errorf("missing Password and SSHKey, one must be provided for authentication")
 	}
 
 	if c.Directory != path.Clean(c.Directory) {
@@ -130,6 +136,12 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	// For now only password authentication is supported.
 	if cfg.Password != "" {
 		sshConfig.Auth = append(sshConfig.Auth, ssh.Password(cfg.Password))
+	} else if cfg.SSHKey != "" {
+		if signer, err := ssh.ParsePrivateKey([]byte(cfg.SSHKey)); err != nil {
+			return nil, fmt.Errorf("parsing ssh key: %w", err)
+		} else {
+			sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
+		}
 	}
 
 	conn, err := ssh.Dial("tcp", cfg.Address, &sshConfig)
