@@ -239,6 +239,17 @@ type transactor struct {
 	templates   map[string]*template.Template
 	bindings    []*binding
 	updateDelay time.Duration
+	cp          checkpoint
+}
+
+func (d *transactor) UnmarshalState(state json.RawMessage) error {
+	var cp checkpoint
+	if err := json.Unmarshal(state, &cp); err != nil {
+		return fmt.Errorf("parsing state: %w", err)
+	}
+	d.cp = cp
+
+	return nil
 }
 
 func newTransactor(
@@ -284,13 +295,6 @@ func newTransactor(
 	// Create stage for file-based transfers.
 	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
 		return nil, fmt.Errorf("creating transfer stage : %w", err)
-	}
-
-	var cp checkpoint
-	if open.StateJson != nil {
-		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
-			return nil, fmt.Errorf("parsing state: %w", err)
-		}
 	}
 
 	for _, binding := range bindings {
@@ -504,6 +508,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
+		d.cp = cp
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
@@ -519,14 +524,7 @@ func renderWithDir(tpl string, dir string) string {
 }
 
 // applyCheckpoint merges data from temporary table to main table
-func (d *transactor) Acknowledge(ctx context.Context, state json.RawMessage) (*pf.ConnectorState, error) {
-	var cp checkpoint
-	if state != nil {
-		if err := json.Unmarshal(state, &cp); err != nil {
-			return nil, fmt.Errorf("parsing state: %w", err)
-		}
-	}
-
+func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
@@ -535,7 +533,7 @@ func (d *transactor) Acknowledge(ctx context.Context, state json.RawMessage) (*p
 	// in a map so that we can then call `RowsAffected` on them, blocking until
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
-	for table, queries := range cp.Queries {
+	for table, queries := range d.cp.Queries {
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if !d.hasTableBinding(table) {
@@ -557,7 +555,7 @@ func (d *transactor) Acknowledge(ctx context.Context, state json.RawMessage) (*p
 		}
 	}
 
-	for table, toDelete := range cp.ToDelete {
+	for table, toDelete := range d.cp.ToDelete {
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if !d.hasTableBinding(table) {
