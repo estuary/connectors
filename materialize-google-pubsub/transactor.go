@@ -1,12 +1,14 @@
 package connector
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
 )
@@ -19,6 +21,9 @@ type topicBinding struct {
 	identifier string
 	topic      *pubsub.Topic
 }
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
 // PubSub is delta-update only.
 func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
