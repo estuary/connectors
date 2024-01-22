@@ -8,7 +8,6 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/evanphx/json-patch/v5"
 	"github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
@@ -16,6 +15,10 @@ import (
 // Transactor is a store-agnostic interface for a materialization connector
 // that implements Flow materialization protocol transactions.
 type Transactor interface {
+	// Unmarshal is called only on transactor startup if there is a persisted state
+	// for this task
+	UnmarshalState(json.RawMessage) error
+
 	// Load implements the transaction load phase by consuming Load requests
 	// from the LoadIterator and calling the provided `loaded` callback.
 	// Load can ignore keys which are not found in the store, and it may
@@ -45,15 +48,15 @@ type Transactor interface {
 	// Acknowledge the commit of a completed transaction.
 	// Acknowledge is run after both a) request.Acknowledge has been received from the runtime,
 	// and also b) after an OpFuture returned by StartCommit has resolved.
-	// It takes a ConnectorState which may either be a recovered ConnectorState upon startup,
-	// or a ConnectorState which was just returned by a preceding StartCommitFunc.
+	// It may use the state populate by UnmarshalState, or the state updated as part of StartCommitFunc
+	//
 	// It returns an optional ConnectorState update which will be applied in a best-effort fashion
 	// upon its successful completion.
 	//
 	// Acknowledge may perform long-running, idempotent operations such as merging staged
 	// updates into a base table. Upon its succesful return, response.Acknowledged is sent to
 	// the runtime, allowing the next pipelined transaction to begin to close.
-	Acknowledge(context.Context, json.RawMessage) (*pf.ConnectorState, error)
+	Acknowledge(context.Context) (*pf.ConnectorState, error)
 
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
@@ -118,9 +121,11 @@ func RunTransactions(
 		return fmt.Errorf("opened is invalid: %w", err)
 	}
 
-	// connector state, initialised by Open and updated as a result of
-	// startCommit and Acknowledge
-	var connectorState json.RawMessage = open.StateJson
+	if open.StateJson != nil {
+		if err := transactor.UnmarshalState(open.StateJson); err != nil {
+			return fmt.Errorf("transactor.UnmarshalState: %w", err)
+		}
+	}
 
 	var rxRequest = pm.Request{Open: &open}
 	var txResponse, err = WriteOpened(stream, &opened)
@@ -171,19 +176,9 @@ func RunTransactions(
 			return nil
 		}
 
-		ackState, err := transactor.Acknowledge(stream.Context(), connectorState)
+		ackState, err := transactor.Acknowledge(stream.Context())
 		if err != nil {
 			return err
-		}
-
-		if ackState != nil {
-			if ackState.MergePatch {
-				if connectorState, err = jsonpatch.MergePatch(connectorState, ackState.UpdatedJson); err != nil {
-					return fmt.Errorf("merging checkpoints: %w", err)
-				}
-			} else {
-				connectorState = ackState.UpdatedJson
-			}
 		}
 
 		return WriteAcknowledged(stream, ackState, &txResponse)
@@ -326,16 +321,6 @@ func RunTransactions(
 				return fmt.Errorf("transactor.StartCommit: %w", err)
 			}
 		default:
-		}
-
-		if stateUpdate != nil {
-			if stateUpdate.MergePatch {
-				if connectorState, err = jsonpatch.MergePatch(connectorState, stateUpdate.UpdatedJson); err != nil {
-					return fmt.Errorf("merging checkpoints: %w", err)
-				}
-			} else {
-				connectorState = stateUpdate.UpdatedJson
-			}
 		}
 
 		if err = WriteStartedCommit(stream, &txResponse, stateUpdate); err != nil {
