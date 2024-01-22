@@ -48,7 +48,7 @@ type Transactor interface {
 	// Acknowledge the commit of a completed transaction.
 	// Acknowledge is run after both a) request.Acknowledge has been received from the runtime,
 	// and also b) after an OpFuture returned by StartCommit has resolved.
-	// It may use the state populate by UnmarshalState, or the state updated as part of StartCommitFunc
+	// It may use the state populated by UnmarshalState, or the state updated as part of StartCommitFunc
 	//
 	// It returns an optional ConnectorState update which will be applied in a best-effort fashion
 	// upon its successful completion.
@@ -79,17 +79,16 @@ type Transactor interface {
 // application. It must begin an asynchronous application of this staged
 // update, immediately returning its OpFuture.
 //
-// That async application MUST await a future signal of `runtimeAckCh`
-// before taking action, however, to ensure that the ConnectorState returned
-// by StartCommit has been durably committed to the runtime recovery log.
-// `runtimeAckCh` is closed when an Acknowledge request is received from
-// the runtime, indicating that the transaction and its ConnectorState
-// have been committed to the runtime recovery log.
+// In the case of idempotent apply pattern, async operations that actually commit
+// the data in the destination store must do so in Acknowledge() to ensure
+// that the ConnectorState returned by StartCommit has been durably committed to the runtime
+// recovery log.
 //
 // Note it's possible that the ConnectorState may commit to the log,
 // but then the runtime or this Transactor may crash before the application
 // is able to complete. For this reason, on initialization a Transactor must
-// take care to (re-)apply a staged update in the opened ConnectorState.
+// take care to (re-)apply a staged update in the opened ConnectorState as part of
+// Acknowledge().
 //
 // If StartCommitFunc fails, it should return a pre-resolved OpFuture
 // which carries its error (for example, via FinishedOperation()).
@@ -161,8 +160,6 @@ func RunTransactions(
 			awaitErr = __out
 			close(awaitDoneCh)
 		}()
-
-		var ackState *pf.ConnectorState = nil
 
 		// Wait for commit to complete, with cancellation checks.
 		select {
