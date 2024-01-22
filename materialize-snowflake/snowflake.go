@@ -240,14 +240,17 @@ type transactor struct {
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
+	cpRecovery  bool
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
+	log.WithField("state", string(state)).Info("raw checkpoint")
 	var cp checkpoint
 	if err := json.Unmarshal(state, &cp); err != nil {
 		return err
 	}
 	d.cp = cp
+	d.cpRecovery = true
 
 	return nil
 }
@@ -446,14 +449,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
-// TODO: use stateKey for the checkpoint
-type checkpoint struct {
-	// Map of table name to query list
-	Queries map[string]string
-
-	// List of files to cleanup after committing the queries of a table
-	ToDelete map[string]string
+type checkpointItem struct {
+	Table    string
+	Query    string
+	ToDelete string
 }
+
+type checkpoint = map[string]*checkpointItem
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	d.store.round++
@@ -482,10 +484,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// recovery log being authoritative and the connector idempotently applies a commit
 	// These are keyed on the binding table name so that in case of a recovery being necessary
 	// we don't run queries belonging to bindings that have been removed
-	var queries = make(map[string]string)
-	// all files uploaded across bindings
-	var toDelete = make(map[string]string)
-
 	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
 		if !b.store.stage.started {
@@ -498,19 +496,22 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			queries[b.target.Identifier] = renderWithDir(b.store.mergeInto, dir)
+			d.cp[b.target.StateKey] = &checkpointItem{
+				Table:    b.target.Identifier,
+				Query:    renderWithDir(b.store.mergeInto, dir),
+				ToDelete: dir,
+			}
 		} else {
-			queries[b.target.Identifier] = renderWithDir(b.store.copyInto, dir)
+			d.cp[b.target.StateKey] = &checkpointItem{
+				Table:    b.target.Identifier,
+				Query:    renderWithDir(b.store.copyInto, dir),
+				ToDelete: dir,
+			}
 		}
-
-		toDelete[b.target.Identifier] = dir
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
-		d.cp = cp
-
-		var checkpointJSON, err = json.Marshal(cp)
+		var checkpointJSON, err = json.Marshal(d.cp)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
@@ -533,36 +534,32 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// in a map so that we can then call `RowsAffected` on them, blocking until
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
-	for table, query := range d.cp.Queries {
+	for stateKey, item := range d.cp {
+		if len(item.Query) == 0 {
+			continue
+		}
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if !d.hasTableBinding(table) {
+		if !d.hasTableBinding(item.Table) {
 			continue
 		}
 
-		log.WithField("table", table).Info("store: starting query")
-		if result, err := d.store.conn.ExecContext(asyncCtx, query); err != nil {
-			return nil, fmt.Errorf("query %q failed: %w", query, err)
+		log.WithField("table", item.Table).Info("store: starting query")
+		if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
+			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
 		} else {
-			results[table] = result
+			results[stateKey] = result
 		}
 	}
 
-	for table, r := range results {
+	for stateKey, r := range results {
+		var item = d.cp[stateKey]
 		if _, err := r.RowsAffected(); err != nil {
 			return nil, fmt.Errorf("query failed: %w", err)
 		}
-		log.WithField("table", table).Info("store: finished query")
-	}
+		log.WithField("table", item.Table).Info("store: finished query")
 
-	for table, toDelete := range d.cp.ToDelete {
-		// during recovery we skip queries that belong to tables which do not have a binding anymore
-		// since these tables might be deleted already
-		if !d.hasTableBinding(table) {
-			continue
-		}
-
-		d.deleteFiles(ctx, []string{toDelete})
+		d.deleteFiles(ctx, []string{item.ToDelete})
 	}
 
 	log.Info("store: finished committing changes")
@@ -575,15 +572,17 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// that have been committed in this transaction. The reason is that it may be the case that a binding
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
-	var checkpointClear = checkpoint{Queries: make(map[string]string), ToDelete: make(map[string]string)}
+	var checkpointClear = make(checkpoint)
 	for _, b := range d.bindings {
-		checkpointClear.Queries[b.target.Identifier] = ""
-		checkpointClear.ToDelete[b.target.Identifier] = ""
+		checkpointClear[b.target.StateKey] = nil
 	}
 	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
+
+	d.cpRecovery = false
+
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
