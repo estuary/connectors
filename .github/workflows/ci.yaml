@@ -90,6 +90,7 @@ jobs:
           - source-postgres-batch
           - source-s3
           - source-sftp
+          - source-snowflake
           - source-sqlserver
           - source-test
           - materialize-bigquery
