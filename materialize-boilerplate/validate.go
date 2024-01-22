@@ -64,6 +64,22 @@ func (v Validator) ValidateBinding(
 		)
 	}
 
+	for _, p := range boundCollection.Projections {
+		// Don't allow collection keys to be nullable unless they have a default value set. If a
+		// default value is set, there will always be a value provided for the field from the
+		// runtime.
+		if !p.IsPrimaryKey {
+			continue
+		}
+
+		mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
+		hasDefault := p.Inference.DefaultJson != nil
+
+		if !mustExist && !hasDefault {
+			return nil, fmt.Errorf("cannot materialize collection with nullable key field '%s' unless it has a default value annotation", p.Field)
+		}
+	}
+
 	var constraints map[string]*pm.Response_Validated_Constraint
 	if !v.is.HasResource(path) || (existingBinding != nil && backfill != existingBinding.Backfill) {
 		// Always validate as a new table if the existing table doesn't exist, since there is no
