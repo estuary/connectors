@@ -41,6 +41,9 @@ type Table struct {
 	// Keys, Values, and the (optional) Document column.
 	Keys, Values []Column
 	Document     *Column
+
+	// The stateKey associated with this table's binding
+	StateKey string
 }
 
 // Column is a database table column which is fully resolved using the database Dialect.

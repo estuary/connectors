@@ -202,6 +202,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 		if table, err := ResolveTable(shape, endpoint.Dialect); err != nil {
 			return nil, nil, err
 		} else {
+			table.StateKey = spec.StateKey
 			tables = append(tables, table)
 		}
 	}
