@@ -240,7 +240,6 @@ type transactor struct {
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
-	cpRecovery  bool
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -250,7 +249,6 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 		return err
 	}
 	d.cp = cp
-	d.cpRecovery = true
 
 	return nil
 }
@@ -580,8 +578,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
-
-	d.cpRecovery = false
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
