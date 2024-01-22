@@ -35,8 +35,8 @@ func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 // snowflakeObject represents the (schema, name) tuple identifying a Snowflake object
 // such as a table, stream, or view.
 type snowflakeObject struct {
-	Schema string
-	Name   string
+	Schema string `json:"schema"`
+	Name   string `json:"name"`
 }
 
 func (t snowflakeObject) String() string {
