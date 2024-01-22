@@ -305,6 +305,9 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
@@ -401,18 +404,18 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() error {
 			defer txn.Rollback(ctx)
 
 			var err error
 			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return nil, fmt.Errorf("marshalling checkpoint: %w", err)
+				return fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
 			var fenceUpdate strings.Builder
 			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return nil, fmt.Errorf("evaluating fence template: %w", err)
+				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 
 			// Add the update to the fence as the last statement in the batch.
@@ -423,22 +426,22 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Execute all remaining doc inserts & updates.
 			for i := 0; i < batch.Len()-1; i++ {
 				if _, err := results.Exec(); err != nil {
-					return nil, fmt.Errorf("store at index %d: %w", i, err)
+					return fmt.Errorf("store at index %d: %w", i, err)
 				}
 			}
 
 			// The fence update is always the last operation in the batch.
 			if _, err := results.Exec(); err != nil {
-				return nil, fmt.Errorf("updating flow checkpoint: %w", err)
+				return fmt.Errorf("updating flow checkpoint: %w", err)
 			} else if err = results.Close(); err != nil {
-				return nil, fmt.Errorf("results.Close(): %w", err)
+				return fmt.Errorf("results.Close(): %w", err)
 			}
 
 			if err := txn.Commit(ctx); err != nil {
-				return nil, fmt.Errorf("committing Store transaction: %w", err)
+				return fmt.Errorf("committing Store transaction: %w", err)
 			}
 
-			return nil, nil
+			return nil
 		})
 	}, nil
 }

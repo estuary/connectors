@@ -28,13 +28,6 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var checkpoint FireboltCheckpoint
-	if open.StateJson != nil {
-		if err := json.Unmarshal(open.StateJson, &checkpoint); err != nil {
-			return nil, nil, fmt.Errorf("parsing driver config: %w", err)
-		}
-	}
-
 	var fb, err = firebolt.New(firebolt.Config{
 		EngineURL: cfg.EngineURL,
 		Database:  cfg.Database,
@@ -43,10 +36,6 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating firebolt client: %w", err)
-	}
-
-	if err = applyCheckpoint(ctx, fb, checkpoint); err != nil {
-		return nil, nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
 	var bindings []*binding
@@ -105,6 +94,40 @@ type transactor struct {
 	bucket       string
 	prefix       string
 	bindings     []*binding
+
+	cp FireboltCheckpoint
+}
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	var checkpoint FireboltCheckpoint
+	if err := json.Unmarshal(state, &checkpoint); err != nil {
+		return err
+	}
+	t.cp = checkpoint
+
+	return nil
+}
+
+// Acknowledge loads stored files from external table to main table
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	if len(t.cp.Files) < 1 {
+		return nil, nil
+	}
+
+	// Acknowledge step might end up being run by a separate process
+	// different from the original, and the new transactor process might be initialised with
+	// a new version of the MaterializationSpec. This means it's possible to have an Acknowledge
+	// with MaterializationSpec v1 be run by a transactor initialised with MaterializationSpec v2.
+	// As such, we keep a copy of the queries generated from the MaterializationSpec of the
+	// transaction to which this Acknowledge belongs in the checkpoint to avoid inconsistencies.
+	for _, query := range t.cp.Queries {
+		_, err := t.fb.Query(query)
+		if err != nil {
+			return nil, fmt.Errorf("moving files from external to main table: %w", err)
+		}
+	}
+
+	return nil, nil
 }
 
 // firebolt is delta-update only, so loading of data from Firebolt is not necessary
@@ -230,44 +253,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	// Return a StartCommitFunc closure which returns our encoded `checkpoint`,
 	// and will apply it only after the runtime acknowledges its commit.
-	return func(ctx context.Context, _ *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var checkpointJSON, err = json.Marshal(checkpoint)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
+		t.cp = checkpoint
 
-		var commitOp = m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
-			select {
-			case <-runtimeAckCh:
-				return nil, applyCheckpoint(ctx, t.fb, checkpoint)
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		})
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, commitOp
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
 	}, nil
-}
-
-// applyCheckpoint loads stored files from external table to main table
-func applyCheckpoint(ctx context.Context, fb *firebolt.Client, checkpoint FireboltCheckpoint) error {
-	if len(checkpoint.Files) < 1 {
-		return nil
-	}
-
-	// Acknowledge step might end up being run by a separate process
-	// different from the original, and the new transactor process might be initialised with
-	// a new version of the MaterializationSpec. This means it's possible to have an Acknowledge
-	// with MaterializationSpec v1 be run by a transactor initialised with MaterializationSpec v2.
-	// As such, we keep a copy of the queries generated from the MaterializationSpec of the
-	// transaction to which this Acknowledge belongs in the checkpoint to avoid inconsistencies.
-	for _, query := range checkpoint.Queries {
-		_, err := fb.Query(query)
-		if err != nil {
-			return fmt.Errorf("moving files from external to main table: %w", err)
-		}
-	}
-
-	return nil
 }
 
 func (t *transactor) Destroy() {}
