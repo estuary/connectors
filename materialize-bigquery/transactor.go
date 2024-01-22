@@ -151,6 +151,9 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	return s, nil
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
@@ -250,7 +253,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		log.Info("store: starting commit phase")
 		var err error
 		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
@@ -261,7 +264,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) commit(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) commit(ctx context.Context) error {
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
 
@@ -273,7 +276,7 @@ func (t *transactor) commit(ctx context.Context) (*pf.ConnectorState, error) {
 	// First we must validate the fence has not been modified.
 	var fenceUpdate strings.Builder
 	if err := tplUpdateFence.Execute(&fenceUpdate, t.fence); err != nil {
-		return nil, fmt.Errorf("evaluating fence template: %w", err)
+		return fmt.Errorf("evaluating fence template: %w", err)
 	}
 	subqueries = append(subqueries, fenceUpdate.String())
 
@@ -288,7 +291,7 @@ func (t *transactor) commit(ctx context.Context) (*pf.ConnectorState, error) {
 
 		delete, err := b.storeFile.flush(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 		defer delete(ctx)
 
@@ -316,7 +319,7 @@ func (t *transactor) commit(ctx context.Context) (*pf.ConnectorState, error) {
 	// This returns a single row with the error status of the query.
 	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("commit query: %w", err)
+		return fmt.Errorf("commit query: %w", err)
 	}
 	log.Info("store: finished commit")
 
@@ -325,14 +328,10 @@ func (t *transactor) commit(ctx context.Context) (*pf.ConnectorState, error) {
 			"job":   job,
 			"error": err,
 		}).Error("Bigquery job failed")
-		return nil, fmt.Errorf("merge error: %s", err)
+		return fmt.Errorf("merge error: %s", err)
 	} else {
-		return nil, nil
+		return nil
 	}
-}
-
-func (t *transactor) Acknowledge(context.Context) error {
-	return nil
 }
 
 func (t *transactor) Destroy() {

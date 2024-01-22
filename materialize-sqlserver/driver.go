@@ -316,6 +316,9 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
@@ -489,27 +492,27 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() error {
 			defer txn.Rollback()
 
 			for _, b := range d.bindings {
 				if b.needsMerge {
 					log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
-						return nil, fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
+						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
 					}
 					log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
 				} else {
 					log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-						return nil, fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
+						return fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
 					}
 					log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 				}
 
 				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-					return nil, fmt.Errorf("truncating store table: %w", err)
+					return fmt.Errorf("truncating store table: %w", err)
 				}
 
 				// reset the value for next transaction
@@ -518,27 +521,27 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			var err error
 			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return nil, fmt.Errorf("marshalling checkpoint: %w", err)
+				return fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
 			var fenceUpdate strings.Builder
 			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
-				return nil, fmt.Errorf("evaluating fence template: %w", err)
+				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 
 			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return nil, fmt.Errorf("updating flow checkpoint: %w", err)
+				return fmt.Errorf("updating flow checkpoint: %w", err)
 			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return nil, fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
+				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
 			} else if rowsAffected < 1 {
-				return nil, fmt.Errorf("This instance was fenced off by another")
+				return fmt.Errorf("This instance was fenced off by another")
 			}
 
 			if err := txn.Commit(); err != nil {
-				return nil, fmt.Errorf("committing Store transaction: %w", err)
+				return fmt.Errorf("committing Store transaction: %w", err)
 			}
 
-			return nil, nil
+			return nil
 		})
 	}, nil
 }

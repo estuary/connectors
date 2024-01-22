@@ -445,6 +445,9 @@ func (t *transactor) addBinding(
 	return nil
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 	gotLoads := false
@@ -643,7 +646,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		log.Info("store: starting commit phase")
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
@@ -660,8 +663,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			d.round,
 			d.updateDelay,
 			it.Total,
-			func(ctx context.Context) (*pf.ConnectorState, error) {
-				return nil, d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates)
+			func(ctx context.Context) error {
+				return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates)
 			},
 		)
 	}, nil

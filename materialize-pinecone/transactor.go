@@ -9,6 +9,7 @@ import (
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -37,6 +38,9 @@ type upsertDoc struct {
 	key      string
 	metadata map[string]interface{}
 }
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
