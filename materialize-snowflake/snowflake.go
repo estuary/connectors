@@ -449,10 +449,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // TODO: use stateKey for the checkpoint
 type checkpoint struct {
 	// Map of table name to query list
-	Queries map[string][]string
+	Queries map[string]string
 
 	// List of files to cleanup after committing the queries of a table
-	ToDelete map[string][]string
+	ToDelete map[string]string
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
@@ -482,9 +482,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// recovery log being authoritative and the connector idempotently applies a commit
 	// These are keyed on the binding table name so that in case of a recovery being necessary
 	// we don't run queries belonging to bindings that have been removed
-	var queries = make(map[string][]string)
+	var queries = make(map[string]string)
 	// all files uploaded across bindings
-	var toDelete = make(map[string][]string)
+	var toDelete = make(map[string]string)
 
 	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
@@ -498,12 +498,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
+			queries[b.target.Identifier] = renderWithDir(b.store.mergeInto, dir)
 		} else {
-			queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
+			queries[b.target.Identifier] = renderWithDir(b.store.copyInto, dir)
 		}
 
-		toDelete[b.target.Identifier] = []string{dir}
+		toDelete[b.target.Identifier] = dir
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -533,26 +533,26 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// in a map so that we can then call `RowsAffected` on them, blocking until
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
-	for table, queries := range d.cp.Queries {
+	for table, query := range d.cp.Queries {
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if !d.hasTableBinding(table) {
 			continue
 		}
 
-		for _, q := range queries {
-			if result, err := d.store.conn.ExecContext(asyncCtx, q); err != nil {
-				return nil, fmt.Errorf("query %q failed: %w", q, err)
-			} else {
-				results[q] = result
-			}
+		log.WithField("table", table).Info("store: starting query")
+		if result, err := d.store.conn.ExecContext(asyncCtx, query); err != nil {
+			return nil, fmt.Errorf("query %q failed: %w", query, err)
+		} else {
+			results[table] = result
 		}
 	}
 
-	for q, r := range results {
+	for table, r := range results {
 		if _, err := r.RowsAffected(); err != nil {
-			return nil, fmt.Errorf("query %q failed: %w", q, err)
+			return nil, fmt.Errorf("query failed: %w", err)
 		}
+		log.WithField("table", table).Info("store: finished query")
 	}
 
 	for table, toDelete := range d.cp.ToDelete {
@@ -562,7 +562,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		d.deleteFiles(ctx, toDelete)
+		d.deleteFiles(ctx, []string{toDelete})
 	}
 
 	log.Info("store: finished committing changes")
@@ -575,10 +575,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// that have been committed in this transaction. The reason is that it may be the case that a binding
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
-	var checkpointClear = checkpoint{Queries: make(map[string][]string), ToDelete: make(map[string][]string)}
+	var checkpointClear = checkpoint{Queries: make(map[string]string), ToDelete: make(map[string]string)}
 	for _, b := range d.bindings {
-		checkpointClear.Queries[b.target.Identifier] = []string{}
-		checkpointClear.ToDelete[b.target.Identifier] = []string{}
+		checkpointClear.Queries[b.target.Identifier] = ""
+		checkpointClear.ToDelete[b.target.Identifier] = ""
 	}
 	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
