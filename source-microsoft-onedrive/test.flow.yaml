@@ -12,10 +12,6 @@ captures:
         config: connector_config.yaml
     bindings:
       - resource:
-          stream: pasta-csv
+          stream: stream_teste
           syncMode: incremental
-        target: acmeCo/pasta-csv
-      - resource:
-          stream: pasta-2-csv
-          syncMode: incremental
-        target: acmeCo/pasta-2-csv
+        target: acmeCo/stream_teste

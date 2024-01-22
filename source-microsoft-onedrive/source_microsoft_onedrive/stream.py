@@ -5,14 +5,13 @@ from io import IOBase
 from typing import Iterable, List, Optional, Any
 
 from airbyte_cdk.sources.file_based.file_based_stream_reader import AbstractFileBasedStreamReader, FileReadMode
+from airbyte_cdk.utils.traced_exception import AirbyteTracedException, FailureType
 from airbyte_cdk.sources.file_based.remote_file import RemoteFile as BaseRemoteFile
 from airbyte_cdk.sources.file_based.config.abstract_file_based_spec import AbstractFileBasedSpec
 
 from .client import BaseClient
 
 class RemoteFile(BaseRemoteFile):
-    name: str
-    type: str
     download_url: str
 
 class BaseStreamReader(AbstractFileBasedStreamReader):
@@ -65,11 +64,32 @@ class BaseStreamReader(AbstractFileBasedStreamReader):
         drives.add_child(my_drive)
 
         files = self.get_files_by_drive_name(drives, self.config.drive_name, self.config.folder_path)
+        
+        try:
+            first_file, path = next(files)
+
+            yield from self.filter_files_by_globs_and_start_date(
+                [
+                    RemoteFile(
+                        uri = path,
+                        download_url = first_file.properties["@microsoft.graph.downloadUrl"],
+                        last_modified = first_file.properties["lastModifiedDateTime"],
+                    )
+                ],
+                globs,
+            )
+
+        except StopIteration as e:
+            raise AirbyteTracedException(
+                internal_message = str(e),
+                message = f"Drive '{self.config.drive_name}' is empty or does not exist.",
+                failure_type = FailureType.config_error,
+                exception = e,
+            )
+
         yield from self.filter_files_by_globs_and_start_date(
             [
                 RemoteFile(
-                    name = file.properties["name"],
-                    type = file.properties["name"].split(".")[-1],
                     uri = path,
                     download_url = file.properties["@microsoft.graph.downloadUrl"],
                     last_modified = file.properties["lastModifiedDateTime"],

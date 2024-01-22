@@ -44,36 +44,28 @@ class BaseSource(FileBasedSource):
             streams: List[Stream] = []
             
             file_formats = ["csv"]
+            stream_name = "stream_teste"
 
-            files = self.stream_reader.get_matching_files(globs = get_globs(file_formats), prefix = None)
+            stream_config = FileBasedStreamConfig(
+                name = stream_name,
+                primary_key = "ID",
+                file_type = "csv",
+                globs = get_globs(file_formats),
+                schemaless = False
+            )
 
-            for file in files:
-                stream_config = FileBasedStreamConfig(
-                    name = slugify(file.name),
-                    primary_key = "ID",
-                    file_type = file.type,
-                    globs = [file.name],
-                    schemaless = False
+            streams.append(
+                DefaultFileBasedStream(
+                    config = stream_config,
+                    catalog_schema = {},
+                    stream_reader = self.stream_reader,
+                    availability_strategy = self.availability_strategy,
+                    discovery_policy = self.discovery_policy,
+                    parsers = self.parsers,
+                    validation_policy = self._validate_and_get_validation_policy(stream_config),
+                    cursor = self.cursor_cls(stream_config),
                 )
-
-                self._validate_input_schema(stream_config)
-                stream_schema = self.stream_schemas.get(stream_config.name)
-                if stream_schema is None:
-                    stream_schema = stream_config.get_input_schema()
-
-                raise ValueError(stream_schema)
-                streams.append(
-                    DefaultFileBasedStream(
-                        config = stream_config,
-                        catalog_schema = self.stream_schemas.get(stream_config.name),
-                        stream_reader = self.stream_reader,
-                        availability_strategy = self.availability_strategy,
-                        discovery_policy = self.discovery_policy,
-                        parsers = self.parsers,
-                        validation_policy = self._validate_and_get_validation_policy(stream_config),
-                        cursor = self.cursor_cls(stream_config),
-                    )
-                )
+            )
 
             return streams
 
