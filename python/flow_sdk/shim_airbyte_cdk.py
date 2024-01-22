@@ -16,6 +16,7 @@ from airbyte_protocol.models import (
     Level as LogLevel,
 )
 
+from typing import Optional
 from .capture import Connector, request, response, Response
 from .flow import CaptureBinding
 from . import flow, ValidateError, logger
@@ -32,8 +33,9 @@ DOCS_URL = os.getenv("DOCS_URL")
 
 @dataclass
 class StreamState:
-    state: AirbyteStateMessage
-    rowId: int
+    state: Optional[AirbyteStateMessage] = None
+    rowId: Optional[int] = None
+
 """
 Airbyte doesn't appear to reduce state like we do. As a result,
 the Airbyte CDK is expecting its state input to look like a list of
@@ -278,6 +280,9 @@ class CaptureShim(Connector):
                 logger.info(f"Got a state message: {str(state_msg)}")
 
                 binding_id = index[(state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name)]
+                if isinstance(binding_id, list):
+                    binding_id = binding_id[0]
+
                 binding = bindings[binding_id]
 
                 state.handle_message(state_msg, binding["stateKey"])
