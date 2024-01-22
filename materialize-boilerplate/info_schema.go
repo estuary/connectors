@@ -130,31 +130,8 @@ func (i *InfoSchema) FieldsForResource(resourcePath []string) ([]EndpointField, 
 	return i.resources[rk], nil
 }
 
-// extractProjection finds the projection in a Flow collection spec that must correspond to a field
-// reported by the endpoint. Fields in the collection spec must have the same one-way translation
-// applied to them that a field does when materializing it in order to do this lookup.
-func (i *InfoSchema) extractProjection(endpointFieldName string, collection pf.CollectionSpec) (pf.Projection, bool, error) {
-	var found bool
-	var out pf.Projection
-
-	for idx := range collection.Projections {
-		matches := i.translateField(collection.Projections[idx].Field) == endpointFieldName
-		if found && matches {
-			// This should never happen since the standard constraints from `Validator` forbid it,
-			// but I'm leaving it here as a sanity check just in case.
-			return pf.Projection{}, false, fmt.Errorf("ambiguous endpoint field name when looking for projection %q", endpointFieldName)
-		} else if matches {
-			found = true
-			out = collection.Projections[idx]
-		}
-	}
-
-	return out, found, nil
-}
-
 // inSelectedFields returns true if the provided endpoint field name (as reported by the endpoint)
-// exists in the field selection for a materialization. It does a similar translation of fields from
-// the field selection as ExtractProjection in order to do this matching.
+// exists in the field selection for a materialization.
 func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelection) (bool, error) {
 	var found bool
 

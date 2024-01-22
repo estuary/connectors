@@ -1,0 +1,34 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        goodField: { type: string }
+        firstBadField: { type: string }
+        firstbadfield: { type: string }
+        FIRSTBADFIELD: { type: string }
+        secondBadField: { type: string }
+        secondbadfield: { type: string }
+        SECONDBADFIELD: { type: string }
+      required: [key]
+    key: [/key]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: false
+          include:
+            key: {}
+            goodField: {}
+            firstBadField: {}
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

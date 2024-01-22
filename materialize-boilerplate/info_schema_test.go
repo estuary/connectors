@@ -120,33 +120,6 @@ func TestInfoSchema(t *testing.T) {
 		require.False(t, got)
 	})
 
-	t.Run("ExtractProjection", func(t *testing.T) {
-		p := pf.Projection{Field: untransform(nullableField.Name)}
-
-		collection := pf.CollectionSpec{
-			Projections: []pf.Projection{p},
-		}
-
-		// Projection exists.
-		proj, found, err := is.extractProjection(nullableField.Name, collection)
-		require.NoError(t, err)
-		require.True(t, found)
-		require.Equal(t, p, proj)
-
-		// Projection doesn't exist.
-		proj, found, err = is.extractProjection(nonNullableField.Name, collection)
-		require.NoError(t, err)
-		require.False(t, found)
-		require.Equal(t, pf.Projection{}, proj)
-
-		// Ambiguous case.
-		collection.Projections = append(collection.Projections, p)
-		proj, found, err = is.extractProjection(nullableField.Name, collection)
-		require.Error(t, err)
-		require.False(t, found)
-		require.Equal(t, pf.Projection{}, proj)
-	})
-
 	t.Run("AmbiguousResourcePaths", func(t *testing.T) {
 		translate := func(in string) string {
 			return strings.ToLower(in)
