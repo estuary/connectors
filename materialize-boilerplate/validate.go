@@ -83,7 +83,7 @@ func (v Validator) ValidateBinding(
 		}
 	}
 
-	return v.forbidAmbiguousFields(constraints), nil
+	return constraints, nil
 }
 
 func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUpdates bool) map[string]*pm.Response_Validated_Constraint {
@@ -91,19 +91,34 @@ func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUp
 
 	sawRoot := false
 
-	for _, projection := range boundCollection.Projections {
-		if projection.IsRootDocumentProjection() {
+	for _, p := range boundCollection.Projections {
+		c := v.c.NewConstraints(&p, deltaUpdates)
+
+		if p.IsRootDocumentProjection() {
 			if sawRoot && !deltaUpdates {
-				constraints[projection.Field] = &pm.Response_Validated_Constraint{
+				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
 					Reason: "Only a single root document projection can be materialized for standard updates",
 				}
-				continue
 			}
 			sawRoot = true
+		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 && c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED {
+			// Any fields that would be ambiguous to materialize should be marked as optional if
+			// they would otherwise be recommended. Only one of these fields should be selected to
+			// materialize.
+			c = &pm.Response_Validated_Constraint{
+				Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+				Reason: fmt.Sprintf(
+					"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
+					p.Field,
+					v.is.translateField(p.Field),
+					strings.Join(ambiguousFields, ","),
+				),
+			}
 		}
 
-		constraints[projection.Field] = v.c.NewConstraints(&projection, deltaUpdates)
+		constraints[p.Field] = c
+
 	}
 	return constraints
 }
@@ -117,78 +132,29 @@ func (v Validator) validateMatchesExistingBinding(
 ) (map[string]*pm.Response_Validated_Constraint, error) {
 	constraints := make(map[string]*pm.Response_Validated_Constraint)
 
-	fields, err := v.is.FieldsForResource(path)
-	if err != nil {
-		// This should never error, since it has previously been established that the resource does
-		// exist in the destination system.
-		return nil, fmt.Errorf("getting fields for existing resource: %w", err)
-	}
-
-	for _, f := range fields {
-		constraint := new(pm.Response_Validated_Constraint)
-
-		proposedProjection, inCollection, err := v.is.extractProjection(f.Name, boundCollection)
-		if err != nil {
-			return nil, fmt.Errorf("extracting projection for existing endpoint field %q: %w", f.Name, err)
-		}
-
-		if !inCollection {
-			// A field that exists in the destination but not in the collection is not a problem,
-			// but Apply may need to make the destination field not required later.
-			continue
-		} else if !deltaUpdates && proposedProjection.IsRootDocumentProjection() {
-			// Root document constraints are handled as a separate loop, further down.
-			continue
-		}
-
-		// Is the proposed type completely disallowed by the materialization? This differs from
-		// being UNSATISFIABLE, which implies that re-creating the materialization could resolve the
-		// difference.
-		if c := v.c.NewConstraints(&proposedProjection, deltaUpdates); c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
-			constraints[proposedProjection.Field] = c
-			continue
-		}
-
-		if compatible, err := v.c.Compatible(f, &proposedProjection, fieldConfigJsonMap[proposedProjection.Field]); err != nil {
-			return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", f.Name, proposedProjection.Field, err)
-		} else if compatible {
-			if proposedProjection.IsPrimaryKey {
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
-				constraint.Reason = "This field is a key in the current materialization"
-			} else {
-				// TODO(whb): Really this should be "FIELD_RECOMMENDED", but that is not a
-				// constraint that has been implemented currently. This would be an issue if there
-				// are multiple projections of the same location.
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-				constraint.Reason = "This location is part of the current materialization"
-			}
-		} else {
-			constraint.Type = pm.Response_Validated_Constraint_UNSATISFIABLE
-			constraint.Reason = fmt.Sprintf(
-				"Field '%s' is already being materialized as endpoint type '%s' and cannot be changed to type '%s'",
-				proposedProjection.Field,
-				f.Type,
-				v.c.DescriptionForType(&proposedProjection),
-			)
-		}
-
-		constraints[proposedProjection.Field] = constraint
-	}
-
 	docFields := []string{}
 	for _, p := range boundCollection.Projections {
-		if !deltaUpdates && p.IsRootDocumentProjection() {
+		// Base constraint used for all new projections of the binding. This may be re-evaluated
+		// below, depending on the details of the projection and any pre-existing materialization of
+		// it.
+		c := v.c.NewConstraints(&p, deltaUpdates)
+
+		if c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
+			// Is the proposed type completely disallowed by the materialization? This differs from
+			// being UNSATISFIABLE, which implies that re-creating the materialization could resolve
+			// the difference.
+		} else if !deltaUpdates && p.IsRootDocumentProjection() {
 			docFields = append(docFields, p.Field)
 			// Only the originally selected root document projection is allowed to be selected for
 			// changes to a standard updates materialization. If there is no previously persisted
 			// spec, the first root document projection is selected as the root document.
 			if (existing != nil && p.Field == existing.FieldSelection.Document) || (existing == nil && len(docFields) == 1) {
-				constraints[p.Field] = &pm.Response_Validated_Constraint{
+				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "This field is the document in the current materialization",
 				}
 			} else {
-				constraints[p.Field] = &pm.Response_Validated_Constraint{
+				c = &pm.Response_Validated_Constraint{
 					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
 					Reason: fmt.Sprintf(
 						"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
@@ -203,26 +169,87 @@ func (v Validator) validateMatchesExistingBinding(
 					),
 				}
 			}
-		}
-
-		// Build constraints for new projections of the binding.
-		if _, ok := constraints[p.Field]; !ok {
-			c := v.c.NewConstraints(&p, deltaUpdates)
-
-			// Continue to recommended any optional fields that were included in a prior spec's
-			// field selection, even if the materialized field is not reported to exist in the
-			// destination. This is primarily to produce more useful constraints for systems that do
-			// not have "columns" that can be inspected, but still support field selection (ex:
-			// materialize-dynamodb), so that selected fields can continue to be recommended.
-			if existing != nil &&
-				c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
-				slices.Contains(existing.FieldSelection.AllFields(), p.Field) {
-				c.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-				c.Reason = "This location is part of the current materialization"
+		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 {
+			// Projections that would result in ambiguous materialized fields are forbidden if a
+			// different ambiguous projection has already been selected, or optional if none have
+			// yet been selected.
+			if existing != nil && slices.Contains(existing.FieldSelection.AllFields(), p.Field) {
+				// This field has already been selected as the ambiguous field to materialize.
+				c = &pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+					Reason: "This location is part of the current materialization",
+				}
+			} else if existing != nil && v.ambiguousFieldIsSelected(p, existing.FieldSelection.AllFields()) {
+				// A different field has been selected, so this one can't be.
+				c = &pm.Response_Validated_Constraint{
+					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+					Reason: fmt.Sprintf(
+						"Flow collection field '%s' is ambiguous with fields already being materialized as '%s' in the destination. Consider using an alternate, unambiguous projection of this field to allow it to be materialized",
+						p.Field,
+						v.is.translateField(p.Field),
+					),
+				}
+			} else if c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED || c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
+				// None of these ambiguous fields have been selected yet, so it's still possible to
+				// pick one.
+				c = &pm.Response_Validated_Constraint{
+					Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+					Reason: fmt.Sprintf(
+						"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
+						p.Field,
+						v.is.translateField(p.Field),
+						strings.Join(ambiguousFields, ","),
+					),
+				}
 			}
-
-			constraints[p.Field] = c
+		} else if existingField, err := v.is.GetField(path, p.Field); err == nil {
+			// All other fields that are already being materialized. Any error from GetField is
+			// because the field does not already exist.
+			if compatible, err := v.c.Compatible(existingField, &p, fieldConfigJsonMap[p.Field]); err != nil {
+				return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", existingField.Name, p.Field, err)
+			} else if compatible {
+				if p.IsPrimaryKey {
+					c = &pm.Response_Validated_Constraint{
+						Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+						Reason: "This field is a key in the current materialization",
+					}
+				} else {
+					// TODO(whb): Really this should be "FIELD_RECOMMENDED", but that is not a
+					// constraint that has been implemented currently. This would be an issue if there
+					// are multiple projections of the same location.
+					c = &pm.Response_Validated_Constraint{
+						Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+						Reason: "This location is part of the current materialization",
+					}
+				}
+			} else {
+				c = &pm.Response_Validated_Constraint{
+					Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+					Reason: fmt.Sprintf(
+						"Field '%s' is already being materialized as endpoint type '%s' and cannot be changed to type '%s'",
+						p.Field,
+						existingField.Type,
+						v.c.DescriptionForType(&p),
+					),
+				}
+			}
 		}
+
+		// Continue to recommended any optional fields that were included in a prior spec's
+		// field selection, even if the materialized field is not reported to exist in the
+		// destination. This is primarily to produce more useful constraints for systems that do
+		// not have "columns" that can be inspected, but still support field selection (ex:
+		// materialize-dynamodb), so that selected fields can continue to be recommended.
+		if existing != nil &&
+			c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
+			slices.Contains(existing.FieldSelection.AllFields(), p.Field) {
+			c = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+				Reason: "This location is part of the current materialization",
+			}
+		}
+
+		constraints[p.Field] = c
 	}
 
 	if existing != nil && !deltaUpdates && !slices.Contains(docFields, existing.FieldSelection.Document) {
@@ -241,37 +268,39 @@ func (v Validator) validateMatchesExistingBinding(
 	return constraints, nil
 }
 
-func (v Validator) forbidAmbiguousFields(constraints map[string]*pm.Response_Validated_Constraint) map[string]*pm.Response_Validated_Constraint {
-	// Fields are "ambiguous" if their destination system treats more than one Flow collection field
-	// name as the same materialized field name. For example, if a destination system is strictly
-	// case-insensitive and lowercases all field names, `ThisField` and `thisField` are ambiguous
-	// and cannot be materialized. If there is a set of ambiguous fields, we forbid all of them from
-	// being materialized, and suggest an alternate projection be used instead.
-	ambiguousFields := make(map[string][]string) // Translated endpoint field name -> List of Flow collection field names
-	for field := range constraints {
-		efn := v.is.translateField(field)
-		ambiguousFields[efn] = append(ambiguousFields[efn], field)
-	}
-	for efn, flowFields := range ambiguousFields {
-		if len(flowFields) == 1 {
-			// No ambiguity, since only a single Flow field translates to this endpoint field name.
-			continue
-		}
+// ambiguousFields determines if the given projection is part of a set of projections that would
+// result in ambiguous field names in the destination system. Fields are "ambiguous" if their
+// destination treats more than one Flow collection field name as the same materialized field name.
+// For example, if a destination is strictly case-insensitive and lowercases all field names,
+// `ThisField` and `thisField` are ambiguous and cannot be materialized together. If there is a set
+// of ambiguous fields, only a single one of them can be materialized.
+func (v Validator) ambiguousFields(p pf.Projection, ps []pf.Projection) []string {
+	ambiguous := []string{}
+	endpointFieldName := v.is.translateField(p.Field)
 
-		slices.Sort(flowFields)
-		for _, f := range flowFields {
-			constraints[f] = &pm.Response_Validated_Constraint{
-				Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-				Reason: fmt.Sprintf(
-					"Flow collection field '%s' would be materialized `%s`, which is ambiguous with the materializations for other Flow collection fields [%s]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized.",
-					f,
-					efn,
-					strings.Join(flowFields, ","),
-				)}
+	for _, pp := range ps {
+		if p.Field != pp.Field && endpointFieldName == v.is.translateField(pp.Field) {
+			ambiguous = append(ambiguous, pp.Field)
 		}
 	}
 
-	return constraints
+	slices.Sort(ambiguous)
+
+	return ambiguous
+}
+
+// ambiguousFieldIsSelected returns true if any of the selected fields are ambiguous with the
+// provided projection, excluding the projection itself being selected.
+func (v Validator) ambiguousFieldIsSelected(p pf.Projection, fieldSelection []string) bool {
+	endpointFieldName := v.is.translateField(p.Field)
+
+	for _, f := range fieldSelection {
+		if f != p.Field && endpointFieldName == v.is.translateField(f) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // findExistingBinding locates a binding within an existing stored specification, and verifies that

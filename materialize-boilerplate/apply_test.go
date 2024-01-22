@@ -117,7 +117,7 @@ func TestApply(t *testing.T) {
 			app := &testApplier{
 				storedSpec: tt.originalSpec,
 			}
-			is := testInfoSchemaFromSpec(t, tt.originalSpec)
+			is := testInfoSchemaFromSpec(t, tt.originalSpec, simpleTestTransform)
 
 			req := &pm.Request_Apply{Materialization: tt.newSpec, Version: "aVersion"}
 
@@ -242,14 +242,9 @@ func (a *testApplier) getResults() testResults {
 
 // testInfoSchemaFromSpec constructs a mock InfoSchema from a spec that represents an existing table
 // with all the fields from the field selection.
-func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec) *InfoSchema {
+func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform func(string) string) *InfoSchema {
 	t.Helper()
 
-	// Hypothetical one-way transformation of path components and field names. I really hope no
-	// system we ever materialize to actually does this.
-	transform := func(in string) string {
-		return in + "_transformed"
-	}
 	transformPath := func(in []string) []string {
 		out := make([]string, 0, len(in))
 		for _, p := range in {
@@ -283,4 +278,12 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec) *InfoSchema
 	}
 
 	return is
+}
+
+func simpleTestTransform(in string) string {
+	return in + "_transformed"
+}
+
+func ambiguousTestTransform(in string) string {
+	return strings.ToLower(in)
 }

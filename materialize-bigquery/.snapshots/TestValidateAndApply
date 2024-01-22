@@ -1,4 +1,5 @@
 Big Schema Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
@@ -37,6 +38,7 @@ Big Schema Initial Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Big Schema Re-validated Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
@@ -75,6 +77,7 @@ Big Schema Re-validated Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Changed Types Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"boolField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BOOL' and cannot be changed to type '[integer]'"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
@@ -113,6 +116,7 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"arrayField","Nullable":"NO","Type":"STRING"}
 {"Name":"boolField","Nullable":"NO","Type":"BOOL"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
@@ -150,6 +154,7 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"stringUuidField","Nullable":"NO","Type":"STRING"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"arrayField","Nullable":"YES","Type":"STRING"}
 {"Name":"boolField","Nullable":"YES","Type":"BOOL"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
@@ -187,6 +192,7 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"stringUuidField","Nullable":"YES","Type":"STRING"}
 
 Big Schema Changed Types With Table Replacement Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
@@ -225,6 +231,7 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Big Schema Materialized Resource Schema Changed Types With Table Replacement:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"arrayField","Nullable":"NO","Type":"STRING"}
 {"Name":"boolField","Nullable":"NO","Type":"INT64"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
@@ -263,6 +270,7 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"stringUuidField","Nullable":"NO","Type":"STRING"}
 
 add a single field:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"addedOptionalString","Nullable":"YES","Type":"STRING"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP"}
@@ -277,6 +285,7 @@ add a single field:
 {"Name":"requiredString","Nullable":"NO","Type":"STRING"}
 
 remove a single optional field:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP"}
 {"Name":"key","Nullable":"NO","Type":"STRING"}
@@ -290,6 +299,7 @@ remove a single optional field:
 {"Name":"requiredString","Nullable":"NO","Type":"STRING"}
 
 remove a single required field:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP"}
 {"Name":"key","Nullable":"NO","Type":"STRING"}
@@ -303,6 +313,7 @@ remove a single required field:
 {"Name":"requiredString","Nullable":"YES","Type":"STRING"}
 
 add and remove many fields:
+{"Name":"_meta_flow_truncated","Nullable":"NO","Type":"BOOL"}
 {"Name":"addedOptionalString","Nullable":"YES","Type":"STRING"}
 {"Name":"addedRequiredString","Nullable":"YES","Type":"STRING"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
