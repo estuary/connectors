@@ -47,7 +47,7 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 		}
 	}
 	if checkpoint.Streams == nil {
-		checkpoint.Streams = make(map[snowflakeObject]*streamState)
+		checkpoint.Streams = make(map[boilerplate.StateKey]*streamState)
 	}
 
 	var ctx = stream.Context()
@@ -63,7 +63,7 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 	}
 	defer db.Close()
 
-	var bindings = make(map[snowflakeObject]*captureBinding)
+	var bindings = make(map[boilerplate.StateKey]*captureBinding)
 	var prerequisiteErrs = setupPrerequisites(ctx, cfg, db)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
@@ -92,7 +92,7 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 			prerequisiteErrs = append(prerequisiteErrs, err)
 			continue
 		}
-		bindings[table] = &captureBinding{
+		bindings[boilerplate.StateKey(binding.StateKey)] = &captureBinding{
 			Index:        idx,
 			Table:        table,
 			OrderColumns: orderColumns,
@@ -118,7 +118,7 @@ type capture struct {
 	Config   *config
 	DB       *sql.DB
 	State    *captureState
-	Bindings map[snowflakeObject]*captureBinding
+	Bindings map[boilerplate.StateKey]*captureBinding
 	Output   *boilerplate.PullOutput
 }
 
@@ -129,7 +129,7 @@ type captureBinding struct {
 }
 
 type captureState struct {
-	Streams map[snowflakeObject]*streamState `json:"streams"`
+	Streams map[boilerplate.StateKey]*streamState `json:"streams"`
 }
 
 func (s captureState) Validate() error {
@@ -137,8 +137,10 @@ func (s captureState) Validate() error {
 }
 
 type streamState struct {
-	SequenceNumber int `json:"seq"` // The sequence number of the current/next staging table to capture.
-	TableOffset    int `json:"off"` // The offset within the current staging table.
+	Disabled       bool            `json:"disabled,omitempty"` // True when there is no longer a binding corresponding to this table
+	SourceTable    snowflakeObject `json:"table"`              // The source table being captured from
+	SequenceNumber int             `json:"seq"`                // The sequence number of the current/next staging table to capture.
+	TableOffset    int             `json:"off"`                // The offset within the current staging table.
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -150,37 +152,34 @@ func (c *capture) Run(ctx context.Context) error {
 	}
 
 	log.Debug("processing added/removed bindings")
-	var removedStreams, err = c.updateState(ctx)
-	if err != nil {
+	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error processing added/removed bindings: %w", err)
 	}
 
-	if err := c.pruneDeletedStreams(ctx, removedStreams); err != nil {
+	if err := c.pruneDeletedStreams(ctx); err != nil {
 		return fmt.Errorf("error pruning deleted streams: %w", err)
 	}
 
-	highestStaged, err := c.pruneStagingTables(ctx, removedStreams)
+	highestStaged, err := c.pruneStagingTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error pruning staging tables: %w", err)
 	}
 
-	// Sort the list of streams so that we can capture each of them in a deterministic order.
-	var tables []snowflakeObject
-	for table := range c.State.Streams {
-		tables = append(tables, table)
-	}
-	slices.SortFunc(tables, func(a, b snowflakeObject) int {
-		if a.Schema != b.Schema {
-			return strings.Compare(a.Schema, b.Schema)
+	// Sort the list of (active) streams so that we can capture
+	// each of them in a deterministic order.
+	var activeKeys []boilerplate.StateKey
+	for stateKey, streamState := range c.State.Streams {
+		if !streamState.Disabled {
+			activeKeys = append(activeKeys, stateKey)
 		}
-		return strings.Compare(a.Name, b.Name)
-	})
+	}
+	slices.Sort(activeKeys)
 
-	for _, table := range tables {
-		var streamState = c.State.Streams[table]
-		var binding = c.Bindings[table]
+	for _, stateKey := range activeKeys {
+		var streamState = c.State.Streams[stateKey]
+		var binding = c.Bindings[stateKey]
 		if binding == nil {
-			return fmt.Errorf("internal error: unknown binding for table %q", table.String())
+			return fmt.Errorf("internal error: unknown binding %q", stateKey)
 		}
 
 		// For each stream, we decide what our target sequence number is. In the overwhelmingly
@@ -188,7 +187,7 @@ func (c *capture) Run(ctx context.Context) error {
 		// but it is possible to end up with some "leftover" staging tables and in these cases
 		// we want to consume those tables *plus one more* which we will create shortly.
 		var targetSeq = streamState.SequenceNumber
-		if staged, ok := highestStaged[table]; ok {
+		if staged, ok := highestStaged[stateKey]; ok {
 			targetSeq = staged + 1
 		}
 
@@ -196,7 +195,7 @@ func (c *capture) Run(ctx context.Context) error {
 		// The captureStagingTable() operation will be responsible for updating the stream
 		// state when done, since it's already handling checkpoints and partial progress.
 		for streamState.SequenceNumber <= targetSeq {
-			if err := c.captureStagingTable(ctx, table, binding.OrderColumns); err != nil {
+			if err := c.captureStagingTable(ctx, stateKey); err != nil {
 				return fmt.Errorf("error capturing staging table %d: %w", streamState.SequenceNumber, err)
 			}
 		}
@@ -204,62 +203,72 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) updateState(ctx context.Context) ([]snowflakeObject, error) {
-	var updatedStreams = make(map[snowflakeObject]*streamState)
-	var removedStreams []snowflakeObject
+func (c *capture) updateState(ctx context.Context) error {
+	var updatedStreams = make(map[boilerplate.StateKey]*streamState)
 
-	// Prune deleted streams from the state.
-	for table := range c.State.Streams {
-		if _, ok := c.Bindings[table]; !ok {
-			log.WithField("table", table.String()).Info("binding removed")
-			delete(c.State.Streams, table)
-			updatedStreams[table] = nil
-			removedStreams = append(removedStreams, table)
+	// Mark disabled/deleted bindings as disabled in the corresponding checkpoint state.
+	for stateKey, prevState := range c.State.Streams {
+		if prevState.Disabled {
+			continue
+		}
+		if _, ok := c.Bindings[stateKey]; !ok {
+			log.WithField("stateKey", stateKey).Info("binding removed")
+			var state = &streamState{
+				Disabled:    true,
+				SourceTable: prevState.SourceTable,
+			}
+			c.State.Streams[stateKey] = state
+			updatedStreams[stateKey] = state
 		}
 	}
 
 	// Identify newly added streams, clone initial table contents, and initialize stream state.
-	for _, binding := range c.Bindings {
-		if _, ok := c.State.Streams[binding.Table]; !ok {
+	for stateKey, binding := range c.Bindings {
+		if prevState, ok := c.State.Streams[stateKey]; !ok || prevState.Disabled {
 			log.WithField("table", binding.Table.String()).Info("binding added")
 
 			streamName, err := createChangeStream(ctx, c.Config, c.DB, c.Name, binding.Table)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			log.WithField("stream", streamName.String()).Debug("created change stream")
 
 			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, c.Name, binding.Table, initialCloneSequenceNumber)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			log.WithField("staged", stagingName.String()).Debug("cloned into staging table")
 
-			var state = &streamState{SequenceNumber: initialCloneSequenceNumber}
-			c.State.Streams[binding.Table] = state
-			updatedStreams[binding.Table] = state
+			var state = &streamState{
+				SourceTable:    binding.Table,
+				SequenceNumber: initialCloneSequenceNumber,
+			}
+			c.State.Streams[stateKey] = state
+			updatedStreams[stateKey] = state
 		}
 	}
 
 	// Emit a new checkpoint patch reflecting these deletions and initializations.
 	if len(updatedStreams) > 0 {
 		if updateCheckpoint, err := json.Marshal(&captureState{Streams: updatedStreams}); err != nil {
-			return nil, fmt.Errorf("error marshalling checkpoint: %w", err)
+			return fmt.Errorf("error marshalling checkpoint: %w", err)
 		} else if err := c.Output.Checkpoint(updateCheckpoint, true); err != nil {
-			return nil, fmt.Errorf("error emitting checkpoint: %w", err)
+			return fmt.Errorf("error emitting checkpoint: %w", err)
 		}
 	}
-	return removedStreams, nil
+	return nil
 }
 
-func (c *capture) pruneDeletedStreams(ctx context.Context, removedStreams []snowflakeObject) error {
+func (c *capture) pruneDeletedStreams(ctx context.Context) error {
 	log.WithField("flowSchema", c.Config.Advanced.FlowSchema).Info("pruning deleted streams")
 
-	// Build a mapping from unique ID strings to deletion status. The function from table name
-	// to ID is one-way, so we have to build the inverse mapping from known table names here.
+	// Build a mapping from unique ID strings to deletion status. The function from
+	// table names to IDs is one-way, so we have to build an inverse mapping for all
+	// known tables here.
 	var idToRemovedStatus = make(map[string]bool)
-	for _, table := range removedStreams {
-		idToRemovedStatus[table.UniqueID(c.Name)] = true
+	for _, streamState := range c.State.Streams {
+		var uniqueID = streamState.SourceTable.UniqueID(c.Name)
+		idToRemovedStatus[uniqueID] = streamState.Disabled
 	}
 
 	// Enumerate streams in the appropriate schema
@@ -313,20 +322,18 @@ func (c *capture) pruneDeletedStreams(ctx context.Context, removedStreams []snow
 //
 // Since newly-added bindings have their initial table snapshot cloned before the stream
 // state is initialized, that snapshot can be viewed as just another staging table here.
-func (c *capture) pruneStagingTables(ctx context.Context, removedStreams []snowflakeObject) (map[snowflakeObject]int, error) {
+func (c *capture) pruneStagingTables(ctx context.Context) (map[boilerplate.StateKey]int, error) {
 	log.WithField("flowSchema", c.Config.Advanced.FlowSchema).Info("pruning staging tables")
 
-	// Build mappings from unique ID strings to the corresponding table name
-	// (for active bindings) and removed status (for bindings removed in this
-	// connector invocation). The function from table name to ID is one-way, so
-	// we have to build the inverse mapping from known table names here.
-	var idToSourceTable = make(map[string]snowflakeObject)
-	for table := range c.State.Streams {
-		idToSourceTable[table.UniqueID(c.Name)] = table
-	}
+	// Build a mapping from unique ID strings to state key and deletion status. The function
+	// from table names to IDs is one-way, so we have to build an inverse mapping for all
+	// known tables here.
+	var idToStateKey = make(map[string]boilerplate.StateKey)
 	var idToRemovedStatus = make(map[string]bool)
-	for _, table := range removedStreams {
-		idToRemovedStatus[table.UniqueID(c.Name)] = true
+	for stateKey, streamState := range c.State.Streams {
+		var uniqueID = streamState.SourceTable.UniqueID(c.Name)
+		idToRemovedStatus[uniqueID] = streamState.Disabled
+		idToStateKey[uniqueID] = stateKey
 	}
 
 	// Enumerate staging tables in the appropriate schema
@@ -339,7 +346,7 @@ func (c *capture) pruneStagingTables(ctx context.Context, removedStreams []snowf
 
 	// Iterate over the list of staging tables and make a list of ones needing deletion.
 	var needsDeletion []string
-	var highestStaged = make(map[snowflakeObject]int)
+	var highestStaged = make(map[boilerplate.StateKey]int)
 	for _, stagingTable := range stagingTables {
 		// Split the name on underscores and extract the sequence number and unique ID portions.
 		var bits = strings.SplitN(stagingTable.Name, "_", 4)
@@ -362,12 +369,12 @@ func (c *capture) pruneStagingTables(ctx context.Context, removedStreams []snowf
 			needsDeletion = append(needsDeletion, stagingTable.Name)
 			continue
 		}
-		var sourceTable, sourceTableKnown = idToSourceTable[uniqueID]
+		var stateKey, sourceTableKnown = idToStateKey[uniqueID]
 		if !sourceTableKnown {
 			log.WithField("name", stagingTable.Name).Debug("will not prune staging table of unknown binding")
 			continue
 		}
-		var streamState = c.State.Streams[sourceTable]
+		var streamState = c.State.Streams[stateKey]
 		if int(sequenceNumber) < streamState.SequenceNumber {
 			log.WithField("name", stagingTable.Name).Debug("will prune staging table which has been fully captured")
 			needsDeletion = append(needsDeletion, stagingTable.Name)
@@ -377,8 +384,8 @@ func (c *capture) pruneStagingTables(ctx context.Context, removedStreams []snowf
 		// Since we're already enumerating staging tables and parsing their names, we also
 		// want to keep track of the highest staging table index observed for later. Using
 		// greater-or-equal comparison here ensures that zero works consistently.
-		if int(sequenceNumber) >= highestStaged[sourceTable] {
-			highestStaged[sourceTable] = int(sequenceNumber)
+		if int(sequenceNumber) >= highestStaged[stateKey] {
+			highestStaged[stateKey] = int(sequenceNumber)
 		}
 	}
 
@@ -393,9 +400,12 @@ func (c *capture) pruneStagingTables(ctx context.Context, removedStreams []snowf
 	return highestStaged, nil
 }
 
-func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject, orderColumns []string) error {
-	var streamState = c.State.Streams[table]
-	var stagingName = stagingTableName(c.Config, c.Name, table, streamState.SequenceNumber)
+func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.StateKey) error {
+	var streamState = c.State.Streams[stateKey]
+	var binding = c.Bindings[stateKey]
+	var table = binding.Table
+	var orderColumns = binding.OrderColumns
+	var stagingName = stagingTableName(c.Config, c.Name, binding.Table, streamState.SequenceNumber)
 	var logEntry = log.WithFields(log.Fields{
 		"table": table.String(),
 		"seq":   streamState.SequenceNumber,
@@ -409,7 +419,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 
 	// Generate a query to read the staging table contents.
 	var quotedOrderColumns []string
-	for _, orderColumn := range orderColumns {
+	for _, orderColumn := range binding.OrderColumns {
 		quotedOrderColumns = append(quotedOrderColumns, quoteSnowflakeIdentifier(orderColumn))
 	}
 	var queryBuf = new(strings.Builder)
@@ -560,7 +570,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 			// When we don't have a usable list of ordering columns, just unconditionally emit
 			// a partial-progress checkpoint between every K documents.
 			if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing {
-				if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
+				if err := c.emitCheckpoint(ctx, stateKey, streamState); err != nil {
 					return err
 				}
 				documentsSinceLastCheckpoint = 0
@@ -609,7 +619,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 			// the minimum spacing. But doing it this way means that things should work correctly
 			// even on atypical datasets.
 			if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing && currentDocumentKeyHash != previousDocumentKeyHash {
-				if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
+				if err := c.emitCheckpoint(ctx, stateKey, streamState); err != nil {
 					return err
 				}
 				documentsSinceLastCheckpoint = 0
@@ -617,7 +627,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 			previousDocumentKeyHash = currentDocumentKeyHash
 		}
 
-		if err := c.emitDocument(ctx, table, document); err != nil {
+		if err := c.emitDocument(ctx, stateKey, document); err != nil {
 			return err
 		}
 
@@ -631,7 +641,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 	logEntry.WithField("off", streamState.TableOffset).Info("done querying staging table")
 	streamState.TableOffset = 0
 	streamState.SequenceNumber++
-	if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
+	if err := c.emitCheckpoint(ctx, stateKey, streamState); err != nil {
 		return err
 	}
 	return nil
@@ -671,25 +681,25 @@ func translateFieldValue(x any, ctype *sql.ColumnType) (any, error) {
 	return x, nil
 }
 
-func (c *capture) emitDocument(ctx context.Context, table snowflakeObject, document any) error {
-	var binding = c.Bindings[table]
+func (c *capture) emitDocument(ctx context.Context, stateKey boilerplate.StateKey, document any) error {
+	var binding = c.Bindings[stateKey]
 	if binding == nil {
-		return fmt.Errorf("internal error: unknown binding for table %q", table.String())
+		return fmt.Errorf("internal error: unknown binding %q", stateKey)
 	}
 	var bs, err = json.Marshal(document)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"doc":   fmt.Sprintf("%#v", document),
-			"table": table.String(),
+			"table": binding.Table.String(),
 			"err":   err,
 		}).Error("document serialization error")
-		return fmt.Errorf("error serializing document from table %q: %w", table.String(), err)
+		return fmt.Errorf("error serializing document from table %q: %w", binding.Table.String(), err)
 	}
 	return c.Output.Documents(binding.Index, bs)
 }
 
-func (c *capture) emitCheckpoint(ctx context.Context, table snowflakeObject, state *streamState) error {
-	var updateStreams = map[snowflakeObject]*streamState{table: state}
+func (c *capture) emitCheckpoint(ctx context.Context, stateKey boilerplate.StateKey, state *streamState) error {
+	var updateStreams = map[boilerplate.StateKey]*streamState{stateKey: state}
 	if updateCheckpoint, err := json.Marshal(&captureState{Streams: updateStreams}); err != nil {
 		return fmt.Errorf("error marshalling checkpoint: %w", err)
 	} else if err := c.Output.Checkpoint(updateCheckpoint, true); err != nil {
