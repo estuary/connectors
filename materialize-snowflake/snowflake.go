@@ -245,7 +245,7 @@ type transactor struct {
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	var cp checkpoint
 	if err := json.Unmarshal(state, &cp); err != nil {
-		return fmt.Errorf("parsing state: %w", err)
+		return err
 	}
 	d.cp = cp
 
@@ -523,7 +523,7 @@ func renderWithDir(tpl string, dir string) string {
 	return fmt.Sprintf(tpl, dir)
 }
 
-// applyCheckpoint merges data from temporary table to main table
+// Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")

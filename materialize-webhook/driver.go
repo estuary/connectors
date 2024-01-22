@@ -150,6 +150,9 @@ type transactor struct {
 	addresses []*url.URL
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 // Load should not be called and panics.
 func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {

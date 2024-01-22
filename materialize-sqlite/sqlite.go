@@ -279,6 +279,9 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (d *transactor) Load(
 	it *m.LoadIterator,
 	loaded func(int, json.RawMessage) error,
@@ -359,13 +362,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() error {
 			if err = txn.Commit(); err != nil {
-				return nil, fmt.Errorf("commit transaction: %w", err)
+				return fmt.Errorf("commit transaction: %w", err)
 			}
 
-			return nil, nil
+			return nil
 		})
 	}, nil
 }

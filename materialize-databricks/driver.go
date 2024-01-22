@@ -109,6 +109,10 @@ func newDatabricksDriver() *sql.Driver {
 type transactor struct {
 	cfg *config
 
+	cp checkpoint
+	// is this checkpoint a recovered checkpoint?
+	cpRecovery bool
+
 	wsClient *databricks.WorkspaceClient
 
 	localStagingPath string
@@ -130,6 +134,17 @@ type transactor struct {
 
 func (t transactor) Context(ctx context.Context) context.Context {
 	return driverctx.NewContextWithStagingInfo(ctx, []string{t.localStagingPath})
+}
+
+func (d *transactor) UnmarshalState(state json.RawMessage) error {
+	var cp checkpoint
+	if err := json.Unmarshal(state, &cp); err != nil {
+		return err
+	}
+	d.cp = cp
+	d.cpRecovery = true
+
+	return nil
 }
 
 func newTransactor(
@@ -191,17 +206,6 @@ func newTransactor(
 	// Create volume for storing staged files
 	if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS %s.%s;", cfg.SchemaName, volumeName)); err != nil {
 		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
-	}
-
-	var cp checkpoint
-	if open.StateJson != nil {
-		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
-			return nil, fmt.Errorf("parsing driver config: %w", err)
-		}
-	}
-
-	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
-		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
 	// Build a query which unions the results of each load subquery.
@@ -501,20 +505,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	log.Info("store: finished file upload and copies")
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
+		d.cp = cp
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = func(ctx context.Context) (*pf.ConnectorState, error) {
-			select {
-			case <-runtimeAckCh:
-				return nil, d.applyCheckpoint(ctx, cp, false)
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
+		var commitOp = func(ctx context.Context) error {
+			<-ctx.Done()
+			return ctx.Err()
 		}
 
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, sql.CommitWithDelay(ctx, d.store.round, d.updateDelay, it.Total, commitOp)
@@ -528,28 +529,30 @@ func renderWithFiles(tpl string, files ...string) string {
 	return fmt.Sprintf(tpl, s)
 }
 
-// applyCheckpoint merges data from temporary table to main table
+// Acknowledge merges data from temporary table to main table
 // TODO: run these queries concurrently for improved performance
-func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
+func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	log.Info("store: starting committing changes")
-	for _, q := range cp.Queries {
+	for _, q := range d.cp.Queries {
 		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
 			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 			// it is okay to skip them in this case
-			if recovery {
+			if d.cpRecovery {
 				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
 					continue
 				}
 			}
-			return fmt.Errorf("query %q failed: %w", q, err)
+			return nil, fmt.Errorf("query %q failed: %w", q, err)
 		}
 	}
 	log.Info("store: finished committing changes")
 
 	// Cleanup files and tables
-	d.deleteFiles(ctx, cp.ToDelete)
+	d.deleteFiles(ctx, d.cp.ToDelete)
 
-	return nil
+	d.cpRecovery = false
+
+	return nil, nil
 }
 
 func (d *transactor) Destroy() {

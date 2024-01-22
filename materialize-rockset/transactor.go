@@ -44,6 +44,9 @@ type transactor struct {
 	bindings []*binding
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
 	for it.Next() {
 		panic("Rockset is not transactional - Load should never be called")

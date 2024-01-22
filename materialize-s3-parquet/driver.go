@@ -302,6 +302,9 @@ type transactor struct {
 	lastUploadTime       time.Time
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("Load should never be called for materialize-s3-parquet.Driver")
@@ -316,7 +319,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Retain runtime checkpoint for it to be potentially encoded in a
 		// driverCheckpointJSON produced as part of a future call to maybeUpload().
 		var err error
@@ -356,10 +359,6 @@ func (t *transactor) maybeUpload() error {
 		t.lastUploadTime = now
 	}
 
-	return nil
-}
-
-func (t *transactor) Acknowledge(context.Context) error {
 	return nil
 }
 
