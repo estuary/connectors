@@ -20,6 +20,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/alternate-root.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/increment-backfill.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullable-key.flow.yaml
 
 //go:embed testdata/validate/generated_specs
 var validateFS embed.FS
@@ -261,6 +262,45 @@ func TestValidate(t *testing.T) {
 		)
 
 		require.ErrorContains(t, err, "cannot add a new binding to materialize collection 'other' to '[key_value]' because an existing binding for collection 'key/value' is already materializing to '[key_value]'")
+	})
+
+	t.Run("can't materialize a nullable collection key with no default value", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
+
+		require.Equal(t, "key", proposed.Bindings[0].Collection.Projections[3].Field)
+		proposed.Bindings[0].Collection.Projections[3].Inference.DefaultJson = nil
+
+		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
+		validator := NewValidator(testConstrainter{}, is)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil,
+		)
+
+		require.ErrorContains(t, err, "cannot materialize collection with nullable key field 'key' unless it has a default value annotation")
+	})
+
+	t.Run("can materialize a nullable collection key with a default value", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
+
+		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
+		validator := NewValidator(testConstrainter{}, is)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil,
+		)
+
+		require.NoError(t, err)
 	})
 }
 
