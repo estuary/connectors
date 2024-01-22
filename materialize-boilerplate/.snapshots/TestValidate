@@ -1,4 +1,5 @@
 new materialization - standard updates:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
@@ -11,6 +12,7 @@ new materialization - standard updates:
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
 
 same binding again - standard updates:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -23,6 +25,7 @@ same binding again - standard updates:
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 new materialization - delta updates:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
@@ -35,6 +38,7 @@ new materialization - delta updates:
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 
 same binding again - delta updates:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -47,6 +51,7 @@ same binding again - delta updates:
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 
 binding update with incompatible changes:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -59,6 +64,7 @@ binding update with incompatible changes:
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 fields exist in destination but not in collection:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -68,6 +74,7 @@ fields exist in destination but not in collection:
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 change root document projection for standard updates:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -79,6 +86,7 @@ change root document projection for standard updates:
 {"Field":"second_root","Type":6,"TypeString":"UNSATISFIABLE","Reason":"The root document must be materialized as field 'flow_document'"}
 
 change root document projection for delta updates:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -90,6 +98,7 @@ change root document projection for delta updates:
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 
 increment backfill counter:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
@@ -102,6 +111,7 @@ increment backfill counter:
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
 
 table already exists with identical spec:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -114,6 +124,7 @@ table already exists with identical spec:
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 table already exists with incompatible proposed spec:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -124,5 +135,44 @@ table already exists with incompatible proposed spec:
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+
+new materialization with ambiguous fields:
+{"Field":"FIRSTBADFIELD","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'FIRSTBADFIELD' would be materialized as 'firstbadfield', which is ambiguous with fields [firstBadField,firstbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"SECONDBADFIELD","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'SECONDBADFIELD' would be materialized as 'secondbadfield', which is ambiguous with fields [secondBadField,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"firstBadField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'firstBadField' would be materialized as 'firstbadfield', which is ambiguous with fields [FIRSTBADFIELD,firstbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"firstbadfield","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'firstbadfield' would be materialized as 'firstbadfield', which is ambiguous with fields [FIRSTBADFIELD,firstBadField]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"goodField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"secondBadField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondBadField' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"secondbadfield","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondbadfield' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondBadField]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+
+table already exists with a column for an ambiguous field for a new materialization:
+{"Field":"FIRSTBADFIELD","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'FIRSTBADFIELD' would be materialized as 'firstbadfield', which is ambiguous with fields [firstBadField,firstbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"SECONDBADFIELD","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'SECONDBADFIELD' would be materialized as 'secondbadfield', which is ambiguous with fields [secondBadField,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"firstBadField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'firstBadField' would be materialized as 'firstbadfield', which is ambiguous with fields [FIRSTBADFIELD,firstbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"firstbadfield","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'firstbadfield' would be materialized as 'firstbadfield', which is ambiguous with fields [FIRSTBADFIELD,firstBadField]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"goodField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"secondBadField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondBadField' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"secondbadfield","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondbadfield' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondBadField]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+
+update an existing materialization with ambiguous fields:
+{"Field":"FIRSTBADFIELD","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Flow collection field 'FIRSTBADFIELD' is ambiguous with fields already being materialized as 'firstbadfield' in the destination. Consider using an alternate, unambiguous projection of this field to allow it to be materialized"}
+{"Field":"SECONDBADFIELD","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'SECONDBADFIELD' would be materialized as 'secondbadfield', which is ambiguous with fields [secondBadField,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"firstBadField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"firstbadfield","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Flow collection field 'firstbadfield' is ambiguous with fields already being materialized as 'firstbadfield' in the destination. Consider using an alternate, unambiguous projection of this field to allow it to be materialized"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"goodField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"secondBadField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondBadField' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
+{"Field":"secondbadfield","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondbadfield' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondBadField]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
 
 

@@ -19,6 +19,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/fewer-fields.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/alternate-root.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/increment-backfill.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields.flow.yaml
 
 //go:embed testdata/validate/generated_specs
 var validateFS embed.FS
@@ -36,97 +37,133 @@ func loadValidateSpec(t *testing.T, path string) *pf.MaterializationSpec {
 
 func TestValidate(t *testing.T) {
 	type testCase struct {
-		name              string
-		deltaUpdates      bool
-		specForInfoSchema *pf.MaterializationSpec
-		existingSpec      *pf.MaterializationSpec
-		proposedSpec      *pf.MaterializationSpec
+		name               string
+		deltaUpdates       bool
+		specForInfoSchema  *pf.MaterializationSpec
+		existingSpec       *pf.MaterializationSpec
+		proposedSpec       *pf.MaterializationSpec
+		fieldNameTransform func(string) string
 	}
 
 	tests := []testCase{
 		{
-			name:              "new materialization - standard updates",
-			deltaUpdates:      false,
-			specForInfoSchema: nil,
-			existingSpec:      nil,
-			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+			name:               "new materialization - standard updates",
+			deltaUpdates:       false,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "same binding again - standard updates",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+			name:               "same binding again - standard updates",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "new materialization - delta updates",
-			deltaUpdates:      true,
-			specForInfoSchema: nil,
-			existingSpec:      nil,
-			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+			name:               "new materialization - delta updates",
+			deltaUpdates:       true,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "same binding again - delta updates",
-			deltaUpdates:      true,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+			name:               "same binding again - delta updates",
+			deltaUpdates:       true,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "binding update with incompatible changes",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "incompatible-changes.flow.proto"),
+			name:               "binding update with incompatible changes",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "fields exist in destination but not in collection",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "fewer-fields.flow.proto"),
+			name:               "fields exist in destination but not in collection",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "fewer-fields.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "change root document projection for standard updates",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "alternate-root.flow.proto"),
+			name:               "change root document projection for standard updates",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "change root document projection for delta updates",
-			deltaUpdates:      true,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "alternate-root.flow.proto"),
+			name:               "change root document projection for delta updates",
+			deltaUpdates:       true,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "increment backfill counter",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
-			proposedSpec:      loadValidateSpec(t, "increment-backfill.flow.proto"),
+			name:               "increment backfill counter",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "table already exists with identical spec",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      nil,
-			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+			name:               "table already exists with identical spec",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
 		},
 		{
-			name:              "table already exists with incompatible proposed spec",
-			deltaUpdates:      false,
-			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
-			existingSpec:      nil,
-			proposedSpec:      loadValidateSpec(t, "incompatible-changes.flow.proto"),
+			name:               "table already exists with incompatible proposed spec",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+		},
+		{
+			name:               "new materialization with ambiguous fields",
+			deltaUpdates:       false,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			fieldNameTransform: ambiguousTestTransform,
+		},
+		{
+			name:               "table already exists with a column for an ambiguous field for a new materialization",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			fieldNameTransform: ambiguousTestTransform,
+		},
+		{
+			name:               "update an existing materialization with ambiguous fields",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			fieldNameTransform: ambiguousTestTransform,
 		},
 	}
 
 	var snap strings.Builder
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema)
+			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
 			validator := NewValidator(testConstrainter{}, is)
 
 			cs, err := validator.ValidateBinding(
@@ -148,7 +185,7 @@ func TestValidate(t *testing.T) {
 	t.Run("can't decrement backfill counter", func(t *testing.T) {
 		existing := loadValidateSpec(t, "increment-backfill.flow.proto")
 		proposed := loadValidateSpec(t, "base.flow.proto")
-		is := testInfoSchemaFromSpec(t, existing)
+		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 		validator := NewValidator(testConstrainter{}, is)
 
 		_, err := validator.ValidateBinding(
@@ -169,7 +206,7 @@ func TestValidate(t *testing.T) {
 
 		existing.Bindings[0].DeltaUpdates = true
 
-		is := testInfoSchemaFromSpec(t, existing)
+		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 		validator := NewValidator(testConstrainter{}, is)
 
 		_, err := validator.ValidateBinding(
@@ -190,7 +227,7 @@ func TestValidate(t *testing.T) {
 
 		proposed.Bindings[0].DeltaUpdates = true
 
-		is := testInfoSchemaFromSpec(t, existing)
+		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 		validator := NewValidator(testConstrainter{}, is)
 
 		_, err := validator.ValidateBinding(
@@ -211,7 +248,7 @@ func TestValidate(t *testing.T) {
 
 		proposed.Bindings[0].Collection.Name = pf.Collection("other")
 
-		is := testInfoSchemaFromSpec(t, existing)
+		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 		validator := NewValidator(testConstrainter{}, is)
 
 		_, err := validator.ValidateBinding(
@@ -392,43 +429,6 @@ func TestAsFormattedNumeric(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestForbidAmbiguousFields(t *testing.T) {
-	translate := func(in string) string {
-		return strings.ToLower(in)
-	}
-
-	v := Validator{
-		is: NewInfoSchema(
-			func(in []string) []string {
-				out := make([]string, 0, len(in))
-				for _, i := range in {
-					out = append(out, translate(i))
-				}
-				return out
-			},
-			translate,
-		),
-	}
-
-	originalConstraints := map[string]*pm.Response_Validated_Constraint{
-		"onlyOne":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
-		"notGood":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "shouldn't be allowed"},
-		"NotGood":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "shouldn't be allowed"},
-		"somethingelse":  {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
-		"something_else": {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is also ok"},
-	}
-
-	want := map[string]*pm.Response_Validated_Constraint{
-		"onlyOne":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
-		"notGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'notGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [NotGood,notGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
-		"NotGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'NotGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [NotGood,notGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
-		"somethingelse":  {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
-		"something_else": {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is also ok"},
-	}
-
-	require.Equal(t, want, v.forbidAmbiguousFields(originalConstraints))
 }
 
 type testConstrainter struct{}
