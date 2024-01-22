@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"io"
@@ -43,21 +43,6 @@ func (t snowflakeObject) String() string {
 	return t.Schema + "." + t.Name
 }
 
-// UniqueID returns a string which can be used to uniquely identify resources (such
-// as streams and staging tables) related to the source table.
-//
-// This identifier combines a SHA-256 hash derived from the table's name and schema with
-// a human-readable suffix (truncated to ensure that we never exceed Snowflake identifier
-// length limits).
-func (t snowflakeObject) UniqueID(captureName string) string {
-	var hash = sha256.Sum256([]byte(fmt.Sprintf("capture: %s, schema: %s, table: %s", captureName, t.Schema, t.Name)))
-	var suffix = strings.ToUpper(fmt.Sprintf("%s_%s", t.Schema, t.Name))
-	if len(suffix) > 128 {
-		suffix = suffix[:128]
-	}
-	return fmt.Sprintf("%X_%s", string(hash[:]), suffix)
-}
-
 // QuotedName returns a quoted and fully-qualified version of the table name which
 // can be directly interpolated into a Snowflake SQL query.
 func (t snowflakeObject) QuotedName() string {
@@ -96,67 +81,65 @@ func unescapeTildes(x string) string {
 // createStagingTable captures the latest changes from a change stream into a staging
 // table with the specified sequence number. The operation is idempotent, if a staging
 // table with the desired sequence number already exists then this does nothing.
-func createStagingTable(ctx context.Context, cfg *config, db *sql.DB, captureName string, table snowflakeObject, seqno int) (snowflakeObject, error) {
-	var changeStreamName = changeStreamName(cfg, captureName, table)
-	var stagingTableName = stagingTableName(cfg, captureName, table, seqno)
+func createStagingTable(ctx context.Context, cfg *config, db *sql.DB, uniqueID string, seqno int) (snowflakeObject, error) {
+	var changeStream = changeStreamName(cfg, uniqueID)
+	var stagingTable = stagingTableName(cfg, uniqueID, seqno)
 	var createStagingTableQuery = fmt.Sprintf(
 		`CREATE TRANSIENT TABLE IF NOT EXISTS %s AS SELECT * FROM %s;`,
-		stagingTableName.QuotedName(),
-		changeStreamName.QuotedName(),
+		stagingTable.QuotedName(),
+		changeStream.QuotedName(),
 	)
 	if _, err := db.ExecContext(ctx, createStagingTableQuery); err != nil {
-		return snowflakeObject{}, fmt.Errorf("error reading stream %q into staging table %q: %w", changeStreamName, stagingTableName, err)
+		return snowflakeObject{}, fmt.Errorf("error reading stream %q into staging table %q: %w", changeStream, stagingTable, err)
 	}
-	return stagingTableName, nil
+	return stagingTable, nil
 }
 
-func createChangeStream(ctx context.Context, cfg *config, db *sql.DB, captureName string, table snowflakeObject) (snowflakeObject, error) {
-	var sourceTableName = table
-	var changeStreamName = changeStreamName(cfg, captureName, table)
+func createChangeStream(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, uniqueID string) (snowflakeObject, error) {
+	var changeStream = changeStreamName(cfg, uniqueID)
 	var createStreamQuery = fmt.Sprintf(
 		`CREATE STREAM IF NOT EXISTS %s ON TABLE %s;`,
-		changeStreamName.QuotedName(),
-		sourceTableName.QuotedName(),
+		changeStream.QuotedName(),
+		sourceTable.QuotedName(),
 	)
 	log.WithField("query", createStreamQuery).Debug("creating change stream")
 	if _, err := db.ExecContext(ctx, createStreamQuery); err != nil {
-		return changeStreamName, fmt.Errorf("error creating stream %s for table %s: %w", changeStreamName, sourceTableName, err)
+		return changeStream, fmt.Errorf("error creating stream %s for table %s: %w", changeStream, sourceTable, err)
 	}
-	return changeStreamName, nil
+	return changeStream, nil
 }
 
 // createInitialCloneTable clones the current state of the source table into a staging table
 // with the specified sequence number. The operation is idempotent, if a staging table with
 // the desired sequence number already exists then this does nothing.
-func createInitialCloneTable(ctx context.Context, cfg *config, db *sql.DB, captureName string, table snowflakeObject, seqno int) (snowflakeObject, error) {
-	var sourceTableName = table
-	var stagingTableName = stagingTableName(cfg, captureName, table, seqno)
+func createInitialCloneTable(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, uniqueID string, seqno int) (snowflakeObject, error) {
+	var stagingTable = stagingTableName(cfg, uniqueID, seqno)
 	var createStagingTableQuery = fmt.Sprintf(
 		`CREATE TRANSIENT TABLE IF NOT EXISTS %s CLONE %s;`,
-		stagingTableName.QuotedName(),
-		sourceTableName.QuotedName(),
+		stagingTable.QuotedName(),
+		sourceTable.QuotedName(),
 	)
 	if _, err := db.ExecContext(ctx, createStagingTableQuery); err != nil {
-		return stagingTableName, fmt.Errorf("error cloning source table %q into staging table %q: %w", sourceTableName, stagingTableName, err)
+		return stagingTable, fmt.Errorf("error cloning source table %q into staging table %q: %w", sourceTable, stagingTable, err)
 	}
-	return stagingTableName, nil
+	return stagingTable, nil
 }
 
 // changeStream returns the table name of the change stream which corresponds to a
-// specific source table.
-func changeStreamName(cfg *config, captureName string, table snowflakeObject) snowflakeObject {
+// specific binding's unique identifier.
+func changeStreamName(cfg *config, uniqueID string) snowflakeObject {
 	return snowflakeObject{
 		Schema: cfg.Advanced.FlowSchema,
-		Name:   fmt.Sprintf("flow_stream_%s", table.UniqueID(captureName)),
+		Name:   fmt.Sprintf("flow_stream_%s", uniqueID),
 	}
 }
 
 // stagingTableName returns the table name of a staging table with the specified
-// sequence number corresponding to a specific source table.
-func stagingTableName(cfg *config, captureName string, table snowflakeObject, seqno int) snowflakeObject {
+// sequence number corresponding to a specific binding's unique identifier.
+func stagingTableName(cfg *config, uniqueID string, seqno int) snowflakeObject {
 	return snowflakeObject{
 		Schema: cfg.Advanced.FlowSchema,
-		Name:   fmt.Sprintf("flow_staging_%012d_%s", seqno, table.UniqueID(captureName)),
+		Name:   fmt.Sprintf("flow_staging_%012d_%s", seqno, uniqueID),
 	}
 }
 
@@ -168,4 +151,24 @@ func stagingTableName(cfg *config, captureName string, table snowflakeObject, se
 // the identifier with a `""` pair.
 func quoteSnowflakeIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+// generateUniqueID returns a string which can be used to uniquely identify resources
+// (such as streams and staging tables) managed by the connector for a particular source
+// table.
+//
+// This identifier combines a random 64-bit nonce with a human-readable schema/table suffix
+// (truncated to ensure that we never exceed Snowflake identifier length limits). The table
+// name portion is purely for human convenience, in general these IDs must be treated as
+// non-invertible.
+func generateUniqueID(t snowflakeObject) string {
+	var nonce = make([]byte, 8)
+	if _, err := rand.Read(nonce); err != nil {
+		panic(fmt.Errorf("error generating random nonce: %w", err))
+	}
+	var suffix = strings.ToUpper(fmt.Sprintf("%s_%s", t.Schema, t.Name))
+	if len(suffix) > 128 {
+		suffix = suffix[:128]
+	}
+	return fmt.Sprintf("%X_%s", nonce, suffix)
 }

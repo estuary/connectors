@@ -129,6 +129,13 @@ type captureBinding struct {
 }
 
 type captureState struct {
+	// The per-stream state property is deliberately not named `bindingStateV1` because
+	// allowing the runtime to automatically prune deleted streams would interfere with
+	// the connector cleaning up streams and staging tables from disabled bindings.
+	//
+	// Currently the connector will not prune disabled entries either. If this ever becomes
+	// a significant issue, the connector can be modified to prune checkpoint state after
+	// ensuring that all old resources have been cleaned up.
 	Streams map[boilerplate.StateKey]*streamState `json:"streams"`
 }
 
@@ -137,10 +144,10 @@ func (s captureState) Validate() error {
 }
 
 type streamState struct {
-	Disabled       bool            `json:"disabled,omitempty"` // True when there is no longer a binding corresponding to this table
-	SourceTable    snowflakeObject `json:"table"`              // The source table being captured from
-	SequenceNumber int             `json:"seq"`                // The sequence number of the current/next staging table to capture.
-	TableOffset    int             `json:"off"`                // The offset within the current staging table.
+	Disabled       bool   `json:"disabled,omitempty"` // True when there is no longer a binding corresponding to this table
+	UniqueID       string `json:"uid"`                // The unique identifier for staging resources of this stream.
+	SequenceNumber int    `json:"seq"`                // The sequence number of the current/next staging table to capture.
+	TableOffset    int    `json:"off"`                // The offset within the current staging table.
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -214,8 +221,8 @@ func (c *capture) updateState(ctx context.Context) error {
 		if _, ok := c.Bindings[stateKey]; !ok {
 			log.WithField("stateKey", stateKey).Info("binding removed")
 			var state = &streamState{
-				Disabled:    true,
-				SourceTable: prevState.SourceTable,
+				Disabled: true,
+				UniqueID: prevState.UniqueID,
 			}
 			c.State.Streams[stateKey] = state
 			updatedStreams[stateKey] = state
@@ -225,22 +232,26 @@ func (c *capture) updateState(ctx context.Context) error {
 	// Identify newly added streams, clone initial table contents, and initialize stream state.
 	for stateKey, binding := range c.Bindings {
 		if prevState, ok := c.State.Streams[stateKey]; !ok || prevState.Disabled {
-			log.WithField("table", binding.Table.String()).Info("binding added")
+			var uniqueID = generateUniqueID(binding.Table)
+			log.WithFields(log.Fields{
+				"table": binding.Table.String(),
+				"uid":   uniqueID,
+			}).Info("binding added")
 
-			streamName, err := createChangeStream(ctx, c.Config, c.DB, c.Name, binding.Table)
+			streamName, err := createChangeStream(ctx, c.Config, c.DB, binding.Table, uniqueID)
 			if err != nil {
 				return err
 			}
 			log.WithField("stream", streamName.String()).Debug("created change stream")
 
-			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, c.Name, binding.Table, initialCloneSequenceNumber)
+			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, binding.Table, uniqueID, initialCloneSequenceNumber)
 			if err != nil {
 				return err
 			}
 			log.WithField("staged", stagingName.String()).Debug("cloned into staging table")
 
 			var state = &streamState{
-				SourceTable:    binding.Table,
+				UniqueID:       uniqueID,
 				SequenceNumber: initialCloneSequenceNumber,
 			}
 			c.State.Streams[stateKey] = state
@@ -267,8 +278,7 @@ func (c *capture) pruneDeletedStreams(ctx context.Context) error {
 	// known tables here.
 	var idToRemovedStatus = make(map[string]bool)
 	for _, streamState := range c.State.Streams {
-		var uniqueID = streamState.SourceTable.UniqueID(c.Name)
-		idToRemovedStatus[uniqueID] = streamState.Disabled
+		idToRemovedStatus[streamState.UniqueID] = streamState.Disabled
 	}
 
 	// Enumerate streams in the appropriate schema
@@ -331,9 +341,8 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[boilerplate.State
 	var idToStateKey = make(map[string]boilerplate.StateKey)
 	var idToRemovedStatus = make(map[string]bool)
 	for stateKey, streamState := range c.State.Streams {
-		var uniqueID = streamState.SourceTable.UniqueID(c.Name)
-		idToRemovedStatus[uniqueID] = streamState.Disabled
-		idToStateKey[uniqueID] = stateKey
+		idToRemovedStatus[streamState.UniqueID] = streamState.Disabled
+		idToStateKey[streamState.UniqueID] = stateKey
 	}
 
 	// Enumerate staging tables in the appropriate schema
@@ -405,7 +414,8 @@ func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.
 	var binding = c.Bindings[stateKey]
 	var table = binding.Table
 	var orderColumns = binding.OrderColumns
-	var stagingName = stagingTableName(c.Config, c.Name, binding.Table, streamState.SequenceNumber)
+
+	var stagingName = stagingTableName(c.Config, streamState.UniqueID, streamState.SequenceNumber)
 	var logEntry = log.WithFields(log.Fields{
 		"table": table.String(),
 		"seq":   streamState.SequenceNumber,
@@ -413,7 +423,7 @@ func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.
 
 	// Ensure that the staging table exists by creating it if necessary. Since
 	// the creation is done IF NOT EXISTS this is a no-op if it already does.
-	if _, err := createStagingTable(ctx, c.Config, c.DB, c.Name, table, streamState.SequenceNumber); err != nil {
+	if _, err := createStagingTable(ctx, c.Config, c.DB, streamState.UniqueID, streamState.SequenceNumber); err != nil {
 		return err
 	}
 
