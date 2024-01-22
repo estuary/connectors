@@ -243,7 +243,6 @@ type transactor struct {
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	log.WithField("state", string(state)).Info("raw checkpoint")
 	var cp checkpoint
 	if err := json.Unmarshal(state, &cp); err != nil {
 		return err
@@ -321,10 +320,6 @@ type binding struct {
 		copyInto  string
 		mustMerge bool
 	}
-}
-
-type TableWithUUID struct {
-	Table *sql.Table
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {

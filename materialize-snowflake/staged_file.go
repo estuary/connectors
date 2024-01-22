@@ -76,10 +76,6 @@ type stagedFile struct {
 	// start() and `false` by flush().
 	started bool
 
-	// List of file names uploaded during the current transaction for transaction data
-	// These data file names randomly generated UUIDs.
-	uploaded []string
-
 	// References to the current file being written.
 	buf     *fileBuffer
 	encoder *sql.CountingEncoder
@@ -132,8 +128,6 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 		rows.Close()
 	}
 
-	// Reset values used per-transaction.
-	f.uploaded = []string{}
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
 	f.putFiles = make(chan string)
 
@@ -231,7 +225,6 @@ func (f *stagedFile) newFile() error {
 		file: file,
 	}
 	f.encoder = sql.NewCountingEncoder(f.buf, true, nil)
-	f.uploaded = append(f.uploaded, fName)
 
 	return nil
 }
