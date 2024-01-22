@@ -68,6 +68,9 @@ func (b transactorBinding) columnCount() int {
 	return len(b.Fields.Keys) + len(b.Fields.Values) + 1
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	it.WaitForAcknowledged()
 
@@ -268,7 +271,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// Ensure transactions are spread out enough to not exceed google sheets rate limits.
 	<-time.After(transactionDelay - time.Since(started))
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		return &pf.ConnectorState{
 			UpdatedJson: json.RawMessage(fmt.Sprintf("{\"round\":%v}", d.round)),
 			MergePatch:  false,

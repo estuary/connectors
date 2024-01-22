@@ -232,6 +232,9 @@ type binding struct {
 	storeFile *stagedFile
 }
 
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("connector must be set to delta updates")
@@ -256,7 +259,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -267,14 +270,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
+		return nil, m.RunAsyncOperation(func() error {
 			// NB: Motherduck doesn't actually support transactions yet, but this code is written
 			// like it does. Eventually Motherduck will probably support transactions, and the
 			// connector pretending like it already does doesn't hurt anything and may make the
 			// eventual transition easier.
 			txn, err := d.storeConn.BeginTx(ctx, nil)
 			if err != nil {
-				return nil, fmt.Errorf("store BeginTx: %w", err)
+				return fmt.Errorf("store BeginTx: %w", err)
 			}
 			defer txn.Rollback()
 
@@ -286,7 +289,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 				delete, err := b.storeFile.flush(ctx)
 				if err != nil {
-					return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+					return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 				}
 				defer delete(ctx)
 
@@ -295,25 +298,25 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					Table: b.target,
 					Files: b.storeFile.allFiles(),
 				}); err != nil {
-					return nil, err
+					return err
 				}
 
 				if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
-					return nil, fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
+					return fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
 				}
 			}
 
 			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return nil, fmt.Errorf("updating checkpoints: %w", err)
+				return fmt.Errorf("updating checkpoints: %w", err)
 			} else if rows, err := res.RowsAffected(); err != nil {
-				return nil, fmt.Errorf("getting fence update rows affected: %w", err)
+				return fmt.Errorf("getting fence update rows affected: %w", err)
 			} else if rows != 1 {
-				return nil, fmt.Errorf("this instance was fenced off by another")
+				return fmt.Errorf("this instance was fenced off by another")
 			} else if err := txn.Commit(); err != nil {
-				return nil, fmt.Errorf("committing store transaction: %w", err)
+				return fmt.Errorf("committing store transaction: %w", err)
 			}
 
-			return nil, nil
+			return nil
 		})
 	}, nil
 }

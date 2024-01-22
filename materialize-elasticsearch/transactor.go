@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -51,6 +52,9 @@ type transactor struct {
 	// Used to correlate the binding number for loaded documents from Elasticsearch.
 	indexToBinding map[string]int
 }
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
