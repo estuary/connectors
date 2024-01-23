@@ -85,7 +85,9 @@ var bqDialect = func() sql.Dialect {
 		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
 		sql.ColValidation{Types: []string{"bool"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"int64"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"float64"}, Validate: sql.NumberCompatible},
+		// We used to create number columns as "bignumeric", so allowing "bignumeric" for these
+		// columns allows for backward compatibility.
+		sql.ColValidation{Types: []string{"float64, bignumeric"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"json"}, Validate: sql.MultipleCompatible},
 		sql.ColValidation{Types: []string{"bignumeric"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
