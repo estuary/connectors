@@ -137,11 +137,9 @@ func (t transactor) Context(ctx context.Context) context.Context {
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	var cp checkpoint
-	if err := json.Unmarshal(state, &cp); err != nil {
+	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
 	}
-	d.cp = cp
 	d.cpRecovery = true
 
 	return nil
