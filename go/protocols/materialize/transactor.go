@@ -15,7 +15,7 @@ import (
 // Transactor is a store-agnostic interface for a materialization connector
 // that implements Flow materialization protocol transactions.
 type Transactor interface {
-	// Unmarshal is called only on transactor startup if there is a persisted state
+	// UnmarshalState is called only on transactor startup if there is a persisted state
 	// for this task
 	UnmarshalState(json.RawMessage) error
 

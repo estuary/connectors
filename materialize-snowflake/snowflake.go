@@ -243,11 +243,9 @@ type transactor struct {
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	var cp checkpoint
-	if err := json.Unmarshal(state, &cp); err != nil {
+	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
 	}
-	d.cp = cp
 
 	return nil
 }
@@ -477,7 +475,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// recovery log being authoritative and the connector idempotently applies a commit
 	// These are keyed on the binding table name so that in case of a recovery being necessary
 	// we don't run queries belonging to bindings that have been removed
-	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
 		if !b.store.stage.started {
 			continue
@@ -531,9 +528,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		if len(item.Query) == 0 {
 			continue
 		}
-		// during recovery we skip queries that belong to tables which do not have a binding anymore
+		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if !d.hasTableBinding(item.Table) {
+		if !d.hasStateKey(stateKey) {
 			continue
 		}
 
@@ -577,9 +574,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-func (d *transactor) hasTableBinding(tableIdentifier string) bool {
+func (d *transactor) hasStateKey(stateKey string) bool {
 	for _, b := range d.bindings {
-		if b.target.Identifier == tableIdentifier {
+		if b.target.StateKey == stateKey {
 			return true
 		}
 	}
