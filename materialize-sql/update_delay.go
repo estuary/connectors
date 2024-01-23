@@ -45,8 +45,7 @@ func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored
 	return m.RunAsyncOperation(func() error {
 		started := time.Now()
 
-		err := commitFn(ctx)
-		if err != nil {
+		if err := commitFn(ctx); err != nil {
 			return err
 		}
 
