@@ -1,6 +1,29 @@
 import logging.config
-import orjson
 import os
+from contextlib import contextmanager
+
+import orjson
+
+logging_context_vars = {}
+dynamic_logging_context_vars = {}
+
+
+def set_context(**kwargs):
+    global logging_context_vars
+
+    logging_context_vars = kwargs
+
+
+@contextmanager
+def logging_context(**kwargs):
+    global dynamic_logging_context_vars
+
+    old_logging_context_vars = dynamic_logging_context_vars.copy()
+    dynamic_logging_context_vars.update(kwargs)
+
+    yield
+
+    dynamic_logging_context_vars = old_logging_context_vars
 
 
 class LogFormatter(logging.Formatter):
@@ -11,6 +34,8 @@ class LogFormatter(logging.Formatter):
     ).__dict__.keys()
 
     def format(self, record: logging.LogRecord) -> str:
+        global dynamic_logging_context_vars
+
         # Attach any extra keywords which are not ordinarily in a LogRecord as fields.
         fields = {
             k: getattr(record, k)
@@ -28,6 +53,16 @@ class LogFormatter(logging.Formatter):
             fields["traceback"] = self.formatException(record.exc_info).splitlines()
         elif record.stack_info:
             fields["stack"] = self.formatStack(record.stack_info).splitlines()
+
+        # attach global context entries, but only if they are not already present in the record
+        for k, v in logging_context_vars.items():
+            if k not in fields:
+                fields[k] = v
+
+        # attach any dyanmic context, but only if they are not already present in the record
+        for k, v in dynamic_logging_context_vars.items():
+            if k not in fields:
+                fields[k] = v
 
         return str(
             orjson.dumps(
