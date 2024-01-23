@@ -160,7 +160,12 @@ func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.
 		}, prop), nil
 	}
 
-	// Otherwise, require that the types match.
+	if prop == elasticTypeText {
+		// Allow text fields to be materialized to either text mappings or keyword mappings.
+		return strings.EqualFold(existing.Type, string(elasticTypeText)) || strings.EqualFold(existing.Type, string(elasticTypeKeyword)), nil
+	}
+
+	// Otherwise, require that the types match exactly.
 	return strings.EqualFold(existing.Type, string(prop)), nil
 }
 
