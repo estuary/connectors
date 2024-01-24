@@ -126,6 +126,9 @@ type transactor struct {
 	store struct {
 		conn  *stdsql.Conn
 		round int
+		// number of documents stored in current transaction
+		// set to StoreIterator.Total
+		stored int
 	}
 	bindings []*binding
 
@@ -511,12 +514,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = func(ctx context.Context) error {
-			<-ctx.Done()
-			return ctx.Err()
-		}
 
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, sql.CommitWithDelay(ctx, d.store.round, d.updateDelay, it.Total, commitOp)
+		d.store.stored = it.Total
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
 	}, nil
 }
 
@@ -530,27 +530,29 @@ func renderWithFiles(tpl string, files ...string) string {
 // Acknowledge merges data from temporary table to main table
 // TODO: run these queries concurrently for improved performance
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	log.Info("store: starting committing changes")
-	for _, q := range d.cp.Queries {
-		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
-			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-			// it is okay to skip them in this case
-			if d.cpRecovery {
-				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-					continue
+	return sql.AcknowledgeWithDelay(ctx, d.store.round, d.updateDelay, d.store.stored, func(ctx context.Context) (*pf.ConnectorState, error) {
+		log.Info("store: starting committing changes")
+		for _, q := range d.cp.Queries {
+			if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
+				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+				// it is okay to skip them in this case
+				if d.cpRecovery {
+					if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+						continue
+					}
 				}
+				return nil, fmt.Errorf("query %q failed: %w", q, err)
 			}
-			return nil, fmt.Errorf("query %q failed: %w", q, err)
 		}
-	}
-	log.Info("store: finished committing changes")
+		log.Info("store: finished committing changes")
 
-	// Cleanup files and tables
-	d.deleteFiles(ctx, d.cp.ToDelete)
+		// Cleanup files and tables
+		d.deleteFiles(ctx, d.cp.ToDelete)
 
-	d.cpRecovery = false
+		d.cpRecovery = false
 
-	return nil, nil
+		return nil, nil
+	})
 }
 
 func (d *transactor) Destroy() {
