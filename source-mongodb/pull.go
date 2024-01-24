@@ -53,12 +53,11 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	migrated, err := migrateState(&prevState, open.Capture.Bindings)
-	if err != nil {
+	if _, err := migrateState(&prevState, open.Capture.Bindings); err != nil {
 		return fmt.Errorf("migrating binding states: %w", err)
 	}
 
-	prevState, err = updateResourceStates(prevState, bindings)
+	prevState, err := updateResourceStates(prevState, bindings)
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
 	}
@@ -94,10 +93,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return err
 	}
 
-	if migrated {
-		if err := c.outputCheckpoint(&prevState, false); err != nil {
-			return err
-		}
+	// Persist the checkpoint in full, which may have been updated in updateResourceStates to remove
+	// bindings.
+	if err := c.outputCheckpoint(&prevState, false); err != nil {
+		return err
 	}
 
 	if !prevState.isBackfillComplete(bindings) {
