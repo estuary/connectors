@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/iancoleman/orderedmap"
-	"github.com/invopop/jsonschema"
 	"net/url"
 	"strings"
+
+	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/iancoleman/orderedmap"
+	"github.com/invopop/jsonschema"
 )
 
 // config represents the endpoint configuration for sql server.
@@ -101,6 +103,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+		return err
 	}
 
 	return c.Credentials.Validate()

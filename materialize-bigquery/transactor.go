@@ -18,6 +18,8 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+var _ m.DelayedCommitter = (*transactor)(nil)
+
 type transactor struct {
 	fence *sql.Fence
 
@@ -27,7 +29,6 @@ type transactor struct {
 
 	bindings    []*binding
 	updateDelay time.Duration
-	round       int
 }
 
 func newTransactor(
@@ -51,7 +52,7 @@ func newTransactor(
 		bucket:     cfg.Bucket,
 	}
 
-	if t.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if t.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
 	}
 
@@ -151,6 +152,10 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	return s, nil
 }
 
+func (t *transactor) AckDelay() time.Duration {
+	return t.updateDelay
+}
+
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
@@ -236,7 +241,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
-	t.round++
 
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
@@ -260,7 +264,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, sql.CommitWithDelay(ctx, t.round, t.updateDelay, it.Total, t.commit)
+		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
 	}, nil
 }
 

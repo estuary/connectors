@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -59,7 +60,7 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
 		return err
 	}
 
