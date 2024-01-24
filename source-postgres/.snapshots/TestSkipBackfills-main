@@ -19,5 +19,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.skipbackfills_18110541":{"backfilled":0,"key_columns":["id"],"mode":"Active"},"test.skipbackfills_24310805":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"test.skipbackfills_38410024":{"backfilled":0,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"test%2Fskipbackfills_18110541":{"backfilled":0,"key_columns":["id"],"mode":"Active"},"test%2Fskipbackfills_24310805":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"test%2Fskipbackfills_38410024":{"backfilled":0,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
 

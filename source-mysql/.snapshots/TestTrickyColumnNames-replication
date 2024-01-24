@@ -11,5 +11,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.trickycolumnnames_14055203":{"backfilled":2,"key_columns":["Meta/`wtf`~ID"],"metadata":{"schema":{"columns":["Meta/`wtf`~ID","data"],"types":{"Meta/`wtf`~ID":"int","data":"text"}}},"mode":"Active"},"test.trickycolumnnames_28395292":{"backfilled":2,"key_columns":["table"],"metadata":{"schema":{"columns":["table","data"],"types":{"data":"text","table":"int"}}},"mode":"Active"}}}
+{"bindingStateV1":{"test%2FTrickyColumnNames_14055203":{"backfilled":2,"key_columns":["Meta/`wtf`~ID"],"metadata":{"schema":{"columns":["Meta/`wtf`~ID","data"],"types":{"Meta/`wtf`~ID":"int","data":"text"}}},"mode":"Active"},"test%2FTrickyColumnNames_28395292":{"backfilled":2,"key_columns":["table"],"metadata":{"schema":{"columns":["table","data"],"types":{"data":"text","table":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

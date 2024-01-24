@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer_889298060000":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"E/w="}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_Integer_889298060000":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"E/w="}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer_889298060000":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"FA=="}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_Integer_889298060000":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"FA=="}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer_889298060000":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"FQI="}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_Integer_889298060000":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"FQI="}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -47,7 +47,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer_889298060000":{"backfilled":4,"key_columns":["k"],"mode":"Backfill","scanned":"Fga7"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_Integer_889298060000":{"backfilled":4,"key_columns":["k"],"mode":"Backfill","scanned":"Fga7"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -56,7 +56,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer_889298060000":{"backfilled":4,"key_columns":["k"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_Integer_889298060000":{"backfilled":4,"key_columns":["k"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 

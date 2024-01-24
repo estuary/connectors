@@ -8,5 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_duplicatedscankey_92011048":{"backfilled":4,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"varchar"}}},"mode":"Active"}}}
+{"bindingStateV1":{"test%2FGeneric_DuplicatedScanKey_92011048":{"backfilled":4,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"varchar"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
