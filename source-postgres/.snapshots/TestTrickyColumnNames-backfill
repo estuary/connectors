@@ -11,5 +11,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.trickycolumnnames_39256824":{"backfilled":2,"key_columns":["Meta/\"wtf\"~ID"],"mode":"Active"},"test.trickycolumnnames_42531495":{"backfilled":2,"key_columns":["table"],"mode":"Active"}}}
+{"bindingStateV1":{"test%2Ftrickycolumnnames_39256824":{"backfilled":2,"key_columns":["Meta/\"wtf\"~ID"],"mode":"Active"},"test%2Ftrickycolumnnames_42531495":{"backfilled":2,"key_columns":["table"],"mode":"Active"}},"cursor":"0/1111111"}
 
