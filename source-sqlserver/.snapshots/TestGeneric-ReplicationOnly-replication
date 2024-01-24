@@ -2052,5 +2052,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationonly_34322067":{"backfilled":0,"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_Generic_ReplicationOnly_34322067":{"backfilled":0,"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

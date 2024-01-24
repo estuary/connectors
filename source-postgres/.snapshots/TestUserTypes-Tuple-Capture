@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.usertypes_tuple_51424093":{"backfilled":2,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"test%2Fusertypes_tuple_51424093":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
 

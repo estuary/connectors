@@ -204,5 +204,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_collatedcapture_varchar_0091303401":{"backfilled":200,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_CollatedCapture_VarChar_0091303401":{"backfilled":200,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

@@ -76,9 +76,11 @@ func (r Resource) Validate() error {
 // SetDefaults fills in the default values for unset optional parameters.
 func (r *Resource) SetDefaults() {}
 
-// Binding represents a capture binding, and includes a Resource config and a binding index.
+// Binding represents a capture binding.
 type Binding struct {
 	Index         uint32
+	StreamID      string
+	StateKey      boilerplate.StateKey
 	Resource      Resource
 	CollectionKey []string // JSON pointers
 }
@@ -255,11 +257,16 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
-	var state = &PersistentState{Streams: make(map[string]*TableState)}
+	var state PersistentState
 	if len(open.StateJson) > 0 {
-		if err := pf.UnmarshalStrict(open.StateJson, state); err != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, &state); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)
 		}
+	}
+
+	migrated, err := migrateState(&state, open.Capture.Bindings)
+	if err != nil {
+		return fmt.Errorf("migrating state: %w", err)
 	}
 
 	var ctx = stream.Context()
@@ -296,6 +303,8 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 		bindings[streamID] = &Binding{
 			Index:         uint32(idx),
+			StreamID:      streamID,
+			StateKey:      boilerplate.StateKey(binding.StateKey),
 			Resource:      res,
 			CollectionKey: binding.Collection.Key,
 		}
@@ -308,9 +317,33 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	var c = Capture{
 		Bindings: bindings,
-		State:    state,
+		State:    &state,
 		Output:   &boilerplate.PullOutput{Connector_CaptureServer: stream},
 		Database: db,
 	}
+
+	// Notify Flow that we're ready and would like to receive acknowledgements.
+	if err := c.Output.Ready(true); err != nil {
+		return err
+	}
+
+	if migrated {
+		// Write out a new state if the state was migrated.
+		if cp, err := json.Marshal(state); err != nil {
+			return fmt.Errorf("marshalling checkpoint: %w", err)
+		} else if err = c.Output.Checkpoint(cp, false); err != nil {
+			return fmt.Errorf("outputting checkpoint: %w", err)
+		}
+
+		// Read the acknowledgement of the migration state update.
+		if request, err := stream.Recv(); err != nil {
+			return fmt.Errorf("receiving ack for migration state update: %w", err)
+		} else if err = request.Validate_(); err != nil {
+			return fmt.Errorf("validating request for migration state update: %w", err)
+		} else if request.Acknowledge == nil {
+			return fmt.Errorf("unexpected message when receiving ack for migration state update %#v", request)
+		}
+	}
+
 	return c.Run(ctx)
 }
