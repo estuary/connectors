@@ -87,7 +87,7 @@ var bqDialect = func() sql.Dialect {
 		sql.ColValidation{Types: []string{"int64"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"float64"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"json"}, Validate: sql.MultipleCompatible},
-		sql.ColValidation{Types: []string{"bignumeric"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"bignumeric"}, Validate: bignumericCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
 	)
@@ -117,6 +117,13 @@ var bqDialect = func() sql.Dialect {
 		ColumnValidator: columnValidator,
 	}
 }()
+
+// bignumericCompatible allows either integers or numbers, since we used to create number columns as
+// "bignumeric" (now they are float64), and currently create strings formatted as integers as
+// "bignumeric". This is needed for compatibility for older materializations.
+func bignumericCompatible(p pf.Projection) bool {
+	return sql.IntegerCompatible(p) || sql.NumberCompatible(p)
+}
 
 // stringCompatible allow strings of any format, arrays, or objects to be materialized.
 func stringCompatible(p pf.Projection) bool {
