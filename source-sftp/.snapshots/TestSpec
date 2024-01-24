@@ -17,21 +17,29 @@
     "password": {
       "type": "string",
       "title": "Password",
-      "description": "Password for authentication.",
+      "description": "Password for authentication. Only one of Password or SSHKey must be provided.",
       "order": 2,
+      "secret": true
+    },
+    "sshKey": {
+      "type": "string",
+      "title": "SSH Key",
+      "description": "SSH Key for authentication. Only one of Password or SSHKey must be provided.",
+      "multiline": true,
+      "order": 3,
       "secret": true
     },
     "directory": {
       "type": "string",
       "title": "Directory",
       "description": "Directory to capture files from. All files in this directory and any subdirectories will be included.",
-      "order": 3
+      "order": 4
     },
     "matchFiles": {
       "type": "string",
       "title": "Match Files Regex",
       "description": "Filter applied to all file names in the directory. If provided, only files whose path (relative to the directory) matches this regex will be read.",
-      "order": 4
+      "order": 5
     },
     "advanced": {
       "properties": {
@@ -575,7 +583,6 @@
   "required": [
     "address",
     "username",
-    "password",
     "directory"
   ],
   "title": "SFTP Source"
