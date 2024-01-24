@@ -512,11 +512,12 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	case slices.Equal(p.Inference.Types, []string{"null"}):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
-
-	default:
-		// Any other case is one where the field has multiple types, which will be materialized as a
-		// JSON (or equivalent) column with the default JSON serialization of the value.
+	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Objects fields may be materialized"
+	default:
+		// Any other case is one where the field is an array or has multiple types.
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "This field is able to be materialized"
 	}
 
