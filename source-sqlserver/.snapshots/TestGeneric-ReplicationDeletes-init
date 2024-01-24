@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationdeletes_65713151":{"backfilled":5,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_Generic_ReplicationDeletes_65713151":{"backfilled":5,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

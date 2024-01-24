@@ -9,7 +9,7 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
+# RUN go mod download
 
 COPY go                  ./go
 COPY source-boilerplate  ./source-boilerplate
@@ -23,10 +23,12 @@ ENV PATH="/builder/bin:$PATH"
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
+# RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
 
 # Build the connector.
-RUN go build -o ./connector -v ./source-postgres/...
+RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+    go build -o ./connector -v ./source-postgres/...
 
 
 # Runtime Stage

@@ -8,5 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_multiplestreams_14930049":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"dbo.test_generic_multiplestreams_26016615":{"backfilled":4,"key_columns":["id"],"mode":"Active"},"dbo.test_generic_multiplestreams_30084965":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_Generic_MultipleStreams_14930049":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_Generic_MultipleStreams_26016615":{"backfilled":4,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_Generic_MultipleStreams_30084965":{"backfilled":3,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

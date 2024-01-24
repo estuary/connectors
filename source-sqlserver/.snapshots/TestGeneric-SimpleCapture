@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_simplecapture_24869578":{"backfilled":5,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_Generic_SimpleCapture_24869578":{"backfilled":5,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 
