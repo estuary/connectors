@@ -105,7 +105,7 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
 		return err
 	}
 
@@ -255,12 +255,12 @@ func newRedshiftDriver() *sql.Driver {
 	}
 }
 
-type transactor struct {
-	fence    sql.Fence
-	bindings []*binding
-	cfg      *config
+var _ m.DelayedCommitter = (*transactor)(nil)
 
-	round       int
+type transactor struct {
+	fence       sql.Fence
+	bindings    []*binding
+	cfg         *config
 	updateDelay time.Duration
 }
 
@@ -278,7 +278,7 @@ func newTransactor(
 		cfg:   cfg,
 	}
 
-	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
 	}
 
@@ -445,6 +445,10 @@ func (t *transactor) addBinding(
 	return nil
 }
 
+func (t *transactor) AckDelay() time.Duration {
+	return t.updateDelay
+}
+
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
@@ -581,7 +585,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
-	d.round++
 
 	// hasUpdates is used to track if a given binding includes only insertions for this store round
 	// or if it includes any updates. If it is only insertions a more efficient direct copy from S3
@@ -658,15 +661,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, sql.CommitWithDelay(
-			ctx,
-			d.round,
-			d.updateDelay,
-			it.Total,
-			func(ctx context.Context) error {
-				return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates)
-			},
-		)
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates) })
 	}, nil
 }
 

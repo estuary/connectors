@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
@@ -54,13 +55,43 @@ type Transactor interface {
 	// upon its successful completion.
 	//
 	// Acknowledge may perform long-running, idempotent operations such as merging staged
-	// updates into a base table. Upon its succesful return, response.Acknowledged is sent to
+	// updates into a base table. Upon its successful return, response.Acknowledged is sent to
 	// the runtime, allowing the next pipelined transaction to begin to close.
 	Acknowledge(context.Context) (*pf.ConnectorState, error)
 
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
 }
+
+// Transactors may implement DelayedCommitter to add an additional delay on sending transaction
+// acknowledgements to the runtime. This will "spread out" transaction processing and result in
+// fewer, larger transactions which may be desirable to reduce warehouse compute costs or comply
+// with rate limits.
+type DelayedCommitter interface {
+	// AckDelay returns the total target time for each commit to complete for streaming commits.
+	// Whether a commit is "streaming" or not is estimated via storeThreshold (see below). The
+	// duration will subtract the actual time taken by the StartCommitFunc returned by Stored and
+	// the time taken by Acknowledge.
+	AckDelay() time.Duration
+}
+
+const (
+	// Default update delay for materializations implementing DelayedCommitter to use if no other
+	// delay has been set.
+	defaultUpdateDelay = 30 * time.Minute
+
+	// storeThreshold is a somewhat crude indication that a transaction was likely part of a backfill
+	// vs. a smaller incremental streaming transaction. If a materialization is configured with a commit
+	// delay, it should only apply that delay to transactions that occur after it has fully backfilled
+	// from the collection. The idea is that if a transaction stored a lot of documents it's probably
+	// part of a backfill.
+	storeThreshold = 1_000_000
+
+	// The number of transactions we will look back at for determining if the update delay should be
+	// applied. The number of documents stored for all of these transactions must be below
+	// storeThreshold for the delay to apply.
+	storedHistorySize = 5
+)
 
 // StartCommitFunc begins to commit a stored transaction.
 // Upon its return a commit operation may still be running in the background,
@@ -107,9 +138,9 @@ func RunTransactions(
 ) (_err error) {
 	defer func() {
 		if _err != nil {
-			logrus.WithError(_err).Error("RunTransactions failed")
+			log.WithError(_err).Error("RunTransactions failed")
 		} else {
-			logrus.Debug("RunTransactions finished")
+			log.Debug("RunTransactions finished")
 		}
 		transactor.Destroy()
 	}()
@@ -132,6 +163,14 @@ func RunTransactions(
 		return err
 	}
 
+	var ackDelay time.Duration
+	if d, ok := transactor.(DelayedCommitter); ok {
+		ackDelay = d.AckDelay()
+		if ackDelay > 0 {
+			log.WithField("delay", ackDelay.String()).Info("transactor running with ackDelay")
+		}
+	}
+
 	var (
 		// awaitErr is the last await() result,
 		// and is readable upon its close of its parameter `awaitDoneCh`.
@@ -139,7 +178,28 @@ func RunTransactions(
 		// loadErr is the last loadAll() result,
 		// and is readable upon its close of its parameter `loadDoneCh`.
 		loadErr error
+		// The variables used for controlling a delay on sending transaction acknowledgements to the
+		// runtime. This will "spread out" transaction processing and result in fewer, larger
+		// transactions which may be desirable to reduce warehouse compute costs or comply with rate
+		// limits. They are safe to access in the concurrent await function because they are only
+		// set in the "round" loop after awaitDoneCh has closed.
+		//
+		// commitStartedAt is the time at which the the commit for the latest round began.
+		commitStartedAt time.Time
+		// storedHistory is a list of the most recent stored counts for transactions.
+		storedHistory [storedHistorySize]int
 	)
+
+	// True only if all historical stored counts are below the threshold, and none of them are 0.
+	// Counts at 0 means that many transactions haven't been completed yet.
+	storedHistoryBelowThreshold := func() bool {
+		for _, v := range storedHistory {
+			if v == 0 || v > storeThreshold {
+				return false
+			}
+		}
+		return true
+	}
 
 	// await is a closure which awaits the completion of a previously
 	// started commit, and then writes Acknowledged to the runtime.
@@ -152,7 +212,7 @@ func RunTransactions(
 	) (__out error) {
 
 		defer func() {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(log.Fields{
 				"round": round,
 				"error": __out,
 			}).Debug("await commit finished")
@@ -178,6 +238,23 @@ func RunTransactions(
 			return err
 		}
 
+		if ackDelay > 0 && !commitStartedAt.IsZero() && storedHistoryBelowThreshold() {
+			remainingDelay := ackDelay - time.Since(commitStartedAt)
+			if remainingDelay > 0 {
+				log.WithFields(log.Fields{
+					"remainingDelay":  remainingDelay.String(),
+					"configuredDelay": ackDelay.String(),
+					"storedHistory":   storedHistory,
+				}).Info("delaying before acknowledging commit")
+			}
+
+			select {
+			case <-loadDoneCh:
+				return nil
+			case <-time.After(remainingDelay):
+			}
+		}
+
 		return WriteAcknowledged(stream, ackState, &txResponse)
 	}
 
@@ -190,7 +267,7 @@ func RunTransactions(
 
 		var loaded int
 		defer func() {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(log.Fields{
 				"round":  round,
 				"total":  it.Total,
 				"loaded": loaded,
@@ -280,7 +357,7 @@ func RunTransactions(
 		} else if err = WriteFlushed(stream, &txResponse); err != nil {
 			return err
 		}
-		logrus.WithField("round", round).Debug("wrote Flushed")
+		log.WithField("round", round).Debug("wrote Flushed")
 
 		// Process all Store requests until StartCommit is read.
 		var storeIt = StoreIterator{stream: stream, request: &rxRequest}
@@ -291,7 +368,8 @@ func RunTransactions(
 		if err != nil {
 			return fmt.Errorf("transactor.Store: %w", err)
 		}
-		logrus.WithFields(logrus.Fields{"round": round, "stored": storeIt.Total}).Debug("Store finished")
+		storedHistory[round%storedHistorySize] = storeIt.Total
+		log.WithFields(log.Fields{"round": round, "stored": storeIt.Total}).Debug("Store finished")
 
 		var runtimeCheckpoint *pc.Checkpoint
 		if runtimeCheckpoint, err = ReadStartCommit(&rxRequest); err != nil {
@@ -300,6 +378,7 @@ func RunTransactions(
 
 		// `startCommit` may be nil to indicate a no-op commit.
 		var stateUpdate *pf.ConnectorState = nil
+		commitStartedAt = time.Now()
 		if startCommit != nil {
 			stateUpdate, ourCommitOp = startCommit(
 				stream.Context(), runtimeCheckpoint)
@@ -325,4 +404,17 @@ func RunTransactions(
 		}
 	}
 	panic("not reached")
+}
+
+// ParseDelay parses the delay Go duration string, returning and error if it is not valid, the
+// parsed value if it is not an empty string, and the defaultUpdateDelay otherwise.
+func ParseDelay(delay string) (time.Duration, error) {
+	if delay != "" {
+		parsed, err := time.ParseDuration(delay)
+		if err != nil {
+			return 0, fmt.Errorf("could not parse updateDelay '%s': must be a valid Go duration string", delay)
+		}
+		return parsed, nil
+	}
+	return defaultUpdateDelay, nil
 }
