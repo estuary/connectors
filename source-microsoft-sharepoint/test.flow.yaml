@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-microsoft-sharepoint:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-microsoft-sharepoint
+        config: connector_config.yaml
+    bindings: []
