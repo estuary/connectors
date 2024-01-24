@@ -6,6 +6,7 @@ import (
 	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -49,7 +50,9 @@ func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored
 			return err
 		}
 
-		if round == 1 {
+		// round zero may mean the transactor has not yet started a new transaction and is
+		// acknowledging the prior transaction
+		if round <= 1 {
 			// Always skip the delay on the first round of transactions, which is often an
 			// artificially small transaction of the immediately-ready documents.
 			log.Debug("will not delay commit acknowledgement of the first transaction")
@@ -79,6 +82,65 @@ func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored
 			return nil
 		}
 	})
+}
+
+// AcknowledgeWithDelay wraps a commitFn in a function that may add additional delay prior to
+// returning. When used in transactor.Acknowledge from a materialization utilizing idempotent apply commits,
+// this can spread out transaction processing and result in fewer, larger transactions which may be
+// desirable to reduce warehouse compute costs or comply with rate limits. The delay is bypassed if
+// the actual commit operation takes longer than the configured delay, or if the number of stored
+// documents is large (see storeThreshold above).
+//
+// Delaying the return from this function delays acknowledgement back to the runtime that the commit
+// has finished. The commit will still apply to the endpoint, but holding back the runtime
+// acknowledgement will delay the start of the next transaction while allowing the runtime to
+// continue combining over documents for the next transaction.
+//
+// It is always possible for a connector to restart between committing to the endpoint and sending
+// the runtime acknowledgement of that commit. The chance of this happening is greater when
+// intentionally adding a delay between these events. In the case of idempotent apply pattern
+// connectors this means that on restart the first call to transactor.Acknowledge will attempt to
+// commit the changes again (which may in this case be a no-op). This time since the round will be zero
+// there will be no delay.
+func AcknowledgeWithDelay(ctx context.Context, round int, delay time.Duration, stored int, commitFn func(context.Context) (*pf.ConnectorState, error)) (*pf.ConnectorState, error) {
+	started := time.Now()
+
+	state, err := commitFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// round zero may mean the transactor has not yet started a new transaction and is
+	// acknowledging the prior transaction
+	if round <= 1 {
+		// Always skip the delay on the first round of transactions, which is often an
+		// artificially small transaction of the immediately-ready documents.
+		log.Debug("will not delay commit acknowledgement of the first transaction")
+		return state, nil
+	}
+
+	remainingDelay := delay - time.Since(started)
+
+	logEntry := log.WithFields(log.Fields{
+		"stored":          stored,
+		"storedThreshold": storeThreshold,
+		"remainingDelay":  remainingDelay.String(),
+		"configuredDelay": delay.String(),
+	})
+
+	if stored > storeThreshold || remainingDelay <= 0 {
+		logEntry.Debug("will acknowledge commit without further delay")
+		return state, nil
+	}
+
+	logEntry.Debug("delaying before acknowledging commit")
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(remainingDelay):
+		return state, nil
+	}
 }
 
 // ParseDelay parses the delay Go duration string, returning and error if it is not valid, the
