@@ -118,7 +118,7 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
 		return err
 	}
 
@@ -223,6 +223,8 @@ func newSnowflakeDriver() *sql.Driver {
 	}
 }
 
+var _ m.DelayedCommitter = (*transactor)(nil)
+
 type transactor struct {
 	cfg *config
 	db  *stdsql.DB
@@ -234,15 +236,15 @@ type transactor struct {
 	store struct {
 		conn  *stdsql.Conn
 		fence *sql.Fence
-		round int
-		// number of documents stored in current transaction
-		// set to StoreIterator.Total
-		stored int
 	}
 	templates   map[string]*template.Template
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
+}
+
+func (t *transactor) AckDelay() time.Duration {
+	return t.updateDelay
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -275,7 +277,7 @@ func newTransactor(
 		db:        db,
 	}
 
-	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
 	}
 
@@ -452,8 +454,6 @@ type checkpointItem struct {
 type checkpoint = map[string]*checkpointItem
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	d.store.round++
-
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -509,7 +509,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
 
-		d.store.stored = it.Total
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 	}, nil
 }
@@ -520,64 +519,62 @@ func renderWithDir(tpl string, dir string) string {
 
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	return sql.AcknowledgeWithDelay(ctx, d.store.round, d.updateDelay, d.store.stored, func(ctx context.Context) (*pf.ConnectorState, error) {
-		var asyncCtx = sf.WithAsyncMode(ctx)
-		log.Info("store: starting committing changes")
+	var asyncCtx = sf.WithAsyncMode(ctx)
+	log.Info("store: starting committing changes")
 
-		// Run the queries using AsyncMode, which means that `ExecContext` will not block
-		// until the query is successful, rather we will store the results of these queries
-		// in a map so that we can then call `RowsAffected` on them, blocking until
-		// the queries are actually executed and done
-		var results = make(map[string]stdsql.Result)
-		for stateKey, item := range d.cp {
-			if len(item.Query) == 0 {
-				continue
-			}
-			// we skip queries that belong to tables which do not have a binding anymore
-			// since these tables might be deleted already
-			if !d.hasStateKey(stateKey) {
-				continue
-			}
-
-			log.WithField("table", item.Table).Info("store: starting query")
-			if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
-				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-			} else {
-				results[stateKey] = result
-			}
+	// Run the queries using AsyncMode, which means that `ExecContext` will not block
+	// until the query is successful, rather we will store the results of these queries
+	// in a map so that we can then call `RowsAffected` on them, blocking until
+	// the queries are actually executed and done
+	var results = make(map[string]stdsql.Result)
+	for stateKey, item := range d.cp {
+		if len(item.Query) == 0 {
+			continue
+		}
+		// we skip queries that belong to tables which do not have a binding anymore
+		// since these tables might be deleted already
+		if !d.hasStateKey(stateKey) {
+			continue
 		}
 
-		for stateKey, r := range results {
-			var item = d.cp[stateKey]
-			if _, err := r.RowsAffected(); err != nil {
-				return nil, fmt.Errorf("query failed: %w", err)
-			}
-			log.WithField("table", item.Table).Info("store: finished query")
-
-			d.deleteFiles(ctx, []string{item.ToDelete})
+		log.WithField("table", item.Table).Info("store: starting query")
+		if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
+			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+		} else {
+			results[stateKey] = result
 		}
+	}
 
-		log.Info("store: finished committing changes")
-
-		// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
-		// so that a restart of the connector does not need to run the same queries again
-		// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
-		// can actually be committed
-		// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
-		// that have been committed in this transaction. The reason is that it may be the case that a binding
-		// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
-		// the binding and running the queries that are pending for its last transaction.
-		var checkpointClear = make(checkpoint)
-		for _, b := range d.bindings {
-			checkpointClear[b.target.StateKey] = nil
+	for stateKey, r := range results {
+		var item = d.cp[stateKey]
+		if _, err := r.RowsAffected(); err != nil {
+			return nil, fmt.Errorf("query failed: %w", err)
 		}
-		var checkpointJSON, err = json.Marshal(checkpointClear)
-		if err != nil {
-			return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
-		}
+		log.WithField("table", item.Table).Info("store: finished query")
 
-		return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
-	})
+		d.deleteFiles(ctx, []string{item.ToDelete})
+	}
+
+	log.Info("store: finished committing changes")
+
+	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
+	// so that a restart of the connector does not need to run the same queries again
+	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
+	// can actually be committed
+	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
+	// that have been committed in this transaction. The reason is that it may be the case that a binding
+	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
+	// the binding and running the queries that are pending for its last transaction.
+	var checkpointClear = make(checkpoint)
+	for _, b := range d.bindings {
+		checkpointClear[b.target.StateKey] = nil
+	}
+	var checkpointJSON, err = json.Marshal(checkpointClear)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
 func (d *transactor) hasStateKey(stateKey string) bool {
