@@ -42,9 +42,9 @@ func (config) GetFieldDocString(fieldName string) string {
 	case "Username":
 		return "Username for authentication."
 	case "Password":
-		return "Password for authentication."
+		return "Password for authentication. Only one of Password or SSHKey must be provided."
 	case "SSHKey":
-		return "SSH Key for authentication."
+		return "SSH Key for authentication. Only one of Password or SSHKey must be provided."
 	case "Directory":
 		return "Directory to capture files from. All files in this directory and any subdirectories will be included."
 	case "MatchFiles":
