@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.prerequisites_12111583":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"test.prerequisites_25518078":{"backfilled":0,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"test%2Fprerequisites_12111583":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"test%2Fprerequisites_25518078":{"backfilled":0,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
 

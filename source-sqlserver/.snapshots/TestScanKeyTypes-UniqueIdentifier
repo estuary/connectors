@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAEA/////////////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAEA/////////////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/AP///////////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/AP///////////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//wD//////////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//wD//////////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -47,7 +47,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":4,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///8A/////////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":4,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///8A/////////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -60,7 +60,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":5,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////AP///////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":5,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////AP///////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -73,7 +73,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":6,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////wD//////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":6,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////wD//////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -86,7 +86,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":7,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////8A/////////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":7,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////8A/////////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -99,7 +99,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":8,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////AP///////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":8,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////AP///////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -112,7 +112,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":9,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////wD//////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":9,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////wD//////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -125,7 +125,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":10,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////8A/////////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":10,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////8A/////////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -138,7 +138,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":11,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////////AP///////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":11,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////////AP///////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -151,7 +151,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":12,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////////wD//////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":12,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////////wD//////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -164,7 +164,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":13,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////////8A/////wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":13,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////////8A/////wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -177,7 +177,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":14,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////////////AP///wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":14,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////////////AP///wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -190,7 +190,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":15,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////////////wD//wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":15,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////////////wD//wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -203,7 +203,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":16,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////////////8A/wAA"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":16,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////////////8A/wAA"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -212,7 +212,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":16,"key_columns":["k"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_UniqueIdentifier_889298060002":{"backfilled":16,"key_columns":["k"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 

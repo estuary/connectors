@@ -237,6 +237,7 @@ func TestCapitalizedTables(t *testing.T) {
 		Collection:         flow.CollectionSpec{Name: flow.Collection("acmeCo/test/users")},
 		ResourceConfigJson: resourceSpecJSON,
 		ResourcePath:       []string{testSchemaName, "USERS"},
+		StateKey:           tests.StateKey([]string{testSchemaName, "USERS"}),
 	}}
 	t.Run("Validate", func(t *testing.T) {
 		var _, err = cs.Validate(ctx, t)

@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTimeOffset_889298060001":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTimeOffset_889298060001":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTimeOffset_889298060001":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 ####################################
@@ -43,7 +43,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":3,"key_columns":["k"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTimeOffset_889298060001":{"backfilled":3,"key_columns":["k"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 
 
 

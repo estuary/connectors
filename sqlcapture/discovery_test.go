@@ -16,52 +16,52 @@ func TestRecommendedCatalogName(t *testing.T) {
 		{
 			schema: "something",
 			table:  "typical",
-			want:   "something.typical",
+			want:   "something_typical",
 		},
 		{
 			schema: "Capital",
 			table:  "LetterS",
-			want:   "capital.letters",
+			want:   "capital_letters",
 		},
 		{
 			schema: "for$bidden",
 			table:  "char%s",
-			want:   "for_bidden.char_s",
+			want:   "for_bidden_char_s",
 		},
 		{
 			schema: "schema",
 			table:  "/table",
-			want:   "schema._table",
+			want:   "schema__table",
 		},
 		{
 			schema: "path-like",
 			table:  "/../this",
-			want:   "path-like._.._this",
+			want:   "path-like__.._this",
 		},
 		{
 			schema: "@",
 			table:  "!",
-			want:   "_._",
+			want:   "___",
 		},
 		{
 			schema: ".",
 			table:  "/",
-			want:   ".._",
+			want:   ".__",
 		},
 		{
 			schema: ".",
 			table:  "", // This should not be possible, but even if it were it would not be a problem as a collection name.
-			want:   "..",
+			want:   "._",
 		},
 		{
 			schema: "/",
 			table:  "./",
-			want:   "_.._",
+			want:   "__._",
 		},
 		{
 			schema: "multiple////",
 			table:  "slashes",
-			want:   "multiple____.slashes",
+			want:   "multiple_____slashes",
 		},
 	}
 

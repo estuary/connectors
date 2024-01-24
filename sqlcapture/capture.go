@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -20,8 +21,57 @@ import (
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
-	Cursor  string                 `json:"cursor"`            // The replication cursor of the most recent 'Commit' event
-	Streams map[string]*TableState `json:"streams,omitempty"` // A mapping from table IDs (<namespace>.<table>) to table-specific state.
+	Cursor     string                               `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
+	Streams    map[boilerplate.StateKey]*TableState `json:"bindingStateV1,omitempty"` // A mapping from runtime-provided state keys to table-specific state.
+	OldStreams map[string]*TableState               `json:"streams,omitempty"`        // TODO(whb): Remove once all captures have migrated.
+}
+
+func migrateState(state *PersistentState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
+	if state.Streams != nil && state.OldStreams != nil {
+		return false, fmt.Errorf("application error: both Streams and OldStreams were non-nil")
+	} else if state.Streams != nil {
+		logrus.Info("skipping state migration since it's already done")
+		return false, nil
+	} else if state.OldStreams == nil {
+		logrus.Info("skipping state migration since there is no old state")
+		return false, nil
+	}
+
+	state.Streams = make(map[boilerplate.StateKey]*TableState)
+
+	for _, b := range bindings {
+		if b.StateKey == "" {
+			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
+		}
+
+		var res Resource
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return false, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		ll := logrus.WithFields(logrus.Fields{
+			"stateKey": b.StateKey,
+			"resource": res,
+			"streamID": streamID,
+		})
+
+		stateFromOld, ok := state.OldStreams[streamID]
+		if !ok {
+			// This should only happen if a new binding has been added at the same time as the
+			// connector first restarted for the state migration.
+			ll.Warn("no state found for binding while migrating state")
+			continue
+		}
+
+		state.Streams[boilerplate.StateKey(b.StateKey)] = stateFromOld
+		ll.Info("migrated binding state")
+	}
+
+	state.OldStreams = nil
+
+	return true, nil
 }
 
 // Validate performs basic sanity-checking after a state has been parsed from JSON. More
@@ -30,30 +80,27 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
-// StreamsInState returns the IDs of all streams in a particular
-// state, in sorted order for reproducibility.
-func (ps *PersistentState) StreamsInState(modes ...string) []string {
-	var streams []string
-	for id, tableState := range ps.Streams {
-		for _, mode := range modes {
-			if tableState.Mode == mode {
-				streams = append(streams, id)
-				break
-			}
+// BindingsInState returns all the bindings having a particular persisted state, in sorted order for
+// reproducibility.
+func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
+	var bindings []*Binding
+	for _, binding := range c.Bindings {
+		if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
+			bindings = append(bindings, binding)
 		}
 	}
-	sort.Strings(streams)
-	return streams
+	slices.SortFunc(bindings, func(a, b *Binding) int { return strings.Compare(a.StreamID, b.StreamID) })
+	return bindings
 }
 
-// StreamsCurrentlyActive returns the IDs of all streams currently being captured.
-func (ps *PersistentState) StreamsCurrentlyActive() []string {
-	return ps.StreamsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill, TableModeActive)
+// BindingsCurrentlyActive returns all the bindings currently being captured.
+func (c *Capture) BindingsCurrentlyActive() []*Binding {
+	return c.BindingsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill, TableModeActive)
 }
 
-// StreamsCurrentlyBackfilling returns the IDs of all streams undergoing some sort of backfill.
-func (ps *PersistentState) StreamsCurrentlyBackfilling() []string {
-	return ps.StreamsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
+// BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
+func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
+	return c.BindingsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -125,11 +172,6 @@ const (
 
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
-	// Notify Flow that we're ready and would like to receive acknowledgements.
-	if err := c.Output.Ready(true); err != nil {
-		return err
-	}
-
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
@@ -155,8 +197,9 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
 	}
-	for _, streamID := range c.State.StreamsCurrentlyActive() {
-		var state = c.State.Streams[streamID]
+	for _, binding := range c.BindingsCurrentlyActive() {
+		var state = c.State.Streams[binding.StateKey]
+		var streamID = binding.StreamID
 		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
@@ -196,15 +239,13 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err := c.streamCatchup(ctx, replStream, watermark); err != nil {
 		return fmt.Errorf("error streaming until watermark: %w", err)
 	}
-	for _, streamID := range c.State.StreamsInState(TableModePending) {
-		var binding = c.Bindings[streamID]
-		if binding == nil {
-			return fmt.Errorf("internal error: no binding information for stream %q", streamID)
-		}
+	for _, binding := range c.BindingsInState(TableModePending) {
+		var streamID = binding.StreamID
+		var stateKey = binding.StateKey
 
 		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
 
-		var state = c.State.Streams[streamID]
+		var state = c.State.Streams[stateKey]
 		var discoveryInfo = c.discovery[streamID]
 		switch binding.Resource.Mode {
 		case BackfillModeAutomatic:
@@ -234,7 +275,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
 		state.dirty = true
-		c.State.Streams[streamID] = state
+		c.State.Streams[stateKey] = state
 
 		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
@@ -255,9 +296,11 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// configuration logic, but that would make that logic more complex and I would like
 	// to deprecate the whole 'SkipBackfills' configuration property in the near future
 	// so I have left this little blob of logic nicely self-contained here.
-	for _, streamID := range c.State.StreamsCurrentlyBackfilling() {
+	for _, binding := range c.BindingsCurrentlyBackfilling() {
+		var streamID = binding.StreamID
+		var stateKey = binding.StateKey
 		if !c.Database.ShouldBackfill(streamID) {
-			var state = c.State.Streams[streamID]
+			var state = c.State.Streams[stateKey]
 			if state.Scanned == nil {
 				logrus.WithField("stream", streamID).Info("skipping backfill for stream")
 			} else {
@@ -269,12 +312,12 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			state.Mode = TableModeActive
 			state.Scanned = nil
 			state.dirty = true
-			c.State.Streams[streamID] = state
+			c.State.Streams[stateKey] = state
 		}
 	}
 
 	// Backfill any tables which require it
-	for c.State.StreamsCurrentlyBackfilling() != nil {
+	for c.BindingsCurrentlyBackfilling() != nil {
 		var watermark = uuid.New().String()
 		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
@@ -307,13 +350,15 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 func (c *Capture) updateState(ctx context.Context) error {
 	// Create the Streams map if nil
 	if c.State.Streams == nil {
-		c.State.Streams = make(map[string]*TableState)
+		c.State.Streams = make(map[boilerplate.StateKey]*TableState)
 	}
 
 	// Streams may be added to the catalog at various times. We need to
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
+	allStreamsAreNew := true
 	for streamID, binding := range c.Bindings {
+		var stateKey = binding.StateKey
 		var discoveryInfo = c.discovery[streamID]
 		if discoveryInfo == nil {
 			return fmt.Errorf("table %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
@@ -330,8 +375,8 @@ func (c *Capture) updateState(ctx context.Context) error {
 		// captures.
 		if !discoveryInfo.BaseTable {
 			logrus.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
-			if _, ok := c.State.Streams[streamID]; ok {
-				c.State.Streams[streamID] = &TableState{Mode: TableModeIgnore, dirty: true}
+			if _, ok := c.State.Streams[stateKey]; ok {
+				c.State.Streams[stateKey] = &TableState{Mode: TableModeIgnore, dirty: true}
 			}
 			continue
 		}
@@ -366,11 +411,12 @@ func (c *Capture) updateState(ctx context.Context) error {
 		}
 
 		// See if the stream is already initialized. If it's not, then create it.
-		var streamState, ok = c.State.Streams[streamID]
+		var streamState, ok = c.State.Streams[stateKey]
 		if !ok || streamState.Mode == TableModeIgnore {
-			c.State.Streams[streamID] = &TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
+			c.State.Streams[stateKey] = &TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
 			continue
 		}
+		allStreamsAreNew = false
 
 		// The following safety checks only matter if we're actively backfilling the table or
 		// intend to start backfilling it shortly. But checking for that would risk silently
@@ -402,21 +448,29 @@ func (c *Capture) updateState(ctx context.Context) error {
 
 	// Likewise streams may be removed from the catalog, and we need to forget
 	// the corresponding state information.
-	for streamID, state := range c.State.Streams {
-		var _, streamExistsInCatalog = c.Bindings[streamID]
-		if !streamExistsInCatalog && state.Mode != TableModeIgnore {
-			logrus.WithField("stream", streamID).Info("stream removed from catalog")
-			c.State.Streams[streamID] = &TableState{Mode: TableModeIgnore, dirty: true}
+	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
+		for _, b := range c.Bindings {
+			if b.StateKey == sk {
+				return true
+			}
+		}
+		return false
+	}
+	for stateKey, state := range c.State.Streams {
+		if !streamExistsInCatalog(stateKey) && state.Mode != TableModeIgnore {
+			logrus.WithField("stateKey", stateKey).Info("stream removed from catalog")
+			c.State.Streams[stateKey] = &TableState{Mode: TableModeIgnore, dirty: true}
 		}
 	}
 
-	// If no bindings are present, forget the old replication cursor. This is safe
-	// because logically if no streams are active then we can't miss any events of
-	// interest when the replication stream jumps ahead, and doing this allows the
-	// user an easy recovery path after WAL deletion, they just need to disable all
-	// bindings and then re-enable them (which will cause them all to get backfilled
-	// anew, as they should after such an event).
-	if len(c.Bindings) == 0 {
+	// If all bindings have been removed or had their backfill counter incremented, forget the old
+	// replication cursor. This is safe because logically if no streams are active or a re-backfill
+	// has been requested for them then we can't miss any events of interest when the replication
+	// stream jumps ahead, and doing this allows the user an easy recovery path after WAL deletion,
+	// they just need to either increment the backfill counter for all bindings, or disable all
+	// bindings and then re-enable them (which will cause them all to get backfilled anew, as they
+	// should after such an event).
+	if allStreamsAreNew {
 		logrus.Info("no active bindings, resetting cursor")
 		c.State.Cursor = ""
 	}
@@ -547,12 +601,18 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	// They have no other effect, the new metadata will only be written
 	// as part of a subsequent state checkpoint.
 	if event, ok := event.(*MetadataEvent); ok {
-		var streamID = event.StreamID
-		if state, ok := c.State.Streams[streamID]; ok {
-			logrus.WithField("stream", streamID).Trace("stream metadata updated")
+		var binding = c.Bindings[event.StreamID]
+		if binding == nil {
+			// Metadata event for a table that we don't have a binding for, which can be ignored.
+			return nil
+		}
+
+		var stateKey = binding.StateKey
+		if state, ok := c.State.Streams[stateKey]; ok {
+			logrus.WithField("stateKey", stateKey).Trace("stream metadata updated")
 			state.Metadata = event.Metadata
 			state.dirty = true
-			c.State.Streams[streamID] = state
+			c.State.Streams[stateKey] = state
 		}
 		return nil
 	}
@@ -563,9 +623,13 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	}
 	var change = event.(*ChangeEvent)
 	var streamID = change.Source.Common().StreamID()
+	var binding = c.Bindings[streamID]
+	var tableState *TableState
+	if binding != nil {
+		tableState = c.State.Streams[binding.StateKey]
+	}
 
 	// Decide what to do with the change event based on the state of the table.
-	var tableState = c.State.Streams[streamID]
 	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableModeIgnore {
 		logrus.WithFields(logrus.Fields{
 			"stream": streamID,
@@ -595,9 +659,13 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context) error {
-	var streams = c.State.StreamsCurrentlyBackfilling()
+	var bindings = c.BindingsCurrentlyBackfilling()
+	var streams = make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		streams = append(streams, b.StreamID)
+	}
 
-	// Select one stream at random to backfill at a time. On average this works
+	// Select one binding at random to backfill at a time. On average this works
 	// as well as any other policy, and just doing one at a time means that we
 	// can size the relevant constants without worrying about how many tables
 	// might be concurrently backfilling.
@@ -615,7 +683,8 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 }
 
 func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
-	var streamState = c.State.Streams[streamID]
+	var stateKey = c.Bindings[streamID].StateKey
+	var streamState = c.State.Streams[stateKey]
 
 	discoveryInfo, ok := c.discovery[streamID]
 	if !ok {
@@ -656,7 +725,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	}
 
 	// Update stream state to reflect backfill results
-	var state = c.State.Streams[streamID]
+	var state = c.State.Streams[stateKey]
 	if eventCount == 0 {
 		state.Mode = TableModeActive
 		state.Scanned = nil
@@ -665,7 +734,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 		state.BackfilledCount += eventCount
 	}
 	state.dirty = true
-	c.State.Streams[streamID] = state
+	c.State.Streams[stateKey] = state
 	return nil
 }
 
@@ -717,11 +786,11 @@ func (c *Capture) emitState() error {
 	// Put together an update which includes only those streams which have changed
 	// since the last state output. At the same time, clear the dirty flags on all
 	// those tables.
-	var streams = make(map[string]*TableState)
-	for streamID, state := range c.State.Streams {
+	var streams = make(map[boilerplate.StateKey]*TableState)
+	for stateKey, state := range c.State.Streams {
 		if state.dirty {
 			state.dirty = false
-			streams[streamID] = state
+			streams[stateKey] = state
 		}
 	}
 	var msg = &PersistentState{
