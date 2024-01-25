@@ -27,7 +27,7 @@ class BaseClient:
         return self._client
 
     def _get_access_token(self):
-        scope = ["files.read.all", "sites.read.all"]
+        scope = ["user.read", "files.read.all", "sites.read.all"]
         refresh_token = self.config.credentials.refresh_token if hasattr(self.config.credentials, "refresh_token") else None
 
         if refresh_token:

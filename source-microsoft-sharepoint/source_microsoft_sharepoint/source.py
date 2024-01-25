@@ -49,6 +49,7 @@ class BaseSource(FileBasedSource):
             stream_config = FileBasedStreamConfig(
                 name = stream_name,
                 file_type = "csv",
+                primary_key = "ID",
                 globs = get_globs(file_formats),
                 schemaless = False
             )

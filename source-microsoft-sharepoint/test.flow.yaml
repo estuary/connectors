@@ -1,4 +1,6 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-microsoft-sharepoint:
     endpoint:
@@ -8,4 +10,8 @@ captures:
           - "-m"
           - source-microsoft-sharepoint
         config: connector_config.yaml
-    bindings: []
+    bindings:
+      - resource:
+          stream: stream_teste
+          syncMode: incremental
+        target: acmeCo/stream_teste

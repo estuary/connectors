@@ -9,14 +9,14 @@ shim_airbyte_cdk.CaptureShim(
             r"https://login.microsoftonline.com/{{{ config.tenant_id }}}/oauth2/v2.0/authorize?"
             r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
             r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
-            r"&scope=files.read.all%20sites.read.all"
+            r"&scope=offline_access%20files.read.all%20sites.read.all"
             r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
             r"&response_type=code"
             r"&prompt=login"
         ),
         "accessTokenBody": (
             r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-            r"&scope=files.read.all%20sites.read.all"
+            r"&scope=offline_access%20files.read.all%20sites.read.all"
             r"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
             r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
             r"&grant_type=authorization_code"

@@ -60,7 +60,7 @@ class BaseSpec(AbstractFileBasedSpec):
         default = "Sharepoint",
         order = 3
     )
-    folder_share_link: str = Field(
+    folder_share_link: Optional[str] = Field(
         title = "Folder Share Link",
         description = "Share Link of the Microsoft Drive where the file(s) exist.",
         order = 5

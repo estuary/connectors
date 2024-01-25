@@ -37,12 +37,11 @@ class BaseStreamReader(AbstractFileBasedStreamReader):
     def list_directories_and_files(self, root_folder, path=None):
         drive_items = root_folder.children.get().execute_query()
         found_items = []
+
         for item in drive_items:
-            item_path = path + "/" + item.name if path else item.name
             if item.is_file:
-                found_items.append((item, item_path))
-            else:
-                found_items.extend(self.list_directories_and_files(item, item_path))
+                found_items.append((item, str(item.name)))
+
         return found_items
 
     def get_files_by_drive_name(self, folder):
