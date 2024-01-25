@@ -551,7 +551,19 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 		d.cpRecovery = false
 
-		return nil, nil
+		// Best-effort zero'ing of the checkpoint after a successful application of the checkpoint.
+		// Right now we always run all the queries in the checkpoint, but very soon will use state
+		// keys and need to change the structure of the checkpoint.
+		checkpointClear := checkpoint{
+			Queries:  nil,
+			ToDelete: nil,
+		}
+		var checkpointJSON, err = json.Marshal(checkpointClear)
+		if err != nil {
+			return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+		}
+
+		return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 	})
 }
 
