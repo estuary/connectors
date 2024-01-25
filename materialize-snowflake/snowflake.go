@@ -528,9 +528,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
 	for stateKey, item := range d.cp {
-		if len(item.Query) == 0 {
-			continue
-		}
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if !d.hasStateKey(stateKey) {

@@ -7,7 +7,19 @@
   "opened": {}
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "default%2Fduplicate_keys_delta": null,
+        "default%2Fduplicate_keys_delta_exclude_flow_doc": null,
+        "default%2Fduplicate_keys_standard": null,
+        "default%2Fformatted_strings": null,
+        "default%2Fmultiple_types": null,
+        "default%2Fsimple": null
+      }
+    }
+  }
 }
 {
   "flushed": {}
@@ -16,28 +28,60 @@
   "startedCommit": {
     "state": {
       "updated": {
-        "Queries": [
-          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT, array_int::STRING, bool_field::BOOLEAN, float_field::DOUBLE, flow_published_at::TIMESTAMP, multiple::STRING, nested::STRING, nullable_int::BIGINT, str_field::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n"
-        ],
-        "ToDelete": [
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
-        ]
+        "default%2Fduplicate_keys_delta": {
+          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fduplicate_keys_delta_exclude_flow_doc": {
+          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fduplicate_keys_standard": {
+          "Query": "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fformatted_strings": {
+          "Query": "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fmultiple_types": {
+          "Query": "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT, array_int::STRING, bool_field::BOOLEAN, float_field::DOUBLE, flow_published_at::TIMESTAMP, multiple::STRING, nested::STRING, nullable_int::BIGINT, str_field::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fsimple": {
+          "Query": "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        }
       }
     }
   }
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "default%2Fduplicate_keys_delta": null,
+        "default%2Fduplicate_keys_delta_exclude_flow_doc": null,
+        "default%2Fduplicate_keys_standard": null,
+        "default%2Fformatted_strings": null,
+        "default%2Fmultiple_types": null,
+        "default%2Fsimple": null
+      }
+    }
+  }
 }
 {
   "loaded": {
@@ -230,30 +274,60 @@
   "startedCommit": {
     "state": {
       "updated": {
-        "Queries": [
-          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP, l.int = r.int::BIGINT, l.str = r.str::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT, r.flow_published_at::TIMESTAMP, r.int::BIGINT, r.str::STRING, r.flow_document::STRING);\n",
-          "\nDROP TABLE IF EXISTS `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard`\n",
-          "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING `flow_temp_store_table_00000000_00000000_4_multiple_types` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int::STRING, l.bool_field = r.bool_field::BOOLEAN, l.float_field = r.float_field::DOUBLE, l.flow_published_at = r.flow_published_at::TIMESTAMP, l.multiple = r.multiple::STRING, l.nested = r.nested::STRING, l.nullable_int = r.nullable_int::BIGINT, l.str_field = r.str_field::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT, r.array_int::STRING, r.bool_field::BOOLEAN, r.float_field::DOUBLE, r.flow_published_at::TIMESTAMP, r.multiple::STRING, r.nested::STRING, r.nullable_int::BIGINT, r.str_field::STRING, r.flow_document::STRING);\n",
-          "\nDROP TABLE IF EXISTS `flow_temp_store_table_00000000_00000000_4_multiple_types`\n"
-        ],
-        "ToDelete": [
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
-        ]
+        "default%2Fduplicate_keys_delta": {
+          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fduplicate_keys_delta_exclude_flow_doc": {
+          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fduplicate_keys_standard": {
+          "Query": "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP, l.int = r.int::BIGINT, l.str = r.str::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT, r.flow_published_at::TIMESTAMP, r.int::BIGINT, r.str::STRING, r.flow_document::STRING);\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fformatted_strings": {
+          "Query": "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fmultiple_types": {
+          "Query": "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING `flow_temp_store_table_00000000_00000000_4_multiple_types` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int::STRING, l.bool_field = r.bool_field::BOOLEAN, l.float_field = r.float_field::DOUBLE, l.flow_published_at = r.flow_published_at::TIMESTAMP, l.multiple = r.multiple::STRING, l.nested = r.nested::STRING, l.nullable_int = r.nullable_int::BIGINT, l.str_field = r.str_field::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT, r.array_int::STRING, r.bool_field::BOOLEAN, r.float_field::DOUBLE, r.flow_published_at::TIMESTAMP, r.multiple::STRING, r.nested::STRING, r.nullable_int::BIGINT, r.str_field::STRING, r.flow_document::STRING);\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        },
+        "default%2Fsimple": {
+          "Query": "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "ToDelete": [
+            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+          ]
+        }
       }
     }
   }
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "default%2Fduplicate_keys_delta": null,
+        "default%2Fduplicate_keys_delta_exclude_flow_doc": null,
+        "default%2Fduplicate_keys_standard": null,
+        "default%2Fformatted_strings": null,
+        "default%2Fmultiple_types": null,
+        "default%2Fsimple": null
+      }
+    }
+  }
 }
 {
   "row": {
@@ -856,5 +930,10 @@
   "opened": {}
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {}
+    }
+  }
 }
