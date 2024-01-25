@@ -20,6 +20,22 @@ collections:
           type:
             - "null"
             - string
+        TESTE:
+          type:
+            - "null"
+            - string
+        CODE:
+          type:
+            - "null"
+            - string
+        USER:
+          type:
+            - "null"
+            - string
+        EMAIL:
+          type:
+            - "null"
+            - string
         _meta:
           type: object
           properties:
@@ -29,4 +45,4 @@ collections:
             - row_id
       x-infer-schema: true
     key:
-      - /ID
+      - /_meta/row_id

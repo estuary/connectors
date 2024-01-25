@@ -60,9 +60,9 @@ class BaseSpec(AbstractFileBasedSpec):
         default = "OneDrive",
         order = 3
     )
-    folder_path: Optional[str] = Field(
-        title = "Folder Path",
-        description = "Path to folder of the Microsoft OneDrive drive where the file(s) exist.",
+    folder_link: Optional[str] = Field(
+        title = "Folder Link",
+        description = "Link to folder of the Microsoft OneDrive drive where the file(s) exist.",
         order = 5
     )
     streams: Optional[List[FileBasedStreamConfig]] = Field(

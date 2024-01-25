@@ -171,14 +171,14 @@ class CaptureShim(Connector):
                     )
                     for component in stream.source_defined_primary_key
                 ]
-            elif sync_mode == SyncMode.full_refresh:
+            else:
                 # Synthesize a key based on the record's order within each stream refresh.
                 key = ["/_meta/row_id"]
-            else:
-                raise RuntimeError(
-                    "incremental stream is missing a source-defined primary key",
-                    stream.name,
-                )
+            # else:
+            #     raise RuntimeError(
+            #         "incremental stream is missing a source-defined primary key",
+            #         stream.name,
+            #     )
 
             # Extend schema with /_meta/row_id, since we always generate it
             meta = stream.json_schema.setdefault("properties", {}).setdefault(

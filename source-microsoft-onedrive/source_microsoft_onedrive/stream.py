@@ -36,35 +36,20 @@ class BaseStreamReader(AbstractFileBasedStreamReader):
     def list_directories_and_files(self, root_folder, path=None):
         drive_items = root_folder.children.get().execute_query()
         found_items = []
+
         for item in drive_items:
-            item_path = path + "/" + item.name if path else item.name
             if item.is_file:
-                found_items.append((item, item_path))
-            else:
-                found_items.extend(self.list_directories_and_files(item, item_path))
+                found_items.append((item, str(item.name)))
+
         return found_items
 
-    def get_files_by_drive_name(self, drives, drive_name, folder_path):
-        path_levels = [level for level in folder_path.split("/") if level]
-        folder_path = "/".join(path_levels)
-
-        for drive in drives:
-            is_onedrive = drive.drive_type in ["personal", "business"]
-            if drive.name == drive_name and is_onedrive:
-                folder = drive.root if folder_path in self.ROOT_PATH else drive.root.get_by_path(folder_path).get().execute_query()
-                yield from self.list_directories_and_files(folder)
+    def get_files_by_folder(self, folder):
+        yield from self.list_directories_and_files(folder)
 
     def get_matching_files(self, globs: List[str], prefix: Optional[str], logger: Logger = Logger) -> Iterable[RemoteFile]:
-        drives = self.one_drive_client.drives.get().execute_query()
-        self.config.drive_name = None
+        folder = self.one_drive_client.shares.by_url(self.config.folder_link).drive_item.get().execute_query()
+        files = self.get_files_by_folder(folder)
 
-        if self.config.credentials.auth_type == "Client":
-            my_drive = self.one_drive_client.me.drive.get().execute_query()
-
-        drives.add_child(my_drive)
-
-        files = self.get_files_by_drive_name(drives, self.config.drive_name, self.config.folder_path)
-        
         try:
             first_file, path = next(files)
 
