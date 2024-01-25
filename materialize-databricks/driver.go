@@ -114,6 +114,8 @@ type transactor struct {
 	cp checkpoint
 	// is this checkpoint a recovered checkpoint?
 	cpRecovery bool
+	// Guard for concurrent access for cp.
+	mu sync.Mutex
 
 	wsClient *databricks.WorkspaceClient
 
@@ -133,11 +135,20 @@ type transactor struct {
 	updateDelay time.Duration
 }
 
-func (t transactor) Context(ctx context.Context) context.Context {
+func (t *transactor) Context(ctx context.Context) context.Context {
 	return driverctx.NewContextWithStagingInfo(ctx, []string{t.localStagingPath})
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
+	// A connector running on the "old" state may not have emitted an ack yet. We don't support
+	// migrating states so hopefully this is nothing but an empty checkpoint.
+	var oldCp oldCheckpoint
+	if err := json.Unmarshal(state, &oldCp); err != nil {
+		log.WithField("oldCheckpoint", oldCp).WithError(err).Warn("failed to unmarshal state into oldCheckpoint")
+	} else if len(oldCp.Queries) > 0 || len(oldCp.ToDelete) > 0 {
+		return fmt.Errorf("UnmarshalState application logic error: oldCp was not empty: %#v", oldCp)
+	}
+
 	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
 	}
@@ -402,7 +413,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
-type checkpoint struct {
+type checkpointItem struct {
+	Query    string
+	ToDelete []string
+}
+
+type checkpoint map[string]*checkpointItem
+
+// TODO: Remove once all tasks have migrated to using the new checkpoint.
+type oldCheckpoint struct {
 	Queries []string
 
 	// List of files to cleanup after committing the queries
@@ -426,14 +445,12 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	log.Info("store: starting file upload and copies")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
-		b.storeFile.start(ctx)
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-		if err != nil {
+		if err := b.storeFile.start(ctx); err != nil {
+			return nil, err
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		}
-
-		if err := b.storeFile.encodeRow(converted); err != nil {
+		} else if b.storeFile.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 
@@ -442,16 +459,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
-	// Upload the staged files and build a list of merge and truncate queries that need to be run
-	// to effectively commit the files into destination tables. These queries are stored
-	// in the checkpoint so that if the connector is restarted in middle of a commit
-	// it can run the same queries on the next startup. This is the pattern for
-	// recovery log being authoritative and the connector idempotently applies a commit
-	var queries []string
-	// all files uploaded across bindings
-	var toDelete []string
-	// mutex to ensure safety of updating these variables
-	mtx := sync.Mutex{}
+	// Upload the staged files and build a list of merge and truncate queries that need to be run to
+	// effectively commit the files into destination tables. These queries are stored in the
+	// checkpoint so that if the connector is restarted in middle of a commit it can run the same
+	// queries on the next startup. This is the pattern for recovery log being authoritative and the
+	// connector idempotently applies a commit. These are keyed on the binding stateKey so that in
+	// case of a recovery being necessary we don't run queries belonging to bindings that have been
+	// removed.
 
 	// we run these processes in parallel
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -463,13 +477,12 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		var bindingCopy = b
 		var idxCopy = idx
 		group.Go(func() error {
+			var query string
+
 			toCopy, toDeleteBinding, err := bindingCopy.storeFile.flush()
 			if err != nil {
 				return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
 			}
-			mtx.Lock()
-			toDelete = append(toDelete, toDeleteBinding...)
-			mtx.Unlock()
 
 			// In case of delta updates or if there are no existing keys being stored
 			// we directly copy from staged files into the target table. Note that this is retriable
@@ -477,9 +490,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// not be loaded again
 			// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 			if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
-				mtx.Lock()
-				queries = append(queries, renderWithFiles(bindingCopy.copyIntoDirect, toCopy...))
-				mtx.Unlock()
+				query = renderWithFiles(bindingCopy.copyIntoDirect, toCopy...)
 			} else {
 				// Create a binding-scoped temporary table for store documents to be merged
 				// into target table
@@ -491,10 +502,15 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoStore, toCopy...)); err != nil {
 					return fmt.Errorf("store: copying into to temporary table: %w", err)
 				}
+				query = renderWithFiles(bindingCopy.mergeInto, toCopy...)
+			}
 
-				mtx.Lock()
-				queries = append(queries, renderWithFiles(bindingCopy.mergeInto, toCopy...), bindingCopy.dropStoreSQL)
-				mtx.Unlock()
+			d.mu.Lock()
+			defer d.mu.Unlock()
+
+			d.cp[bindingCopy.target.StateKey] = &checkpointItem{
+				Query:    query,
+				ToDelete: toDeleteBinding,
 			}
 
 			return nil
@@ -508,10 +524,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	log.Info("store: finished file upload and copies")
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
-		d.cp = cp
-
-		var checkpointJSON, err = json.Marshal(cp)
+		var checkpointJSON, err = json.Marshal(d.cp)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
@@ -531,8 +544,15 @@ func renderWithFiles(tpl string, files ...string) string {
 // TODO: run these queries concurrently for improved performance
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	log.Info("store: starting committing changes")
-	for _, q := range d.cp.Queries {
-		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
+
+	for _, b := range d.bindings {
+		item, ok := d.cp[b.target.StateKey]
+		if !ok || item == nil {
+			// No data for this binding for this transaction.
+			continue
+		}
+
+		if _, err := d.store.conn.ExecContext(ctx, item.Query); err != nil {
 			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 			// it is okay to skip them in this case
 			if d.cpRecovery {
@@ -540,24 +560,25 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					continue
 				}
 			}
-			return nil, fmt.Errorf("query %q failed: %w", q, err)
+			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
 		}
-	}
-	log.Info("store: finished committing changes")
 
-	// Cleanup files and tables
-	d.deleteFiles(ctx, d.cp.ToDelete)
+		// Cleanup files.
+		d.deleteFiles(ctx, item.ToDelete)
+	}
 
 	d.cpRecovery = false
+
+	// Clear the checkpoint for current bindings. This is a best-effort update that will hopefully
+	// be persisted as part of the ack response.
+	for _, b := range d.bindings {
+		d.cp[b.target.StateKey] = nil
+	}
 
 	// Best-effort zero'ing of the checkpoint after a successful application of the checkpoint.
 	// Right now we always run all the queries in the checkpoint, but very soon will use state
 	// keys and need to change the structure of the checkpoint.
-	checkpointClear := checkpoint{
-		Queries:  nil,
-		ToDelete: nil,
-	}
-	var checkpointJSON, err = json.Marshal(checkpointClear)
+	var checkpointJSON, err = json.Marshal(d.cp)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
