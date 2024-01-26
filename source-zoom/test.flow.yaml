@@ -1,0 +1,89 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-zoom:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-zoom
+        config: connector_config.yaml
+    bindings:
+      - resource:
+          stream: users
+          syncMode: full_refresh
+        target: acmeCo/users
+      - resource:
+          stream: meetings
+          syncMode: full_refresh
+        target: acmeCo/meetings
+      - resource:
+          stream: meetings_registrants
+          syncMode: full_refresh
+        target: acmeCo/meetings_registrants
+      - resource:
+          stream: meetings_polls
+          syncMode: full_refresh
+        target: acmeCo/meetings_polls
+      - resource:
+          stream: meetings_poll_results
+          syncMode: full_refresh
+        target: acmeCo/meetings_poll_results
+      - resource:
+          stream: meetings_registration_questions
+          syncMode: full_refresh
+        target: acmeCo/meetings_registration_questions
+      - resource:
+          stream: webinars
+          syncMode: full_refresh
+        target: acmeCo/webinars
+      - resource:
+          stream: webinar_panelists
+          syncMode: full_refresh
+        target: acmeCo/webinar_panelists
+      - resource:
+          stream: webinar_registrants
+          syncMode: full_refresh
+        target: acmeCo/webinar_registrants
+      - resource:
+          stream: webinar_absentees
+          syncMode: full_refresh
+        target: acmeCo/webinar_absentees
+      - resource:
+          stream: webinar_polls
+          syncMode: full_refresh
+        target: acmeCo/webinar_polls
+      - resource:
+          stream: webinar_poll_results
+          syncMode: full_refresh
+        target: acmeCo/webinar_poll_results
+      - resource:
+          stream: webinar_registration_questions
+          syncMode: full_refresh
+        target: acmeCo/webinar_registration_questions
+      - resource:
+          stream: webinar_tracking_sources
+          syncMode: full_refresh
+        target: acmeCo/webinar_tracking_sources
+      - resource:
+          stream: webinar_qna_results
+          syncMode: full_refresh
+        target: acmeCo/webinar_qna_results
+      - resource:
+          stream: report_meetings
+          syncMode: full_refresh
+        target: acmeCo/report_meetings
+      - resource:
+          stream: report_meeting_participants
+          syncMode: full_refresh
+        target: acmeCo/report_meeting_participants
+      - resource:
+          stream: report_webinars
+          syncMode: full_refresh
+        target: acmeCo/report_webinars
+      - resource:
+          stream: report_webinar_participants
+          syncMode: full_refresh
+        target: acmeCo/report_webinar_participants

@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "source-zoom-estuary"
+version = "0.1.0"
+description = ""
+authors = ["Jonathan Wihl <jonathan@estuary.dev>"]
+
+[tool.poetry.dependencies]
+airbyte-cdk = "0.51.14"
+mypy = "^1.5"
+python = ">=3.11,<3.12"
+debugpy = "^1.8.0"
+source_zoom = { path = "source_zoom", develop = true }
+flow-sdk = { path = "../python", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

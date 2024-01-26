@@ -1,0 +1,21 @@
+credentials:
+    account_id_sops: ENC[AES256_GCM,data:ycfs3BY8ud2mvj908Xqv4RN0JKPFxw==,iv:K8KSL6l1qh3AwjX/gZy4yRLRThFjkzizL1DFg9XKDcc=,tag:Ay65KlBdc3b96TPOjFZewA==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:pOJKLvg8RxbQtBJjSteOBMDhEI3LWQ==,iv:IlOBhemJtUYiyUqLfiOi/e3jbEBmpd6yq6wmlPHxAW4=,tag:T/FGY4qhV1RgiOI6vfC4IQ==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:u/hDGTJQgTHCtzyTHeRYRaq0U39puDJbmBNEPPQNVlA=,iv:2pAmpsxeCR2wlolYmOoArc3hskvHKLgH8WG/sa6WeOU=,tag:l9+3iL+KNxJ67t1kKi7d3A==,type:str]
+    access_token: eyJzdiI6IjAwMDAwMSIsImFsZyI6IkhTNTEyIiwidiI6IjIuMCIsImtpZCI6IjYxZTE3ZjI0LTdjZjQtNDVjYi04NWUwLTc1YTlkODM0ZDAxZiJ9.eyJ2ZXIiOjksImF1aWQiOiI5YmViZGU4NGFiZGE4MDI3YTIwMTEyNWVjNGRjYzE4MyIsImNvZGUiOiJOOGdlMzJ5dlRORWV2clMxLTZrUVFXUXJrakNVX3E1bFEiLCJpc3MiOiJ6bTpjaWQ6Zmp6VExJdFFURXVURk1sbGRrZnRjQSIsImdubyI6MCwidHlwZSI6MCwidGlkIjowLCJhdWQiOiJodHRwczovL29hdXRoLnpvb20udXMiLCJ1aWQiOiJ2V3JfTHJPb1J6ZXVFdTJJSkRsdEpBIiwibmJmIjoxNzA2MjY2MzE5LCJleHAiOjE3MDYyNjk5MTksImlhdCI6MTcwNjI2NjMxOSwiYWlkIjoiWk85Ri1qMURSd2V5XzlyNFRqZ0E1QSJ9.X17--NqR2_7umn-l_RfxO9n9XWXAnY_xDxHAyoq0Rp5532WaG3Te_B65JZKCdLPDuq6X7CY8SbLNZwsJG1bK4A
+    refresh_token: eyJzdiI6IjAwMDAwMSIsImFsZyI6IkhTNTEyIiwidiI6IjIuMCIsImtpZCI6IjkyMjZlZGVjLTQ3YWEtNGQ0Mi05OWFlLTUyODQxMzlmNDhmNiJ9.eyJ2ZXIiOjksImF1aWQiOiI5YmViZGU4NGFiZGE4MDI3YTIwMTEyNWVjNGRjYzE4MyIsImNvZGUiOiJOOGdlMzJ5dlRORWV2clMxLTZrUVFXUXJrakNVX3E1bFEiLCJpc3MiOiJ6bTpjaWQ6Zmp6VExJdFFURXVURk1sbGRrZnRjQSIsImdubyI6MCwidHlwZSI6MSwidGlkIjowLCJhdWQiOiJodHRwczovL29hdXRoLnpvb20udXMiLCJ1aWQiOiJ2V3JfTHJPb1J6ZXVFdTJJSkRsdEpBIiwibmJmIjoxNzA2MjY2MzE5LCJleHAiOjE3MTQwNDIzMTksImlhdCI6MTcwNjI2NjMxOSwiYWlkIjoiWk85Ri1qMURSd2V5XzlyNFRqZ0E1QSJ9.HlI8_OZaCiB1499nlFFJ0NAuw0vFfG1EGCn9aiyaTHubUATzVFAwyT8yMCqYhw1B496SNqGz5YhpUMj-W5Xu3Q
+    token_expiry_date: "2024-01-26T11:52:04.363Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-01-06T15:12:01Z"
+          enc: CiQAdmEdwu+NkfcDFHI1HD0xEdrY9U4sY/h10udj/ZFkZVwbtB8SSQCVvC1zYUbgbqZ2Db9irjQ7UiPc2JpBm3PHoR2AqLsA3WJ0TzEy/Tz1WXT48eokyZTR4xU6dClgKu69xh2RqXowjpw9X6uVElc=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-01-26T10:53:23Z"
+    mac: ENC[AES256_GCM,data:TMFgZDaYqirbmyrT2V/pWPf2T2474YoYe1tJpg2p/7uH7PMWy1x3+d0yDNxo1BQ1QdPObKDVk+97aiVhM5mqjIn9Nb4GtF/8HSfaWWHmMYzOL6XkWv0QAXxfFdbjCjshF3ZpyeB3LS8zg6rsI/ux8rP08eh/bR4CzTgcFgGHfbs=,iv:VQMOToGO3UtvdkPYLHEk6ZKk65ZkJIijExmXdQ+1sMA=,tag:XXfULntpdN8Bms520GfcZw==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
