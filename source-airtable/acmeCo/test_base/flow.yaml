@@ -1,3 +1,4 @@
 ---
 import:
   - pizzas/flow.yaml
+  - soups/flow.yaml
