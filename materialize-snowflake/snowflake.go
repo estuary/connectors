@@ -568,6 +568,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var checkpointClear = make(checkpoint)
 	for _, b := range d.bindings {
 		checkpointClear[b.target.StateKey] = nil
+		delete(d.cp, b.target.StateKey)
 	}
 	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
