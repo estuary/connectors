@@ -1,6 +1,6 @@
 ---
 collections:
-  acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f:
+  acmeCo/test_base/soups/tblDi5DS0EjiYi83h:
     schema:
       $schema: "https://json-schema.org/draft-07/schema#"
       type: object
@@ -20,14 +20,14 @@ collections:
           type:
             - "null"
             - string
+        notes:
+          type:
+            - "null"
+            - string
         status:
           type:
             - "null"
             - string
-        cost:
-          type:
-            - "null"
-            - number
         _meta:
           type: object
           properties:
