@@ -259,7 +259,8 @@ class CaptureShim(Connector):
             if record := message.record:
                 entry = index.get((record.namespace, record.stream), None)
                 if entry is None:
-                    raise Exception(f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})")
+                    logger.warn(f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})")
+                    continue
 
                 record.data.setdefault("_meta", {})["row_id"] = entry[1]
                 entry[1] += 1
@@ -282,7 +283,8 @@ class CaptureShim(Connector):
 
                 binding_lookup = index.get((state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name), None)
                 if binding_lookup is None:
-                    raise Exception(f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})")                
+                    logger.warn(f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})")                
+                    continue
                 
                 # index values: [binding_index, row_id]
                 binding = bindings[binding_lookup[0]]
