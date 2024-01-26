@@ -257,7 +257,10 @@ class CaptureShim(Connector):
             logger, config, catalog, state.to_airbyte_input()
         ):
             if record := message.record:
-                entry = index[(record.namespace, record.stream)]
+                entry = index.get((record.namespace, record.stream), None)
+                if entry is None:
+                    raise Exception(f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})")
+
                 record.data.setdefault("_meta", {})["row_id"] = entry[1]
                 entry[1] += 1
 
@@ -277,8 +280,12 @@ class CaptureShim(Connector):
 
                 logger.info(f"Got a state message: {str(state_msg)}")
 
-                binding_id = index[(state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name)]
-                binding = bindings[binding_id]
+                binding_lookup = index.get((state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name), None)
+                if binding_lookup is None:
+                    raise Exception(f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})")                
+                
+                # index values: [binding_index, row_id]
+                binding = bindings[binding_lookup[0]]
 
                 state.handle_message(state_msg, binding["stateKey"])
                 emit(
