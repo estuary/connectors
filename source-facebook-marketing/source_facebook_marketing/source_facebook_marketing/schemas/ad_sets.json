@@ -1,12 +1,11 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
   "properties": {
     "name": {
       "type": ["null", "string"]
     },
     "end_time": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "promoted_object": {
       "type": ["null", "object"],
@@ -44,8 +43,7 @@
       "type": ["null", "string"]
     },
     "updated_time": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "daily_budget": {
       "type": ["null", "number"]
@@ -60,12 +58,10 @@
       "type": ["null", "string"]
     },
     "created_time": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "start_time": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "lifetime_budget": {
       "type": ["null", "number"]
@@ -109,8 +105,8 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
-          "created_time": { "type": "string", "format": "date-time" },
-          "updated_time": { "type": "string", "format": "date-time" }
+          "created_time": { "type": "string" },
+          "updated_time": { "type": "string" }
         }
       }
     }

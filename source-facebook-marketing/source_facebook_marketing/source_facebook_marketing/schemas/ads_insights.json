@@ -338,5 +338,5 @@
       "type": ["null", "number"]
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"]
 }
