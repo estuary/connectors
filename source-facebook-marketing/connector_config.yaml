@@ -1,0 +1,7 @@
+account_id: "914250693155235"
+start_date: "2022-01-01T00:00:00Z"
+credentials:
+    access_token_sops: EAAHxjuPZADIQBO1fKjO9xClWWq6SbuZBygUo7dm7ZBLY2dzBrzE6Uc2oehnxBrpHT1ETsaAikq7Xx3TtgZAnxk5MZAgobz7F5fXW3WJda5WXx93upsxoXpxqVRkIZAZCxF2YC30RKQnIo6cz6vES9UmZCWmtZBoZAhMypFEJD8HGANbpyU4KkiZBMwJGt0LiONNJNXYhZBbIkcOZB6V21AdIZAESZAWsDTBPveKkcHxw8HIyaIWAO5zczCAyEVfSrLPa5bVqvIZD
+    auth_type: OAuth Credentials
+    client_id_sops: 547070987013252
+    client_secret_sops: 09187c2e4baeb8c121f345de6352f5e7

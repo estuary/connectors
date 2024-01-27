@@ -1,0 +1,2473 @@
+---
+type: object
+additionalProperties: true
+properties:
+  account_currency:
+    type:
+      - "null"
+      - string
+  account_id:
+    type:
+      - "null"
+      - string
+  account_name:
+    type:
+      - "null"
+      - string
+  action_values:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  ad_click_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  ad_id:
+    type:
+      - "null"
+      - string
+  ad_impression_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  ad_name:
+    type:
+      - "null"
+      - string
+  adset_id:
+    type:
+      - "null"
+      - string
+  adset_name:
+    type:
+      - "null"
+      - string
+  age_targeting:
+    type:
+      - "null"
+      - string
+  attribution_setting:
+    type:
+      - "null"
+      - string
+  auction_bid:
+    type:
+      - "null"
+      - number
+  auction_competitiveness:
+    type:
+      - "null"
+      - number
+  auction_max_competitor_bid:
+    type:
+      - "null"
+      - number
+  buying_type:
+    type:
+      - "null"
+      - string
+  campaign_id:
+    type:
+      - "null"
+      - string
+  campaign_name:
+    type:
+      - "null"
+      - string
+  canvas_avg_view_percent:
+    type:
+      - "null"
+      - number
+  canvas_avg_view_time:
+    type:
+      - "null"
+      - number
+  catalog_segment_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  catalog_segment_value:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  catalog_segment_value_mobile_purchase_roas:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  catalog_segment_value_omni_purchase_roas:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  catalog_segment_value_website_purchase_roas:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  clicks:
+    type:
+      - "null"
+      - integer
+  conversion_rate_ranking:
+    type:
+      - "null"
+      - string
+  conversion_values:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  conversions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  converted_product_quantity:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  converted_product_value:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_15_sec_video_view:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_2_sec_continuous_video_view:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_action_type:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_ad_click:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_conversion:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_estimated_ad_recallers:
+    type:
+      - "null"
+      - number
+  cost_per_inline_link_click:
+    type:
+      - "null"
+      - number
+  cost_per_inline_post_engagement:
+    type:
+      - "null"
+      - number
+  cost_per_outbound_click:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_thruplay:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_unique_action_type:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cost_per_unique_click:
+    type:
+      - "null"
+      - number
+  cost_per_unique_inline_link_click:
+    type:
+      - "null"
+      - number
+  cost_per_unique_outbound_click:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  cpc:
+    type:
+      - "null"
+      - number
+  cpm:
+    type:
+      - "null"
+      - number
+  cpp:
+    type:
+      - "null"
+      - number
+  created_time:
+    format: date
+    type:
+      - "null"
+      - string
+  ctr:
+    type:
+      - "null"
+      - number
+  date_start:
+    format: date
+    type:
+      - "null"
+      - string
+  date_stop:
+    format: date
+    type:
+      - "null"
+      - string
+  engagement_rate_ranking:
+    type:
+      - "null"
+      - string
+  estimated_ad_recall_rate:
+    type:
+      - "null"
+      - number
+  estimated_ad_recall_rate_lower_bound:
+    type:
+      - "null"
+      - number
+  estimated_ad_recall_rate_upper_bound:
+    type:
+      - "null"
+      - number
+  estimated_ad_recallers:
+    type:
+      - "null"
+      - number
+  estimated_ad_recallers_lower_bound:
+    type:
+      - "null"
+      - number
+  estimated_ad_recallers_upper_bound:
+    type:
+      - "null"
+      - number
+  frequency:
+    type:
+      - "null"
+      - number
+  full_view_impressions:
+    type:
+      - "null"
+      - number
+  full_view_reach:
+    type:
+      - "null"
+      - number
+  gender_targeting:
+    type:
+      - "null"
+      - string
+  impressions:
+    type:
+      - "null"
+      - integer
+  inline_link_click_ctr:
+    type:
+      - "null"
+      - number
+  inline_link_clicks:
+    type:
+      - "null"
+      - integer
+  inline_post_engagement:
+    type:
+      - "null"
+      - integer
+  instant_experience_clicks_to_open:
+    type:
+      - "null"
+      - number
+  instant_experience_clicks_to_start:
+    type:
+      - "null"
+      - number
+  instant_experience_outbound_clicks:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  labels:
+    type:
+      - "null"
+      - string
+  location:
+    type:
+      - "null"
+      - string
+  mobile_app_purchase_roas:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  objective:
+    type:
+      - "null"
+      - string
+  optimization_goal:
+    type:
+      - "null"
+      - string
+  outbound_clicks:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  outbound_clicks_ctr:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  purchase_roas:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  qualifying_question_qualify_answer_rate:
+    type:
+      - "null"
+      - number
+  quality_ranking:
+    type:
+      - "null"
+      - string
+  reach:
+    type:
+      - "null"
+      - integer
+  social_spend:
+    type:
+      - "null"
+      - number
+  spend:
+    type:
+      - "null"
+      - number
+  unique_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  unique_clicks:
+    type:
+      - "null"
+      - integer
+  unique_ctr:
+    type:
+      - "null"
+      - number
+  unique_inline_link_click_ctr:
+    type:
+      - "null"
+      - number
+  unique_inline_link_clicks:
+    type:
+      - "null"
+      - integer
+  unique_link_clicks_ctr:
+    type:
+      - "null"
+      - number
+  unique_outbound_clicks:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  unique_outbound_clicks_ctr:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  updated_time:
+    format: date
+    type:
+      - "null"
+      - string
+  video_15_sec_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_30_sec_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_avg_time_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_continuous_2_sec_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_p100_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_p25_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_p50_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_p75_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_p95_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_play_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  video_play_curve_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - array
+          items:
+            type:
+              - "null"
+              - integer
+  video_play_retention_0_to_15s_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - array
+          items:
+            type:
+              - "null"
+              - integer
+  video_play_retention_20_to_60s_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - array
+          items:
+            type:
+              - "null"
+              - integer
+  video_play_retention_graph_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - array
+          items:
+            type:
+              - "null"
+              - integer
+  video_time_watched_actions:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  website_ctr:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  website_purchase_roas:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        1d_click:
+          type:
+            - "null"
+            - number
+        7d_click:
+          type:
+            - "null"
+            - number
+        28d_click:
+          type:
+            - "null"
+            - number
+        1d_view:
+          type:
+            - "null"
+            - number
+        7d_view:
+          type:
+            - "null"
+            - number
+        28d_view:
+          type:
+            - "null"
+            - number
+        action_destination:
+          type:
+            - "null"
+            - string
+        action_target_id:
+          type:
+            - "null"
+            - string
+        action_type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - number
+  wish_bid:
+    type:
+      - "null"
+      - number
+  age:
+    type:
+      - "null"
+      - string
+  gender:
+    type:
+      - "null"
+      - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+type:
+  - object
+x-infer-schema: true

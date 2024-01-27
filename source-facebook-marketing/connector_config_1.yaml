@@ -1,0 +1,21 @@
+account_id: "914250693155235"
+start_date: "2022-01-01T00:00:00Z"
+credentials:
+    access_token_sops: ENC[AES256_GCM,data:9tAboTBbeKYtFoCERvl8nNZFFkOJYNpK1AumFel1SgTSvlF580kOJ3kyot9pFE4gpL62TTam6a3VlSx4ychudcdzx+aT1G0hhydKnkTn9rcLFc0GMiN2EnfHZc0ToW10HbNP5DJOhF7oe/lUCaeyQSo+ge+5cDVOPNmEMaoRjUo2QxkgQHx/KLlMa8sIdNDfTKSNjOrNZmWqmWufn7U+OA8QcCiYFa+m5VP7SmouzNO3yDcM2wvFDkYHt66xendy2KYHcg8CpZ8OJAwEdt9E0OWgb7SEwmajvwS8oZkZEUSM6ltsRM342WzVoFUiQBQfpc5f0Bm0foWrlIRL2COvJxtveJcmvFePtcFZVCQ=,iv:fOek5BNB5BLI5ZOzBEu7+psD1hgKjPTTRShLFU6VozY=,tag:1QrGhHH3un2D5f6Xg5hZUA==,type:str]
+    auth_type: OAuth Credentials
+    client_id_sops: ENC[AES256_GCM,data:UCyAGg9Dh4nXHD5ZhCXT,iv:72R5ITjDrcv+W3dvgKmhgZvKQzThvqEBOGT2yyddkyc=,tag:ZliPFfFIC3/5v5f25vKPog==,type:int]
+    client_secret_sops: ENC[AES256_GCM,data:8WLu9qOWR4+pOOInYAlveZlzyCzbnGkXd8G9G7rtbeE=,iv:fQJRItcWkosmYS5a1HOXLON2cCFyQIzOkO0nOtL33kQ=,tag:115LzI5zGgkCHC74Iueeng==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
+          created_at: "2024-01-25T21:04:09Z"
+          enc: CiQAW8BC2JjWD1PhCknVHmNoTfMbthZM3w6zYn7pswJZBg8S1WESSQD00UdDHrg68rqS4vAgATnWh+6SdWfLueNFS2CpCck62xrcUeyw4hIh30T22NpLKrZ2o1axjxMK1M/kp+K/LGLdNnxS+qMCTsQ=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-01-25T21:21:40Z"
+    mac: ENC[AES256_GCM,data:dg2yOOFte+FhnF13sNuIbxhsc3ZVqJm5ehi8FOeZDt1kQ44BEZeu0Od/auM26PpYZ0gPjBZSFKzt508vPe6Bu/MEcFUpImn/pLWyNchdz9w3fHCUshqckpbPeX9uwtVO/Qxs/XwLNL9j/fC72ytLvk66ygQ/i42dFhsLY+xfI2o=,iv:X2uO/bTNxQz8YPPL0add0DgdUshxjRrf/LsOcFcAVSI=,tag:vSBTRCzY2XKsKSSjbWK+KQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
