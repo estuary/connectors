@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Type
 
 from airbyte_cdk.sources.config import BaseConfig
 from facebook_business.adobjects.adsinsights import AdsInsights
-from pydantic import BaseModel, Field, PositiveInt
+from pydantic import BaseModel, Field, PositiveInt, ConfigDict
 
 logger = logging.getLogger("airbyte")
 
@@ -82,11 +82,31 @@ class InsightConfig(BaseModel):
     insights_lookback_window: Optional[PositiveInt] = Field(
         title="Custom Insights Lookback Window",
         description="The attribution window",
-        maximum=28,
-        mininum=1,
+        # maximum=28,
+        # mininum=1,
         default=28,
     )
 
+class AccessToken(BaseModel):
+    access_token: str = Field(
+        title="Access Token",
+        order=1,
+        description=(
+            "The value of the generated access token. "
+            'From your App’s Dashboard, click on "Marketing API" then "Tools". '
+            'Select permissions <b>ads_management, ads_read, read_insights, business_management</b>. Then click on "Get token". '
+            'See the <a href="https://docs.airbyte.com/integrations/sources/facebook-marketing">docs</a> for more information.'
+        ),
+        airbyte_secret=True,
+    )
+
+class Credentials(BaseModel):
+    access_token: Any
+    auth_type: str
+    client_id: Any
+    client_secret: Any
+
+    model_config = ConfigDict(from_attributes=True)
 
 class ConnectorConfig(BaseConfig):
     """Connector config"""
@@ -120,6 +140,7 @@ class ConnectorConfig(BaseConfig):
         examples=["2017-01-25T00:00:00Z"],
     )
 
+
     end_date: Optional[datetime] = Field(
         title="End Date",
         order=2,
@@ -133,17 +154,6 @@ class ConnectorConfig(BaseConfig):
         default_factory=lambda: datetime.now(tz=timezone.utc),
     )
 
-    access_token: str = Field(
-        title="Access Token",
-        order=3,
-        description=(
-            "The value of the generated access token. "
-            'From your App’s Dashboard, click on "Marketing API" then "Tools". '
-            'Select permissions <b>ads_management, ads_read, read_insights, business_management</b>. Then click on "Get token". '
-            'See the <a href="https://docs.airbyte.com/integrations/sources/facebook-marketing">docs</a> for more information.'
-        ),
-        airbyte_secret=True,
-    )
 
     include_deleted: bool = Field(
         title="Include Deleted Campaigns, Ads, and AdSets",
@@ -187,8 +197,8 @@ class ConnectorConfig(BaseConfig):
             "so you can retrieve refreshed insights from the past by setting this parameter. "
             "If you set a custom lookback window value in Facebook account, please provide the same value here."
         ),
-        maximum=28,
-        mininum=1,
+        # maximum=28,
+        # mininum=1,
         default=28,
     )
 
@@ -202,8 +212,11 @@ class ConnectorConfig(BaseConfig):
         default=50,
     )
 
+    credentials: Credentials
+
     action_breakdowns_allow_empty: bool = Field(
         description="Allows action_breakdowns to be an empty list",
         default=True,
-        airbyte_hidden=True,
+        # airbyte_hidden=True,
     )
+

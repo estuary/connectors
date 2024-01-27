@@ -1,5 +1,5 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
   "properties": {
     "bid_type": {
       "type": ["null", "string"]
@@ -22,15 +22,13 @@
             "type": "string"
           },
           "created_time": {
-            "type": "string",
-            "format": "date-time"
+            "type": "string"            
           },
           "name": {
             "type": "string"
           },
           "updated_time": {
-            "type": "string",
-            "format": "date-time"
+            "type": "string"            
           }
         }
       }
@@ -76,12 +74,10 @@
       "type": ["null", "string"]
     },
     "updated_time": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]      
     },
     "created_time": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]      
     },
     "name": {
       "type": ["null", "string"]

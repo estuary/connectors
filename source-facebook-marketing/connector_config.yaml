@@ -1,0 +1,51 @@
+account_id: 196765372540622
+credentials:
+    access_token_sops: ENC[AES256_GCM,data:Re73N0PHhhJs7Umo5ONjzSXdb4xKe+XtOBI3r1padMyQo5Bki3bW7l+1+/v4ifQuq4RypBwxQOAXdJfarwqLMW6vKCpxzq+kcbEHkvFd+NTJIWduYl8lC5bbFHT6uTrBNMxaTv/N7LNTwohBss+iKc9kf+Dp7dwpUqikOohnvOZ9y6C4+p2lvanOUpVfw7mGL52uW8VALPiLWh1hgbn6ZXlk7MOAjZAboIzf2bCzkzZQIiTz/4NYVLcmbFbPx8DRjrUd6XU1yeLsfXbT3CNRbAJyNWwDJN9vwKErGQIKcfsXsP5hVb0rpFuSW+WBvpJ0avCR6N8vvM8I8mc5W47EMuMTAxI=,iv:hWmqMuuIUBm8Vm30DVzv5jkesBAIuxZnCzn2h/ysUZ8=,tag:uKzEZpI3M4IWiXGXIqncZQ==,type:str]
+    auth_type: OAuth Credentials
+    client_id_sops: ENC[AES256_GCM,data:PUiJOYEJ3mvXd8WzJxIZ,iv:lpr0soQq/wTKKcG3pQchej/AbC9FLSrJ69p+LyIjTBA=,tag:j/FIzjhSq9jXUbGOlauZBA==,type:int]
+    client_secret_sops: ENC[AES256_GCM,data:6nklWUz04h+T/y+gt6w42xtRaKOxNT3yf6Vflvdlc3c=,iv:RBu8s8vYpJJNZB8dUAxG52CV/ikmRxcfvytRRgtOwwM=,tag:E2Kd++rZKTl7gIm6rS8A2A==,type:str]
+custom_insights:
+    - action_breakdowns: []
+      breakdowns:
+        - publisher_platform
+      fields:
+        - ad_id
+        - ad_name
+        - account_id
+        - account_name
+        - adset_id
+        - adset_name
+        - campaign_id
+        - campaign_name
+        - date_start
+        - date_stop
+        - clicks
+        - impressions
+        - reach
+        - inline_link_clicks
+        - outbound_clicks
+      insights_lookback_window: 28
+      level: ad
+      name: ads_insights_publisher_platform
+      start_date: "2021-11-01T00:00:00Z"
+      time_increment: 1
+fetch_thumbnail_images: false
+include_deleted: true
+insights_lookback_window: 28
+max_batch_size: 50
+page_size: 100
+start_date: "2021-11-01T00:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-05T20:28:24Z"
+          enc: CiQAdmEdwj4SNLDVXyrUmXTnpuwscnsPsh1OnOueWOW9T7fjUwISSQCVvC1z8rwv74QRIMIledeWcUHKPJ/VwFxMIS5HPZ6vkvqt/XQo7O83qtGR4R1pj3KQhII3Sfooh9oOt62lIczGnJ8pYvpx7dQ=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-02-05T20:28:25Z"
+    mac: ENC[AES256_GCM,data:YUcWunj0x4VESD4/loOG6j8dORqI2kqRjqwfyHf4q/va2X7CmDUK9R5+gVWbyJl8HOrOgVsJdwF91PnPQ1X7cwMhvyGofOlCcT2ufVTQQ8VixasAzDtdwKAMO2fVyKlkx8NfeOaWkManUtvEF4Nh9iKS9cTjS1ekRE3T8SUvpcE=,iv:FhH8HUocLMlapQLtHnVXIyax6lWuFKVbGHQzkxrPMYQ=,tag:Rt7oub5AptdBap2/frw/8A==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
