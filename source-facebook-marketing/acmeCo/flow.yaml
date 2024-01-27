@@ -1,0 +1,91 @@
+---
+collections:
+  acmeCo/ad_account:
+    schema: ad_account.schema.yaml
+    key:
+      - /id
+  acmeCo/ad_creatives:
+    schema: ad_creatives.schema.yaml
+    key:
+      - /id
+  acmeCo/ad_sets:
+    schema: ad_sets.schema.yaml
+    key:
+      - /id
+  acmeCo/ads:
+    schema: ads.schema.yaml
+    key:
+      - /id
+  acmeCo/ads_insights:
+    schema: ads_insights.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+  acmeCo/ads_insights_action_type:
+    schema: ads_insights_action_type.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+  acmeCo/ads_insights_age_and_gender:
+    schema: ads_insights_age_and_gender.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /age
+      - /gender
+  acmeCo/ads_insights_country:
+    schema: ads_insights_country.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /country
+  acmeCo/ads_insights_dma:
+    schema: ads_insights_dma.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /dma
+  acmeCo/ads_insights_platform_and_device:
+    schema: ads_insights_platform_and_device.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /publisher_platform
+      - /platform_position
+      - /impression_device
+  acmeCo/ads_insights_region:
+    schema: ads_insights_region.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /region
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/custom_conversions:
+    schema: custom_conversions.schema.yaml
+    key:
+      - /id
+  acmeCo/customads_insights_publisher_platform:
+    schema: customads_insights_publisher_platform.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /publisher_platform
+  acmeCo/images:
+    schema: images.schema.yaml
+    key:
+      - /id
+  acmeCo/videos:
+    schema: videos.schema.yaml
+    key:
+      - /id

@@ -1,0 +1,83 @@
+---
+properties:
+  id:
+    type:
+      - "null"
+      - string
+  account_id:
+    type:
+      - "null"
+      - string
+  business:
+    type:
+      - "null"
+      - string
+  creation_time:
+    type: string
+  custom_event_type:
+    type:
+      - "null"
+      - string
+  data_sources:
+    type:
+      - "null"
+      - array
+    items:
+      type: object
+      properties:
+        id:
+          type: string
+        source_type:
+          type: string
+        name:
+          type: string
+  default_conversion_value:
+    type:
+      - "null"
+      - number
+  description:
+    type:
+      - "null"
+      - string
+  event_source_type:
+    type:
+      - "null"
+      - string
+  first_fired_time:
+    type: string
+  is_archived:
+    type:
+      - "null"
+      - boolean
+  is_unavailable:
+    type:
+      - "null"
+      - boolean
+  last_fired_time:
+    type: string
+  name:
+    type:
+      - "null"
+      - string
+  offline_conversion_data_set:
+    type:
+      - "null"
+      - string
+  retention_days:
+    type:
+      - "null"
+      - number
+  rule:
+    type:
+      - "null"
+      - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+type:
+  - object
+x-infer-schema: true

@@ -10,8 +10,7 @@
       "type": ["null", "string"]
     },
     "creation_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "custom_event_type": {
       "type": ["null", "string"]
@@ -43,8 +42,7 @@
       "type": ["null", "string"]
     },
     "first_fired_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "is_archived": {
       "type": ["null", "boolean"]
@@ -53,8 +51,7 @@
       "type": ["null", "boolean"]
     },
     "last_fired_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "name": {
       "type": ["null", "string"]
@@ -69,5 +66,5 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"]
 }
