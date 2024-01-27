@@ -1,4 +1,5 @@
 {
+  "type": "object",
   "properties": {
     "id": {
       "type": "string"
@@ -10,8 +11,7 @@
       }
     },
     "backdated_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "backdated_time_granularity": {
       "type": ["null", "string"]
@@ -26,8 +26,7 @@
       }
     },
     "created_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "custom_labels": {
       "type": ["null", "array"],
@@ -91,8 +90,7 @@
       "type": ["null", "boolean"]
     },
     "scheduled_publish_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "source": {
       "type": ["null", "string"]
@@ -104,8 +102,7 @@
       "type": ["null", "string"]
     },
     "updated_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"      
     },
     "views": {
       "type": ["null", "integer"]

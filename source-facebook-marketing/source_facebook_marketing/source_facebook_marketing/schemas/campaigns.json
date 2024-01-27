@@ -15,12 +15,10 @@
             "type": "string"
           },
           "created_time": {
-            "type": "string",
-            "format": "date-time"
+            "type": "string"
           },
           "updated_time": {
-            "type": "string",
-            "format": "date-time"
+            "type": "string"
           }
         }
       }
@@ -41,8 +39,7 @@
       "type": ["null", "number"]
     },
     "created_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     },
     "effective_status": {
       "type": ["null", "string"]
@@ -101,17 +98,14 @@
       "type": ["null", "number"]
     },
     "start_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     },
     "stop_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     },
     "updated_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"]
 }

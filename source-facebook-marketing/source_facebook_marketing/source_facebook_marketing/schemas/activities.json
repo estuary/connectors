@@ -16,8 +16,7 @@
       "type": ["null", "string"]
     },
     "event_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     },
     "event_type": {
       "type": ["null", "string"]
@@ -38,5 +37,5 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"]
 }

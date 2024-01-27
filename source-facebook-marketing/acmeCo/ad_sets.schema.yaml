@@ -1,0 +1,1748 @@
+---
+type:
+  - object
+properties:
+  name:
+    type:
+      - "null"
+      - string
+  end_time:
+    type:
+      - "null"
+      - string
+  promoted_object:
+    type:
+      - "null"
+      - object
+    properties:
+      custom_event_type:
+        type:
+          - "null"
+          - string
+      pixel_id:
+        type:
+          - "null"
+          - string
+      pixel_rule:
+        type:
+          - "null"
+          - string
+      page_id:
+        type:
+          - "null"
+          - string
+      object_store_url:
+        type:
+          - "null"
+          - string
+      application_id:
+        type:
+          - "null"
+          - string
+      product_set_id:
+        type:
+          - "null"
+          - string
+      offer_id:
+        type:
+          - "null"
+          - string
+  id:
+    type:
+      - "null"
+      - string
+  account_id:
+    type:
+      - "null"
+      - string
+  updated_time:
+    type:
+      - "null"
+      - string
+  daily_budget:
+    type:
+      - "null"
+      - number
+  budget_remaining:
+    type:
+      - "null"
+      - number
+  effective_status:
+    type:
+      - "null"
+      - string
+  campaign_id:
+    type:
+      - "null"
+      - string
+  created_time:
+    type:
+      - "null"
+      - string
+  start_time:
+    type:
+      - "null"
+      - string
+  lifetime_budget:
+    type:
+      - "null"
+      - number
+  targeting:
+    type:
+      - "null"
+      - object
+    properties:
+      messenger_positions:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - string
+      locales:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      connections:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      instagram_positions:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      audience_network_positions:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      exclusions:
+        type:
+          - "null"
+          - object
+        properties:
+          household_composition:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          home_type:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          friends_of_connections:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          family_statuses:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          work_positions:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          education_majors:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          life_events:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          moms:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          custom_audiences:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          interests:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          behaviors:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          connections:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          excluded_connections:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          user_adclusters:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          income:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          excluded_custom_audiences:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          work_employers:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          industries:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          net_worth:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          relationship_statuses:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - integer
+          generation:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          home_ownership:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          politics:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+      interests:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      geo_locations:
+        type:
+          - "null"
+          - object
+        properties:
+          regions:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                key:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          countries:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          cities:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                key:
+                  type:
+                    - "null"
+                    - string
+                distance_unit:
+                  type:
+                    - "null"
+                    - string
+                region:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                region_id:
+                  type:
+                    - "null"
+                    - string
+                radius:
+                  type:
+                    - "null"
+                    - integer
+            type:
+              - "null"
+              - array
+          location_types:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          zips:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                country:
+                  type:
+                    - "null"
+                    - string
+                key:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+                primary_city_id:
+                  type:
+                    - "null"
+                    - integer
+                region_id:
+                  type:
+                    - "null"
+                    - integer
+          custom_locations:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                address_string:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                distance_unit:
+                  type:
+                    - "null"
+                    - string
+                latitude:
+                  type:
+                    - "null"
+                    - number
+                longitude:
+                  type:
+                    - "null"
+                    - number
+                name:
+                  type:
+                    - "null"
+                    - string
+                primary_city_id:
+                  type:
+                    - "null"
+                    - integer
+                radius:
+                  type:
+                    - "null"
+                    - integer
+                region_id:
+                  type:
+                    - "null"
+                    - integer
+          country_groups:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - string
+          geo-markets:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                key:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+      excluded_geo_locations:
+        type:
+          - "null"
+          - object
+        properties:
+          regions:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                key:
+                  type:
+                    - "null"
+                    - string
+            type:
+              - "null"
+              - array
+          countries:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          cities:
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                key:
+                  type:
+                    - "null"
+                    - string
+                distance_unit:
+                  type:
+                    - "null"
+                    - string
+                region:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                region_id:
+                  type:
+                    - "null"
+                    - string
+                radius:
+                  type:
+                    - "null"
+                    - integer
+            type:
+              - "null"
+              - array
+          location_types:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          zips:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                country:
+                  type:
+                    - "null"
+                    - string
+                key:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+                primary_city_id:
+                  type:
+                    - "null"
+                    - integer
+                region_id:
+                  type:
+                    - "null"
+                    - integer
+          custom_locations:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                address_string:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                distance_unit:
+                  type:
+                    - "null"
+                    - string
+                latitude:
+                  type:
+                    - "null"
+                    - number
+                longitude:
+                  type:
+                    - "null"
+                    - number
+                name:
+                  type:
+                    - "null"
+                    - string
+                primary_city_id:
+                  type:
+                    - "null"
+                    - integer
+                radius:
+                  type:
+                    - "null"
+                    - integer
+                region_id:
+                  type:
+                    - "null"
+                    - integer
+          country_groups:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - string
+          geo-markets:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                key:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+      work_positions:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      education_statuses:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      publisher_platforms:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      age_max:
+        type:
+          - "null"
+          - integer
+      custom_audiences:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      device_platforms:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      age_min:
+        type:
+          - "null"
+          - integer
+      facebook_positions:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      excluded_connections:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      flexible_spec:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            household_composition:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            home_type:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            friends_of_connections:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            family_statuses:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            work_positions:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            education_majors:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            life_events:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            moms:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            custom_audiences:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            interests:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            behaviors:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            connections:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            excluded_connections:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            user_adclusters:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            income:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            excluded_custom_audiences:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            work_employers:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            industries:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            net_worth:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            relationship_statuses:
+              type:
+                - "null"
+                - array
+              items:
+                type:
+                  - "null"
+                  - integer
+            generation:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            home_ownership:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+            politics:
+              items:
+                type:
+                  - "null"
+                  - object
+                properties:
+                  name:
+                    type:
+                      - "null"
+                      - string
+                  id:
+                    type:
+                      - "null"
+                      - string
+              type:
+                - "null"
+                - array
+        type:
+          - "null"
+          - array
+      friends_of_connections:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      user_os:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - string
+      user_device:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - string
+      excluded_custom_audiences:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      excluded_publisher_categories:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - string
+      genders:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - integer
+      targeting_optimization:
+        type:
+          - "null"
+          - string
+      user_adclusters:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      generation:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      behaviors:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      moms:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      home_ownership:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      office_type:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      home_type:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      family_statuses:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      relationship_statuses:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - integer
+      industries:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      income:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      app_install_state:
+        type:
+          - "null"
+          - string
+      net_worth:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      politics:
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+        type:
+          - "null"
+          - array
+      interested_in:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - integer
+      excluded_user_device:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - string
+  bid_info:
+    type:
+      - "null"
+      - object
+    properties:
+      CLICKS:
+        type:
+          - "null"
+          - integer
+      ACTIONS:
+        type:
+          - "null"
+          - integer
+      IMPRESSIONS:
+        type:
+          - "null"
+          - integer
+      REACH:
+        type:
+          - "null"
+          - integer
+  bid_strategy:
+    type:
+      - "null"
+      - string
+  bid_amount:
+    type:
+      - "null"
+      - number
+  bid_constraints:
+    type:
+      - "null"
+      - object
+    properties:
+      roas_average_floor:
+        type:
+          - "null"
+          - integer
+  adlabels:
+    type:
+      - "null"
+      - array
+    items:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_time:
+          type: string
+        updated_time:
+          type: string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

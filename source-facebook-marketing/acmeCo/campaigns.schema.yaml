@@ -1,0 +1,120 @@
+---
+properties:
+  account_id:
+    type:
+      - "null"
+      - string
+  adlabels:
+    type:
+      - "null"
+      - array
+    items:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_time:
+          type: string
+        updated_time:
+          type: string
+  bid_strategy:
+    type:
+      - "null"
+      - string
+  budget_rebalance_flag:
+    type:
+      - "null"
+      - boolean
+  budget_remaining:
+    type:
+      - "null"
+      - number
+  buying_type:
+    type:
+      - "null"
+      - string
+  daily_budget:
+    type:
+      - "null"
+      - number
+  created_time:
+    type: string
+  effective_status:
+    type:
+      - "null"
+      - string
+  id:
+    type:
+      - "null"
+      - string
+  issues_info:
+    type:
+      - "null"
+      - array
+    items:
+      type: object
+      properties:
+        error_code:
+          type: string
+        error_message:
+          type: string
+        error_summary:
+          type: string
+        error_type:
+          type: string
+        level:
+          type: string
+  lifetime_budget:
+    type:
+      - "null"
+      - number
+  name:
+    type:
+      - "null"
+      - string
+  objective:
+    type:
+      - "null"
+      - string
+  smart_promotion_type:
+    type:
+      - "null"
+      - string
+  source_campaign_id:
+    type:
+      - "null"
+      - number
+  special_ad_category:
+    type:
+      - "null"
+      - string
+  special_ad_category_country:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - string
+  spend_cap:
+    type:
+      - "null"
+      - number
+  start_time:
+    type: string
+  stop_time:
+    type: string
+  updated_time:
+    type: string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+type:
+  - object
+x-infer-schema: true

@@ -59,8 +59,7 @@
       }
     },
     "created_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     },
     "currency": {
       "type": ["null", "string"]
@@ -136,9 +135,6 @@
           "type": ["null", "integer"]
         }
       }
-    },
-    "has_advertiser_opted_in_odax": {
-      "type": ["null", "boolean"]
     },
     "has_migrated_permissions": {
       "type": ["null", "boolean"]
