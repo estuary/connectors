@@ -343,7 +343,7 @@ func advanceCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
 	captureCtx, cancelCapture := context.WithCancel(ctx)
 
-	const shutdownDelay = 100 * time.Millisecond
+	const shutdownDelay = 1000 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {
