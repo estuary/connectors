@@ -14,6 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 // captureState is the persistent state for the entire capture, which consists of one or more table
@@ -91,6 +92,8 @@ type capture struct {
 	// Mutex for guarding changes to captureState.
 	mu    sync.Mutex
 	state captureState
+
+	listShardsLimiter *rate.Limiter
 }
 
 func (c *capture) getSegmentState(sk boilerplate.StateKey, segment int) segmentState {
