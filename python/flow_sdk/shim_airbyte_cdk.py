@@ -58,7 +58,7 @@ class State:
         if not self.bindingStateV1:
             self.bindingStateV1 = {}
         if not state_key in self.bindingStateV1:
-            self.bindingStateV1[state_key] = StreamState()
+            self.bindingStateV1[state_key] = StreamState(msg, 0)
         self.bindingStateV1[state_key].state = msg
 
     def to_airbyte_input(self):
@@ -289,7 +289,7 @@ class CaptureShim(Connector):
                     continue
                 
                 # index values: [binding_index, row_id]
-                binding = bindings[binding_lookup[0]]
+                binding: response.ValidatedBinding = bindings[binding_lookup[0]]
 
                 state.handle_message(state_msg, binding["stateKey"])
                 emit(
