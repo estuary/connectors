@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flow-sdk"
-version = "0.1.6"
+version = "0.1.8"
 description = ""
 authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
 readme = "README.md"
