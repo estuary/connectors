@@ -346,6 +346,10 @@ func (c *capture) listShards(ctx context.Context, streamArn string) (map[string]
 
 	var exclusiveStartShardId *string
 	for {
+		if err := c.listShardsLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("list shards limiter wait: %w", err)
+		}
+
 		streamDescribe, err := c.client.stream.DescribeStream(ctx, &dynamodbstreams.DescribeStreamInput{
 			StreamArn:             aws.String(streamArn),
 			ExclusiveStartShardId: exclusiveStartShardId,
