@@ -1675,6 +1675,7 @@ class FormSubmissions(ClientSideIncrementalStream):
 
     url = "/form-integrations/v1/submissions/forms"
     limit = 50
+    primary_key = ["submittedAt", "formId"]
     updated_at_field = "updatedAt"
     cursor_field_datetime_format = "x"
     scopes = {"forms"}
@@ -2101,6 +2102,7 @@ class SubscriptionChanges(IncrementalStream):
     """
 
     url = "/email/public/v1/subscriptions/timeline"
+    primary_key = ["timestamp", "recipient"]
     data_field = "timeline"
     more_key = "hasMore"
     updated_at_field = "timestamp"
@@ -2290,6 +2292,7 @@ class CustomObject(CRMSearchStream, ABC):
         return self.entity
 
     def get_json_schema(self) -> Mapping[str, Any]:
+        self.schema["type"] = "object"
         return self.schema
 
     @property

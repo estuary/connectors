@@ -171,17 +171,17 @@ class SourceHubspot(AbstractSource):
         if api.is_oauth2():
             authenticator = api.get_authenticator()
             granted_scopes = self.get_granted_scopes(authenticator)
-            self.logger.info(f"The following scopes were granted: {granted_scopes}")
+            # self.logger.warn(f"The following scopes were granted: {granted_scopes}")
 
             available_streams = [stream for stream in streams if stream.scope_is_granted(granted_scopes)]
             unavailable_streams = [stream for stream in streams if not stream.scope_is_granted(granted_scopes)]
-            self.logger.info(f"The following streams are unavailable: {[s.name for s in unavailable_streams]}")
+            # self.logger.warn(f"The following streams are unavailable: {[s.name for s in unavailable_streams]}")
             partially_available_streams = [stream for stream in streams if not stream.properties_scope_is_granted()]
             required_scoped = set(chain(*[x.properties_scopes for x in partially_available_streams]))
-            self.logger.info(
-                f"The following streams are partially available: {[s.name for s in partially_available_streams]}, "
-                f"add the following scopes to download all available data: {required_scoped}"
-            )
+            # self.logger.warn(
+            #     f"The following streams are partially available: {[s.name for s in partially_available_streams]}, "
+            #     f"add the following scopes to download all available data: {required_scoped}"
+            # )
         else:
             self.logger.info("No scopes to grant when authenticating with API key.")
             available_streams = streams
