@@ -1,0 +1,175 @@
+---
+collections:
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/companies:
+    schema: companies.schema.yaml
+    key:
+      - /id
+  acmeCo/companies_property_history:
+    schema: companies_property_history.schema.yaml
+    key:
+      - /companyId
+      - /property
+      - /timestamp
+  acmeCo/contact_lists:
+    schema: contact_lists.schema.yaml
+    key:
+      - /listId
+  acmeCo/contacts:
+    schema: contacts.schema.yaml
+    key:
+      - /id
+  acmeCo/contacts_list_memberships:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        canonical-vid:
+          type:
+            - "null"
+            - integer
+        static-list-id:
+          type:
+            - "null"
+            - integer
+        internal-list-id:
+          type:
+            - "null"
+            - integer
+        timestamp:
+          type:
+            - "null"
+            - integer
+        vid:
+          type:
+            - "null"
+            - integer
+        is-member:
+          type:
+            - "null"
+            - boolean
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /canonical-vid
+  acmeCo/contacts_merged_audit:
+    schema: contacts_merged_audit.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/contacts_property_history:
+    schema: contacts_property_history.schema.yaml
+    key:
+      - /vid
+      - /property
+      - /timestamp
+  acmeCo/deal_pipelines:
+    schema: deal_pipelines.schema.yaml
+    key:
+      - /pipelineId
+  acmeCo/deals:
+    schema: deals.schema.yaml
+    key:
+      - /id
+  acmeCo/deals_archived:
+    schema: deals_archived.schema.yaml
+    key:
+      - /id
+  acmeCo/deals_property_history:
+    schema: deals_property_history.schema.yaml
+    key:
+      - /dealId
+      - /property
+      - /timestamp
+  acmeCo/email_events:
+    schema: email_events.schema.yaml
+    key:
+      - /id
+  acmeCo/email_subscriptions:
+    schema: email_subscriptions.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements:
+    schema: engagements.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_calls:
+    schema: engagements_calls.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_emails:
+    schema: engagements_emails.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_meetings:
+    schema: engagements_meetings.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_notes:
+    schema: engagements_notes.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_tasks:
+    schema: engagements_tasks.schema.yaml
+    key:
+      - /id
+  acmeCo/form_submissions:
+    schema: form_submissions.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/forms:
+    schema: forms.schema.yaml
+    key:
+      - /id
+  acmeCo/goals:
+    schema: goals.schema.yaml
+    key:
+      - /id
+  acmeCo/line_items:
+    schema: line_items.schema.yaml
+    key:
+      - /id
+  acmeCo/marketing_emails:
+    schema: marketing_emails.schema.yaml
+    key:
+      - /id
+  acmeCo/owners:
+    schema: owners.schema.yaml
+    key:
+      - /id
+  acmeCo/owners_archived:
+    schema: owners_archived.schema.yaml
+    key:
+      - /id
+  acmeCo/products:
+    schema: products.schema.yaml
+    key:
+      - /id
+  acmeCo/subscription_changes:
+    schema: subscription_changes.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/ticket_pipelines:
+    schema: ticket_pipelines.schema.yaml
+    key:
+      - /id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/venues:
+    schema: venues.schema.yaml
+    key:
+      - /id
+  acmeCo/workflows:
+    schema: workflows.schema.yaml
+    key:
+      - /id

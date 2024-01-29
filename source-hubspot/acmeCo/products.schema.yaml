@@ -1,0 +1,459 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  id:
+    type:
+      - "null"
+      - string
+  createdAt:
+    type:
+      - "null"
+      - string
+    format: date-time
+  updatedAt:
+    type:
+      - "null"
+      - string
+    format: date-time
+  archived:
+    type:
+      - "null"
+      - boolean
+  properties:
+    type: object
+    properties:
+      amount:
+        type:
+          - "null"
+          - number
+      createdate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      description:
+        type:
+          - "null"
+          - string
+      discount:
+        type:
+          - "null"
+          - number
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_assigned_business_unit_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_avatar_filemanager_key:
+        type:
+          - "null"
+          - string
+      hs_cost_of_goods_sold:
+        type:
+          - "null"
+          - number
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_discount_percentage:
+        type:
+          - "null"
+          - number
+      hs_folder_id:
+        type:
+          - "null"
+          - number
+      hs_images:
+        type:
+          - "null"
+          - string
+      hs_lastmodifieddate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_price_aud:
+        type:
+          - "null"
+          - number
+      hs_price_cad:
+        type:
+          - "null"
+          - number
+      hs_price_usd:
+        type:
+          - "null"
+          - number
+      hs_product_type:
+        type:
+          - "null"
+          - string
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_recurring_billing_period:
+        type:
+          - "null"
+          - string
+      hs_recurring_billing_start_date:
+        type:
+          - "null"
+          - string
+        format: date
+      hs_sku:
+        type:
+          - "null"
+          - string
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_url:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      ip__ecomm_bridge__ecomm_synced:
+        type:
+          - "null"
+          - string
+      ip__ecomm_bridge__image_url:
+        type:
+          - "null"
+          - string
+      ip__ecomm_bridge__source_app_id:
+        type:
+          - "null"
+          - string
+      ip__ecomm_bridge__source_store_id:
+        type:
+          - "null"
+          - string
+      ip__sync_extension__external_source_account_id:
+        type:
+          - "null"
+          - string
+      ip__sync_extension__external_source_app_id:
+        type:
+          - "null"
+          - string
+      media_url:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      price:
+        type:
+          - "null"
+          - number
+      quantity:
+        type:
+          - "null"
+          - number
+      recurringbillingfrequency:
+        type:
+          - "null"
+          - string
+      tax:
+        type:
+          - "null"
+          - number
+  properties_amount:
+    type:
+      - "null"
+      - number
+  properties_createdate:
+    type:
+      - "null"
+      - string
+    format: date-time
+  properties_description:
+    type:
+      - "null"
+      - string
+  properties_discount:
+    type:
+      - "null"
+      - number
+  properties_hs_all_accessible_team_ids:
+    type:
+      - "null"
+      - string
+  properties_hs_all_assigned_business_unit_ids:
+    type:
+      - "null"
+      - string
+  properties_hs_all_owner_ids:
+    type:
+      - "null"
+      - string
+  properties_hs_all_team_ids:
+    type:
+      - "null"
+      - string
+  properties_hs_avatar_filemanager_key:
+    type:
+      - "null"
+      - string
+  properties_hs_cost_of_goods_sold:
+    type:
+      - "null"
+      - number
+  properties_hs_created_by_user_id:
+    type:
+      - "null"
+      - number
+  properties_hs_createdate:
+    type:
+      - "null"
+      - string
+    format: date-time
+  properties_hs_discount_percentage:
+    type:
+      - "null"
+      - number
+  properties_hs_folder_id:
+    type:
+      - "null"
+      - number
+  properties_hs_images:
+    type:
+      - "null"
+      - string
+  properties_hs_lastmodifieddate:
+    type:
+      - "null"
+      - string
+    format: date-time
+  properties_hs_merged_object_ids:
+    type:
+      - "null"
+      - string
+  properties_hs_object_id:
+    type:
+      - "null"
+      - number
+  properties_hs_object_source:
+    type:
+      - "null"
+      - string
+  properties_hs_object_source_id:
+    type:
+      - "null"
+      - string
+  properties_hs_object_source_label:
+    type:
+      - "null"
+      - string
+  properties_hs_object_source_user_id:
+    type:
+      - "null"
+      - number
+  properties_hs_price_aud:
+    type:
+      - "null"
+      - number
+  properties_hs_price_cad:
+    type:
+      - "null"
+      - number
+  properties_hs_price_usd:
+    type:
+      - "null"
+      - number
+  properties_hs_product_type:
+    type:
+      - "null"
+      - string
+  properties_hs_read_only:
+    type:
+      - "null"
+      - boolean
+  properties_hs_recurring_billing_period:
+    type:
+      - "null"
+      - string
+  properties_hs_recurring_billing_start_date:
+    type:
+      - "null"
+      - string
+    format: date
+  properties_hs_sku:
+    type:
+      - "null"
+      - string
+  properties_hs_unique_creation_key:
+    type:
+      - "null"
+      - string
+  properties_hs_updated_by_user_id:
+    type:
+      - "null"
+      - number
+  properties_hs_url:
+    type:
+      - "null"
+      - string
+  properties_hs_user_ids_of_all_notification_followers:
+    type:
+      - "null"
+      - string
+  properties_hs_user_ids_of_all_notification_unfollowers:
+    type:
+      - "null"
+      - string
+  properties_hs_user_ids_of_all_owners:
+    type:
+      - "null"
+      - string
+  properties_hs_was_imported:
+    type:
+      - "null"
+      - boolean
+  properties_hubspot_owner_assigneddate:
+    type:
+      - "null"
+      - string
+    format: date-time
+  properties_hubspot_owner_id:
+    type:
+      - "null"
+      - string
+  properties_hubspot_team_id:
+    type:
+      - "null"
+      - string
+  properties_ip__ecomm_bridge__ecomm_synced:
+    type:
+      - "null"
+      - string
+  properties_ip__ecomm_bridge__image_url:
+    type:
+      - "null"
+      - string
+  properties_ip__ecomm_bridge__source_app_id:
+    type:
+      - "null"
+      - string
+  properties_ip__ecomm_bridge__source_store_id:
+    type:
+      - "null"
+      - string
+  properties_ip__sync_extension__external_source_account_id:
+    type:
+      - "null"
+      - string
+  properties_ip__sync_extension__external_source_app_id:
+    type:
+      - "null"
+      - string
+  properties_media_url:
+    type:
+      - "null"
+      - string
+  properties_name:
+    type:
+      - "null"
+      - string
+  properties_price:
+    type:
+      - "null"
+      - number
+  properties_quantity:
+    type:
+      - "null"
+      - number
+  properties_recurringbillingfrequency:
+    type:
+      - "null"
+      - string
+  properties_tax:
+    type:
+      - "null"
+      - number
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

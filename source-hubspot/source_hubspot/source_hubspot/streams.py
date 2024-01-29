@@ -2290,6 +2290,7 @@ class CustomObject(CRMSearchStream, ABC):
         return self.entity
 
     def get_json_schema(self) -> Mapping[str, Any]:
+        self.schema["type"] = "object"
         return self.schema
 
     @property
