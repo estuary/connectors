@@ -11,8 +11,8 @@ jsonlines = "^4.0.0"
 mypy = "^1.5"
 orjson = "^3.9.7"
 python = "<3.12,>=3.11"
-requests = "^2.31.0"
-types-requests = "^2.31"
+requests = "^2.26.0"
+types-requests = "^2.26"
 pytest = "^7.4.3"
 
 [build-system]

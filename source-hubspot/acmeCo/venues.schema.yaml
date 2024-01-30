@@ -1,0 +1,179 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+additionalProperties: true
+properties:
+  id:
+    type:
+      - "null"
+      - string
+  createdAt:
+    type:
+      - "null"
+      - string
+    format: date-time
+  updatedAt:
+    type:
+      - "null"
+      - string
+    format: date-time
+  archived:
+    type:
+      - "null"
+      - boolean
+  properties:
+    type:
+      - "null"
+      - object
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      currency:
+        type:
+          - "null"
+          - string
+      gcs_name:
+        type:
+          - "null"
+          - string
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_assigned_business_unit_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_lastmodifieddate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_pinned_engagement_id:
+        type:
+          - "null"
+          - number
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      itemid:
+        type:
+          - "null"
+          - string
+      market:
+        type:
+          - "null"
+          - string
+      operating_status:
+        type:
+          - "null"
+          - string
+      segment:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      venue_code:
+        type:
+          - "null"
+          - string
+      venue_name:
+        type:
+          - "null"
+          - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true
