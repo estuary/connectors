@@ -55,10 +55,10 @@ captures:
       #     stream: ads_insights_action_type
       #     syncMode: incremental
       #   target: acmeCo/ads_insights_action_type
-      # - resource:
-      #     stream: campaigns
-      #     syncMode: incremental
-      #   target: acmeCo/campaigns
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+        target: acmeCo/campaigns
       # - resource:
       #     stream: custom_conversions
       #     syncMode: full_refresh
@@ -67,7 +67,7 @@ captures:
       #     stream: images
       #     syncMode: incremental
       #   target: acmeCo/images
-      - resource:
-          stream: videos
-          syncMode: incremental
-        target: acmeCo/videos
+      # - resource:
+      #     stream: videos
+      #     syncMode: incremental
+      #   target: acmeCo/videos

@@ -19,10 +19,8 @@ properties:
           type: string
         created_time:
           type: string
-          format: date-time
         updated_time:
           type: string
-          format: date-time
   bid_strategy:
     type:
       - "null"
@@ -45,7 +43,6 @@ properties:
       - number
   created_time:
     type: string
-    format: date-time
   effective_status:
     type:
       - "null"
@@ -109,13 +106,10 @@ properties:
       - number
   start_time:
     type: string
-    format: date-time
   stop_time:
     type: string
-    format: date-time
   updated_time:
     type: string
-    format: date-time
   _meta:
     type: object
     properties:
