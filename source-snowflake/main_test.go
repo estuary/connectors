@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -13,8 +14,8 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
-	"github.com/estuary/connectors/sqlcapture/tests"
 	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/require"
@@ -121,6 +122,7 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"rowid":"ffffffffffffffffffffffffffffffffffffffff"`] = regexp.MustCompile(`"rowid":"[0-9a-fA-F]{32,}"`)
+	sanitizers[`"uid":"FFFFFFFFFFFFFFFF_`] = regexp.MustCompile(`"uid":"[0-9a-fA-F]{16}_`)
 
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
@@ -130,9 +132,49 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 		Sanitizers:   sanitizers,
 	}
 	if len(streamMatchers) > 0 {
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamMatchers...)
+		cs.Bindings = discoverBindings(ctx, t, tb, streamMatchers...)
 	}
 	return cs
+}
+
+func discoverBindings(ctx context.Context, t testing.TB, tb *testBackend, streamMatchers ...*regexp.Regexp) []*pf.CaptureSpec_Binding {
+	t.Helper()
+	var cs = tb.CaptureSpec(ctx, t)
+
+	// Perform discovery, expecting to match one stream with each provided regexp.
+	var discovery = cs.Discover(ctx, t, streamMatchers...)
+	if len(discovery) != len(streamMatchers) {
+		t.Fatalf("discovered incorrect number of streams: got %d, expected %d", len(discovery), len(streamMatchers))
+	}
+
+	// Translate discovery bindings into capture bindings.
+	var bindings []*pf.CaptureSpec_Binding
+	for _, b := range discovery {
+		var res resource
+		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
+		bindings = append(bindings, &pf.CaptureSpec_Binding{
+			ResourceConfigJson: b.ResourceConfigJson,
+			Collection: pf.CollectionSpec{
+				Name:           pf.Collection("acmeCo/test/" + b.RecommendedName),
+				ReadSchemaJson: b.DocumentSchemaJson,
+				Key:            b.Key,
+				// Converting the discovered schema into a list of projections would be quite
+				// a task and all we actually need it for is to enable transaction IDs in
+				// MySQL and Postgres.
+				Projections: []pf.Projection{{Ptr: "/_meta/source/txid"}},
+			},
+
+			ResourcePath: []string{res.Schema, res.Table},
+
+			// TODO(wgd): Does this seem correct for a two-element resource path? I'm just
+			// cargo-culting what source-mongodb tests do since that's the only example of
+			// such that I could find. It's just test logic anyway, so as long as this is
+			// vaguely reasonable I suppose we could make it more realistic in the future
+			// without any difficulties.
+			StateKey: url.QueryEscape(res.Schema) + "/" + url.QueryEscape(res.Table),
+		})
+	}
+	return bindings
 }
 
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
