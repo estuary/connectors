@@ -10,7 +10,6 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
-	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/stretchr/testify/require"
 )
 
@@ -111,6 +110,8 @@ func TestLargeCapture(t *testing.T) {
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
+	var summary = new(strings.Builder)
+
 	// Helper operations to make the sequence of test manipulations cleaner
 	var insertRows = func(ctx context.Context, lo, hi int) {
 		var rows [][]any
@@ -132,15 +133,23 @@ func TestLargeCapture(t *testing.T) {
 		cs.Checkpoint, err = json.Marshal(checkpoint)
 		return err
 	}
-
-	var summary = new(strings.Builder)
+	var sanitize = func(data json.RawMessage) json.RawMessage {
+		var bs = []byte(data)
+		for replacement, matcher := range cs.Sanitizers {
+			bs = matcher.ReplaceAll(bs, []byte(replacement))
+		}
+		return json.RawMessage(bs)
+	}
+	var summarize = func(data json.RawMessage) {
+		fmt.Fprintf(summary, "%s\n", string(sanitize(data)))
+	}
 
 	// Insert 100 rows and then run the first capture
 	insertRows(ctx, 0, 100)
 	fmt.Fprintf(summary, "// =================================\n")
 	fmt.Fprintf(summary, "// Initial Capture\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	// Manually reset the state checkpoint back to (0, 70) which is 70% of the way
 	// through the initial backfill, then run another capture. This simulates the
@@ -148,48 +157,48 @@ func TestLargeCapture(t *testing.T) {
 	require.NoError(t, rewindCheckpoint(cs, 0, 70))
 	fmt.Fprintf(summary, "\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	fmt.Fprintf(summary, "// Backfill Capture Rewound to %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// Backfill Capture Rewound to %s\n", string(sanitize(cs.Checkpoint)))
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	// Insert another 100 rows and run a subsequent capture
 	insertRows(ctx, 100, 200)
 	fmt.Fprintf(summary, "\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(sanitize(cs.Checkpoint)))
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	// Reset the subsequent capture back to (3, 60) to simulate killing and restarting
 	// the capture partway through a large chunk of staged stream changes.
 	require.NoError(t, rewindCheckpoint(cs, 3, 60))
 	fmt.Fprintf(summary, "\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	fmt.Fprintf(summary, "// Subsequent Capture Rewound to %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// Subsequent Capture Rewound to %s\n", string(sanitize(cs.Checkpoint)))
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	// Run another capture which shouldn't observe any changes
 	fmt.Fprintf(summary, "\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(sanitize(cs.Checkpoint)))
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	// Do it again to observe that the sequence numbers are ticking over nicely
 	fmt.Fprintf(summary, "\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(sanitize(cs.Checkpoint)))
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	// Insert another 51 rows and observe those the next time the capture runs
 	insertRows(ctx, 200, 251)
 	fmt.Fprintf(summary, "\n")
 	fmt.Fprintf(summary, "// =================================\n")
-	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(sanitize(cs.Checkpoint)))
 	fmt.Fprintf(summary, "// =================================\n")
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Capture(ctx, t, summarize)
 
 	cupaloy.SnapshotT(t, summary.String())
 }
@@ -204,23 +213,32 @@ func TestAddingAndRemovingBindings(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]any{{3, "Three"}, {4, "Four"}, {5, "Five"}})
 	tb.Insert(ctx, t, tableC, [][]any{{6, "Six"}, {7, "Seven"}, {8, "Eight"}})
 
+	var cs = tb.CaptureSpec(ctx, t)
+
 	var summary = new(strings.Builder)
+	var summarize = func(data json.RawMessage) {
+		var bs = []byte(data)
+		for replacement, matcher := range cs.Sanitizers {
+			bs = matcher.ReplaceAll(bs, []byte(replacement))
+		}
+		fmt.Fprintf(summary, "%s\n", string(bs))
+	}
 
 	fmt.Fprintf(summary, "// Just A\n")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA))
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Bindings = discoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA))
+	cs.Capture(ctx, t, summarize)
 
 	fmt.Fprintf(summary, "\n// Just B\n")
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueB))
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Bindings = discoverBindings(ctx, t, tb, regexp.MustCompile(uniqueB))
+	cs.Capture(ctx, t, summarize)
 
 	fmt.Fprintf(summary, "\n// Both A and C\n")
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueC))
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Bindings = discoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueC))
+	cs.Capture(ctx, t, summarize)
 
 	fmt.Fprintf(summary, "\n// Both B and C\n")
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
-	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+	cs.Bindings = discoverBindings(ctx, t, tb, regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
+	cs.Capture(ctx, t, summarize)
 
 	cupaloy.SnapshotT(t, summary.String())
 }
