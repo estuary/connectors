@@ -7,8 +7,7 @@
         "type": "string",
         "title": "Host URL",
         "description": "The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol).",
-        "order": 0,
-        "pattern": "^[^/:]+.snowflakecomputing.com$"
+        "order": 0
       },
       "account": {
         "type": "string",
