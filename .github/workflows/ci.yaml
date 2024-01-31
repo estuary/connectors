@@ -124,6 +124,9 @@ jobs:
           - connector: source-airtable
             connector_type: capture
             python: true
+          - connector: source-hubspot
+            connector_type: capture
+            python: true
 
     steps:
       - uses: actions/checkout@v2
