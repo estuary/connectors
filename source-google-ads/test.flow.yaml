@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-google-ads:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-google-ads
+        config: connector_config.yaml
+    bindings: []
