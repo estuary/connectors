@@ -11,9 +11,9 @@ from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams import IncrementalMixin, Stream
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v11.errors.types.authorization_error import AuthorizationErrorEnum
-from google.ads.googleads.v11.errors.types.request_error import RequestErrorEnum
-from google.ads.googleads.v11.services.services.google_ads_service.pagers import SearchPager
+from google.ads.googleads.v15.errors.types.authorization_error import AuthorizationErrorEnum
+from google.ads.googleads.v15.errors.types.request_error import RequestErrorEnum
+from google.ads.googleads.v15.services.services.google_ads_service.pagers import SearchPager
 
 from .google_ads import GoogleAds
 from .models import Customer
@@ -347,6 +347,12 @@ class AccountPerformanceReport(IncrementalGoogleAdsStream):
     AccountPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/customer
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#account_performance
     """
+    primary_key = [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "customer.id",
+    ]
 
 
 class AdGroupAdReport(IncrementalGoogleAdsStream):
@@ -354,6 +360,14 @@ class AdGroupAdReport(IncrementalGoogleAdsStream):
     AdGroupAdReport stream: https://developers.google.com/google-ads/api/fields/v11/ad_group_ad
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#ad_performance
     """
+    primary_key = [
+        "segments.ad_network_type",
+        "segments.date",
+        "ad_group.id",
+        "campaign.id",
+        "customer.id",
+        "ad_group_ad.ad.id"
+    ]
 
 
 class DisplayKeywordPerformanceReport(IncrementalGoogleAdsStream):
@@ -361,6 +375,15 @@ class DisplayKeywordPerformanceReport(IncrementalGoogleAdsStream):
     DisplayKeywordPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/display_keyword_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#display_keyword_performance
     """
+    primary_key = [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "ad_group.id",
+        "customer.id",
+        "campaign.id",
+        "ad_group_criterion.criterion_id"
+    ]
 
 
 class DisplayTopicsPerformanceReport(IncrementalGoogleAdsStream):
@@ -368,6 +391,15 @@ class DisplayTopicsPerformanceReport(IncrementalGoogleAdsStream):
     DisplayTopicsPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/topic_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#display_topics_performance
     """
+    primary_key = [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "ad_group.id",
+        "customer.id",
+        "campaign.id",
+        "ad_group_criterion.criterion_id"
+    ]
 
 
 class ShoppingPerformanceReport(IncrementalGoogleAdsStream):
@@ -375,6 +407,15 @@ class ShoppingPerformanceReport(IncrementalGoogleAdsStream):
     ShoppingPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/shopping_performance_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#shopping_performance
     """
+    primary_key = [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "ad_group.id",
+        "customer.id",
+        "campaign.id",
+        "segments.product_item_id"
+    ]
 
 
 class UserLocationReport(IncrementalGoogleAdsStream):
@@ -382,18 +423,36 @@ class UserLocationReport(IncrementalGoogleAdsStream):
     UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/user_location_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#geo_performance
     """
+    primary_key = [
+        "segments.ad_network_type",
+        "segments.date",
+        "customer.id",
+        "campaign.id",
+        "user_location_view.resource_name"
+    ]
 
 
 class GeographicReport(IncrementalGoogleAdsStream):
     """
     UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/geographic_view
     """
+    primary_key = [
+        "segments.date",
+        "ad_group.id",
+        "geographic_view.country_criterion_id",
+        "customer.descriptive_name"
+    ]
 
 
 class KeywordReport(IncrementalGoogleAdsStream):
     """
     UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/keyword_view
     """
+    primary_key = [
+        "segments.date",
+        "ad_group.id",
+        "ad_group_criterion.criterion_id"
+    ]
 
 
 class ClickView(IncrementalGoogleAdsStream):
