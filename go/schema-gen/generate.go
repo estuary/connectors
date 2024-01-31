@@ -1,7 +1,10 @@
 package schemagen
 
 import (
+	"fmt"
+	"os"
 	"reflect"
+	"slices"
 	"strconv"
 
 	"github.com/invopop/jsonschema"
@@ -26,6 +29,7 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 	schema.Title = title
 	walkSchema(
 		schema,
+		createOneOf,
 		fixSchemaFlagBools(schema, "secret", "advanced", "multiline", "x-collection-name"),
 		fixSchemaOrderingStrings,
 	)
@@ -38,15 +42,91 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 // accomplish the desired transformation.
 func walkSchema(root *jsonschema.Schema, visits ...func(t *jsonschema.Schema)) {
 	if root.Properties != nil {
-		for _, key := range root.Properties.Keys() {
-			if p, ok := root.Properties.Get(key); ok {
-				if p, ok := p.(*jsonschema.Schema); ok {
-					for _, visit := range visits {
-						visit(p)
+		for pair := root.Properties.Oldest(); pair != nil; pair = pair.Next() {
+			for _, visit := range visits {
+				visit(pair.Value)
+			}
+
+			walkSchema(pair.Value, visits...)
+		}
+	}
+}
+
+func createOneOf(t *jsonschema.Schema) {
+	for key, _ := range t.Extras {
+		os.Stderr.WriteString(fmt.Sprintf("%v\n", key))
+		if key == "oneOf" {
+			os.Stderr.WriteString(fmt.Sprintf("oneOf found %v!\n", t.Properties.Len()))
+			delete(t.Extras, "oneOf")
+			var cleanup []string
+
+			var groups = make(map[int]*jsonschema.Schema)
+			var discriminator string
+			for pair := t.Properties.Oldest(); pair != nil; pair = pair.Next() {
+				var pkey = pair.Key
+				var p = pair.Value
+				os.Stderr.WriteString(fmt.Sprintf("%v=%v\n", pkey, p))
+				var indices []int
+
+				for k, v := range p.Extras {
+					if k == "oneOf_group" {
+						os.Stderr.WriteString(fmt.Sprintf("oneOf_group found!\n"))
+						var idxStrings []string
+						if str, ok := v.(string); ok {
+							idxStrings = []string{str}
+						} else if sli, ok := v.([]string); ok {
+							idxStrings = sli
+						}
+						for _, i := range idxStrings {
+							var index, err = strconv.Atoi(i)
+							if err != nil {
+								continue
+							}
+							indices = append(indices, index)
+						}
+						os.Stderr.WriteString(fmt.Sprintf("indices %v!\n", indices))
+						delete(p.Extras, k)
 					}
 
-					walkSchema(p, visits...)
+					if k == "oneOf_discriminator" {
+						discriminator = pkey
+						delete(p.Extras, k)
+					}
 				}
+				var isRequiredIndex = slices.Index(t.Required, pkey)
+				if len(indices) > 0 {
+					t.Required = slices.Delete(t.Required, isRequiredIndex, 1)
+				}
+
+				for _, index := range indices {
+					if _, ok := groups[index]; !ok {
+						groups[index] = &jsonschema.Schema{}
+						groups[index].Properties = jsonschema.NewProperties()
+					}
+					var group = groups[index]
+
+					group.Properties.Set(pkey, p)
+					if isRequiredIndex > -1 {
+						group.Required = append(group.Required, pkey)
+					}
+					cleanup = append(cleanup, pkey)
+				}
+			}
+
+			var groupSlice []*jsonschema.Schema
+			for _, v := range groups {
+				groupSlice = append(groupSlice, v)
+			}
+			t.OneOf = groupSlice
+
+			if discriminator != "" {
+				t.Extras["discriminator"] = map[string]string{
+					"propertyName": discriminator,
+				}
+			}
+
+			for _, k := range cleanup {
+				t.Properties.Delete(k)
 			}
 		}
 	}

@@ -18,6 +18,7 @@ import (
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -25,26 +26,23 @@ import (
 )
 
 type config struct {
-	Address    string         `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
-	Username   string         `json:"username" jsonschema:"title=Username" jsonschema_extras:"order=1"`
-	Password   string         `json:"password,omitempty" jsonschema:"title=Password" jsonschema_extras:"secret=true,order=2"`
-	SSHKey     string         `json:"sshKey,omitempty" jsonschema:"title=SSH Key" jsonschema_extras:"secret=true,multiline=true,order=3"`
-	Directory  string         `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
-	MatchFiles string         `json:"matchFiles,omitempty" jsonschema:"title=Match Files Regex" jsonschema_extras:"order=5"`
-	Advanced   advancedConfig `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
-	Parser     *parser.Config `json:"parser,omitempty"`
+	Address     string            `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
+	Username    string            `json:"username" jsonschema:"-"`
+	Password    string            `json:"password" jsonschema:"-"`
+	SSHKey      string            `json:"sshKey" jsonschema:"-"`
+	Directory   string            `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
+	MatchFiles  string            `json:"matchFiles,omitempty" jsonschema:"title=Match Files Regex" jsonschema_extras:"order=5"`
+	Credentials credentialsConfig `json:"credentials" jsonschema_extras:"order=6,oneOf=true"`
+	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
+	Parser      *parser.Config    `json:"parser,omitempty"`
 }
 
 func (config) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Address":
 		return "Host and port of the SFTP server. Example: myserver.com:22"
-	case "Username":
-		return "Username for authentication."
-	case "Password":
-		return "Password for authentication. Only one of Password or SSHKey must be provided."
-	case "SSHKey":
-		return "SSH Key for authentication. Only one of Password or SSHKey must be provided."
+	case "Credentials":
+		return "Credentials for authentication"
 	case "Directory":
 		return "Directory to capture files from. All files in this directory and any subdirectories will be included."
 	case "MatchFiles":
@@ -54,6 +52,15 @@ func (config) GetFieldDocString(fieldName string) string {
 	default:
 		return ""
 	}
+}
+
+type credentialsConfig struct {
+	// one of "password" or "sshKey"
+	Type string `json:"type" jsonschema:"title=Authentication Method" jsonschema_extras:"oneOf_discriminator=true,oneOf_group=1+2"`
+
+	Username string `json:"username" jsonschema:"title=Username" jsonschema_extras:"order=1,oneOf_group=1+2"`
+	Password string `json:"password" jsonschema:"title=Password for authentication" jsonschema_extras:"oneOf_group=1,secret=true"`
+	SSHKey   string `json:"sshKey" jsonschema:"title=SSH Key for authentication" jsonschema_extras:"oneOf_group=2,secret=true,multiline=true"`
 }
 
 type advancedConfig struct {
@@ -417,7 +424,7 @@ func main() {
 	src.Main()
 }
 
-func configSchema(parserSchema json.RawMessage) json.RawMessage {
+func configSchema(parserSchema *jsonschema.Schema) json.RawMessage {
 	schema := schemagen.GenerateSchema("SFTP Source", &config{})
 
 	schema.Properties.Set("parser", parserSchema)

@@ -18,6 +18,7 @@ import (
 	"github.com/estuary/flow/go/parser"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -46,7 +47,7 @@ type Config interface {
 type Source struct {
 	// ConfigSchema returns the JSON schema of the source's configuration,
 	// given a parser JSON schema it may wish to embed.
-	ConfigSchema func(parserSchema json.RawMessage) json.RawMessage
+	ConfigSchema func(parserSchema *jsonschema.Schema) json.RawMessage
 	// NewConfig decodes the input raw json into Config
 	NewConfig func(raw json.RawMessage) (Config, error)
 	// Connect using to the Source's Store using the decoded and validated Config.
@@ -156,7 +157,12 @@ func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_
 		panic(err)
 	}
 
-	var endpointSchema = src.ConfigSchema(parserSpec)
+	var parserSchema = &jsonschema.Schema{}
+	if err := parserSchema.UnmarshalJSON(parserSpec); err != nil {
+		return nil, fmt.Errorf("parserSchema: %w", err)
+	}
+
+	var endpointSchema = src.ConfigSchema(parserSchema)
 	if err != nil {
 		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
 	}
