@@ -251,6 +251,14 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
 	}
+	// TODO: remove after migration
+	for _, item := range d.cp {
+		if len(item.StagedDir) == 0 {
+			log.WithField("state", string(state)).Info("found old checkpoint format, ignoring the checkpoint and starting clean")
+			d.cp = make(checkpoint)
+			break
+		}
+	}
 
 	return nil
 }
@@ -446,9 +454,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Table    string
-	Query    string
-	ToDelete string
+	Table     string
+	Query     string
+	StagedDir string
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -490,15 +498,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if b.store.mustMerge {
 			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:    b.target.Identifier,
-				Query:    renderWithDir(b.store.mergeInto, dir),
-				ToDelete: dir,
+				Table:     b.target.Identifier,
+				Query:     renderWithDir(b.store.mergeInto, dir),
+				StagedDir: dir,
 			}
 		} else {
 			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:    b.target.Identifier,
-				Query:    renderWithDir(b.store.copyInto, dir),
-				ToDelete: dir,
+				Table:     b.target.Identifier,
+				Query:     renderWithDir(b.store.copyInto, dir),
+				StagedDir: dir,
 			}
 		}
 	}
@@ -549,7 +557,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 		log.WithField("table", item.Table).Info("store: finished query")
 
-		d.deleteFiles(ctx, []string{item.ToDelete})
+		d.deleteFiles(ctx, []string{item.StagedDir})
 	}
 
 	log.Info("store: finished committing changes")
