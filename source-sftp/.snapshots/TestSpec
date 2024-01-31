@@ -1,6 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/estuary/connectors/source-sftp/config",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "properties": {
     "address": {
       "type": "string",
@@ -8,26 +7,74 @@
       "description": "Host and port of the SFTP server. Example: myserver.com:22",
       "order": 0
     },
-    "username": {
-      "type": "string",
-      "title": "Username",
-      "description": "Username for authentication.",
-      "order": 1
-    },
-    "password": {
-      "type": "string",
-      "title": "Password",
-      "description": "Password for authentication. Only one of Password or SSHKey must be provided.",
-      "order": 2,
-      "secret": true
-    },
-    "sshKey": {
-      "type": "string",
-      "title": "SSH Key",
-      "description": "SSH Key for authentication. Only one of Password or SSHKey must be provided.",
-      "multiline": true,
-      "order": 3,
-      "secret": true
+    "credentials": {
+      "type": "object",
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "title": "SSH Key",
+          "properties": {
+            "type": {
+              "type": "string",
+              "title": "Authentication Method",
+              "const": "sshKey",
+              "default": "sshKey",
+              "order": 1
+            },
+            "username": {
+              "type": "string",
+              "title": "Username",
+              "description": "Username for authentication.",
+              "order": 2
+            },
+            "sshKey": {
+              "type": "string",
+              "title": "SSH Key",
+              "description": "SSH Key for authentication",
+              "multiline": true,
+              "order": 3,
+              "secret": true
+            }
+          },
+          "required": [
+            "type",
+            "username",
+            "sshKey"
+          ]
+        },
+        {
+          "title": "Password",
+          "properties": {
+            "type": {
+              "type": "string",
+              "title": "Authentication Method",
+              "const": "password",
+              "default": "password",
+              "order": 1
+            },
+            "username": {
+              "type": "string",
+              "title": "Username",
+              "description": "Username for authentication.",
+              "order": 2
+            },
+            "password": {
+              "type": "string",
+              "title": "Password",
+              "description": "Password for authentication",
+              "order": 3,
+              "secret": true
+            }
+          },
+          "required": [
+            "type",
+            "username",
+            "password"
+          ]
+        }
+      ]
     },
     "directory": {
       "type": "string",
@@ -582,7 +629,7 @@
   "type": "object",
   "required": [
     "address",
-    "username",
+    "credentials",
     "directory"
   ],
   "title": "SFTP Source"
