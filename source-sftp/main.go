@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/filesource"
-	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/pkg/sftp"
@@ -25,26 +24,23 @@ import (
 )
 
 type config struct {
-	Address    string         `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
-	Username   string         `json:"username" jsonschema:"title=Username" jsonschema_extras:"order=1"`
-	Password   string         `json:"password,omitempty" jsonschema:"title=Password" jsonschema_extras:"secret=true,order=2"`
-	SSHKey     string         `json:"sshKey,omitempty" jsonschema:"title=SSH Key" jsonschema_extras:"secret=true,multiline=true,order=3"`
-	Directory  string         `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
-	MatchFiles string         `json:"matchFiles,omitempty" jsonschema:"title=Match Files Regex" jsonschema_extras:"order=5"`
-	Advanced   advancedConfig `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
-	Parser     *parser.Config `json:"parser,omitempty"`
+	Address     string            `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
+	Username    string            `json:"username" jsonschema:"-"`
+	Password    string            `json:"password" jsonschema:"-"`
+	SSHKey      string            `json:"sshKey" jsonschema:"-"`
+	Directory   string            `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
+	MatchFiles  string            `json:"matchFiles,omitempty" jsonschema:"title=Match Files Regex" jsonschema_extras:"order=5"`
+	Credentials credentialsConfig `json:"credentials" jsonschema_extras:"order=6,oneOf=true"`
+	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
+	Parser      *parser.Config    `json:"parser,omitempty"`
 }
 
 func (config) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Address":
 		return "Host and port of the SFTP server. Example: myserver.com:22"
-	case "Username":
-		return "Username for authentication."
-	case "Password":
-		return "Password for authentication. Only one of Password or SSHKey must be provided."
-	case "SSHKey":
-		return "SSH Key for authentication. Only one of Password or SSHKey must be provided."
+	case "Credentials":
+		return "Credentials for authentication"
 	case "Directory":
 		return "Directory to capture files from. All files in this directory and any subdirectories will be included."
 	case "MatchFiles":
@@ -54,6 +50,15 @@ func (config) GetFieldDocString(fieldName string) string {
 	default:
 		return ""
 	}
+}
+
+type credentialsConfig struct {
+	// one of "password" or "sshKey"
+	Type string `json:"type"`
+
+	Username string `json:"username"`
+	Password string `json:"password"`
+	SSHKey   string `json:"sshKey"`
 }
 
 type advancedConfig struct {
@@ -76,7 +81,6 @@ func (advancedConfig) GetFieldDocString(fieldName string) string {
 
 func (c config) Validate() error {
 	var requiredProperties = [][]string{
-		{"username", c.Username},
 		{"directory", c.Directory},
 	}
 	for _, req := range requiredProperties {
@@ -85,8 +89,12 @@ func (c config) Validate() error {
 		}
 	}
 
-	if c.Password == "" && c.SSHKey == "" {
-		return fmt.Errorf("missing Password and SSHKey, one must be provided for authentication")
+	if c.Credentials.Password == "" && c.Credentials.SSHKey == "" && c.Password == "" && c.SSHKey == "" {
+		return fmt.Errorf("missing password and sshKey, one must be provided for authentication")
+	}
+
+	if c.Credentials.Username == "" && c.Username == "" {
+		return fmt.Errorf("missing username")
 	}
 
 	if c.Directory != path.Clean(c.Directory) {
@@ -127,20 +135,39 @@ func (c config) PathRegex() string {
 }
 
 func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
+	var user = cfg.Credentials.Username
+	if len(user) == 0 && len(cfg.Username) > 0 {
+		user = cfg.Username
+	}
+
 	sshConfig := ssh.ClientConfig{
-		User:            cfg.Username,
+		User:            user,
 		Auth:            []ssh.AuthMethod{},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	// For now only password authentication is supported.
-	if cfg.Password != "" {
-		sshConfig.Auth = append(sshConfig.Auth, ssh.Password(cfg.Password))
-	} else if cfg.SSHKey != "" {
-		if signer, err := ssh.ParsePrivateKey([]byte(cfg.SSHKey)); err != nil {
-			return nil, fmt.Errorf("parsing ssh key: %w", err)
+	// Legacy authentication method
+	if cfg.Credentials.Type == "" {
+		if cfg.Password != "" {
+			sshConfig.Auth = append(sshConfig.Auth, ssh.Password(cfg.Password))
+		} else if cfg.SSHKey != "" {
+			if signer, err := ssh.ParsePrivateKey([]byte(cfg.SSHKey)); err != nil {
+				return nil, fmt.Errorf("parsing ssh key: %w", err)
+			} else {
+				sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
+			}
+		}
+	} else {
+		if cfg.Credentials.Type == "password" {
+			sshConfig.Auth = append(sshConfig.Auth, ssh.Password(cfg.Credentials.Password))
+		} else if cfg.Credentials.Type == "sshKey" {
+			if signer, err := ssh.ParsePrivateKey([]byte(cfg.Credentials.SSHKey)); err != nil {
+				return nil, fmt.Errorf("parsing ssh key: %w", err)
+			} else {
+				sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
+			}
 		} else {
-			sshConfig.Auth = append(sshConfig.Auth, ssh.PublicKeys(signer))
+			return nil, fmt.Errorf("invalid credentials.type %q", cfg.Credentials.Type)
 		}
 	}
 
@@ -418,14 +445,112 @@ func main() {
 }
 
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
-	schema := schemagen.GenerateSchema("SFTP Source", &config{})
-
-	schema.Properties.Set("parser", parserSchema)
-
-	out, err := schema.MarshalJSON()
-	if err != nil {
-		log.Fatal(fmt.Errorf("generating endpoint schema: %w", err))
-	}
-
-	return out
+	return json.RawMessage(`{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address",
+            "description": "Host and port of the SFTP server. Example: myserver.com:22",
+            "order": 0
+          },
+          "credentials": {
+            "type": "object",
+            "discriminator": {
+              "propertyName": "type"
+            },
+            "oneOf": [{
+              "title": "SSH Key",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "title": "Authentication Method",
+                  "const": "sshKey",
+                  "default": "sshKey"
+                },
+                "username": {
+                  "type": "string",
+                  "title": "Username",
+                  "description": "Username for authentication.",
+                  "order": 1
+                },
+                "sshKey": {
+                  "type": "string",
+                  "title": "SSH Key",
+                  "description": "SSH Key for authentication",
+                  "multiline": true,
+                  "order": 3,
+                  "secret": true
+                }
+              },
+              "required": [
+                "type",
+                "username",
+                "sshKey"
+              ]
+            }, {
+              "title": "Password",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "title": "Authentication Method",
+                  "const": "password",
+                  "default": "password"
+                },
+                "username": {
+                  "type": "string",
+                  "title": "Username",
+                  "description": "Username for authentication.",
+                  "order": 1
+                },
+                "password": {
+                  "type": "string",
+                  "title": "Password",
+                  "description": "Password for authentication",
+                  "order": 2,
+                  "secret": true
+                }
+              },
+              "required": [
+                "type",
+                "username",
+                "sshKey"
+              ]
+            }]
+          },
+          "directory": {
+            "type": "string",
+            "title": "Directory",
+            "description": "Directory to capture files from. All files in this directory and any subdirectories will be included.",
+            "order": 4
+          },
+          "matchFiles": {
+            "type": "string",
+            "title": "Match Files Regex",
+            "description": "Filter applied to all file names in the directory. If provided, only files whose path (relative to the directory) matches this regex will be read.",
+            "order": 5
+          },
+          "advanced": {
+            "properties": {
+              "ascendingKeys": {
+                "type": "boolean",
+                "title": "Ascending Keys",
+                "description": "May improve sync speeds by listing files from the end of the last sync, rather than listing all files in the configured directory. This requires that you write files in ascending lexicographic order, such as an RFC-3339 timestamp, so that lexical path ordering matches modification time ordering."
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "description": "Options for advanced users. You should not typically need to modify these.",
+            "advanced": true
+          },
+          "parser": ` + string(parserSchema) + `
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "credentials",
+          "directory"
+        ],
+        "title": "SFTP Source"
+      }`)
 }
