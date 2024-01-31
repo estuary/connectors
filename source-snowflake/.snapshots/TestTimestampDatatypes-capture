@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"streams":{"PUBLIC/test_TimestampDatatypes_38028141":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_TIMESTAMPDATATYPES_38028141"}}}
+{"streams":{"PUBLIC%2Ftest_TimestampDatatypes_38028141":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_TIMESTAMPDATATYPES_38028141"}}}
 
