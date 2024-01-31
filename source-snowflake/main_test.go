@@ -165,13 +165,7 @@ func discoverBindings(ctx context.Context, t testing.TB, tb *testBackend, stream
 			},
 
 			ResourcePath: []string{res.Schema, res.Table},
-
-			// TODO(wgd): Does this seem correct for a two-element resource path? I'm just
-			// cargo-culting what source-mongodb tests do since that's the only example of
-			// such that I could find. It's just test logic anyway, so as long as this is
-			// vaguely reasonable I suppose we could make it more realistic in the future
-			// without any difficulties.
-			StateKey: url.QueryEscape(res.Schema) + "/" + url.QueryEscape(res.Table),
+			StateKey:     url.QueryEscape(res.Schema + "/" + res.Table),
 		})
 	}
 	return bindings
