@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"streams":{"PUBLIC/test_LongTableNames_24869578_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxABCDEFGHIJKLMNOPQRSTUVWXYZ":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_LONGTABLENAMES_24869578_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"}}}
+{"streams":{"PUBLIC%2Ftest_LongTableNames_24869578_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxABCDEFGHIJKLMNOPQRSTUVWXYZ":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_LONGTABLENAMES_24869578_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"}}}
 

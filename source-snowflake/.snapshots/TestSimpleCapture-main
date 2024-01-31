@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"streams":{"PUBLIC/test_SimpleCapture_24869578":{"off":0,"seq":3,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_SIMPLECAPTURE_24869578"}}}
+{"streams":{"PUBLIC%2Ftest_SimpleCapture_24869578":{"off":0,"seq":3,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_SIMPLECAPTURE_24869578"}}}
 
