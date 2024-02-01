@@ -1,0 +1,62 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  changes:
+    items:
+      properties:
+        causedByEvent:
+          properties:
+            created:
+              type:
+                - "null"
+                - integer
+            id:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        change:
+          type:
+            - "null"
+            - string
+        changeType:
+          type:
+            - "null"
+            - string
+        portalId:
+          type:
+            - "null"
+            - integer
+        source:
+          type:
+            - "null"
+            - string
+        subscriptionId:
+          type:
+            - "null"
+            - integer
+        timestamp:
+          type:
+            - "null"
+            - integer
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  portalId:
+    type:
+      - "null"
+      - integer
+  recipient:
+    type: string
+  timestamp:
+    type: integer
+required:
+  - timestamp
+  - recipient
+type:
+  - object

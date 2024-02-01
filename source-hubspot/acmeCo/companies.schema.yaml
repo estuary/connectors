@@ -1,0 +1,757 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  companies:
+    items:
+      format: integer
+      type:
+        - "null"
+        - integer
+        - string
+    type:
+      - "null"
+      - array
+  contacts:
+    items:
+      format: integer
+      type:
+        - "null"
+        - integer
+        - string
+    type:
+      - "null"
+      - array
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  properties:
+    properties:
+      about_us:
+        type:
+          - "null"
+          - string
+      address:
+        type:
+          - "null"
+          - string
+      address2:
+        type:
+          - "null"
+          - string
+      annualrevenue:
+        type:
+          - "null"
+          - number
+      city:
+        type:
+          - "null"
+          - string
+      closedate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      closedate_timestamp_earliest_value_a2a17e6e:
+        format: date-time
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      days_to_close:
+        type:
+          - "null"
+          - number
+      description:
+        type:
+          - "null"
+          - string
+      domain:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked:
+        format: date-time
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_campaign:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_medium:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_source:
+        type:
+          - "null"
+          - string
+      facebook_company_page:
+        type:
+          - "null"
+          - string
+      facebookfans:
+        type:
+          - "null"
+          - number
+      first_contact_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_contact_createdate_timestamp_earliest_value_78b50eea:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_conversion_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_conversion_date_timestamp_earliest_value_61f58f2c:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_conversion_event_name:
+        type:
+          - "null"
+          - string
+      first_conversion_event_name_timestamp_earliest_value_68ddae0a:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_deal_created_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      founded_year:
+        type:
+          - "null"
+          - string
+      googleplus_page:
+        type:
+          - "null"
+          - string
+      hs_additional_domains:
+        type:
+          - "null"
+          - string
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_analytics_first_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_first_timestamp_timestamp_earliest_value_11e3a63a:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_first_touch_converting_campaign:
+        type:
+          - "null"
+          - string
+      hs_analytics_first_touch_converting_campaign_timestamp_earliest_value_4757fe10:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_first_visit_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_first_visit_timestamp_timestamp_earliest_value_accc17ae:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_timestamp_timestamp_latest_value_4e16365a:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_touch_converting_campaign:
+        type:
+          - "null"
+          - string
+      hs_analytics_last_touch_converting_campaign_timestamp_latest_value_81a64e30:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_visit_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_visit_timestamp_timestamp_latest_value_999a0fce:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_1:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_2:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_num_page_views:
+        type:
+          - "null"
+          - number
+      hs_analytics_num_page_views_cardinality_sum_e46e85b0:
+        type:
+          - "null"
+          - number
+      hs_analytics_num_visits:
+        type:
+          - "null"
+          - number
+      hs_analytics_num_visits_cardinality_sum_53d952a6:
+        type:
+          - "null"
+          - number
+      hs_analytics_source:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_1:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_1_timestamp_earliest_value_9b2f1fa1:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_2:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_2_timestamp_earliest_value_9b2f9400:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_source_timestamp_earliest_value_25a3a52c:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_annual_revenue_currency_code:
+        type:
+          - "null"
+          - string
+      hs_avatar_filemanager_key:
+        type:
+          - "null"
+          - string
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_customer:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_evangelist:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_lead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_marketingqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_opportunity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_other:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_salesqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_subscriber:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_customer:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_evangelist:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_lead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_marketingqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_opportunity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_other:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_salesqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_subscriber:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_ideal_customer_profile:
+        type:
+          - "null"
+          - string
+      hs_is_target_account:
+        type:
+          - "null"
+          - boolean
+      hs_last_booked_meeting_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_logged_call_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_open_task_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_sales_activity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_sales_activity_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_sales_activity_type:
+        type:
+          - "null"
+          - string
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_createdate_of_active_subscriptions:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_meeting_activity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lead_status:
+        type:
+          - "null"
+          - string
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_num_blockers:
+        type:
+          - "null"
+          - number
+      hs_num_child_companies:
+        type:
+          - "null"
+          - number
+      hs_num_contacts_with_buying_roles:
+        type:
+          - "null"
+          - number
+      hs_num_decision_makers:
+        type:
+          - "null"
+          - number
+      hs_num_open_deals:
+        type:
+          - "null"
+          - number
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_parent_company_id:
+        type:
+          - "null"
+          - number
+      hs_pinned_engagement_id:
+        type:
+          - "null"
+          - number
+      hs_pipeline:
+        type:
+          - "null"
+          - string
+      hs_predictivecontactscore_v2_next_max_max_d4e58c1e:
+        type:
+          - "null"
+          - number
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_sales_email_last_replied:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_target_account:
+        type:
+          - "null"
+          - string
+      hs_target_account_probability:
+        type:
+          - "null"
+          - number
+      hs_target_account_recommendation_snooze_time:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_target_account_recommendation_state:
+        type:
+          - "null"
+          - string
+      hs_time_in_customer:
+        type:
+          - "null"
+          - number
+      hs_time_in_evangelist:
+        type:
+          - "null"
+          - number
+      hs_time_in_lead:
+        type:
+          - "null"
+          - number
+      hs_time_in_marketingqualifiedlead:
+        type:
+          - "null"
+          - number
+      hs_time_in_opportunity:
+        type:
+          - "null"
+          - number
+      hs_time_in_other:
+        type:
+          - "null"
+          - number
+      hs_time_in_salesqualifiedlead:
+        type:
+          - "null"
+          - number
+      hs_time_in_subscriber:
+        type:
+          - "null"
+          - number
+      hs_total_deal_value:
+        type:
+          - "null"
+          - number
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      hubspotscore:
+        type:
+          - "null"
+          - number
+      industry:
+        type:
+          - "null"
+          - string
+      is_public:
+        type:
+          - "null"
+          - boolean
+      lifecyclestage:
+        type:
+          - "null"
+          - string
+      linkedin_company_page:
+        type:
+          - "null"
+          - string
+      linkedinbio:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      notes_last_contacted:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_last_updated:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_next_activity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      num_associated_contacts:
+        type:
+          - "null"
+          - number
+      num_associated_deals:
+        type:
+          - "null"
+          - number
+      num_contacted_notes:
+        type:
+          - "null"
+          - number
+      num_conversion_events:
+        type:
+          - "null"
+          - number
+      num_conversion_events_cardinality_sum_d095f14b:
+        type:
+          - "null"
+          - number
+      num_notes:
+        type:
+          - "null"
+          - number
+      numberofemployees:
+        type:
+          - "null"
+          - number
+      phone:
+        type:
+          - "null"
+          - string
+      recent_conversion_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      recent_conversion_date_timestamp_latest_value_72856da1:
+        format: date-time
+        type:
+          - "null"
+          - string
+      recent_conversion_event_name:
+        type:
+          - "null"
+          - string
+      recent_conversion_event_name_timestamp_latest_value_66c820bf:
+        format: date-time
+        type:
+          - "null"
+          - string
+      recent_deal_amount:
+        type:
+          - "null"
+          - number
+      recent_deal_close_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      timezone:
+        type:
+          - "null"
+          - string
+      total_money_raised:
+        type:
+          - "null"
+          - string
+      total_revenue:
+        type:
+          - "null"
+          - number
+      twitterbio:
+        type:
+          - "null"
+          - string
+      twitterfollowers:
+        type:
+          - "null"
+          - number
+      twitterhandle:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      web_technologies:
+        type:
+          - "null"
+          - string
+      website:
+        type:
+          - "null"
+          - string
+      zip:
+        type:
+          - "null"
+          - string
+    type: object
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

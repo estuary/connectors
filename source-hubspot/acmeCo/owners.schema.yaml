@@ -1,0 +1,58 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  email:
+    type:
+      - "null"
+      - string
+  firstName:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  lastName:
+    type:
+      - "null"
+      - string
+  teams:
+    items:
+      properties:
+        id:
+          type:
+            - "null"
+            - string
+        membership:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+      type: object
+    type:
+      - "null"
+      - array
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  userId:
+    type:
+      - "null"
+      - integer
+required:
+  - id
+type:
+  - object

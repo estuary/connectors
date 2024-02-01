@@ -1,0 +1,118 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  createdAt:
+    type:
+      - "null"
+      - integer
+  deleteable:
+    type:
+      - "null"
+      - boolean
+  dynamic:
+    type:
+      - "null"
+      - boolean
+  filters:
+    items:
+      items:
+        properties:
+          checkPastVersions:
+            type:
+              - "null"
+              - boolean
+          filterFamily:
+            type:
+              - "null"
+              - string
+          operator:
+            type:
+              - "null"
+              - string
+          property:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          value:
+            type:
+              - "null"
+              - string
+          withinTimeMode:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      type:
+        - "null"
+        - array
+    type:
+      - "null"
+      - array
+  internalListId:
+    type:
+      - "null"
+      - integer
+  listId:
+    type: integer
+  listType:
+    type:
+      - "null"
+      - string
+  metaData:
+    properties:
+      error:
+        type:
+          - "null"
+          - string
+      lastProcessingStateChangeAt:
+        type:
+          - "null"
+          - integer
+      lastSizeChangeAt:
+        type:
+          - "null"
+          - integer
+      processing:
+        type:
+          - "null"
+          - string
+      size:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  parentId:
+    type:
+      - "null"
+      - integer
+  portalId:
+    type:
+      - "null"
+      - integer
+  readOnly:
+    type:
+      - "null"
+      - boolean
+  updatedAt:
+    type:
+      - "null"
+      - integer
+required:
+  - listId
+type: object

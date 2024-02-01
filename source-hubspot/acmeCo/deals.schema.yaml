@@ -1,0 +1,569 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  companies:
+    items:
+      format: integer
+      type:
+        - "null"
+        - integer
+        - string
+    type:
+      - "null"
+      - array
+  contacts:
+    items:
+      format: integer
+      type:
+        - "null"
+        - integer
+        - string
+    type:
+      - "null"
+      - array
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  line_items:
+    items:
+      format: integer
+      type:
+        - "null"
+        - integer
+        - string
+    type:
+      - "null"
+      - array
+  properties:
+    properties:
+      amount:
+        type:
+          - "null"
+          - number
+      amount_in_home_currency:
+        type:
+          - "null"
+          - number
+      closed_lost_reason:
+        type:
+          - "null"
+          - string
+      closed_won_reason:
+        type:
+          - "null"
+          - string
+      closedate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      days_to_close:
+        type:
+          - "null"
+          - number
+      dealname:
+        type:
+          - "null"
+          - string
+      dealstage:
+        type:
+          - "null"
+          - string
+      dealtype:
+        type:
+          - "null"
+          - string
+      description:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked:
+        format: date-time
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_campaign:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_medium:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_source:
+        type:
+          - "null"
+          - string
+      hs_acv:
+        type:
+          - "null"
+          - number
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_collaborator_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_deal_split_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_company:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_contact:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_1:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_1_company:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_1_contact:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_2:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_2_company:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_data_2_contact:
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_timestamp_company:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_latest_source_timestamp_contact:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_source:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_1:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_2:
+        type:
+          - "null"
+          - string
+      hs_arr:
+        type:
+          - "null"
+          - number
+      hs_closed_amount:
+        type:
+          - "null"
+          - number
+      hs_closed_amount_in_home_currency:
+        type:
+          - "null"
+          - number
+      hs_closed_won_count:
+        type:
+          - "null"
+          - number
+      hs_closed_won_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_appointmentscheduled:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_closedlost:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_closedwon:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_contractsent:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_decisionmakerboughtin:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_presentationscheduled:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_qualifiedtobuy:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_appointmentscheduled:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_closedlost:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_closedwon:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_contractsent:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_decisionmakerboughtin:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_presentationscheduled:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_qualifiedtobuy:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_days_to_close_raw:
+        type:
+          - "null"
+          - number
+      hs_deal_amount_calculation_preference:
+        type:
+          - "null"
+          - string
+      hs_deal_stage_probability:
+        type:
+          - "null"
+          - number
+      hs_deal_stage_probability_shadow:
+        type:
+          - "null"
+          - number
+      hs_exchange_rate:
+        type:
+          - "null"
+          - number
+      hs_forecast_amount:
+        type:
+          - "null"
+          - number
+      hs_forecast_probability:
+        type:
+          - "null"
+          - number
+      hs_is_closed:
+        type:
+          - "null"
+          - boolean
+      hs_is_closed_won:
+        type:
+          - "null"
+          - boolean
+      hs_is_open_count:
+        type:
+          - "null"
+          - number
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_meeting_activity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_likelihood_to_close:
+        type:
+          - "null"
+          - number
+      hs_line_item_global_term_hs_discount_percentage:
+        type:
+          - "null"
+          - string
+      hs_line_item_global_term_hs_discount_percentage_enabled:
+        type:
+          - "null"
+          - boolean
+      hs_line_item_global_term_hs_recurring_billing_period:
+        type:
+          - "null"
+          - string
+      hs_line_item_global_term_hs_recurring_billing_period_enabled:
+        type:
+          - "null"
+          - boolean
+      hs_line_item_global_term_hs_recurring_billing_start_date:
+        type:
+          - "null"
+          - string
+      hs_line_item_global_term_hs_recurring_billing_start_date_enabled:
+        type:
+          - "null"
+          - boolean
+      hs_line_item_global_term_recurringbillingfrequency:
+        type:
+          - "null"
+          - string
+      hs_line_item_global_term_recurringbillingfrequency_enabled:
+        type:
+          - "null"
+          - boolean
+      hs_manual_forecast_category:
+        type:
+          - "null"
+          - string
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_mrr:
+        type:
+          - "null"
+          - number
+      hs_next_step:
+        type:
+          - "null"
+          - string
+      hs_num_of_associated_line_items:
+        type:
+          - "null"
+          - number
+      hs_num_target_accounts:
+        type:
+          - "null"
+          - number
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_pinned_engagement_id:
+        type:
+          - "null"
+          - number
+      hs_predicted_amount:
+        type:
+          - "null"
+          - number
+      hs_predicted_amount_in_home_currency:
+        type:
+          - "null"
+          - number
+      hs_priority:
+        type:
+          - "null"
+          - string
+      hs_projected_amount:
+        type:
+          - "null"
+          - number
+      hs_projected_amount_in_home_currency:
+        type:
+          - "null"
+          - number
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_sales_email_last_replied:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_tcv:
+        type:
+          - "null"
+          - number
+      hs_time_in_appointmentscheduled:
+        type:
+          - "null"
+          - number
+      hs_time_in_closedlost:
+        type:
+          - "null"
+          - number
+      hs_time_in_closedwon:
+        type:
+          - "null"
+          - number
+      hs_time_in_contractsent:
+        type:
+          - "null"
+          - number
+      hs_time_in_decisionmakerboughtin:
+        type:
+          - "null"
+          - number
+      hs_time_in_presentationscheduled:
+        type:
+          - "null"
+          - number
+      hs_time_in_qualifiedtobuy:
+        type:
+          - "null"
+          - number
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      notes_last_contacted:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_last_updated:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_next_activity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      num_associated_contacts:
+        type:
+          - "null"
+          - number
+      num_contacted_notes:
+        type:
+          - "null"
+          - number
+      num_notes:
+        type:
+          - "null"
+          - number
+      pipeline:
+        type:
+          - "null"
+          - string
+    type: object
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object
