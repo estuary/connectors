@@ -1,0 +1,401 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  configuration:
+    properties:
+      allowLinkToResetKnownValues:
+        type:
+          - "null"
+          - boolean
+      archivable:
+        type:
+          - "null"
+          - boolean
+      cloneable:
+        type:
+          - "null"
+          - boolean
+      createNewContactForNewEmail:
+        type:
+          - "null"
+          - boolean
+      editable:
+        type:
+          - "null"
+          - boolean
+      language:
+        type:
+          - "null"
+          - string
+      notifyContactOwner:
+        type:
+          - "null"
+          - boolean
+      notifyRecipients:
+        type:
+          - "null"
+          - array
+      postSubmitAction:
+        properties:
+          type:
+            type:
+              - "null"
+              - string
+          value:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      prePopulateKnownValues:
+        type:
+          - "null"
+          - boolean
+      recaptchaEnabled:
+        type:
+          - "null"
+          - boolean
+    type:
+      - "null"
+      - object
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  deletedAt:
+    type:
+      - "null"
+      - string
+  displayOptions:
+    properties:
+      renderRawHtml:
+        type:
+          - "null"
+          - boolean
+      style:
+        properties:
+          backgroundWidth:
+            type:
+              - "null"
+              - string
+          fontFamily:
+            type:
+              - "null"
+              - string
+          helpTextColor:
+            type:
+              - "null"
+              - string
+          helpTextSize:
+            type:
+              - "null"
+              - string
+          labelTextColor:
+            type:
+              - "null"
+              - string
+          labelTextSize:
+            type:
+              - "null"
+              - string
+          legalConsentTextColor:
+            type:
+              - "null"
+              - string
+          legalConsentTextSize:
+            type:
+              - "null"
+              - string
+          submitAlignment:
+            type:
+              - "null"
+              - string
+          submitColor:
+            type:
+              - "null"
+              - string
+          submitFontColor:
+            type:
+              - "null"
+              - string
+          submitSize:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      submitButtonText:
+        type:
+          - "null"
+          - string
+      theme:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  fieldGroups:
+    items:
+      properties:
+        fields:
+          items:
+            properties:
+              fieldType:
+                type:
+                  - "null"
+                  - string
+              hidden:
+                type:
+                  - "null"
+                  - boolean
+              label:
+                type:
+                  - "null"
+                  - string
+              name:
+                type:
+                  - "null"
+                  - string
+              objectTypeId:
+                type:
+                  - "null"
+                  - string
+              required:
+                type:
+                  - "null"
+                  - boolean
+            type:
+              - "null"
+              - object
+          type:
+            - "null"
+            - array
+        groupType:
+          type:
+            - "null"
+            - string
+        richTextType:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  id:
+    type: string
+  legalConsentOptions:
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  properties:
+    properties:
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_assigned_business_unit_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_cloneable:
+        type:
+          - "null"
+          - string
+      hs_created_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_deletable:
+        type:
+          - "null"
+          - string
+      hs_editable:
+        type:
+          - "null"
+          - string
+      hs_embed_version:
+        type:
+          - "null"
+          - string
+      hs_folder_id:
+        type:
+          - "null"
+          - number
+      hs_form_id:
+        type:
+          - "null"
+          - string
+      hs_form_interactions:
+        type:
+          - "null"
+          - number
+      hs_form_submissions:
+        type:
+          - "null"
+          - number
+      hs_form_submissions_per_form_interaction:
+        type:
+          - "null"
+          - number
+      hs_form_submissions_per_form_view:
+        type:
+          - "null"
+          - number
+      hs_form_submissions_per_page_view:
+        type:
+          - "null"
+          - number
+      hs_form_submissions_per_pop_up_cta_view:
+        type:
+          - "null"
+          - number
+      hs_form_type:
+        type:
+          - "null"
+          - string
+      hs_form_views:
+        type:
+          - "null"
+          - number
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_marketing_campaign_guid:
+        type:
+          - "null"
+          - string
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_name:
+        type:
+          - "null"
+          - string
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_page_views:
+        type:
+          - "null"
+          - number
+      hs_pop_up_cta_views:
+        type:
+          - "null"
+          - number
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_spam_submissions:
+        type:
+          - "null"
+          - number
+      hs_status:
+        type:
+          - "null"
+          - string
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+    type: object
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

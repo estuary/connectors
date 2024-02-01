@@ -1,0 +1,173 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-hubspot:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-hubspot:v4"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+          cursorField:
+            - lastUpdatedTime
+        target: acmeCo/campaigns
+      - resource:
+          stream: companies
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/companies
+      - resource:
+          stream: contact_lists
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/contact_lists
+      - resource:
+          stream: contacts
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/contacts
+      - resource:
+          stream: contacts_list_memberships
+          syncMode: full_refresh
+          cursorField:
+            - canonical-vid
+        target: acmeCo/contacts_list_memberships
+      - resource:
+          stream: deal_pipelines
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/deal_pipelines
+      - resource:
+          stream: deals
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/deals
+      - resource:
+          stream: deals_archived
+          syncMode: incremental
+          cursorField:
+            - archivedAt
+        target: acmeCo/deals_archived
+      - resource:
+          stream: email_events
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/email_events
+      - resource:
+          stream: email_subscriptions
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/email_subscriptions
+      - resource:
+          stream: engagements
+          syncMode: incremental
+          cursorField:
+            - lastUpdated
+        target: acmeCo/engagements
+      - resource:
+          stream: engagements_calls
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/engagements_calls
+      - resource:
+          stream: engagements_emails
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/engagements_emails
+      - resource:
+          stream: engagements_meetings
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/engagements_meetings
+      - resource:
+          stream: engagements_notes
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/engagements_notes
+      - resource:
+          stream: engagements_tasks
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/engagements_tasks
+      - resource:
+          stream: forms
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/forms
+      - resource:
+          stream: form_submissions
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/form_submissions
+      - resource:
+          stream: line_items
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/line_items
+      - resource:
+          stream: marketing_emails
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/marketing_emails
+      - resource:
+          stream: owners
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/owners
+      - resource:
+          stream: products
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/products
+      - resource:
+          stream: property_history
+          syncMode: full_refresh
+          cursorField:
+            - property
+            - timestamp
+        target: acmeCo/property_history
+      - resource:
+          stream: subscription_changes
+          syncMode: incremental
+          cursorField:
+            - timestamp
+        target: acmeCo/subscription_changes
+      - resource:
+          stream: tickets
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/tickets
+      - resource:
+          stream: ticket_pipelines
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/ticket_pipelines
+      - resource:
+          stream: workflows
+          syncMode: incremental
+          cursorField:
+            - updatedAt
+        target: acmeCo/workflows

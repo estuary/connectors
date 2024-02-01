@@ -1,0 +1,58 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  contactListIds:
+    properties:
+      active:
+        type:
+          - "null"
+          - integer
+      enrolled:
+        type:
+          - "null"
+          - integer
+      steps:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  enabled:
+    type:
+      - "null"
+      - boolean
+  id:
+    type: integer
+  insertedAt:
+    type:
+      - "null"
+      - integer
+  name:
+    type:
+      - "null"
+      - string
+  personaTagIds:
+    items:
+      type:
+        - "null"
+        - integer
+    type:
+      - "null"
+      - array
+  type:
+    type:
+      - "null"
+      - string
+  updatedAt:
+    type:
+      - "null"
+      - integer
+required:
+  - id
+type:
+  - object
