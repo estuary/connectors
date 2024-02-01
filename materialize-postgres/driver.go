@@ -24,12 +24,11 @@ import (
 )
 
 const (
-	// These are coarse limits on the amount of memory that will be used to buffer insert/update
-	// batches for load and store operations. In the future it may be interesting to investigate
-	// using the Postgres copy protocol in the future for bulk loading data tables instead of with
-	// DML statements.
-	storeBatchSizeLimit = 4096                    // Assuming store records average ~2kB then 4k * 2kB = 8MB
-	loadBatchSizeLimit  = storeBatchSizeLimit * 5 // Load records are keys-only so allow for more in a batch
+	// As a very rough approximation, this will limit the amount of memory used for accumulating
+	// batches of keys to load or documents to store based on the size of their packed tuples. As an
+	// example, if documents average 2kb then a 10mb batch size will allow for ~5000 documents per
+	// batch.
+	batchBytesLimit = 10 * 1024 * 1024 // Bytes
 )
 
 type sshForwarding struct {
@@ -320,7 +319,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	defer txn.Rollback(ctx)
 
 	var batch pgx.Batch
+	batchBytes := 0
 	for it.Next() {
+		// This assumes that the length of the packed key is at least proportional to the amount of
+		// memory it will occupy when populated buffered in a pgx.Batch.
+		batchBytes += len(it.PackedKey)
+
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
@@ -329,10 +333,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			batch.Queue(b.loadInsertSQL, converted...)
 		}
 
-		if batch.Len() >= loadBatchSizeLimit {
+		if batchBytes >= batchBytesLimit {
 			if err := sendBatch(ctx, txn, &batch); err != nil {
 				return fmt.Errorf("sending load batch: %w", err)
 			}
+			batchBytes = 0
 		}
 	}
 	if it.Err() != nil {
@@ -386,7 +391,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}()
 
 	var batch pgx.Batch
+	batchBytes := 0
 	for it.Next() {
+		// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
+		// tuples & the document JSON are proportional to the size of the item in the batch.
+		batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
@@ -397,10 +406,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			batch.Queue(b.storeInsertSQL, converted...)
 		}
 
-		if batch.Len() >= storeBatchSizeLimit {
+		if batchBytes >= batchBytesLimit {
 			if err := sendBatch(ctx, txn, &batch); err != nil {
 				return nil, fmt.Errorf("sending store batch: %w", err)
 			}
+			batchBytes = 0
 		}
 	}
 
