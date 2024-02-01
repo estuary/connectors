@@ -243,13 +243,14 @@ func ReadFlush(request *pm.Request) error {
 
 // StoreIterator is an iterator over Store requests.
 type StoreIterator struct {
-	Binding   int             // Binding index of this stored document.
-	Exists    bool            // Does this document exist in the store already?
-	Key       tuple.Tuple     // Key of the document to store.
-	PackedKey []byte          // PackedKey of the document to store.
-	RawJSON   json.RawMessage // Document to store.
-	Values    tuple.Tuple     // Values of the document to store.
-	Total     int             // Total number of iterated stores.
+	Binding      int             // Binding index of this stored document.
+	Exists       bool            // Does this document exist in the store already?
+	Key          tuple.Tuple     // Key of the document to store.
+	PackedKey    []byte          // PackedKey of the document to store.
+	Values       tuple.Tuple     // Values of the document to store.
+	PackedValues []byte          // PackedValues of the document to store.
+	RawJSON      json.RawMessage // Document to store.
+	Total        int             // Total number of iterated stores.
 
 	stream  RequestRx
 	request *pm.Request // Request read into.
@@ -289,6 +290,7 @@ func (it *StoreIterator) Next() bool {
 		it.err = fmt.Errorf("unpacking Store key: %w", it.err)
 		return false
 	}
+	it.PackedValues = s.ValuesPacked
 	it.Values, it.err = tuple.Unpack(s.ValuesPacked)
 	if it.err != nil {
 		it.err = fmt.Errorf("unpacking Store values: %w", it.err)
