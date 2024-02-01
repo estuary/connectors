@@ -1,0 +1,75 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  label:
+    type:
+      - "null"
+      - string
+  stages:
+    items:
+      properties:
+        active:
+          type:
+            - "null"
+            - boolean
+        createdAt:
+          format: date-time
+          type:
+            - "null"
+            - string
+        displayOrder:
+          type:
+            - "null"
+            - integer
+        id:
+          type:
+            - "null"
+            - string
+        label:
+          type:
+            - "null"
+            - string
+        metadata:
+          properties:
+            isClosed:
+              type:
+                - "null"
+                - string
+            ticketState:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        updatedAt:
+          format: date-time
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,1191 @@
+---
+$schema: "http://json-schema.org/draft-07/schema"
+properties:
+  properties:
+    properties:
+      address:
+        type:
+          - "null"
+          - string
+      annualrevenue:
+        type:
+          - "null"
+          - string
+      associatedcompanyid:
+        type:
+          - "null"
+          - number
+      associatedcompanylastupdated:
+        type:
+          - "null"
+          - number
+      city:
+        type:
+          - "null"
+          - string
+      closedate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      company:
+        type:
+          - "null"
+          - string
+      company_size:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      currentlyinworkflow:
+        type:
+          - "null"
+          - string
+      date_of_birth:
+        type:
+          - "null"
+          - string
+      days_to_close:
+        type:
+          - "null"
+          - number
+      degree:
+        type:
+          - "null"
+          - string
+      email:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked:
+        format: date-time
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_campaign:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_medium:
+        type:
+          - "null"
+          - string
+      engagements_last_meeting_booked_source:
+        type:
+          - "null"
+          - string
+      fax:
+        type:
+          - "null"
+          - string
+      field_of_study:
+        type:
+          - "null"
+          - string
+      first_conversion_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_conversion_event_name:
+        type:
+          - "null"
+          - string
+      first_deal_created_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      firstname:
+        type:
+          - "null"
+          - string
+      gender:
+        type:
+          - "null"
+          - string
+      graduation_date:
+        type:
+          - "null"
+          - string
+      hs_additional_emails:
+        type:
+          - "null"
+          - string
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_contact_vids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_analytics_average_page_views:
+        type:
+          - "null"
+          - number
+      hs_analytics_first_referrer:
+        type:
+          - "null"
+          - string
+      hs_analytics_first_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_first_touch_converting_campaign:
+        type:
+          - "null"
+          - string
+      hs_analytics_first_url:
+        type:
+          - "null"
+          - string
+      hs_analytics_first_visit_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_referrer:
+        type:
+          - "null"
+          - string
+      hs_analytics_last_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_last_touch_converting_campaign:
+        type:
+          - "null"
+          - string
+      hs_analytics_last_url:
+        type:
+          - "null"
+          - string
+      hs_analytics_last_visit_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_analytics_num_event_completions:
+        type:
+          - "null"
+          - number
+      hs_analytics_num_page_views:
+        type:
+          - "null"
+          - number
+      hs_analytics_num_visits:
+        type:
+          - "null"
+          - number
+      hs_analytics_revenue:
+        type:
+          - "null"
+          - number
+      hs_analytics_source:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_1:
+        type:
+          - "null"
+          - string
+      hs_analytics_source_data_2:
+        type:
+          - "null"
+          - string
+      hs_avatar_filemanager_key:
+        type:
+          - "null"
+          - string
+      hs_buying_role:
+        type:
+          - "null"
+          - string
+      hs_calculated_form_submissions:
+        type:
+          - "null"
+          - string
+      hs_calculated_merged_vids:
+        type:
+          - "null"
+          - string
+      hs_calculated_mobile_number:
+        type:
+          - "null"
+          - string
+      hs_calculated_phone_number:
+        type:
+          - "null"
+          - string
+      hs_calculated_phone_number_area_code:
+        type:
+          - "null"
+          - string
+      hs_calculated_phone_number_country_code:
+        type:
+          - "null"
+          - string
+      hs_calculated_phone_number_region_code:
+        type:
+          - "null"
+          - string
+      hs_clicked_linkedin_ad:
+        type:
+          - "null"
+          - string
+      hs_content_membership_email:
+        type:
+          - "null"
+          - string
+      hs_content_membership_email_confirmed:
+        type:
+          - "null"
+          - boolean
+      hs_content_membership_follow_up_enqueued_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_content_membership_notes:
+        type:
+          - "null"
+          - string
+      hs_content_membership_registered_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_content_membership_registration_domain_sent_to:
+        type:
+          - "null"
+          - string
+      hs_content_membership_registration_email_sent_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_content_membership_status:
+        type:
+          - "null"
+          - string
+      hs_conversations_visitor_email:
+        type:
+          - "null"
+          - string
+      hs_count_is_unworked:
+        type:
+          - "null"
+          - number
+      hs_count_is_worked:
+        type:
+          - "null"
+          - number
+      hs_created_by_conversations:
+        type:
+          - "null"
+          - boolean
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_customer:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_evangelist:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_lead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_marketingqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_opportunity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_other:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_salesqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_subscriber:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_customer:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_evangelist:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_lead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_marketingqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_opportunity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_other:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_salesqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_subscriber:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_document_last_revisited:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_bad_address:
+        type:
+          - "null"
+          - boolean
+      hs_email_bounce:
+        type:
+          - "null"
+          - number
+      hs_email_click:
+        type:
+          - "null"
+          - number
+      hs_email_customer_quarantined_reason:
+        type:
+          - "null"
+          - string
+      hs_email_delivered:
+        type:
+          - "null"
+          - number
+      hs_email_domain:
+        type:
+          - "null"
+          - string
+      hs_email_first_click_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_first_open_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_first_reply_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_first_send_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_hard_bounce_reason:
+        type:
+          - "null"
+          - string
+      hs_email_hard_bounce_reason_enum:
+        type:
+          - "null"
+          - string
+      hs_email_is_ineligible:
+        type:
+          - "null"
+          - boolean
+      hs_email_last_click_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_last_email_name:
+        type:
+          - "null"
+          - string
+      hs_email_last_open_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_last_reply_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_last_send_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_email_open:
+        type:
+          - "null"
+          - number
+      hs_email_optout:
+        type:
+          - "null"
+          - boolean
+      hs_email_optout_286760152:
+        type:
+          - "null"
+          - string
+      hs_email_optout_286760157:
+        type:
+          - "null"
+          - string
+      hs_email_quarantined:
+        type:
+          - "null"
+          - boolean
+      hs_email_quarantined_reason:
+        type:
+          - "null"
+          - string
+      hs_email_replied:
+        type:
+          - "null"
+          - number
+      hs_email_sends_since_last_engagement:
+        type:
+          - "null"
+          - number
+      hs_emailconfirmationstatus:
+        type:
+          - "null"
+          - string
+      hs_facebook_ad_clicked:
+        type:
+          - "null"
+          - boolean
+      hs_facebook_click_id:
+        type:
+          - "null"
+          - string
+      hs_first_engagement_object_id:
+        type:
+          - "null"
+          - number
+      hs_first_outreach_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_first_subscription_create_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_google_click_id:
+        type:
+          - "null"
+          - string
+      hs_has_active_subscription:
+        type:
+          - "null"
+          - number
+      hs_ip_timezone:
+        type:
+          - "null"
+          - string
+      hs_is_contact:
+        type:
+          - "null"
+          - boolean
+      hs_is_unworked:
+        type:
+          - "null"
+          - boolean
+      hs_language:
+        type:
+          - "null"
+          - string
+      hs_last_sales_activity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_sales_activity_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_sales_activity_type:
+        type:
+          - "null"
+          - string
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_disqualified_lead_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_meeting_activity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_open_lead_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_qualified_lead_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_sequence_ended_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_sequence_enrolled:
+        type:
+          - "null"
+          - number
+      hs_latest_sequence_enrolled_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_sequence_finished_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_sequence_unenrolled_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_source:
+        type:
+          - "null"
+          - string
+      hs_latest_source_data_1:
+        type:
+          - "null"
+          - string
+      hs_latest_source_data_2:
+        type:
+          - "null"
+          - string
+      hs_latest_source_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_subscription_create_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lead_status:
+        type:
+          - "null"
+          - string
+      hs_legal_basis:
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_customer_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_evangelist_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_lead_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_marketingqualifiedlead_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_opportunity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_other_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_salesqualifiedlead_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lifecyclestage_subscriber_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_linkedin_ad_clicked:
+        type:
+          - "null"
+          - string
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_persona:
+        type:
+          - "null"
+          - string
+      hs_pinned_engagement_id:
+        type:
+          - "null"
+          - number
+      hs_pipeline:
+        type:
+          - "null"
+          - string
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_sa_first_engagement_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_sa_first_engagement_descr:
+        type:
+          - "null"
+          - string
+      hs_sa_first_engagement_object_type:
+        type:
+          - "null"
+          - string
+      hs_sales_email_last_clicked:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_sales_email_last_opened:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_sales_email_last_replied:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_searchable_calculated_international_mobile_number:
+        type:
+          - "null"
+          - string
+      hs_searchable_calculated_international_phone_number:
+        type:
+          - "null"
+          - string
+      hs_searchable_calculated_mobile_number:
+        type:
+          - "null"
+          - string
+      hs_searchable_calculated_phone_number:
+        type:
+          - "null"
+          - string
+      hs_sequences_actively_enrolled_count:
+        type:
+          - "null"
+          - number
+      hs_sequences_enrolled_count:
+        type:
+          - "null"
+          - number
+      hs_sequences_is_enrolled:
+        type:
+          - "null"
+          - boolean
+      hs_testpurge:
+        type:
+          - "null"
+          - string
+      hs_testrollback:
+        type:
+          - "null"
+          - string
+      hs_time_in_customer:
+        type:
+          - "null"
+          - number
+      hs_time_in_evangelist:
+        type:
+          - "null"
+          - number
+      hs_time_in_lead:
+        type:
+          - "null"
+          - number
+      hs_time_in_marketingqualifiedlead:
+        type:
+          - "null"
+          - number
+      hs_time_in_opportunity:
+        type:
+          - "null"
+          - number
+      hs_time_in_other:
+        type:
+          - "null"
+          - number
+      hs_time_in_salesqualifiedlead:
+        type:
+          - "null"
+          - number
+      hs_time_in_subscriber:
+        type:
+          - "null"
+          - number
+      hs_time_to_first_engagement:
+        type:
+          - "null"
+          - number
+      hs_timezone:
+        type:
+          - "null"
+          - string
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_customer:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_evangelist:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_lead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_marketingqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_opportunity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_other:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_salesqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_entered_subscriber:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_customer:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_evangelist:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_lead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_marketingqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_opportunity:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_other:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_salesqualifiedlead:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_v2_date_exited_subscriber:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hs_whatsapp_phone_number:
+        type:
+          - "null"
+          - string
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      hubspotscore:
+        type:
+          - "null"
+          - number
+      industry:
+        type:
+          - "null"
+          - string
+      ip_city:
+        type:
+          - "null"
+          - string
+      ip_country:
+        type:
+          - "null"
+          - string
+      ip_country_code:
+        type:
+          - "null"
+          - string
+      ip_latlon:
+        type:
+          - "null"
+          - string
+      ip_state:
+        type:
+          - "null"
+          - string
+      ip_state_code:
+        type:
+          - "null"
+          - string
+      ip_zipcode:
+        type:
+          - "null"
+          - string
+      job_function:
+        type:
+          - "null"
+          - string
+      jobtitle:
+        type:
+          - "null"
+          - string
+      lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      lastname:
+        type:
+          - "null"
+          - string
+      lifecyclestage:
+        type:
+          - "null"
+          - string
+      linkedin_account:
+        type:
+          - "null"
+          - string
+      marital_status:
+        type:
+          - "null"
+          - string
+      message:
+        type:
+          - "null"
+          - string
+      military_status:
+        type:
+          - "null"
+          - string
+      mobilephone:
+        type:
+          - "null"
+          - string
+      notes_last_contacted:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_last_updated:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_next_activity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      num_associated_deals:
+        type:
+          - "null"
+          - number
+      num_contacted_notes:
+        type:
+          - "null"
+          - number
+      num_conversion_events:
+        type:
+          - "null"
+          - number
+      num_notes:
+        type:
+          - "null"
+          - number
+      num_unique_conversion_events:
+        type:
+          - "null"
+          - number
+      numemployees:
+        type:
+          - "null"
+          - string
+      phone:
+        type:
+          - "null"
+          - string
+      recent_conversion_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      recent_conversion_event_name:
+        type:
+          - "null"
+          - string
+      recent_deal_amount:
+        type:
+          - "null"
+          - number
+      recent_deal_close_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      relationship_status:
+        type:
+          - "null"
+          - string
+      salutation:
+        type:
+          - "null"
+          - string
+      school:
+        type:
+          - "null"
+          - string
+      seniority:
+        type:
+          - "null"
+          - string
+      start_date:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      surveymonkeyeventlastupdated:
+        type:
+          - "null"
+          - number
+      total_revenue:
+        type:
+          - "null"
+          - number
+      twitterhandle:
+        type:
+          - "null"
+          - string
+      webinareventlastupdated:
+        type:
+          - "null"
+          - number
+      website:
+        type:
+          - "null"
+          - string
+      work_email:
+        type:
+          - "null"
+          - string
+      zip:
+        type:
+          - "null"
+          - string
+    type: object
+  property:
+    type: string
+  selected:
+    type:
+      - "null"
+      - boolean
+  source-id:
+    type:
+      - "null"
+      - string
+  source-label:
+    type:
+      - "null"
+      - string
+  source-type:
+    type:
+      - "null"
+      - string
+  timestamp:
+    type: integer
+  updated-by-user-id:
+    type:
+      - "null"
+      - integer
+  value:
+    type:
+      - "null"
+      - string
+  vid:
+    type:
+      - "null"
+      - integer
+required:
+  - property
+  - timestamp
+type:
+  - object

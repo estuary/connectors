@@ -1,0 +1,203 @@
+---
+collections:
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/companies:
+    schema: companies.schema.yaml
+    key:
+      - /id
+  acmeCo/contact_lists:
+    schema: contact_lists.schema.yaml
+    key:
+      - /listId
+  acmeCo/contacts:
+    schema: contacts.schema.yaml
+    key:
+      - /id
+  acmeCo/contacts_list_memberships:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      properties:
+        canonical-vid:
+          type: integer
+        internal-list-id:
+          type:
+            - "null"
+            - integer
+        is-member:
+          type:
+            - "null"
+            - boolean
+        static-list-id:
+          type:
+            - "null"
+            - integer
+        timestamp:
+          type:
+            - "null"
+            - integer
+        vid:
+          type:
+            - "null"
+            - integer
+      required:
+        - canonical-vid
+      type: object
+    key:
+      - /canonical-vid
+  acmeCo/deal_pipelines:
+    schema: deal_pipelines.schema.yaml
+    key:
+      - /pipelineId
+  acmeCo/deals:
+    schema: deals.schema.yaml
+    key:
+      - /id
+  acmeCo/deals_archived:
+    schema: deals_archived.schema.yaml
+    key:
+      - /id
+  acmeCo/email_events:
+    schema: email_events.schema.yaml
+    key:
+      - /id
+  acmeCo/email_subscriptions:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        active:
+          type:
+            - "null"
+            - boolean
+        description:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        name:
+          type:
+            - "null"
+            - string
+        portalId:
+          type:
+            - "null"
+            - integer
+      required:
+        - id
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/engagements:
+    schema: engagements.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_calls:
+    schema: engagements_calls.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_emails:
+    schema: engagements_emails.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_meetings:
+    schema: engagements_meetings.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_notes:
+    schema: engagements_notes.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_tasks:
+    schema: engagements_tasks.schema.yaml
+    key:
+      - /id
+  acmeCo/form_submissions:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema"
+      properties:
+        formId:
+          type: string
+        pageUrl:
+          type:
+            - "null"
+            - string
+        submittedAt:
+          type: integer
+        updatedAt:
+          type:
+            - "null"
+            - integer
+        values:
+          items:
+            properties:
+              name:
+                type:
+                  - "null"
+                  - string
+              objectTypeId:
+                type:
+                  - "null"
+                  - string
+              value:
+                type:
+                  - "null"
+                  - string
+            type: object
+          type:
+            - "null"
+            - array
+      required:
+        - submittedAt
+        - formId
+      type:
+        - object
+    key:
+      - /submittedAt
+      - /formId
+  acmeCo/forms:
+    schema: forms.schema.yaml
+    key:
+      - /id
+  acmeCo/line_items:
+    schema: line_items.schema.yaml
+    key:
+      - /id
+  acmeCo/marketing_emails:
+    schema: marketing_emails.schema.yaml
+    key:
+      - /id
+  acmeCo/owners:
+    schema: owners.schema.yaml
+    key:
+      - /id
+  acmeCo/products:
+    schema: products.schema.yaml
+    key:
+      - /id
+  acmeCo/property_history:
+    schema: property_history.schema.yaml
+    key:
+      - /property
+      - /timestamp
+  acmeCo/subscription_changes:
+    schema: subscription_changes.schema.yaml
+    key:
+      - /timestamp
+      - /recipient
+  acmeCo/ticket_pipelines:
+    schema: ticket_pipelines.schema.yaml
+    key:
+      - /id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/workflows:
+    schema: workflows.schema.yaml
+    key:
+      - /id

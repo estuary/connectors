@@ -1,0 +1,87 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  createdAt:
+    type:
+      - "null"
+      - integer
+  default:
+    type:
+      - "null"
+      - boolean
+  displayOrder:
+    type:
+      - "null"
+      - integer
+  label:
+    type:
+      - "null"
+      - string
+  objectType:
+    type:
+      - "null"
+      - string
+  objectTypeId:
+    type:
+      - "null"
+      - string
+  pipelineId:
+    type: string
+  stages:
+    items:
+      properties:
+        active:
+          type:
+            - "null"
+            - boolean
+        createdAt:
+          type:
+            - "null"
+            - integer
+        displayOrder:
+          type:
+            - "null"
+            - integer
+        label:
+          type:
+            - "null"
+            - string
+        metadata:
+          properties:
+            isClosed:
+              type:
+                - "null"
+                - string
+            probability:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        stageId:
+          type:
+            - "null"
+            - string
+        updatedAt:
+          type:
+            - "null"
+            - integer
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  updatedAt:
+    type:
+      - "null"
+      - integer
+required:
+  - pipelineId
+type:
+  - object

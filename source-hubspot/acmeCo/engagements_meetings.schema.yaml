@@ -1,0 +1,347 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  companies:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  contacts:
+    items:
+      format: integer
+      type:
+        - "null"
+        - integer
+        - string
+    type:
+      - "null"
+      - array
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  deals:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  id:
+    type: string
+  properties:
+    properties:
+      hs_activity_type:
+        type:
+          - "null"
+          - string
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_assigned_business_unit_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_at_mentioned_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_attachment_ids:
+        type:
+          - "null"
+          - string
+      hs_attendee_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_body_preview:
+        type:
+          - "null"
+          - string
+      hs_body_preview_html:
+        type:
+          - "null"
+          - string
+      hs_body_preview_is_truncated:
+        type:
+          - "null"
+          - boolean
+      hs_contact_first_outreach_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_created_by:
+        type:
+          - "null"
+          - number
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_engagement_source:
+        type:
+          - "null"
+          - string
+      hs_engagement_source_id:
+        type:
+          - "null"
+          - string
+      hs_follow_up_action:
+        type:
+          - "null"
+          - string
+      hs_gdpr_deleted:
+        type:
+          - "null"
+          - boolean
+      hs_guest_emails:
+        type:
+          - "null"
+          - string
+      hs_i_cal_uid:
+        type:
+          - "null"
+          - string
+      hs_include_description_in_reminder:
+        type:
+          - "null"
+          - boolean
+      hs_internal_meeting_notes:
+        type:
+          - "null"
+          - string
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_meeting_body:
+        type:
+          - "null"
+          - string
+      hs_meeting_calendar_event_hash:
+        type:
+          - "null"
+          - string
+      hs_meeting_change_id:
+        type:
+          - "null"
+          - string
+      hs_meeting_created_from_link_id:
+        type:
+          - "null"
+          - string
+      hs_meeting_end_time:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_meeting_external_url:
+        type:
+          - "null"
+          - string
+      hs_meeting_location:
+        type:
+          - "null"
+          - string
+      hs_meeting_location_type:
+        type:
+          - "null"
+          - string
+      hs_meeting_outcome:
+        type:
+          - "null"
+          - string
+      hs_meeting_payments_session_id:
+        type:
+          - "null"
+          - string
+      hs_meeting_pre_meeting_prospect_reminders:
+        type:
+          - "null"
+          - string
+      hs_meeting_source:
+        type:
+          - "null"
+          - string
+      hs_meeting_source_id:
+        type:
+          - "null"
+          - string
+      hs_meeting_start_time:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_meeting_title:
+        type:
+          - "null"
+          - string
+      hs_meeting_web_conference_meeting_id:
+        type:
+          - "null"
+          - string
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_modified_by:
+        type:
+          - "null"
+          - number
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_outcome_canceled_count:
+        type:
+          - "null"
+          - number
+      hs_outcome_completed_count:
+        type:
+          - "null"
+          - number
+      hs_outcome_no_show_count:
+        type:
+          - "null"
+          - number
+      hs_outcome_rescheduled_count:
+        type:
+          - "null"
+          - number
+      hs_outcome_scheduled_count:
+        type:
+          - "null"
+          - number
+      hs_product_name:
+        type:
+          - "null"
+          - string
+      hs_queue_membership_ids:
+        type:
+          - "null"
+          - string
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_roster_object_coordinates:
+        type:
+          - "null"
+          - string
+      hs_scheduled_tasks:
+        type:
+          - "null"
+          - string
+      hs_time_to_book_meeting_from_first_contact:
+        type:
+          - "null"
+          - number
+      hs_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_timezone:
+        type:
+          - "null"
+          - string
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_unique_id:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+    type: object
+  tickets:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object
