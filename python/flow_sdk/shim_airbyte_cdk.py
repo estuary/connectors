@@ -181,7 +181,7 @@ class CaptureShim(Connector):
                 "_meta", {"type": "object"}
             )
             meta.setdefault("properties", {})["row_id"] = {"type": "integer"}
-            meta.setdefault("required", []).append("row_id")
+            # meta.setdefault("required", []).append("row_id") # TODO(johnny): Disable for now (or forever?) because historical collections don't have it.
             json_schema = stream.json_schema
 
             if self.usesSchemaInference:
