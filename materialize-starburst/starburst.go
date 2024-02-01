@@ -290,7 +290,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		dataDirPrefix := loadFileProcessor.GetCloudPrefix(b.target.Binding)
 		dataDir := fmt.Sprintf("s3://%s/%s", t.cfg.Bucket, dataDirPrefix)
 		if _, err := t.store.conn.ExecContext(it.Context(), b.load.createTempTable, dataDir); err != nil {
-			return fmt.Errorf("creating load temp table fialed: %w", err)
+			return fmt.Errorf("creating load temp table failed: %w", err)
 		}
 		// Fetch data from load temp table
 		rows, err := t.load.conn.QueryContext(it.Context(), b.load.loadQuery)
@@ -401,15 +401,15 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		dataDir := fmt.Sprintf("s3://%s/%s", t.cfg.Bucket, item.DataDirPrefix)
 		// Create a binding-scoped temporary table for store documents to be merged into target table
 		if _, err := t.store.conn.ExecContext(ctx, item.CreateSql, dataDir); err != nil {
-			return nil, fmt.Errorf("creating temp table fialed: %w", err)
+			return nil, fmt.Errorf("creating temp table failed: %w", err)
 		}
 		// Merging temp table with target
 		if _, err := t.store.conn.ExecContext(ctx, item.MergeSql); err != nil {
-			return nil, fmt.Errorf("merging fialed: %w", err)
+			return nil, fmt.Errorf("merging failed: %w", err)
 		}
 		// Drop temp table
 		if _, err := t.store.conn.ExecContext(ctx, item.DropSql); err != nil {
-			return nil, fmt.Errorf("droping temp table fialed: %w", err)
+			return nil, fmt.Errorf("droping temp table failed: %w", err)
 		}
 		//Clean cloud files
 		if err := fileProcessor.Delete(item.DataDirPrefix); err != nil {
