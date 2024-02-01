@@ -1,0 +1,302 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  properties:
+    properties:
+      amount:
+        type:
+          - "null"
+          - number
+      createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      description:
+        type:
+          - "null"
+          - string
+      discount:
+        type:
+          - "null"
+          - number
+      hs_acv:
+        type:
+          - "null"
+          - number
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_assigned_business_unit_ids:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_allow_buyer_selected_quantity:
+        type:
+          - "null"
+          - string
+      hs_arr:
+        type:
+          - "null"
+          - number
+      hs_billing_period_end_date:
+        format: date
+        type:
+          - "null"
+          - string
+      hs_billing_period_start_date:
+        format: date
+        type:
+          - "null"
+          - string
+      hs_billing_start_delay_days:
+        type:
+          - "null"
+          - number
+      hs_billing_start_delay_months:
+        type:
+          - "null"
+          - number
+      hs_billing_start_delay_type:
+        type:
+          - "null"
+          - string
+      hs_cost_of_goods_sold:
+        type:
+          - "null"
+          - number
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_discount_percentage:
+        type:
+          - "null"
+          - number
+      hs_external_id:
+        type:
+          - "null"
+          - number
+      hs_images:
+        type:
+          - "null"
+          - string
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_line_item_currency_code:
+        type:
+          - "null"
+          - string
+      hs_margin:
+        type:
+          - "null"
+          - number
+      hs_margin_acv:
+        type:
+          - "null"
+          - number
+      hs_margin_arr:
+        type:
+          - "null"
+          - number
+      hs_margin_mrr:
+        type:
+          - "null"
+          - number
+      hs_margin_tcv:
+        type:
+          - "null"
+          - number
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_mrr:
+        type:
+          - "null"
+          - number
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_position_on_quote:
+        type:
+          - "null"
+          - number
+      hs_pre_discount_amount:
+        type:
+          - "null"
+          - number
+      hs_product_id:
+        type:
+          - "null"
+          - number
+      hs_product_type:
+        type:
+          - "null"
+          - string
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_recurring_billing_end_date:
+        format: date
+        type:
+          - "null"
+          - string
+      hs_recurring_billing_number_of_payments:
+        type:
+          - "null"
+          - number
+      hs_recurring_billing_period:
+        type:
+          - "null"
+          - string
+      hs_recurring_billing_start_date:
+        format: date
+        type:
+          - "null"
+          - string
+      hs_recurring_billing_terms:
+        type:
+          - "null"
+          - string
+      hs_sku:
+        type:
+          - "null"
+          - string
+      hs_sync_amount:
+        type:
+          - "null"
+          - number
+      hs_tcv:
+        type:
+          - "null"
+          - number
+      hs_term_in_months:
+        type:
+          - "null"
+          - number
+      hs_total_discount:
+        type:
+          - "null"
+          - number
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_url:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_variant_id:
+        type:
+          - "null"
+          - number
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      price:
+        type:
+          - "null"
+          - number
+      quantity:
+        type:
+          - "null"
+          - number
+      recurringbillingfrequency:
+        type:
+          - "null"
+          - string
+      tax:
+        type:
+          - "null"
+          - number
+    type: object
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

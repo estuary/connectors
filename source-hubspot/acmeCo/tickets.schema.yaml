@@ -1,0 +1,502 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  archived:
+    type:
+      - "null"
+      - boolean
+  companies:
+    items:
+      format: integer
+      type:
+        - integer
+        - string
+        - "null"
+    type:
+      - "null"
+      - array
+  contacts:
+    items:
+      format: integer
+      type:
+        - integer
+        - string
+        - "null"
+    type:
+      - "null"
+      - array
+  createdAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+  deals:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  id:
+    type: string
+  properties:
+    properties:
+      closed_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      content:
+        type:
+          - "null"
+          - string
+      created_by:
+        type:
+          - "null"
+          - number
+      createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      first_agent_reply_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_all_accessible_team_ids:
+        type:
+          - "null"
+          - string
+      hs_all_associated_contact_companies:
+        type:
+          - "null"
+          - string
+      hs_all_associated_contact_emails:
+        type:
+          - "null"
+          - string
+      hs_all_associated_contact_firstnames:
+        type:
+          - "null"
+          - string
+      hs_all_associated_contact_lastnames:
+        type:
+          - "null"
+          - string
+      hs_all_associated_contact_mobilephones:
+        type:
+          - "null"
+          - string
+      hs_all_associated_contact_phones:
+        type:
+          - "null"
+          - string
+      hs_all_conversation_mentions:
+        type:
+          - "null"
+          - string
+      hs_all_owner_ids:
+        type:
+          - "null"
+          - string
+      hs_all_team_ids:
+        type:
+          - "null"
+          - string
+      hs_assignment_method:
+        type:
+          - "null"
+          - string
+      hs_auto_generated_from_thread_id:
+        type:
+          - "null"
+          - number
+      hs_conversations_originating_message_id:
+        type:
+          - "null"
+          - string
+      hs_conversations_originating_thread_id:
+        type:
+          - "null"
+          - number
+      hs_created_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_createdate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_custom_inbox:
+        type:
+          - "null"
+          - number
+      hs_date_entered_1:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_2:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_3:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_entered_4:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_1:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_2:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_3:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_date_exited_4:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_external_object_ids:
+        type:
+          - "null"
+          - string
+      hs_file_upload:
+        type:
+          - "null"
+          - string
+      hs_first_agent_message_sent_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_helpdesk_sort_timestamp:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_in_helpdesk:
+        type:
+          - "null"
+          - boolean
+      hs_inbox_id:
+        type:
+          - "null"
+          - number
+      hs_is_visible_in_help_desk:
+        type:
+          - "null"
+          - boolean
+      hs_last_email_activity:
+        type:
+          - "null"
+          - string
+      hs_last_email_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_message_from_visitor:
+        type:
+          - "null"
+          - boolean
+      hs_last_message_received_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_last_message_sent_at:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lastactivitydate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lastcontacted:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_lastmodifieddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_latest_message_seen_by_agent_ids:
+        type:
+          - "null"
+          - string
+      hs_merged_object_ids:
+        type:
+          - "null"
+          - string
+      hs_most_relevant_sla_status:
+        type:
+          - "null"
+          - string
+      hs_most_relevant_sla_type:
+        type:
+          - "null"
+          - string
+      hs_msteams_message_id:
+        type:
+          - "null"
+          - string
+      hs_nextactivitydate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_num_associated_companies:
+        type:
+          - "null"
+          - number
+      hs_num_associated_conversations:
+        type:
+          - "null"
+          - number
+      hs_num_times_contacted:
+        type:
+          - "null"
+          - number
+      hs_object_id:
+        type:
+          - "null"
+          - number
+      hs_object_source:
+        type:
+          - "null"
+          - string
+      hs_object_source_id:
+        type:
+          - "null"
+          - string
+      hs_object_source_label:
+        type:
+          - "null"
+          - string
+      hs_object_source_user_id:
+        type:
+          - "null"
+          - number
+      hs_originating_channel_instance_id:
+        type:
+          - "null"
+          - string
+      hs_originating_email_engagement_id:
+        type:
+          - "null"
+          - number
+      hs_originating_generic_channel_id:
+        type:
+          - "null"
+          - string
+      hs_pinned_engagement_id:
+        type:
+          - "null"
+          - number
+      hs_pipeline:
+        type:
+          - "null"
+          - string
+      hs_pipeline_stage:
+        type:
+          - "null"
+          - string
+      hs_primary_company:
+        type:
+          - "null"
+          - string
+      hs_primary_company_id:
+        type:
+          - "null"
+          - number
+      hs_primary_company_name:
+        type:
+          - "null"
+          - string
+      hs_read_only:
+        type:
+          - "null"
+          - boolean
+      hs_resolution:
+        type:
+          - "null"
+          - string
+      hs_sales_email_last_replied:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hs_thread_ids_to_restore:
+        type:
+          - "null"
+          - string
+      hs_ticket_category:
+        type:
+          - "null"
+          - string
+      hs_ticket_id:
+        type:
+          - "null"
+          - number
+      hs_ticket_priority:
+        type:
+          - "null"
+          - string
+      hs_time_in_1:
+        type:
+          - "null"
+          - number
+      hs_time_in_2:
+        type:
+          - "null"
+          - number
+      hs_time_in_3:
+        type:
+          - "null"
+          - number
+      hs_time_in_4:
+        type:
+          - "null"
+          - number
+      hs_unique_creation_key:
+        type:
+          - "null"
+          - string
+      hs_updated_by_user_id:
+        type:
+          - "null"
+          - number
+      hs_user_ids_of_all_notification_followers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_notification_unfollowers:
+        type:
+          - "null"
+          - string
+      hs_user_ids_of_all_owners:
+        type:
+          - "null"
+          - string
+      hs_was_imported:
+        type:
+          - "null"
+          - boolean
+      hubspot_owner_assigneddate:
+        format: date-time
+        type:
+          - "null"
+          - string
+      hubspot_owner_id:
+        type:
+          - "null"
+          - string
+      hubspot_team_id:
+        type:
+          - "null"
+          - string
+      last_engagement_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      last_reply_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_last_contacted:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_last_updated:
+        format: date-time
+        type:
+          - "null"
+          - string
+      notes_next_activity_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      nps_follow_up_answer:
+        type:
+          - "null"
+          - string
+      nps_follow_up_question_version:
+        type:
+          - "null"
+          - number
+      nps_score:
+        type:
+          - "null"
+          - string
+      num_contacted_notes:
+        type:
+          - "null"
+          - number
+      num_notes:
+        type:
+          - "null"
+          - number
+      source_ref:
+        type:
+          - "null"
+          - string
+      source_thread_id:
+        type:
+          - "null"
+          - string
+      source_type:
+        type:
+          - "null"
+          - string
+      subject:
+        type:
+          - "null"
+          - string
+      tags:
+        type:
+          - "null"
+          - string
+      time_to_close:
+        type:
+          - "null"
+          - number
+      time_to_first_agent_reply:
+        type:
+          - "null"
+          - number
+    type: object
+  updatedAt:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

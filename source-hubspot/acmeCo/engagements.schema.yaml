@@ -1,0 +1,422 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  activityType:
+    type:
+      - "null"
+      - string
+  allAccessibleTeamIds:
+    items:
+      type:
+        - "null"
+        - integer
+    type:
+      - "null"
+      - array
+  associations:
+    properties:
+      companyIds:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      contactIds:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      dealIds:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      ownerIds:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      ticketIds:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      workflowIds:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  attachments:
+    items:
+      properties:
+        id:
+          type:
+            - "null"
+            - integer
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  bodyPreview:
+    type:
+      - "null"
+      - string
+  bodyPreviewHtml:
+    type:
+      - "null"
+      - string
+  bodyPreviewIsTruncated:
+    type:
+      - "null"
+      - boolean
+  createdAt:
+    type:
+      - "null"
+      - integer
+  createdBy:
+    type:
+      - "null"
+      - integer
+  gdprDeleted:
+    type:
+      - "null"
+      - boolean
+  id:
+    type: integer
+  lastUpdated:
+    type:
+      - "null"
+      - integer
+  metadata:
+    properties:
+      attachedVideoOpened:
+        type:
+          - "null"
+          - boolean
+      attachedVideoWatched:
+        type:
+          - "null"
+          - boolean
+      bcc:
+        items:
+          properties:
+            email:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+      body:
+        type:
+          - "null"
+          - string
+      calleeObjectId:
+        type:
+          - "null"
+          - integer
+      calleeObjectType:
+        type:
+          - "null"
+          - string
+      cc:
+        items:
+          properties:
+            email:
+              type:
+                - "null"
+                - string
+            firstName:
+              type:
+                - "null"
+                - string
+            lastName:
+              type:
+                - "null"
+                - string
+            raw:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+      completionDate:
+        type:
+          - "null"
+          - integer
+      disposition:
+        type:
+          - "null"
+          - string
+      durationMilliseconds:
+        type:
+          - "null"
+          - integer
+      endTime:
+        type:
+          - "null"
+          - integer
+      errorMessage:
+        type:
+          - "null"
+          - string
+      externalAccountId:
+        type:
+          - "null"
+          - string
+      externalId:
+        type:
+          - "null"
+          - string
+      externalUrl:
+        type:
+          - "null"
+          - string
+      facsimileSendId:
+        type:
+          - "null"
+          - string
+      forObjectType:
+        type:
+          - "null"
+          - string
+      from:
+        properties:
+          email:
+            type:
+              - "null"
+              - string
+          firstName:
+            type:
+              - "null"
+              - string
+          lastName:
+            type:
+              - "null"
+              - string
+          raw:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      fromNumber:
+        type:
+          - "null"
+          - string
+      html:
+        type:
+          - "null"
+          - string
+      isAllDay:
+        type:
+          - "null"
+          - boolean
+      loggedFrom:
+        type:
+          - "null"
+          - string
+      mediaProcessingStatus:
+        type:
+          - "null"
+          - string
+      messageId:
+        type:
+          - "null"
+          - string
+      postSendStatus:
+        type:
+          - "null"
+          - string
+      priority:
+        type:
+          - "null"
+          - string
+      recipientDropReasons:
+        type:
+          - "null"
+          - string
+      recordingUrl:
+        type:
+          - "null"
+          - string
+      reminders:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      sendDefaultReminder:
+        type:
+          - "null"
+          - boolean
+      sender:
+        properties:
+          email:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      sentVia:
+        type:
+          - "null"
+          - string
+      sequenceStepOrder:
+        type:
+          - "null"
+          - integer
+      source:
+        type:
+          - "null"
+          - string
+      sourceId:
+        type:
+          - "null"
+          - string
+      startTime:
+        type:
+          - "null"
+          - integer
+      status:
+        type:
+          - "null"
+          - string
+      subject:
+        type:
+          - "null"
+          - string
+      taskType:
+        type:
+          - "null"
+          - string
+      text:
+        type:
+          - "null"
+          - string
+      threadId:
+        type:
+          - "null"
+          - string
+          - integer
+      title:
+        type:
+          - "null"
+          - string
+      to:
+        items:
+          properties:
+            email:
+              type:
+                - "null"
+                - string
+            firstName:
+              type:
+                - "null"
+                - string
+            lastName:
+              type:
+                - "null"
+                - string
+            raw:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+      toNumber:
+        type:
+          - "null"
+          - string
+      trackerKey:
+        type:
+          - "null"
+          - string
+      unknownVisitorConversation:
+        type:
+          - "null"
+          - boolean
+    type:
+      - "null"
+      - object
+  modifiedBy:
+    type:
+      - "null"
+      - integer
+  ownerId:
+    type:
+      - "null"
+      - integer
+  portalId:
+    type:
+      - "null"
+      - integer
+  source:
+    type:
+      - "null"
+      - string
+  sourceId:
+    type:
+      - "null"
+      - string
+  teamId:
+    type:
+      - "null"
+      - integer
+  timestamp:
+    type:
+      - "null"
+      - integer
+  type:
+    type:
+      - "null"
+      - string
+  uid:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,118 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  appId:
+    type:
+      - "null"
+      - integer
+  appName:
+    type:
+      - "null"
+      - string
+  contentId:
+    type:
+      - "null"
+      - integer
+  counters:
+    properties:
+      bounce:
+        type:
+          - "null"
+          - integer
+      click:
+        type:
+          - "null"
+          - integer
+      deferred:
+        type:
+          - "null"
+          - integer
+      delivered:
+        type:
+          - "null"
+          - integer
+      dropped:
+        type:
+          - "null"
+          - integer
+      forward:
+        type:
+          - "null"
+          - integer
+      mta_dropped:
+        type:
+          - "null"
+          - integer
+      open:
+        type:
+          - "null"
+          - integer
+      print:
+        type:
+          - "null"
+          - integer
+      processed:
+        type:
+          - "null"
+          - integer
+      reply:
+        type:
+          - "null"
+          - integer
+      sent:
+        type:
+          - "null"
+          - integer
+      spamreport:
+        type:
+          - "null"
+          - integer
+      statuschange:
+        type:
+          - "null"
+          - integer
+      suppressed:
+        type:
+          - "null"
+          - integer
+      unsubscribed:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  id:
+    type: integer
+  lastUpdatedTime:
+    type:
+      - "null"
+      - integer
+  name:
+    type:
+      - "null"
+      - string
+  numIncluded:
+    type:
+      - "null"
+      - integer
+  numQueued:
+    type:
+      - "null"
+      - integer
+  subType:
+    type:
+      - "null"
+      - string
+  subject:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

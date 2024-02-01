@@ -1,0 +1,23 @@
+credentials:
+    client_id_sops: ENC[AES256_GCM,data:cN4R7R7ixwd0QiX9uanxOSx9xsGmTi4oEHX6vNbTAdY6VFiU,iv:2fvIsHIOv4YtAgWb0P777akB5LZyRNXXpRU9IJp2q5Y=,tag:VqxBHJO6I21yMiHpw6nHBg==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:UlJR+XVn0rgji2eoxy6pe0xUFa3QqrfGyxsGDwo3ntRR4z0/,iv:zn0YVI1gE5vOKzfeaCw1qYe76375RhRBJdPDL/mO90k=,tag:P0ziOgenDQKUUdZyFp8sZA==,type:str]
+    credentials_title: OAuth Credentials
+    refresh_token_sops: ENC[AES256_GCM,data:NsJY4Y+6q2iTrx0C8J7NxsJ8UlgkwTc852LKaDK0LgAvXvex,iv:YscFVcaTDa8TSDYUlQf4vyLDFIBn4wyge9DQvu0eY+8=,tag:bT2xDC/jbBREMXkBxJfSHg==,type:str]
+    access_token: CIjW-KzWMRIUEgeDUQAAYiAAAABYAgEAAAAAAAQYkrXBFSC51qkeKNm1QDIU163X4hggpbwBcAPFvBM8IXV5s0g6PwAkJMH_BwAAwP-zAABgfMA0hgAAAAAABAQMANgcDgDQw38wAQAAAIFG_BgGABAgAwAAAAAAAAAAgAACoAm4AkIUbMa75cEba03_w0WSvUU4GcxdnoZKA25hMVIAWgA
+    refresh_token: 74c17bcb-5a5d-4440-b828-5780d2bf4c09
+    token_expiry_date: "2024-02-01T17:01:21.703Z"
+start_date: "2024-01-01T12:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-02-01T17:08:50Z"
+    mac: ENC[AES256_GCM,data:qxmgWWjFDJ190R1wwfHI4DWYB1MgxgpI7xJiP+gyhyD4oi5yfBJ3dC6QBDc8Cb5ip9p/YVUozXXagtvI6RWTqNvof1tb10ZCLfAGDWjWvcB8uAQn6JM/hbM4QmoKAR/l9f3bf5TW+ToVQxtI3s6XVyy2KUFWiofQlIbdvCeBrA4=,iv:M1D1yhI/5bqEMi5Afg2cLRH4otZZlIMUnHwpzm/Gf7s=,tag:qmLDzTbsTw4JdKWJvgvy3A==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
