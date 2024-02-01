@@ -1,2 +1,22 @@
+conversion_window_days: 14
 credentials:
-  - access_token: asdfsd
+  client_id_sops: "ENC[AES256_GCM,data:4Q3lf8xeIui0NdfKTy7Ihhr++uvb1FF3l1wEdyOfSWLs5D/rtNLqG7fj6Z+M9tNNF6jGsFDFV5bDnaSe9bXlx6+0pRl1rYPX,iv:8g0LY8Q4uLFAXTJ4Qn6315aMm7lXifdp2zBDdrOameg=,tag:HPwj+cg+tnly1IqbltNq7Q==,type:str]"
+  client_secret_sops: "ENC[AES256_GCM,data:BuZoXY8OuZG6ez/QuVF9EoxNOfmZ1fMgY6AS+8/MxKCFK9c=,iv:8WOREtPuB1VxPxGZm2L1NnxMOQdYFbaIesRHaRrNVWg=,tag:XJQNKvIS30A4LNP6OJHZBg==,type:str]"
+  developer_token_sops: "ENC[AES256_GCM,data:5iTzpTIFu5iWO4oIulkCCMweVh79tg==,iv:epw5wPK5jSNffm1en6vNRqBWhL/94dke5icUe8806U8=,tag:duxaFk3D8Lo+xCuG1b6Suw==,type:str]"
+  refresh_token_sops: "ENC[AES256_GCM,data:LRBGl/ratPgi5JJd+T0AkFBCAi8POHl7yDKNjjXIA9YgvFm2fCZJasrMEq0io9LSyNs+MzwbHHumgwqhBOa3kNUAhKFNS6QIhbwx1tIhvs5DAqA1QwsX8w9D4OHcEuqs15QhKB27/w==,iv:kt44kxlMYoU2IFqUcqHDheFV5ESZ5zr8Os89CmnHZ3s=,tag:Ho0vRasI7BhQsm52njya3Q==,type:str]"
+customer_id: "6458773721"
+start_date: 2022-01-01
+sops:
+  kms: ~
+  gcp_kms:
+    - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/catalog-sops/cryptoKeys/config-encryptor
+      created_at: "2022-11-17T00:07:17Z"
+      enc: CiQABM8p+5ZeS8Ki3o6U/Oqldu/wMzIWG+qd5V5z7MtmKwHyH7USSQCft6tp8W+45Ggiarybz9qxhUQsM29+AqQsMfXkI6CoApgVKItz29eaLbPRXltc8pBFD0R3ckEMOzg+SxeLaGySP+WYwBQuHbw=
+  azure_kv: ~
+  hc_vault: ~
+  age: ~
+  lastmodified: "2022-11-17T00:07:17Z"
+  mac: "ENC[AES256_GCM,data:lZpujaloZnmF1ElAEixm7MzUjIYc2B5FMYWN+hNPCHkaPXcwhNEuiM9W/pwJz8SoE7C5dRVYFiQwFeYwtxH+YwRpMtoYDcUIpjY9x1Mypc3fdPU1KzUx1uJMhoVwMnHXzwnRQvWrxCwJtoDsFN5jesgXmfSyM0mFBlHBvQFGT3A=,iv:BV+OUMYdJK9M9FwJVT7tY9TRJzD8HWeOAdk2PGkx20c=,tag:TdigseOmKOGlmSl+87/PHA==,type:str]"
+  pgp: ~
+  encrypted_suffix: _sops
+  version: 3.7.3

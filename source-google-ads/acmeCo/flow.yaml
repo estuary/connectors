@@ -1,0 +1,189 @@
+---
+collections:
+  acmeCo/account_performance_report:
+    schema: account_performance_report.schema.yaml
+    key:
+      - /segments.ad_network_type
+      - /segments.device
+      - /segments.date
+      - /customer.id
+  acmeCo/accounts:
+    schema: accounts.schema.yaml
+    key:
+      - /customer.id
+      - /segments.date
+  acmeCo/ad_group_ad_labels:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        ad_group_ad.ad.resource_name:
+          type:
+            - "null"
+            - string
+        ad_group_ad_label.resource_name:
+          type:
+            - "null"
+            - string
+        label.name:
+          type:
+            - "null"
+            - string
+        label.resource_name:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /ad_group_ad_label.resource_name
+  acmeCo/ad_group_ad_report:
+    schema: ad_group_ad_report.schema.yaml
+    key:
+      - /segments.ad_network_type
+      - /segments.date
+      - /ad_group.id
+      - /campaign.id
+      - /customer.id
+      - /ad_group_ad.ad.id
+  acmeCo/ad_group_ads:
+    schema: ad_group_ads.schema.yaml
+    key:
+      - /ad_group_ad.ad.id
+      - /segments.date
+  acmeCo/ad_group_labels:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        ad_group.resource_name:
+          type:
+            - "null"
+            - string
+        ad_group_label.resource_name:
+          type:
+            - "null"
+            - string
+        label.name:
+          type:
+            - "null"
+            - string
+        label.resource_name:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /ad_group_label.resource_name
+  acmeCo/ad_groups:
+    schema: ad_groups.schema.yaml
+    key:
+      - /ad_group.id
+      - /segments.date
+  acmeCo/campaign_labels:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        campaign.resource_name:
+          type:
+            - "null"
+            - string
+        campaign_label.resource_name:
+          type:
+            - "null"
+            - string
+        label.name:
+          type:
+            - "null"
+            - string
+        label.resource_name:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /campaign_label.resource_name
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /campaign.id
+      - /segments.date
+      - /segments.hour
+  acmeCo/click_view:
+    schema: click_view.schema.yaml
+    key:
+      - /click_view.gclid
+      - /segments.date
+      - /segments.ad_network_type
+  acmeCo/display_keyword_performance_report:
+    schema: display_keyword_performance_report.schema.yaml
+    key:
+      - /segments.ad_network_type
+      - /segments.device
+      - /segments.date
+      - /ad_group.id
+      - /customer.id
+      - /campaign.id
+      - /ad_group_criterion.criterion_id
+  acmeCo/display_topics_performance_report:
+    schema: display_topics_performance_report.schema.yaml
+    key:
+      - /segments.ad_network_type
+      - /segments.device
+      - /segments.date
+      - /ad_group.id
+      - /customer.id
+      - /campaign.id
+      - /ad_group_criterion.criterion_id
+  acmeCo/geographic_report:
+    schema: geographic_report.schema.yaml
+    key:
+      - /segments.date
+      - /ad_group.id
+      - /geographic_view.country_criterion_id
+      - /customer.descriptive_name
+  acmeCo/keyword_report:
+    schema: keyword_report.schema.yaml
+    key:
+      - /segments.date
+      - /ad_group.id
+      - /ad_group_criterion.criterion_id
+  acmeCo/shopping_performance_report:
+    schema: shopping_performance_report.schema.yaml
+    key:
+      - /segments.ad_network_type
+      - /segments.device
+      - /segments.date
+      - /ad_group.id
+      - /customer.id
+      - /campaign.id
+      - /segments.product_item_id
+  acmeCo/user_location_report:
+    schema: user_location_report.schema.yaml
+    key:
+      - /segments.ad_network_type
+      - /segments.date
+      - /customer.id
+      - /campaign.id
+      - /user_location_view.resource_name

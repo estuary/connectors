@@ -20,6 +20,7 @@ pytest = "^7.4.3"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
 pytest-insta = "^0.2.0"
+debugpy = "^1.8.0"
 
 [build-system]
 requires = ["poetry-core"]
