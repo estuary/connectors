@@ -38,10 +38,6 @@ properties:
           - "null"
           - string
         format: date-time
-      competitor:
-        type:
-          - "null"
-          - string
       facebookfans:
         type:
           - "null"
@@ -76,14 +72,6 @@ properties:
           - string
         format: date-time
       founded_year:
-        type:
-          - "null"
-          - string
-      guest_service_e_mail:
-        type:
-          - "null"
-          - string
-      guests_services_phone:
         type:
           - "null"
           - string
@@ -401,10 +389,6 @@ properties:
         type:
           - "null"
           - string
-      hs_predictivecontactscore_v2:
-        type:
-          - "null"
-          - number
       hs_predictivecontactscore_v2_next_max_max_d4e58c1e:
         type:
           - "null"
@@ -499,10 +483,6 @@ properties:
         type:
           - "null"
           - boolean
-      magic_company_tier:
-        type:
-          - "null"
-          - string
       num_associated_contacts:
         type:
           - "null"
@@ -547,18 +527,6 @@ properties:
           - "null"
           - string
         format: date-time
-      region:
-        type:
-          - "null"
-          - string
-      segment:
-        type:
-          - "null"
-          - string
-      segtype:
-        type:
-          - "null"
-          - string
       timezone:
         type:
           - "null"

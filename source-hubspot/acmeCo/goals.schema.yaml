@@ -100,10 +100,6 @@ properties:
         type:
           - "null"
           - string
-      hs_goal_target_currency_code:
-        type:
-          - "null"
-          - string
       hs_goal_target_group_id:
         type:
           - "null"
@@ -133,6 +129,14 @@ properties:
           - "null"
           - string
       hs_kpi_filter_groups:
+        type:
+          - "null"
+          - string
+      hs_kpi_filter_groups_for_key_grouping:
+        type:
+          - "null"
+          - string
+      hs_kpi_filter_groups_for_key_team_grouping:
         type:
           - "null"
           - string
@@ -259,10 +263,6 @@ properties:
           - "null"
           - string
       hs_owner_ids_of_all_owners:
-        type:
-          - "null"
-          - string
-      hs_participant_type:
         type:
           - "null"
           - string

@@ -41,25 +41,7 @@ properties:
   properties:
     type: object
     properties:
-      account_creation_date:
-        type:
-          - "null"
-          - string
-        format: date
-      account_id:
-        type:
-          - "null"
-          - string
-      add_to_cart_date:
-        type:
-          - "null"
-          - string
-        format: date
       company_size:
-        type:
-          - "null"
-          - string
-      currency:
         type:
           - "null"
           - string
@@ -72,26 +54,6 @@ properties:
           - "null"
           - number
       degree:
-        type:
-          - "null"
-          - string
-      digitalmediaavailableforpurchase:
-        type:
-          - "null"
-          - string
-      digitalmediaavailableforpurchase_venuecode:
-        type:
-          - "null"
-          - string
-      digitalmediapurchased:
-        type:
-          - "null"
-          - string
-      digitalmediapurchased_venuecode:
-        type:
-          - "null"
-          - string
-      ext_:
         type:
           - "null"
           - string
@@ -113,23 +75,11 @@ properties:
           - "null"
           - string
         format: date-time
-      first_transaction_type:
-        type:
-          - "null"
-          - string
-      full_name:
-        type:
-          - "null"
-          - string
       gender:
         type:
           - "null"
           - string
       graduation_date:
-        type:
-          - "null"
-          - string
-      has_active_album:
         type:
           - "null"
           - string
@@ -362,11 +312,6 @@ properties:
         type:
           - "null"
           - string
-      hs_email_recipient_fatigue_recovery_time:
-        type:
-          - "null"
-          - string
-        format: date-time
       hs_email_sends_since_last_engagement:
         type:
           - "null"
@@ -497,22 +442,6 @@ properties:
         type:
           - "null"
           - string
-      hs_marketable_reason_id:
-        type:
-          - "null"
-          - string
-      hs_marketable_reason_type:
-        type:
-          - "null"
-          - string
-      hs_marketable_status:
-        type:
-          - "null"
-          - string
-      hs_marketable_until_renewal:
-        type:
-          - "null"
-          - string
       hs_merged_object_ids:
         type:
           - "null"
@@ -542,14 +471,6 @@ properties:
           - "null"
           - number
       hs_pipeline:
-        type:
-          - "null"
-          - string
-      hs_predictivecontactscore_v2:
-        type:
-          - "null"
-          - number
-      hs_predictivescoringtier:
         type:
           - "null"
           - string
@@ -616,14 +537,6 @@ properties:
         type:
           - "null"
           - string
-      hs_time_between_contact_creation_and_deal_close:
-        type:
-          - "null"
-          - number
-      hs_time_between_contact_creation_and_deal_creation:
-        type:
-          - "null"
-          - number
       hs_time_in_customer:
         type:
           - "null"
@@ -660,26 +573,6 @@ properties:
         type:
           - "null"
           - number
-      hs_time_to_move_from_lead_to_customer:
-        type:
-          - "null"
-          - number
-      hs_time_to_move_from_marketingqualifiedlead_to_customer:
-        type:
-          - "null"
-          - number
-      hs_time_to_move_from_opportunity_to_customer:
-        type:
-          - "null"
-          - number
-      hs_time_to_move_from_salesqualifiedlead_to_customer:
-        type:
-          - "null"
-          - number
-      hs_time_to_move_from_subscriber_to_customer:
-        type:
-          - "null"
-          - number
       hs_timezone:
         type:
           - "null"
@@ -704,38 +597,6 @@ properties:
         type:
           - "null"
           - string
-      hs_v2_cumulative_time_in_customer:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_evangelist:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_lead:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_marketingqualifiedlead:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_opportunity:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_other:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_salesqualifiedlead:
-        type:
-          - "null"
-          - number
-      hs_v2_cumulative_time_in_subscriber:
-        type:
-          - "null"
-          - number
       hs_v2_date_entered_customer:
         type:
           - "null"
@@ -816,38 +677,6 @@ properties:
           - "null"
           - string
         format: date-time
-      hs_v2_latest_time_in_customer:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_evangelist:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_lead:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_marketingqualifiedlead:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_opportunity:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_other:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_salesqualifiedlead:
-        type:
-          - "null"
-          - number
-      hs_v2_latest_time_in_subscriber:
-        type:
-          - "null"
-          - number
       hs_was_imported:
         type:
           - "null"
@@ -861,26 +690,6 @@ properties:
           - "null"
           - string
         format: date-time
-      ip__ecomm_bridge__ecomm_synced:
-        type:
-          - "null"
-          - string
-      ip__ecomm_bridge__source_app_id:
-        type:
-          - "null"
-          - string
-      ip__ecomm_bridge__source_store_id:
-        type:
-          - "null"
-          - string
-      ip__sync_extension__external_source_account_id:
-        type:
-          - "null"
-          - string
-      ip__sync_extension__external_source_app_id:
-        type:
-          - "null"
-          - string
       ip_city:
         type:
           - "null"
@@ -918,157 +727,7 @@ properties:
           - "null"
           - string
         format: date-time
-      lastupdatedat:
-        type:
-          - "null"
-          - string
-      latestalbumcodeviewed:
-        type:
-          - "null"
-          - string
-      latestalbumview_latestsiteviewed:
-        type:
-          - "null"
-          - string
-      latestalbumviewdate:
-        type:
-          - "null"
-          - string
-        format: date
-      latestcompletedorderamount:
-        type:
-          - "null"
-          - number
-      latestcompletedordercurrency:
-        type:
-          - "null"
-          - string
-      latestcompletedorderdate:
-        type:
-          - "null"
-          - string
-        format: date
-      latestcompletedorderpaymenttype:
-        type:
-          - "null"
-          - string
-      latestcompletedorderreference:
-        type:
-          - "null"
-          - string
-      latestcompletedordertaxamount:
-        type:
-          - "null"
-          - number
-      latestcompletedordertaxrate:
-        type:
-          - "null"
-          - number
-      latestcompleteorderamount:
-        type:
-          - "null"
-          - number
-      latestsiteviewed:
-        type:
-          - "null"
-          - string
-      latestsiteviewed_name:
-        type:
-          - "null"
-          - string
-      linkedln:
-        type:
-          - "null"
-          - string
-      list_1_year_anniversary_workflow_dropouts:
-        type:
-          - "null"
-          - string
-      list_abandoned_cart_users:
-        type:
-          - "null"
-          - string
-      list_ackz:
-        type:
-          - "null"
-          - string
-      list_completed_nurture_unsolds_cycle___no_purchase:
-        type:
-          - "null"
-          - string
-      list_currently_in_sold_nurture:
-        type:
-          - "null"
-          - string
-      list_currently_in_unsold_nurture:
-        type:
-          - "null"
-          - string
-      list_entered_sold_nurture__prev_24h:
-        type:
-          - "null"
-          - string
-      list_entered_unsold_nurture__prev_24h:
-        type:
-          - "null"
-          - string
-      list_fcbw0d7qa2871:
-        type:
-          - "null"
-          - string
-      list_german_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_hong_kong_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_japanese_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_korean_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_llcr:
-        type:
-          - "null"
-          - string
-      list_lluk:
-        type:
-          - "null"
-          - string
-      list_mea_purchases:
-        type:
-          - "null"
-          - string
-      list_nz_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_prints_active_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_solds_nurture_workflow_dropouts:
-        type:
-          - "null"
-          - string
-      list_thai_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_uk_eu_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      list_us_sites__based_on_latestalbumview_:
-        type:
-          - "null"
-          - string
-      locale:
+      linkedin_account:
         type:
           - "null"
           - string
@@ -1076,26 +735,7 @@ properties:
         type:
           - "null"
           - string
-      media_ready_date:
-        type:
-          - "null"
-          - string
-        format: date
       military_status:
-        type:
-          - "null"
-          - string
-      mm_email_verified_time_utc:
-        type:
-          - "null"
-          - string
-        format: date
-      mm_mobile_verified_time_utc:
-        type:
-          - "null"
-          - string
-        format: date
-      mm_user_id:
         type:
           - "null"
           - string
@@ -1111,40 +751,6 @@ properties:
         type:
           - "null"
           - number
-      password_reset_date:
-        type:
-          - "null"
-          - string
-        format: date
-      purchasedate:
-        type:
-          - "null"
-          - string
-        format: date
-      purchasedmediaalbumcode:
-        type:
-          - "null"
-          - string
-      purchasedmediacount:
-        type:
-          - "null"
-          - number
-      purchasedmediafirstphotourl:
-        type:
-          - "null"
-          - string
-      purchasedmediasitecode:
-        type:
-          - "null"
-          - string
-      purchasedmediavenuename:
-        type:
-          - "null"
-          - string
-      receive_marketing:
-        type:
-          - "null"
-          - string
       recent_conversion_date:
         type:
           - "null"
@@ -1163,19 +769,7 @@ properties:
           - "null"
           - string
         format: date-time
-      region:
-        type:
-          - "null"
-          - string
-      registration_source:
-        type:
-          - "null"
-          - string
       relationship_status:
-        type:
-          - "null"
-          - string
-      reset_url:
         type:
           - "null"
           - string
@@ -1187,10 +781,6 @@ properties:
         type:
           - "null"
           - string
-      sign_up_source:
-        type:
-          - "null"
-          - string
       start_date:
         type:
           - "null"
@@ -1199,30 +789,6 @@ properties:
         type:
           - "null"
           - number
-      unpurchasedmediaalbumcode:
-        type:
-          - "null"
-          - string
-      unpurchasedmediacount:
-        type:
-          - "null"
-          - number
-      unpurchasedmediafirstphotourl:
-        type:
-          - "null"
-          - string
-      unpurchasedmediasitecode:
-        type:
-          - "null"
-          - string
-      unpurchasedmediavenuename:
-        type:
-          - "null"
-          - string
-      viewed_marketing_authorisation:
-        type:
-          - "null"
-          - string
       work_email:
         type:
           - "null"
@@ -1239,19 +805,11 @@ properties:
         type:
           - "null"
           - number
-      hs_email_optout_20278030:
+      hs_email_optout_286760152:
         type:
           - "null"
           - string
-      hs_email_optout_35544018:
-        type:
-          - "null"
-          - string
-      hs_email_optout_61432675:
-        type:
-          - "null"
-          - string
-      hs_email_optout_61432713:
+      hs_email_optout_286760157:
         type:
           - "null"
           - string

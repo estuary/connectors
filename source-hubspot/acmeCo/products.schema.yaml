@@ -114,18 +114,6 @@ properties:
         type:
           - "null"
           - number
-      hs_price_aud:
-        type:
-          - "null"
-          - number
-      hs_price_cad:
-        type:
-          - "null"
-          - number
-      hs_price_usd:
-        type:
-          - "null"
-          - number
       hs_product_type:
         type:
           - "null"
@@ -185,34 +173,6 @@ properties:
           - "null"
           - string
       hubspot_team_id:
-        type:
-          - "null"
-          - string
-      ip__ecomm_bridge__ecomm_synced:
-        type:
-          - "null"
-          - string
-      ip__ecomm_bridge__image_url:
-        type:
-          - "null"
-          - string
-      ip__ecomm_bridge__source_app_id:
-        type:
-          - "null"
-          - string
-      ip__ecomm_bridge__source_store_id:
-        type:
-          - "null"
-          - string
-      ip__sync_extension__external_source_account_id:
-        type:
-          - "null"
-          - string
-      ip__sync_extension__external_source_app_id:
-        type:
-          - "null"
-          - string
-      media_url:
         type:
           - "null"
           - string

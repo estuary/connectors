@@ -50,6 +50,56 @@ properties:
           - "null"
           - string
         format: date-time
+      hs_date_entered_60b5c368_04c4_4d32_9b4a_457e159f49b7_13292096:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_entered_61bafb31_e7fa_46ed_aaa9_1322438d6e67_1866552342:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_entered_af0e6a5c_2ea3_4c72_b69f_7c6cb3fdb591_1652950531:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_entered_dd5826e4_c976_4654_a527_b59ada542e52_2144133616:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_entered_fc8148fb_3a2d_4b59_834e_69b7859347cb_1813133675:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_exited_60b5c368_04c4_4d32_9b4a_457e159f49b7_13292096:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_exited_61bafb31_e7fa_46ed_aaa9_1322438d6e67_1866552342:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_exited_af0e6a5c_2ea3_4c72_b69f_7c6cb3fdb591_1652950531:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_exited_dd5826e4_c976_4654_a527_b59ada542e52_2144133616:
+        type:
+          - "null"
+          - string
+        format: date-time
+      hs_date_exited_fc8148fb_3a2d_4b59_834e_69b7859347cb_1813133675:
+        type:
+          - "null"
+          - string
+        format: date-time
       hs_engagement_source:
         type:
           - "null"
@@ -250,6 +300,26 @@ properties:
         type:
           - "null"
           - string
+      hs_time_in_60b5c368_04c4_4d32_9b4a_457e159f49b7_13292096:
+        type:
+          - "null"
+          - number
+      hs_time_in_61bafb31_e7fa_46ed_aaa9_1322438d6e67_1866552342:
+        type:
+          - "null"
+          - number
+      hs_time_in_af0e6a5c_2ea3_4c72_b69f_7c6cb3fdb591_1652950531:
+        type:
+          - "null"
+          - number
+      hs_time_in_dd5826e4_c976_4654_a527_b59ada542e52_2144133616:
+        type:
+          - "null"
+          - number
+      hs_time_in_fc8148fb_3a2d_4b59_834e_69b7859347cb_1813133675:
+        type:
+          - "null"
+          - number
       hs_timestamp:
         type:
           - "null"

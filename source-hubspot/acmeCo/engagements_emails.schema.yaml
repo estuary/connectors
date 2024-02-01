@@ -50,22 +50,6 @@ properties:
         type:
           - "null"
           - string
-      hs_email_attached_video_id:
-        type:
-          - "null"
-          - string
-      hs_email_attached_video_name:
-        type:
-          - "null"
-          - string
-      hs_email_attached_video_opened:
-        type:
-          - "null"
-          - boolean
-      hs_email_attached_video_watched:
-        type:
-          - "null"
-          - boolean
       hs_email_bcc_email:
         type:
           - "null"

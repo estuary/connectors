@@ -288,10 +288,18 @@ properties:
         type:
           - "null"
           - number
+      hs_originating_channel_instance_id:
+        type:
+          - "null"
+          - string
       hs_originating_email_engagement_id:
         type:
           - "null"
           - number
+      hs_originating_generic_channel_id:
+        type:
+          - "null"
+          - string
       hs_pinned_engagement_id:
         type:
           - "null"
