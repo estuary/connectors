@@ -1,6 +1,10 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-google-ads:
+    shards:
+      logLevel: debug
     endpoint:
       local:
         command:
@@ -8,4 +12,93 @@ captures:
           - "-m"
           - source-google-ads
         config: connector_config.yaml
-    bindings: []
+    bindings:
+      - resource:
+          stream: ad_group_ads
+          syncMode: incremental
+        target: acmeCo/ad_group_ads
+        disable: true
+
+      - resource:
+          stream: ad_group_ad_labels
+          syncMode: full_refresh
+        target: acmeCo/ad_group_ad_labels
+        disable: true
+
+      - resource:
+          stream: ad_groups
+          syncMode: incremental
+        target: acmeCo/ad_groups
+        disable: true
+
+      - resource:
+          stream: ad_group_labels
+          syncMode: full_refresh
+        target: acmeCo/ad_group_labels
+        disable: true
+
+      - resource:
+          stream: accounts
+          syncMode: incremental
+        target: acmeCo/accounts
+
+      - resource:
+          stream: campaign_labels
+          syncMode: full_refresh
+        target: acmeCo/campaign_labels
+        disable: true
+
+      - resource:
+          stream: click_view
+          syncMode: incremental
+        target: acmeCo/click_view
+        disable: true
+
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+        target: acmeCo/campaigns
+        disable: true
+
+      - resource:
+          stream: user_location_report
+          syncMode: incremental
+        target: acmeCo/user_location_report
+        disable: true
+
+      - resource:
+          stream: account_performance_report
+          syncMode: incremental
+        target: acmeCo/account_performance_report
+        disable: true
+
+      - resource:
+          stream: display_topics_performance_report
+          syncMode: incremental
+        target: acmeCo/display_topics_performance_report
+        disable: true
+      - resource:
+          stream: display_keyword_performance_report
+          syncMode: incremental
+        target: acmeCo/display_keyword_performance_report
+        disable: true
+      - resource:
+          stream: shopping_performance_report
+          syncMode: incremental
+        target: acmeCo/shopping_performance_report
+        disable: true
+      - resource:
+          stream: ad_group_ad_report
+          syncMode: incremental
+        target: acmeCo/ad_group_ad_report
+        disable: true
+      - resource:
+          stream: geographic_report
+          syncMode: incremental
+        target: acmeCo/geographic_report
+        disable: true
+      - resource:
+          stream: keyword_report
+          syncMode: incremental
+        target: acmeCo/keyword_report
+        disable: true

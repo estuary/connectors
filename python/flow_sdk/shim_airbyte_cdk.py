@@ -34,16 +34,10 @@ DOCS_URL = os.getenv("DOCS_URL")
 class StreamState:
     state: AirbyteStateMessage
     rowId: int
-"""
-Airbyte doesn't appear to reduce state like we do. As a result,
-the Airbyte CDK is expecting its state input to look like a list of
-AirbyteStateMessages. Since we _do_ reduce state, what we do here is
-keep track of the latest AirbyteStateMessage for each stream, and then
-just give Airbyte a list of all of the latest state messages on boot.
-"""
+
 @dataclass
 class State:
-    bindingStateV1: t.Optional[t.Dict[str, StreamState]] = None
+    bindingStateV1: t.Dict[str, StreamState]
 
     """
     Update the latest known state value for a particular stream,
@@ -51,17 +45,15 @@ class State:
     """
     def handle_message(self, msg: AirbyteStateMessage, state_key: str):
         if msg.stream == None:
-            raise Exception(
-                "Got a STREAM-specific state message with no stream-specific state"
-            )
-        if not self.bindingStateV1:
-            self.bindingStateV1 = {}
+            raise Exception("Got a STREAM-specific state message with no stream-specific state")
+
         if not state_key in self.bindingStateV1:
             self.bindingStateV1[state_key] = StreamState(msg, 0)
+
         self.bindingStateV1[state_key].state = msg
 
     def to_airbyte_input(self):
-        return [streamState.state for k, streamState in self.bindingStateV1.items()]
+        return [streamState.state for streamState in self.bindingStateV1.values()]
 
     """
     Generate the final state value emitted to the Flow runtime.
@@ -77,17 +69,17 @@ class State:
             }
         }
     }
-    """    
+    """
     def to_flow_state(self, index: dict[t.Tuple[str | None, str], t.List[int]], bindings: t.List[CaptureBinding]):
-        for i, binding in enumerate(bindings):
+        for binding in bindings:
             if binding["stateKey"] in self.bindingStateV1:
-                namespace = binding["resourceConfig"].get("namespace",None)
+                namespace = binding["resourceConfig"].get("namespace", None)
                 stream = binding["resourceConfig"]["stream"]
                 rowId = index.get((namespace, stream), [0,1])[1]
                 self.bindingStateV1[binding["stateKey"]].rowId = rowId
 
         return {
-            "bindingStateV1": self.bindingStateV1
+            "bindingStateV1": {k: {"rowId": v.rowId, "state": v.state.dict()} for (k, v) in self.bindingStateV1.items()}
         }
 
     """
@@ -98,17 +90,31 @@ class State:
     """
     @staticmethod
     def from_flow_state(state: t.Dict[str, t.Any], bindings: t.List[CaptureBinding]):
-        state = State(**{
-            "bindingStateV1": state.get("bindingStateV1", {})
-        })
-
         index: dict[t.Tuple[str | None, str], t.List[int]] = {}
-        for i, binding in enumerate(bindings):
-            if binding["stateKey"] in state.bindingStateV1:
-                namespace = binding["resourceConfig"].get("namespace",None)
+        input = state.get("bindingStateV1", {})
+        recovered: t.Dict[str, StreamState] = {}
+
+        #state = State(**{
+        #    "bindingStateV1": state.get("bindingStateV1", {})
+        #})
+
+        for binding in bindings:
+            state_key = binding["stateKey"]
+
+            if (keyed := input.get(state_key)):
+                row_id = keyed["rowId"]
+
+                logger.info(f'attempting to parse AirbyteStateMessage {keyed["state"]}')
+
+                state = AirbyteStateMessage.parse_obj(keyed["state"])
+
+                recovered[state_key] = StreamState(state, row_id)
+
+                namespace = binding["resourceConfig"].get("namespace", None)
                 stream = binding["resourceConfig"]["stream"]
-                index[(namespace, stream)] = state.bindingStateV1[binding["stateKey"]].rowId
-        return (state, index)
+                index[(namespace, stream)] = row_id
+
+        return (State(recovered), index)
 
 class CaptureShim(Connector):
     delegate: Source
@@ -278,8 +284,6 @@ class CaptureShim(Connector):
                     raise Exception(
                         f"Unsupported Airbyte state type {state_msg.type}"
                     ) 
-
-                logger.info(f"Got a state message: {str(state_msg)}")
 
                 binding_lookup = index.get((state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name), None)
                 if binding_lookup is None:
