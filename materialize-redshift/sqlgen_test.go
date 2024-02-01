@@ -125,3 +125,38 @@ func TestSQLGeneration(t *testing.T) {
 
 	cupaloy.SnapshotT(t, snap.String())
 }
+
+func TestTruncatedIdentifier(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "no truncation",
+			input: "hello",
+			want:  "hello",
+		},
+		{
+			name:  "truncate ASCII",
+			input: strings.Repeat("a", 128),
+			want:  strings.Repeat("a", 127),
+		},
+		{
+			name:  "truncate UTF-8",
+			input: strings.Repeat("a", 125) + "码",
+			want:  strings.Repeat("a", 125),
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, truncatedIdentifier(tt.input))
+		})
+	}
+}
