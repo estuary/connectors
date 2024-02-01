@@ -54,7 +54,7 @@
         "type": "string",
         "title": "Bucket Path",
         "description": "A prefix that will be used to store objects in S3.",
-        "order": 8
+        "order": 9
       },
       "advanced": {
         "properties": {
