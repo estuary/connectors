@@ -144,7 +144,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.String())); err != nil {
+	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
@@ -167,7 +167,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
 
-	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.String()))
+	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.Name.String()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("building endpoint: %w", err)
 	}
