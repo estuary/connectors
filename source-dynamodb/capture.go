@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
@@ -20,49 +19,7 @@ import (
 // captureState is the persistent state for the entire capture, which consists of one or more table
 // states.
 type captureState struct {
-	Tables    map[boilerplate.StateKey]tableState `json:"bindingStateV1,omitempty"`
-	OldTables map[string]tableState               `json:"tables,omitempty"` // TODO(whb): Remove once all captures have migrated.
-}
-
-func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
-	if state.Tables != nil && state.OldTables != nil {
-		return false, fmt.Errorf("application error: both Tables and OldTables were non-nil")
-	} else if state.Tables != nil {
-		log.Info("skipping state migration since it's already done")
-		return false, nil
-	}
-
-	state.Tables = make(map[boilerplate.StateKey]tableState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return false, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		ll := log.WithFields(log.Fields{
-			"stateKey": b.StateKey,
-			"table":    res.Table,
-		})
-
-		stateFromOldTables, ok := state.OldTables[res.Table]
-		if !ok {
-			// This may happen if the connector has never emitted any checkpoints.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Tables[boilerplate.StateKey(b.StateKey)] = stateFromOldTables
-		ll.Info("migrated binding state")
-	}
-
-	state.OldTables = nil
-
-	return true, nil
+	Tables map[boilerplate.StateKey]tableState `json:"bindingStateV1,omitempty"`
 }
 
 type tableState struct {
