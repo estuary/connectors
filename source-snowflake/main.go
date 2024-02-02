@@ -31,7 +31,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FlowSchema string `json:"flowSchema,omitempty" jsonschema:"default=FLOW,description=The schema in which Flow will create and manage its streams and staging tables."`
+	FlowSchema string `json:"flowSchema,omitempty" jsonschema:"default=ESTUARY_STAGING,description=The schema in which Flow will create and manage its streams and staging tables."`
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
@@ -71,7 +71,7 @@ func (c *config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
 	if c.Advanced.FlowSchema == "" {
-		c.Advanced.FlowSchema = "FLOW"
+		c.Advanced.FlowSchema = "ESTUARY_STAGING"
 	}
 }
 
