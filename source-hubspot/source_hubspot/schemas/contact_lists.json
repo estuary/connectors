@@ -70,7 +70,7 @@
       "type": ["null", "integer"]
     },
     "listId": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "updatedAt": {
       "type": ["null", "integer"]
@@ -90,5 +90,6 @@
     "archived": {
       "type": ["null", "boolean"]
     }
-  }
+  },
+  "required": ["listId"]
 }

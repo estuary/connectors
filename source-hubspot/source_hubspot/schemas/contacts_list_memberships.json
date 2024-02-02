@@ -3,7 +3,7 @@
   "type": "object",
   "properties": {
     "canonical-vid": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "static-list-id": {
       "type": ["null", "integer"]
@@ -20,5 +20,6 @@
     "is-member": {
       "type": ["null", "boolean"]
     }
-  }
+  },
+  "required": ["canonical-vid"]
 }
