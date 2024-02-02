@@ -82,11 +82,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		checkpoint.Tables = make(map[boilerplate.StateKey]tableState)
 	}
 
-	migrated, err := migrateState(&checkpoint, open.Capture.Bindings)
-	if err != nil {
-		return err
-	}
-
 	c := capture{
 		client:            client,
 		stream:            stream,
@@ -115,13 +110,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 	}
 
 	eg, groupCtx := errgroup.WithContext(ctx)
-
-	if migrated {
-		if err := c.checkpoint(); err != nil {
-			return fmt.Errorf("updating migrated checkpoint: %w", err)
-		}
-	}
-
 	for _, table := range tables {
 		table := table
 		eg.Go(func() error {
