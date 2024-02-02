@@ -2,6 +2,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "row_id": 1
+      },
       "archived": false,
       "createdAt": "2024-01-31T17:37:43.662Z",
       "id": "1",
@@ -278,6 +281,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "row_id": 3
+      },
       "archived": false,
       "createdAt": "2024-01-31T17:38:50.249Z",
       "id": "101",
@@ -554,6 +560,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "row_id": 2
+      },
       "archived": false,
       "createdAt": "2024-01-31T17:37:44.164Z",
       "id": "51",
@@ -830,6 +839,9 @@
   [
     "acmeCo/deal_pipelines",
     {
+      "_meta": {
+        "row_id": 1
+      },
       "active": true,
       "createdAt": 0,
       "default": true,
@@ -930,6 +942,9 @@
   [
     "acmeCo/deals",
     {
+      "_meta": {
+        "row_id": 1
+      },
       "archived": false,
       "contacts": [
         "1"
@@ -1001,8 +1016,8 @@
         "hs_exchange_rate": null,
         "hs_forecast_amount": 1000.0,
         "hs_forecast_probability": null,
-        "hs_is_closed": true,
-        "hs_is_closed_won": true,
+        "hs_is_closed": false,
+        "hs_is_closed_won": false,
         "hs_is_open_count": 1,
         "hs_lastmodifieddate": "2024-01-31T17:38:24.674000+00:00",
         "hs_latest_meeting_activity": null,
@@ -1065,6 +1080,9 @@
   [
     "acmeCo/email_subscriptions",
     {
+      "_meta": {
+        "row_id": 2
+      },
       "active": true,
       "businessUnitId": 0,
       "category": "Sales",
@@ -1080,6 +1098,9 @@
   [
     "acmeCo/email_subscriptions",
     {
+      "_meta": {
+        "row_id": 1
+      },
       "active": true,
       "businessUnitId": 0,
       "category": "Marketing",
@@ -1095,6 +1116,9 @@
   [
     "acmeCo/owners",
     {
+      "_meta": {
+        "row_id": 1
+      },
       "archived": false,
       "createdAt": "2024-01-31T17:37:42.736Z",
       "email": "fivetranfan@gmail.com",
@@ -1108,6 +1132,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 5
+      },
       "property": "city",
       "selected": false,
       "source-id": "sample-contact",
@@ -1122,6 +1149,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 53
+      },
       "property": "city",
       "selected": false,
       "source-id": "sample-contact",
@@ -1136,6 +1166,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 22
+      },
       "property": "company",
       "selected": false,
       "source-id": "sample-contact",
@@ -1150,6 +1183,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 67
+      },
       "property": "company",
       "selected": false,
       "source-id": "sample-contact",
@@ -1164,6 +1200,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 11
+      },
       "property": "createdate",
       "selected": false,
       "source-id": "sample-contact",
@@ -1178,6 +1217,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 59
+      },
       "property": "createdate",
       "selected": false,
       "source-id": "sample-contact",
@@ -1192,6 +1234,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 97
+      },
       "property": "createdate",
       "selected": false,
       "source-id": "userId:63597369",
@@ -1206,6 +1251,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 25
+      },
       "property": "email",
       "selected": false,
       "source-id": "sample-contact",
@@ -1220,6 +1268,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 69
+      },
       "property": "email",
       "selected": false,
       "source-id": "sample-contact",
@@ -1234,6 +1285,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 106
+      },
       "property": "email",
       "selected": false,
       "source-id": "userId:63597369",
@@ -1248,6 +1302,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 18
+      },
       "property": "first_deal_created_date",
       "selected": false,
       "source-id": "RollupProperties",
@@ -1262,6 +1319,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 4
+      },
       "property": "firstname",
       "selected": false,
       "source-id": "sample-contact",
@@ -1276,6 +1336,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 52
+      },
       "property": "firstname",
       "selected": false,
       "source-id": "sample-contact",
@@ -1290,6 +1353,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 92
+      },
       "property": "firstname",
       "selected": false,
       "source-id": "userId:63597369",
@@ -1304,6 +1370,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 35
+      },
       "property": "hs_all_contact_vids",
       "selected": false,
       "source-id": "sample-contact",
@@ -1318,6 +1387,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 77
+      },
       "property": "hs_all_contact_vids",
       "selected": false,
       "source-id": "sample-contact",
@@ -1332,6 +1404,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 111
+      },
       "property": "hs_all_contact_vids",
       "selected": false,
       "source-id": "userId:63597369",
@@ -1346,6 +1421,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 75
+      },
       "property": "hs_analytics_average_page_views",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1360,6 +1438,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 33
+      },
       "property": "hs_analytics_average_page_views",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1374,6 +1455,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 110
+      },
       "property": "hs_analytics_average_page_views",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1388,6 +1472,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 73
+      },
       "property": "hs_analytics_first_timestamp",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1402,6 +1489,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 29
+      },
       "property": "hs_analytics_first_timestamp",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1416,6 +1506,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 109
+      },
       "property": "hs_analytics_first_timestamp",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1430,6 +1523,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 83
+      },
       "property": "hs_analytics_num_event_completions",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1444,6 +1540,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 42
+      },
       "property": "hs_analytics_num_event_completions",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1458,6 +1557,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 116
+      },
       "property": "hs_analytics_num_event_completions",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1472,6 +1574,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 66
+      },
       "property": "hs_analytics_num_page_views",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1486,6 +1591,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 21
+      },
       "property": "hs_analytics_num_page_views",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1500,6 +1608,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 104
+      },
       "property": "hs_analytics_num_page_views",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1514,6 +1625,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 60
+      },
       "property": "hs_analytics_num_visits",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1528,6 +1642,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 13
+      },
       "property": "hs_analytics_num_visits",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1542,6 +1659,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 98
+      },
       "property": "hs_analytics_num_visits",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1556,6 +1676,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 58
+      },
       "property": "hs_analytics_revenue",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1570,6 +1693,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 10
+      },
       "property": "hs_analytics_revenue",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1584,6 +1710,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 95
+      },
       "property": "hs_analytics_revenue",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1598,6 +1727,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 64
+      },
       "property": "hs_analytics_source",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1612,6 +1744,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 17
+      },
       "property": "hs_analytics_source",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1626,6 +1761,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 101
+      },
       "property": "hs_analytics_source",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1640,6 +1778,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 87
+      },
       "property": "hs_analytics_source_data_1",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1654,6 +1795,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 46
+      },
       "property": "hs_analytics_source_data_1",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1668,6 +1812,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 119
+      },
       "property": "hs_analytics_source_data_1",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1682,6 +1829,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 84
+      },
       "property": "hs_analytics_source_data_2",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1696,6 +1846,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 43
+      },
       "property": "hs_analytics_source_data_2",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1710,6 +1863,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 118
+      },
       "property": "hs_analytics_source_data_2",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1724,6 +1880,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 103
+      },
       "property": "hs_created_by_user_id",
       "selected": false,
       "source-id": "userId:63597369",
@@ -1738,6 +1897,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 6
+      },
       "property": "hs_date_entered_lead",
       "selected": false,
       "source-id": null,
@@ -1752,6 +1914,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 54
+      },
       "property": "hs_date_entered_lead",
       "selected": false,
       "source-id": null,
@@ -1766,6 +1931,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 37
+      },
       "property": "hs_date_entered_opportunity",
       "selected": false,
       "source-id": null,
@@ -1780,6 +1948,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 30
+      },
       "property": "hs_date_exited_lead",
       "selected": false,
       "source-id": null,
@@ -1794,6 +1965,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 20
+      },
       "property": "hs_email_domain",
       "selected": false,
       "source-id": null,
@@ -1808,6 +1982,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 65
+      },
       "property": "hs_email_domain",
       "selected": false,
       "source-id": null,
@@ -1822,6 +1999,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 105
+      },
       "property": "hs_email_domain",
       "selected": false,
       "source-id": null,
@@ -1836,6 +2016,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 38
+      },
       "property": "hs_is_contact",
       "selected": false,
       "source-id": null,
@@ -1850,6 +2033,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 79
+      },
       "property": "hs_is_contact",
       "selected": false,
       "source-id": null,
@@ -1864,6 +2050,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 113
+      },
       "property": "hs_is_contact",
       "selected": false,
       "source-id": null,
@@ -1878,6 +2067,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 3
+      },
       "property": "hs_is_unworked",
       "selected": false,
       "source-id": "CalculatedPropertyComputer",
@@ -1892,6 +2084,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 51
+      },
       "property": "hs_is_unworked",
       "selected": false,
       "source-id": "CalculatedPropertyComputer",
@@ -1906,6 +2101,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 90
+      },
       "property": "hs_is_unworked",
       "selected": false,
       "source-id": "CalculatedPropertyComputer",
@@ -1920,6 +2118,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 56
+      },
       "property": "hs_latest_source",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1934,6 +2135,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 8
+      },
       "property": "hs_latest_source",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1948,6 +2152,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 93
+      },
       "property": "hs_latest_source",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1962,6 +2169,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 50
+      },
       "property": "hs_latest_source_data_1",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1976,6 +2186,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 2
+      },
       "property": "hs_latest_source_data_1",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -1990,6 +2203,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 91
+      },
       "property": "hs_latest_source_data_1",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2004,6 +2220,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 49
+      },
       "property": "hs_latest_source_data_2",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2018,6 +2237,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 1
+      },
       "property": "hs_latest_source_data_2",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2032,6 +2254,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 89
+      },
       "property": "hs_latest_source_data_2",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2046,6 +2271,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 70
+      },
       "property": "hs_latest_source_timestamp",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2060,6 +2288,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 26
+      },
       "property": "hs_latest_source_timestamp",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2074,6 +2305,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 107
+      },
       "property": "hs_latest_source_timestamp",
       "selected": false,
       "source-id": "WebAnalyticsPropertyCalculation",
@@ -2088,6 +2322,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 45
+      },
       "property": "hs_lifecyclestage_lead_date",
       "selected": false,
       "source-id": "sample-contact",
@@ -2102,6 +2339,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 86
+      },
       "property": "hs_lifecyclestage_lead_date",
       "selected": false,
       "source-id": "sample-contact",
@@ -2116,6 +2356,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 12
+      },
       "property": "hs_lifecyclestage_opportunity_date",
       "selected": false,
       "source-id": "deals-lifecycle-sync",
@@ -2130,6 +2373,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 40
+      },
       "property": "hs_object_id",
       "selected": false,
       "source-id": "sample-contact",
@@ -2144,6 +2390,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 81
+      },
       "property": "hs_object_id",
       "selected": false,
       "source-id": "sample-contact",
@@ -2158,6 +2407,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 115
+      },
       "property": "hs_object_id",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2172,6 +2424,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 41
+      },
       "property": "hs_object_source",
       "selected": false,
       "source-id": "sample-contact",
@@ -2186,6 +2441,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 82
+      },
       "property": "hs_object_source",
       "selected": false,
       "source-id": "sample-contact",
@@ -2200,6 +2458,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 117
+      },
       "property": "hs_object_source",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2214,6 +2475,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 16
+      },
       "property": "hs_object_source_id",
       "selected": false,
       "source-id": "sample-contact",
@@ -2228,6 +2492,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 63
+      },
       "property": "hs_object_source_id",
       "selected": false,
       "source-id": "sample-contact",
@@ -2242,6 +2509,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 102
+      },
       "property": "hs_object_source_id",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2256,6 +2526,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 14
+      },
       "property": "hs_object_source_label",
       "selected": false,
       "source-id": "sample-contact",
@@ -2270,6 +2543,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 61
+      },
       "property": "hs_object_source_label",
       "selected": false,
       "source-id": "sample-contact",
@@ -2284,6 +2560,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 99
+      },
       "property": "hs_object_source_label",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2298,6 +2577,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 120
+      },
       "property": "hs_object_source_user_id",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2312,6 +2594,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 9
+      },
       "property": "hs_pipeline",
       "selected": false,
       "source-id": "sample-contact",
@@ -2326,6 +2611,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 57
+      },
       "property": "hs_pipeline",
       "selected": false,
       "source-id": "sample-contact",
@@ -2340,6 +2628,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 96
+      },
       "property": "hs_pipeline",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2354,6 +2645,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 62
+      },
       "property": "hs_sequences_actively_enrolled_count",
       "selected": false,
       "source-id": "RollupProperties",
@@ -2368,6 +2662,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 15
+      },
       "property": "hs_sequences_actively_enrolled_count",
       "selected": false,
       "source-id": "RollupProperties",
@@ -2382,6 +2679,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 100
+      },
       "property": "hs_sequences_actively_enrolled_count",
       "selected": false,
       "source-id": "RollupProperties",
@@ -2396,6 +2696,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 31
+      },
       "property": "hs_time_in_lead",
       "selected": false,
       "source-id": null,
@@ -2410,6 +2713,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 74
+      },
       "property": "hs_time_in_lead",
       "selected": false,
       "source-id": null,
@@ -2424,6 +2730,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 32
+      },
       "property": "hs_time_in_opportunity",
       "selected": false,
       "source-id": null,
@@ -2438,6 +2747,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 121
+      },
       "property": "hs_updated_by_user_id",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2452,6 +2764,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 44
+      },
       "property": "hs_v2_date_entered_lead",
       "selected": false,
       "source-id": "",
@@ -2466,6 +2781,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 85
+      },
       "property": "hs_v2_date_entered_lead",
       "selected": false,
       "source-id": "",
@@ -2480,6 +2798,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 24
+      },
       "property": "hs_v2_date_entered_opportunity",
       "selected": false,
       "source-id": "",
@@ -2494,6 +2815,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 36
+      },
       "property": "hs_v2_date_exited_lead",
       "selected": false,
       "source-id": "",
@@ -2508,6 +2832,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 28
+      },
       "property": "jobtitle",
       "selected": false,
       "source-id": "sample-contact",
@@ -2522,6 +2849,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 72
+      },
       "property": "jobtitle",
       "selected": false,
       "source-id": "sample-contact",
@@ -2536,6 +2866,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 108
+      },
       "property": "jobtitle",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2550,6 +2883,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 34
+      },
       "property": "lastname",
       "selected": false,
       "source-id": "sample-contact",
@@ -2564,6 +2900,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 76
+      },
       "property": "lastname",
       "selected": false,
       "source-id": "sample-contact",
@@ -2578,6 +2917,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 112
+      },
       "property": "lastname",
       "selected": false,
       "source-id": "userId:63597369",
@@ -2592,6 +2934,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 48
+      },
       "property": "lifecyclestage",
       "selected": false,
       "source-id": "sample-contact",
@@ -2606,6 +2951,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 88
+      },
       "property": "lifecyclestage",
       "selected": false,
       "source-id": "sample-contact",
@@ -2620,6 +2968,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 47
+      },
       "property": "lifecyclestage",
       "selected": false,
       "source-id": "deals-lifecycle-sync",
@@ -2634,6 +2985,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 19
+      },
       "property": "num_associated_deals",
       "selected": false,
       "source-id": "RollupProperties",
@@ -2648,6 +3002,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 39
+      },
       "property": "num_conversion_events",
       "selected": false,
       "source-id": null,
@@ -2662,6 +3019,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 80
+      },
       "property": "num_conversion_events",
       "selected": false,
       "source-id": null,
@@ -2676,6 +3036,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 114
+      },
       "property": "num_conversion_events",
       "selected": false,
       "source-id": null,
@@ -2690,6 +3053,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 7
+      },
       "property": "num_unique_conversion_events",
       "selected": false,
       "source-id": null,
@@ -2704,6 +3070,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 55
+      },
       "property": "num_unique_conversion_events",
       "selected": false,
       "source-id": null,
@@ -2718,6 +3087,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 94
+      },
       "property": "num_unique_conversion_events",
       "selected": false,
       "source-id": null,
@@ -2732,6 +3104,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 23
+      },
       "property": "state",
       "selected": false,
       "source-id": "sample-contact",
@@ -2746,6 +3121,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 68
+      },
       "property": "state",
       "selected": false,
       "source-id": "sample-contact",
@@ -2760,6 +3138,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 78
+      },
       "property": "twitterhandle",
       "selected": false,
       "source-id": "sample-contact",
@@ -2774,6 +3155,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 27
+      },
       "property": "website",
       "selected": false,
       "source-id": "sample-contact",
@@ -2788,6 +3172,9 @@
   [
     "acmeCo/property_history",
     {
+      "_meta": {
+        "row_id": 71
+      },
       "property": "website",
       "selected": false,
       "source-id": "sample-contact",
