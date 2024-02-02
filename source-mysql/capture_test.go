@@ -119,3 +119,42 @@ func TestPartitionedTable(t *testing.T) {
 		})
 	})
 }
+
+func TestDatetimeNormalization(t *testing.T) {
+	// Create a table with some 'difficult' column names (a reserved word, a capitalized
+	// name, and one containing special characters which also happens to be the primary key).
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "24528211"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, x DATETIME)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	delete(cs.Sanitizers, `"<TIMESTAMP>"`) // Don't sanitize timestamps in this test's output
+
+	// Tell MySQL to act as though we're running in Chicago. This has an effect (in very
+	// different ways) on the processing of DATETIME and TIMESTAMP values.
+	tb.Query(ctx, t, "SET GLOBAL time_zone = 'America/Chicago';")
+	tb.Query(ctx, t, "SET SESSION time_zone = 'America/Chicago';")
+
+	// Permit arbitrarily crazy datetime values
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'NO_ZERO_DATE',''));")
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'NO_ZERO_IN_DATE',''));")
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode, ',ALLOW_INVALID_DATES'));")
+
+	// Insert various test timestamps
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{100, "1991-08-31 12:34:56.987654"},
+		{101, "0000-00-00 00:00:00"},
+		{102, "2023-00-00 00:00:00"},
+		{103, "2023-07-00 00:00:00"},
+	})
+	tests.VerifiedCapture(ctx, t, cs)
+
+	t.Run("replication", func(t *testing.T) {
+		tb.Insert(ctx, t, tableName, [][]interface{}{
+			{200, "1991-08-31 12:34:56.987654"},
+			{201, "0000-00-00 00:00:00"},
+			{202, "2023-00-00 00:00:00"},
+			{203, "2023-07-00 00:00:00"},
+		})
+		tests.VerifiedCapture(ctx, t, cs)
+	})
+}

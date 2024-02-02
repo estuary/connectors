@@ -266,10 +266,10 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				if strings.HasPrefix(string(val), "0000-00-00 00:00:00") {
 					return "0001-01-01T00:00:00Z", nil
 				}
-
-				t, err := time.Parse(mysqlTimestampLayout, string(val))
+				var inputTimestamp = normalizeMySQLTimestamp(string(val))
+				t, err := time.Parse(mysqlTimestampLayout, inputTimestamp)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing timestamp %q: %w", string(val), err)
+					return nil, fmt.Errorf("error parsing timestamp %q: %w", inputTimestamp, err)
 				}
 				return t.Format(time.RFC3339Nano), nil
 			case "datetime":
@@ -282,9 +282,10 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				if db.datetimeLocation == nil {
 					return nil, fmt.Errorf("unable to translate DATETIME values: %w", errDatabaseTimezoneUnknown)
 				}
-				t, err := time.ParseInLocation(mysqlTimestampLayout, string(val), db.datetimeLocation)
+				var inputTimestamp = normalizeMySQLTimestamp(string(val))
+				t, err := time.ParseInLocation(mysqlTimestampLayout, inputTimestamp, db.datetimeLocation)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing datetime %q: %w", string(val), err)
+					return nil, fmt.Errorf("error parsing datetime %q: %w", inputTimestamp, err)
 				}
 				return t.UTC().Format(time.RFC3339Nano), nil
 			}
@@ -292,6 +293,38 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 		return string(val), nil
 	}
 	return val, nil
+}
+
+func normalizeMySQLTimestamp(ts string) string {
+	// Split timestamp into "YYYY-MM-DD" and "HH:MM:SS ..." portions
+	var tsBits = strings.SplitN(ts, " ", 2)
+	if len(tsBits) != 2 {
+		return ts
+	}
+	// Split "YYYY-MM-DD" into "YYYY" "MM" and "DD" portions
+	var ymdBits = strings.Split(tsBits[0], "-")
+	if len(ymdBits) != 3 {
+		return ts
+	}
+	// Replace zero-valued year/month/day with ones instead
+	if ymdBits[0] == "0000" {
+		ymdBits[0] = "0001"
+	}
+	if ymdBits[1] == "00" {
+		ymdBits[1] = "01"
+	}
+	if ymdBits[2] == "00" {
+		ymdBits[2] = "01"
+	}
+	// Reassemble the Year/Month/Day and tack on the rest of the original timestamp
+	var normalized = fmt.Sprintf("%s-%s-%s %s", ymdBits[0], ymdBits[1], ymdBits[2], tsBits[1])
+	if normalized != ts {
+		logrus.WithFields(logrus.Fields{
+			"input":  ts,
+			"output": normalized,
+		}).Debug("normalized illegal timestamp")
+	}
+	return normalized
 }
 
 const queryDiscoverTables = `
