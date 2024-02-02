@@ -235,8 +235,8 @@ jobs:
         if: ${{matrix.python}}
         run: |
           cd ${{matrix.connector}};
-          source $(poetry env info --path)/bin/activate
           poetry install;
+          source $(poetry env info --path)/bin/activate
           cd ..;
           pytest ${{matrix.connector}}/tests;
 
