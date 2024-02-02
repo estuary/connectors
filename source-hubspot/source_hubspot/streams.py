@@ -60,6 +60,21 @@ CUSTOM_FIELD_TYPE_TO_VALUE = {
 
 CUSTOM_FIELD_VALUE_TO_TYPE = {v: k for k, v in CUSTOM_FIELD_TYPE_TO_VALUE.items()}
 
+def retry_401(**kwargs):
+    """
+        Oauth2Authenticator.token_has_expired() does not include a buffer of time
+        to refresh the token _before_ it expires. So if the token expires in the
+        next millisecond, we'll still happily send it only for it to arrive expired.
+        This retry is a quick'n'dirty fix for this bug. The real solution would be
+        to introduce a buffer of time _before_ a token expires in which we should
+        fetch a new token.
+    """
+
+    return backoff.on_exception(
+        backoff.expo,
+        HubspotInvalidAuth, #401
+        **kwargs,
+    )
 
 def retry_connection_handler(**kwargs):
     """Retry helper, log each attempt"""
@@ -328,6 +343,12 @@ class Stream(HttpStream, ABC):
         if creds_title in (OAUTH_CREDENTIALS, PRIVATE_APP_CREDENTIALS):
             self._authenticator = api.get_authenticator()
 
+    def should_retry(self, response: requests.Response) -> bool:
+        if response.status_code == HTTPStatus.UNAUTHORIZED:
+            message = response.json().get("message")
+            raise HubspotInvalidAuth(message, response=response)
+        return super().should_retry(response)
+
     def backoff_time(self, response: requests.Response) -> Optional[float]:
         if response.status_code == codes.too_many_requests:
             return float(response.headers.get("Retry-After", 3))
@@ -346,6 +367,11 @@ class Stream(HttpStream, ABC):
             json_schema["properties"]["properties"] = {"type": "object", "properties": self.properties}
         return json_schema
 
+    # This 401 retry handler is only there to handle the case that
+    # a token expires in flight. As such, it should only need to
+    # retry a single time at most. Any additional failures are real
+    # and should be bubbled up as such.
+    @retry_401(max_tries=5)
     def handle_request(
         self,
         stream_slice: Mapping[str, Any] = None,
