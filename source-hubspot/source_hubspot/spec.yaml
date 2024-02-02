@@ -1,4 +1,4 @@
-documentationUrl: https://docs.airbyte.com/integrations/sources/hubspot
+documentationUrl: https://go.estuary.dev/HMXE65
 connectionSpecification:
   $schema: http://json-schema.org/draft-07/schema#
   title: HubSpot Source Spec
@@ -25,6 +25,7 @@ connectionSpecification:
       oneOf:
         - type: object
           title: OAuth
+          x-oauth2-provider: hubspot
           required:
             - client_id
             - client_secret
@@ -33,7 +34,7 @@ connectionSpecification:
           properties:
             credentials_title:
               type: string
-              title: Auth Type
+              title: Credentials
               description: Name of the credentials
               const: OAuth Credentials
               order: 0
@@ -74,16 +75,14 @@ connectionSpecification:
           properties:
             credentials_title:
               type: string
-              title: Auth Type
+              title: Credentials
               description: Name of the credentials set
               const: Private App Credentials
               order: 0
             access_token:
               title: Access token
               description: >-
-                HubSpot Access token. See the <a
-                href="https://developers.hubspot.com/docs/api/private-apps">Hubspot docs</a>
-                if you need help finding this token.
+                HubSpot Access token. See the docs if you need help finding this token: https://go.estuary.dev/XSVhJy.
               type: string
               airbyte_secret: true
 advanced_auth:
