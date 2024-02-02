@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": ["null", "object"],
+  "type": ["object"],
   "properties": {
     "id": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "createdAt": {
       "type": ["null", "string"],
@@ -16,5 +16,6 @@
     "archived": {
       "type": ["null", "boolean"]
     }
-  }
+  },
+  "required": ["id"]
 }

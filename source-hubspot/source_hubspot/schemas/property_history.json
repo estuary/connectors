@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "type": ["null", "object"],
+  "type": ["object"],
   "properties": {
     "value": {
       "type": ["null", "string"]
@@ -18,16 +18,17 @@
       "type": ["null", "integer"]
     },
     "timestamp": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "selected": {
       "type": ["null", "boolean"]
     },
     "property": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "vid": {
       "type": ["null", "integer"]
     }
-  }
+  },
+  "required": ["property", "timestamp"]
 }
