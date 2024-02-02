@@ -6,14 +6,10 @@
       "properties": {
         "credentials": {
           "description": "Choose how to authenticate to HubSpot.",
-          "discriminator": {
-            "propertyName": "credentials_title"
-          },
           "oneOf": [
             {
               "properties": {
                 "client_id": {
-                  "airbyte_secret": true,
                   "description": "The Client ID of your HubSpot developer application. See the <a href=\"https://legacydocs.hubspot.com/docs/methods/oauth2/oauth2-quickstart\">Hubspot docs</a> if you need help finding this ID.",
                   "examples": [
                     "123456789000"
@@ -32,7 +28,6 @@
                 },
                 "credentials_title": {
                   "const": "OAuth Credentials",
-                  "default": "OAuth Credentials",
                   "description": "Name of the credentials",
                   "order": 0,
                   "title": "Credentials",
@@ -60,30 +55,6 @@
             },
             {
               "properties": {
-                "api_key": {
-                  "airbyte_secret": true,
-                  "description": "HubSpot API Key. See the Hubspot docs if you need help finding this key: https://go.estuary.dev/Sg8JDC",
-                  "title": "API key",
-                  "type": "string"
-                },
-                "credentials_title": {
-                  "const": "API Key Credentials",
-                  "default": "API Key Credentials",
-                  "description": "Name of the credentials set",
-                  "order": 0,
-                  "title": "Credentials",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "api_key",
-                "credentials_title"
-              ],
-              "title": "API key",
-              "type": "object"
-            },
-            {
-              "properties": {
                 "access_token": {
                   "airbyte_secret": true,
                   "description": "HubSpot Access token. See the docs if you need help finding this token: https://go.estuary.dev/XSVhJy.",
@@ -102,7 +73,7 @@
                 "access_token",
                 "credentials_title"
               ],
-              "title": "Private APP",
+              "title": "Private App",
               "type": "object"
             }
           ],
