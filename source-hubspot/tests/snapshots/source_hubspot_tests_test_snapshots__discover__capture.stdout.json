@@ -893,6 +893,24 @@
                 "string"
               ]
             },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_source_id": {
               "type": [
                 "null",
@@ -2619,6 +2637,24 @@
                 "string"
               ]
             },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_source_id": {
               "type": [
                 "null",
@@ -4134,6 +4170,24 @@
                 "string"
               ]
             },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_source_id": {
               "type": [
                 "null",
@@ -4990,6 +5044,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -6579,6 +6651,12 @@
                 "string"
               ]
             },
+            "hs_call_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_call_primary_deal": {
               "type": [
                 "null",
@@ -6744,6 +6822,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -7221,6 +7317,12 @@
                 "string"
               ]
             },
+            "hs_email_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_email_open_count": {
               "type": [
                 "null",
@@ -7286,6 +7388,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_email_sent_count": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_email_sent_via": {
@@ -7416,6 +7524,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -7872,6 +7998,12 @@
                 "string"
               ]
             },
+            "hs_meeting_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_meeting_outcome": {
               "type": [
                 "null",
@@ -7940,6 +8072,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -8338,6 +8488,12 @@
                 "string"
               ]
             },
+            "hs_note_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_id": {
               "type": [
                 "null",
@@ -8345,6 +8501,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -8779,6 +8953,24 @@
                 "string"
               ]
             },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_source_id": {
               "type": [
                 "null",
@@ -8936,6 +9128,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_task_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_task_priority": {
@@ -9644,6 +9842,24 @@
                 "string"
               ]
             },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_source_id": {
               "type": [
                 "null",
@@ -10072,12 +10288,6 @@
                 "string"
               ]
             },
-            "hs_kpi_filter_group_without_team_id": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_kpi_filter_groups": {
               "type": [
                 "null",
@@ -10255,6 +10465,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -10734,6 +10962,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -12046,6 +12292,24 @@
                 "string"
               ]
             },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_source_id": {
               "type": [
                 "null",
@@ -13255,6 +13519,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
@@ -14525,6 +14807,24 @@
               ]
             },
             "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_detail_3": {
               "type": [
                 "null",
                 "string"
