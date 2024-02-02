@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams"
 	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -141,16 +142,24 @@ func (c *capture) pruneShards(table *table, activeShards map[string]streamTypes.
 				// Shard is gone but we didn't get to completely read it. This is an error since it
 				// means the capture has lost consistency. The binding will need to be reset to run
 				// a new backfill for it before resuming streaming.
-				return fmt.Errorf("shard %s was not completely read but no longer exists", id)
+				return fmt.Errorf("shard %s of table %s was not completely read but no longer exists: this binding must be re-backfilled for the capture to continue", id, table.tableName)
 			}
 		}
 	}
+
+	stateUpdate := captureState{
+		Tables: map[boilerplate.StateKey]tableState{
+			table.stateKey: {Shards: make(map[string]*shardState)},
+		},
+	}
+
 	if len(prune) > 0 {
 		for _, p := range prune {
 			delete(c.state.Tables[table.stateKey].Shards, p)
+			stateUpdate.Tables[table.stateKey].Shards[p] = nil // Explicit nil, so that the shard state is deleted from the checkpoint in the merge patch.
 		}
 
-		if err := c.checkpoint(); err != nil {
+		if err := c.checkpoint(stateUpdate); err != nil {
 			return fmt.Errorf("emitting prune shards checkpoint: %w", err)
 		}
 	}

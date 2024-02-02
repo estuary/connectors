@@ -90,6 +90,10 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		listShardsLimiter: rate.NewLimiter(rate.Limit(listShardsPerSecond), 1),
 	}
 
+	if err := stream.Ready(false); err != nil {
+		return err
+	}
+
 	tables := []*table{}
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
@@ -103,10 +107,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 
 		tables = append(tables, t)
-	}
-
-	if err := stream.Ready(false); err != nil {
-		return err
 	}
 
 	eg, groupCtx := errgroup.WithContext(ctx)
