@@ -10072,12 +10072,6 @@
                 "string"
               ]
             },
-            "hs_kpi_filter_group_without_team_id": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_kpi_filter_groups": {
               "type": [
                 "null",
