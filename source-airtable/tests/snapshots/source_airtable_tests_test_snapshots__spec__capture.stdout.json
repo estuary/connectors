@@ -28,6 +28,7 @@
       ]
     },
     "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
       "properties": {
         "stream": {
@@ -41,10 +42,16 @@
           ]
         },
         "namespace": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "cursorField": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
@@ -53,7 +60,8 @@
       "required": [
         "stream",
         "syncMode"
-      ]
+      ],
+      "title": "ResourceSpec"
     },
     "documentationUrl": "https://docs.airbyte.com/integrations/sources/airtable",
     "oauth2": {

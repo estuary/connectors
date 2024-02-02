@@ -132,6 +132,9 @@ jobs:
           - connector: source-facebook-marketing
             connector_type: capture
             python: true
+          - connector: source-hubspot
+            connector_type: capture
+            python: true
 
     steps:
       - uses: actions/checkout@v2
@@ -234,8 +237,11 @@ jobs:
       - name: Python connector ${{ matrix.connector }} snapshot tests
         if: ${{matrix.python}}
         run: |
-          poetry --directory ${{matrix.connector}} install --no-root;
-          poetry run --directory ${{matrix.connector}} pytest ${{matrix.connector}}/tests;
+          cd ${{matrix.connector}};
+          poetry install;
+          source $(poetry env info --path)/bin/activate
+          cd ..;
+          pytest ${{matrix.connector}}/tests;
 
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
