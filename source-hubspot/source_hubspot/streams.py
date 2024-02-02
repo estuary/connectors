@@ -125,7 +125,7 @@ class API:
     """HubSpot API interface, authorize, retrieve and post, supports backoff logic"""
 
     BASE_URL = "https://api.hubapi.com"
-    USER_AGENT = "Airbyte"
+    USER_AGENT = "Estuary"
     logger = logger
 
     def is_oauth2(self) -> bool:
@@ -213,7 +213,7 @@ class API:
                 schema = self.generate_schema(raw_schema=raw_schema)
                 schemas[raw_schema["name"]] = schema
         else:
-            self.logger.warn(self._parse_and_handle_errors(response))
+            self.logger.warning(self._parse_and_handle_errors(response))
 
         return schemas
 
@@ -683,7 +683,7 @@ class Stream(HttpStream, ABC):
 
         if not converted_type:
             converted_type = "string"
-            logger.warn(f"Unsupported type {field_type} found")
+            logger.warning(f"Unsupported type {field_type} found")
 
         field_props = {
             "type": ["null", converted_type or field_type],
@@ -709,7 +709,12 @@ class Stream(HttpStream, ABC):
             return props
         data, response = self._api.get(f"/properties/v2/{self.entity}/properties")
         for row in data:
-            props[row["name"]] = self._get_field_props(row["type"])
+
+            #TODO(johnny): This is kicking the can on a schema mistake that we should fix.
+            if self.name == "contacts" and row["name"] == "hs_latest_source_timestamp":
+                props[row["name"]] = {"type": ["null", "string"], "format": "date"}
+            else:
+                props[row["name"]] = self._get_field_props(row["type"])
 
         return props
 
@@ -1255,6 +1260,7 @@ class ContactLists(IncrementalStream):
     limit_field = "count"
     need_chunk = False
     scopes = {"crm.lists.read"}
+    primary_key = "listId"
 
 
 class ContactsListMemberships(Stream):
@@ -1502,6 +1508,7 @@ class FormSubmissions(ClientSideIncrementalStream):
     updated_at_field = "updatedAt"
     cursor_field_datetime_format = "x"
     scopes = {"forms"}
+    primary_key = ["submittedAt", "formId"]
 
     def path(
         self,
@@ -1601,6 +1608,7 @@ class PropertyHistory(Stream):
     limit = 100
     scopes = {"crm.objects.contacts.read"}
     properties_scopes = {"crm.schemas.contacts.read"}
+    primary_key = ["property", "timestamp"]
 
     def request_params(
         self,
@@ -1644,6 +1652,7 @@ class SubscriptionChanges(IncrementalStream):
     more_key = "hasMore"
     updated_at_field = "timestamp"
     scopes = {"content"}
+    primary_key = ["timestamp", "recipient"]
 
 
 class Workflows(ClientSideIncrementalStream):

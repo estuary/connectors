@@ -3,9 +3,19 @@ import:
   - acmeCo/flow.yaml
 captures:
   acmeCo/source-hubspot:
+    shards:
+      logLevel: debug
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-hubspot:v4"
+      local:
+        command:
+          - python
+          # - "-Xfrozen_modules=off"
+          # - "-m"
+          # - debugpy
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          - __main__.py
         config: config.yaml
     bindings:
       - resource:
