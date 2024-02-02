@@ -6,11 +6,22 @@ import (
 	"net/url"
 )
 
+type sshForwarding struct {
+	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
+	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
+}
+
+type tunnelConfig struct {
+	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
+}
+
 type config struct {
 	Address  string `json:"address" jsonschema:"title=Address" jsonschema_description:"The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin." jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database" jsonschema:"title=Database,description=Name of the database to materialize to." jsonschema_extras:"order=3"`
+
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 func (c *config) Validate() error {
@@ -51,6 +62,12 @@ func (c *config) ToURI() string {
 
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
+	}
+
+	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:27017 to address
+	// through the bastion server, so we use the tunnel's address.
+	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		uri.Host = "localhost:27017"
 	}
 
 	return uri.String()
