@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test_datetimenormalization_24528211": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DatetimeNormalization_24528211","cursor":"backfill:0"}},"id":100,"x":"1991-08-31T17:34:57Z"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DatetimeNormalization_24528211","cursor":"backfill:1"}},"id":101,"x":"0001-01-01T00:00:00Z"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DatetimeNormalization_24528211","cursor":"backfill:2"}},"id":102,"x":"2023-01-01T06:00:00Z"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DatetimeNormalization_24528211","cursor":"backfill:3"}},"id":103,"x":"2023-07-01T05:00:00Z"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FDatetimeNormalization_24528211":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","x"],"types":{"id":"int","x":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
