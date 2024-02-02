@@ -3,6 +3,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "appId": {
           "type": [
             "null",
@@ -194,6 +205,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -1311,6 +1333,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -1502,6 +1535,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -3260,6 +3304,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "canonical-vid": {
           "type": "integer"
         },
@@ -3304,9 +3359,6 @@
     ],
     "recommendedName": "contacts_list_memberships",
     "resourceConfig": {
-      "cursorField": [
-        "canonical-vid"
-      ],
       "stream": "contacts_list_memberships",
       "syncMode": "full_refresh"
     }
@@ -3315,6 +3367,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "active": {
           "type": [
             "null",
@@ -3460,6 +3523,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -4309,6 +4383,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -5159,6 +5244,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "appId": {
           "type": [
             "null",
@@ -5546,6 +5642,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "active": {
           "type": [
             "null",
@@ -5586,9 +5693,6 @@
     ],
     "recommendedName": "email_subscriptions",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "email_subscriptions",
       "syncMode": "full_refresh"
     }
@@ -5597,6 +5701,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "active": {
           "type": [
             "null",
@@ -6247,6 +6362,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -6785,6 +6911,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -7472,6 +7609,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -8001,6 +8149,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -8343,6 +8502,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -8948,8 +9118,8 @@
           "type": "object"
         },
         "tickets": {
-          "format": "integer",
           "items": {
+            "format": "integer",
             "type": [
               "null",
               "string",
@@ -8992,6 +9162,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -9607,6 +9788,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "formId": {
           "type": "string"
         },
@@ -9680,6 +9872,652 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "archived": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "properties": {
+          "properties": {
+            "hs__migration_soft_delete": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_ad_account_asset_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_ad_campaign_asset_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_all_accessible_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_all_assigned_business_unit_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_all_owner_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_all_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_assignee_team_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_assignee_user_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_contact_lifecycle_stage": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_created_by_user_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_createdate": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_currency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_deal_pipeline_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_edit_updates_notification_frequency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_end_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_end_datetime": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_fiscal_year_offset": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_goal_definition_key": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_goal_definition_key_with_team": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_goal_definition_key_with_user": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_goal_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_goal_target_group_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_goal_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_group_correlation_uuid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_is_forecastable": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_is_legacy": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_display_unit": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_filter_group_without_team_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_filter_groups": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_filter_groups_for_key_grouping": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_filter_groups_for_key_team_grouping": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_is_team_rollup": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_kpi_metric_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_object_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_object_type_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_progress_percent": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_kpi_property_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_single_object_custom_goal_type_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_time_period_property": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_tracking_method": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_unit_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_kpi_value": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_kpi_value_calculated_at": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_kpi_value_last_calculated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_lastmodifieddate": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_legacy_active": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_legacy_created_at": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_legacy_created_by": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_legacy_quarterly_target_composite_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_legacy_sql_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_legacy_unique_sql_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_legacy_updated_at": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_legacy_updated_by": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_merged_object_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_migration_soft_delete": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_milestone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_object_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_label": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_object_source_user_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_outcome": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_owner_ids_of_all_owners": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_pipelines": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_progress_updates_notification_frequency": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_read_only": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_should_notify_on_achieved": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_should_notify_on_edit_updates": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_should_notify_on_exceeded": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_should_notify_on_kickoff": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_should_notify_on_missed": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_should_notify_on_progress_updates": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_should_recalculate": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_start_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_start_datetime": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_static_kpi_filter_groups": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_status": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_status_display_order": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_target_amount": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_target_amount_in_home_currency": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_team_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_template_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_ticket_pipeline_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_unique_creation_key": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_updated_by_user_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_user_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_user_ids_of_all_notification_followers": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_user_ids_of_all_notification_unfollowers": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_user_ids_of_all_owners": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_was_imported": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hubspot_owner_assigneddate": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hubspot_owner_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hubspot_team_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "goals",
+    "resourceConfig": {
+      "cursorField": [
+        "updatedAt"
+      ],
+      "stream": "goals",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -10142,6 +10980,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "ab": {
           "type": [
             "null",
@@ -10932,9 +11781,6 @@
     ],
     "recommendedName": "marketing_emails",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "marketing_emails",
       "syncMode": "full_refresh"
     }
@@ -10943,6 +11789,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -11043,6 +11900,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -11352,6 +12220,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "properties": {
           "properties": {
             "address": {
@@ -13098,10 +13977,6 @@
     ],
     "recommendedName": "property_history",
     "resourceConfig": {
-      "cursorField": [
-        "property",
-        "timestamp"
-      ],
       "stream": "property_history",
       "syncMode": "full_refresh"
     }
@@ -13110,6 +13985,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "changes": {
           "items": {
             "properties": {
@@ -13218,6 +14104,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -13968,6 +14865,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "type": [
             "null",
@@ -14093,6 +15001,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "contactListIds": {
           "properties": {
             "active": {
