@@ -2,14 +2,11 @@ import logging
 import os
 import typing as t
 from airbyte_cdk.sources.source import Source
-from dataclasses import asdict, dataclass
 from airbyte_protocol.models import (
     SyncMode,
     ConfiguredAirbyteCatalog,
     ConfiguredAirbyteStream,
     AirbyteStateMessage,
-    AirbyteStreamState,
-    AirbyteGlobalState,
     AirbyteStateType,
     AirbyteStream,
     Status,
@@ -155,8 +152,8 @@ class CaptureShim(Connector):
             }
             if stream.namespace:
                 config["namespace"] = stream.namespace
-
-            json_schema = stream.json_schema
+            if stream.default_cursor_field:
+                config["cursorField"] = stream.default_cursor_field
 
             if stream.source_defined_primary_key:
                 # Map array of array of property names into an array of JSON pointers.
@@ -182,15 +179,14 @@ class CaptureShim(Connector):
             )
             meta.setdefault("properties", {})["row_id"] = {"type": "integer"}
             meta.setdefault("required", []).append("row_id")
-            json_schema = stream.json_schema
 
             if self.usesSchemaInference:
-                json_schema["x-infer-schema"] = True
+                stream.json_schema["x-infer-schema"] = True
 
             bindings.append(
                 response.DiscoveredBinding(
                     recommendedName=stream.name,
-                    documentSchema=json_schema,
+                    documentSchema=stream.json_schema,
                     resourceConfig=t.cast(dict, config),
                     key=key,
                 )
@@ -364,15 +360,17 @@ class StreamResourceConfig(t.TypedDict):
 
 
 resource_config_schema = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
         "stream": {"type": "string"},
         "syncMode": {"type": "string", "enum": ["incremental", "full_refresh"]},
-        "namespace": {"type": "string"},
+        "namespace": {"type": ["string", "null"]},
         "cursorField": {
-            "type": "array",
+            "type": ["array", "null"],
             "items": {"type": "string"},
         },
     },
     "required": ["stream", "syncMode"],
+    "title": "ResourceSpec"
 }
