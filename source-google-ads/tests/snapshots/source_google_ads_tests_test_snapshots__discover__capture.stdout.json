@@ -3,7 +3,10 @@
     "recommendedName": "ad_group_ads",
     "resourceConfig": {
       "stream": "ad_group_ads",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1012,7 +1015,10 @@
     "recommendedName": "ad_groups",
     "resourceConfig": {
       "stream": "ad_groups",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1274,7 +1280,10 @@
     "recommendedName": "accounts",
     "resourceConfig": {
       "stream": "accounts",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1485,7 +1494,10 @@
     "recommendedName": "click_view",
     "resourceConfig": {
       "stream": "click_view",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1611,7 +1623,10 @@
     "recommendedName": "campaigns",
     "resourceConfig": {
       "stream": "campaigns",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -2158,7 +2173,10 @@
     "recommendedName": "user_location_report",
     "resourceConfig": {
       "stream": "user_location_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -2461,7 +2479,10 @@
     "recommendedName": "account_performance_report",
     "resourceConfig": {
       "stream": "account_performance_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -2838,7 +2859,10 @@
     "recommendedName": "display_topics_performance_report",
     "resourceConfig": {
       "stream": "display_topics_performance_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -3361,7 +3385,10 @@
     "recommendedName": "display_keyword_performance_report",
     "resourceConfig": {
       "stream": "display_keyword_performance_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -3887,7 +3914,10 @@
     "recommendedName": "shopping_performance_report",
     "resourceConfig": {
       "stream": "shopping_performance_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -4276,7 +4306,10 @@
     "recommendedName": "ad_group_ad_report",
     "resourceConfig": {
       "stream": "ad_group_ad_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -5150,7 +5183,10 @@
     "recommendedName": "geographic_report",
     "resourceConfig": {
       "stream": "geographic_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -5218,7 +5254,10 @@
     "recommendedName": "keyword_report",
     "resourceConfig": {
       "stream": "keyword_report",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
     },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
