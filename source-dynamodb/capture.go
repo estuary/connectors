@@ -23,11 +23,11 @@ type captureState struct {
 }
 
 type tableState struct {
-	BackfillFinishedAt      time.Time             `json:"backfillFinishedAt,omitempty"`
-	TotalBackfillSegments   int                   `json:"totalBackfillSegments,omitempty"`
-	BackfillSegmentProgress map[int]segmentState  `json:"backfillSegmentProgress,omitempty"`
-	Shards                  map[string]shardState `json:"shards,omitempty"`
-	StreamArn               string                `json:"streamArn,omitempty"`
+	BackfillFinishedAt      *time.Time             `json:"backfillFinishedAt,omitempty"`
+	TotalBackfillSegments   int                    `json:"totalBackfillSegments,omitempty"`
+	BackfillSegmentProgress map[int]segmentState   `json:"backfillSegmentProgress,omitempty"`
+	Shards                  map[string]*shardState `json:"shards,omitempty"`
+	StreamArn               string                 `json:"streamArn,omitempty"`
 }
 
 type segmentState struct {
@@ -64,7 +64,13 @@ func (c *capture) getSequenceState(sk boilerplate.StateKey, shardId string) shar
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.state.Tables[sk].Shards[shardId]
+	s := c.state.Tables[sk].Shards[shardId]
+	if s == nil {
+		// Simplify caller handling by providing an empty state rather than `nil` if the shard
+		// hasn't been checkpointed yet.
+		return shardState{}
+	}
+	return *s
 }
 
 func (c *capture) initializeTable(ctx context.Context, binding int, tableName string, sk boilerplate.StateKey, configuredRcus int) (*table, error) {
@@ -97,18 +103,18 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		log.WithField("table", tableName).Info("no RCU limit set for the table and no provisioned limit detected; backfills will use unlimited RCUs")
 	}
 
-	tableState := c.state.Tables[sk]
+	state := c.state.Tables[sk]
 
-	if tableState.Shards == nil {
+	if state.Shards == nil {
 		// Never emitted a document from reading a shard.
-		tableState.Shards = make(map[string]shardState)
+		state.Shards = make(map[string]*shardState)
 	}
-	if tableState.BackfillSegmentProgress == nil {
+	if state.BackfillSegmentProgress == nil {
 		// Never emitted a document from a backfill.
-		tableState.BackfillSegmentProgress = make(map[int]segmentState)
+		state.BackfillSegmentProgress = make(map[int]segmentState)
 	}
 
-	if tableState.StreamArn == "" {
+	if state.StreamArn == "" {
 		// First time seeing this table.
 
 		// Set the number of backfill segments for parallel scans. This must not change after the
@@ -122,20 +128,20 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 			"table":    t.tableName,
 			"segments": segments,
 		}).Info("setting backfill segments for table")
-		tableState.TotalBackfillSegments = segments
+		state.TotalBackfillSegments = segments
 
 		// Get a persistent reference to the stream ARN. It is an error if this ever changes.
 		log.WithFields(log.Fields{
 			"table":     t.tableName,
 			"streamArn": d.streamArn,
 		}).Info("setting stream ARN for table")
-		tableState.StreamArn = d.streamArn
+		state.StreamArn = d.streamArn
 
 		// Mark any shards that are closed before the backfill begins as fully read. Shards that
 		// have been closed prior to the backfill starting by definition will not have any records
 		// added to them while the backfill is on-going. It would not be incorrect to capture the
 		// values from these shards, but is unnecessary.
-		shards, err := c.listShards(ctx, tableState.StreamArn)
+		shards, err := c.listShards(ctx, state.StreamArn)
 		if err != nil {
 			return nil, fmt.Errorf("listing shards: %w", err)
 		}
@@ -148,23 +154,34 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 
 			log.WithFields(log.Fields{
 				"table":     t.tableName,
-				"streamArn": tableState.StreamArn,
+				"streamArn": state.StreamArn,
 				"shardId":   shardId,
 			}).Info("will not read change events from shard since it was closed prior to starting table backfill")
-			tableState.Shards[shardId] = shardState{FinishedReading: true}
+			state.Shards[shardId] = &shardState{FinishedReading: true}
+		}
+
+		// Emit this initial table state.
+		stateUpdate := captureState{
+			Tables: map[boilerplate.StateKey]tableState{
+				sk: state,
+			},
+		}
+
+		if err := c.checkpoint(stateUpdate); err != nil {
+			return nil, fmt.Errorf("emitting initial state update for table: %w", err)
 		}
 	}
 
-	if tableState.StreamArn != d.streamArn {
+	if state.StreamArn != d.streamArn {
 		// The stream ARN can only change if the stream is disabled and then re-enabled on a table,
 		// which would result in a loss of data consistency.
-		return nil, fmt.Errorf("stream ARN has changed for table %s: was %s and is now %s", t.tableName, tableState.StreamArn, d.streamArn)
+		return nil, fmt.Errorf("stream ARN has changed for table %s: was %s and is now %s", t.tableName, state.StreamArn, d.streamArn)
 	}
 
 	// Hydrate parameters from the persisted state.
-	t.totalBackfillSegments = tableState.TotalBackfillSegments
-	t.streamArn = tableState.StreamArn
-	t.backfillComplete = !tableState.BackfillFinishedAt.IsZero()
+	t.backfillComplete = state.BackfillFinishedAt != nil && !state.BackfillFinishedAt.IsZero()
+	t.totalBackfillSegments = state.TotalBackfillSegments
+	t.streamArn = state.StreamArn
 
 	t.shardMonitorDelay = defaultShardMonitorDelay
 	t.scanLimitFromConfig = 0 // The actual scan limit used may be lower if the table has low provisioned RCUs. 0 is unlimited.
@@ -174,7 +191,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		t.scanLimitFromConfig = c.config.Advanced.ScanLimit
 	}
 
-	c.state.Tables[sk] = tableState
+	c.state.Tables[sk] = state
 
 	return t, nil
 }
@@ -274,12 +291,12 @@ func (c *capture) captureTable(ctx context.Context, t *table) error {
 	return nil
 }
 
-// checkpoint emits the current state of the connector to the output stream. Synchronization must be
-// handled by the caller.
-func (c *capture) checkpoint() error {
-	if cp, err := json.Marshal(c.state); err != nil {
+// checkpoint emits the provided state update to the output stream as merge patch checkpoint update.
+// Synchronization must be handled by the caller.
+func (c *capture) checkpoint(stateUpdate any) error {
+	if cp, err := json.Marshal(stateUpdate); err != nil {
 		return fmt.Errorf("preparing checkpoint update: %w", err)
-	} else if err := c.stream.Checkpoint(cp, false); err != nil {
+	} else if err := c.stream.Checkpoint(cp, true); err != nil {
 		return fmt.Errorf("emitting checkpoint: %w", err)
 	}
 
@@ -296,7 +313,7 @@ func (c *capture) emitBackfill(
 	binding int,
 	sk boilerplate.StateKey,
 	segment int,
-	segmentState segmentState,
+	state segmentState,
 	records []map[string]types.AttributeValue,
 	keyFields []string,
 ) error {
@@ -324,11 +341,21 @@ func (c *capture) emitBackfill(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.state.Tables[sk].BackfillSegmentProgress[segment] = segmentState
+	c.state.Tables[sk].BackfillSegmentProgress[segment] = state
+
+	stateUpdate := captureState{
+		Tables: map[boilerplate.StateKey]tableState{
+			sk: {
+				BackfillSegmentProgress: map[int]segmentState{
+					segment: state,
+				},
+			},
+		},
+	}
 
 	if err := c.stream.Documents(binding, docs...); err != nil {
 		return fmt.Errorf("outputting backfill documents: %w", err)
-	} else if err := c.checkpoint(); err != nil {
+	} else if err := c.checkpoint(stateUpdate); err != nil {
 		return fmt.Errorf("outputting backfill checkpoint: %w", err)
 	}
 
@@ -339,7 +366,7 @@ func (c *capture) emitStream(
 	binding int,
 	sk boilerplate.StateKey,
 	shardId string,
-	shardState shardState,
+	state shardState,
 	records []streamTypes.Record,
 	keyFields []string,
 ) error {
@@ -417,11 +444,21 @@ func (c *capture) emitStream(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.state.Tables[sk].Shards[shardId] = shardState
+	c.state.Tables[sk].Shards[shardId] = &state
+
+	stateUpdate := captureState{
+		Tables: map[boilerplate.StateKey]tableState{
+			sk: {
+				Shards: map[string]*shardState{
+					shardId: &state,
+				},
+			},
+		},
+	}
 
 	if err := c.stream.Documents(binding, docs...); err != nil {
 		return fmt.Errorf("outputting stream documents: %w", err)
-	} else if err := c.checkpoint(); err != nil {
+	} else if err := c.checkpoint(stateUpdate); err != nil {
 		return fmt.Errorf("outputting stream checkpoint: %w", err)
 	}
 
