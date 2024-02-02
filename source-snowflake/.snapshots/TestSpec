@@ -46,7 +46,7 @@
           "flowSchema": {
             "type": "string",
             "description": "The schema in which Flow will create and manage its streams and staging tables.",
-            "default": "FLOW"
+            "default": "ESTUARY_STAGING"
           }
         },
         "additionalProperties": false,
