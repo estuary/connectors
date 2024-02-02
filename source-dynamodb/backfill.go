@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
@@ -83,12 +84,18 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	tableState := c.state.Tables[t.stateKey]
-	tableState.BackfillFinishedAt = finished
-	c.state.Tables[t.stateKey] = tableState
+	ts := c.state.Tables[t.stateKey]
+	ts.BackfillFinishedAt = &finished
+	c.state.Tables[t.stateKey] = ts
 	t.backfillComplete = true
 
-	if err := c.checkpoint(); err != nil {
+	stateUpdate := captureState{
+		Tables: map[boilerplate.StateKey]tableState{
+			t.stateKey: {BackfillFinishedAt: &finished},
+		},
+	}
+
+	if err := c.checkpoint(stateUpdate); err != nil {
 		return fmt.Errorf("checkpointing backfill complete: %w", err)
 	}
 
