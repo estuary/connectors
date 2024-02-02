@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test_datetimenormalization_24528211": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DatetimeNormalization_24528211","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":200,"x":"1991-08-31T17:34:57Z"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DatetimeNormalization_24528211","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":201,"x":"0001-01-01T00:00:00Z"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DatetimeNormalization_24528211","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":202,"x":"2022-11-30T06:00:00Z"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DatetimeNormalization_24528211","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":203,"x":"2023-06-30T05:00:00Z"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FDatetimeNormalization_24528211":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","x"],"types":{"id":"int","x":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
