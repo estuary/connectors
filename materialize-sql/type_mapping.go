@@ -267,6 +267,11 @@ func StdStrToInt() ElementConverter {
 			str = str[:idx]
 		}
 
+		// Flow validates strings like "1__234" and "123_" as integer formats. So we remove all
+		// underscores before trying to parse, as above on the assumption that the string is a
+		// valid formatted integer.
+		str = strings.ReplaceAll(str, "_", "")
+
 		var i big.Int
 		out, ok := i.SetString(str, 10)
 		if !ok {
@@ -292,6 +297,11 @@ func StdStrToFloat(nan, posInfinity, negInfinity interface{}) ElementConverter {
 		case "-Infinity":
 			return negInfinity, nil
 		default:
+			// Flow validates strings like "12__34.1" and "1.23_" as number formats.
+			// strconv.ParseFloat does not allow for trailing underscores or more than one
+			// underscore in a row, so we remove all underscores before trying to parse.
+			str = strings.ReplaceAll(str, "_", "")
+
 			out, err := strconv.ParseFloat(str, 64)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert %q to float64: %w", str, err)

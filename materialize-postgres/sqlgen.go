@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 var pgDialect = func() sql.Dialect {
@@ -29,11 +30,21 @@ var pgDialect = func() sql.Dialect {
 			WithFormat: map[string]sql.TypeMapper{
 				"integer": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("TEXT"),
-					Delegate:   sql.NewStaticMapper("NUMERIC"),
+					Delegate: sql.NewStaticMapper("NUMERIC", sql.WithElementConverter(
+						func(te tuple.TupleElement) (interface{}, error) {
+							// Flow validates strings like "1__234" and "123_" as integer formats,
+							// so we must remove all underscores from the string for compatibility
+							// with inserting into a Postgres NUMERIC column.
+							if str, ok := te.(string); ok {
+								return strings.ReplaceAll(str, "_", ""), nil
+							}
+							return te, nil
+						})),
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("TEXT"),
-					Delegate:   sql.NewStaticMapper("DECIMAL"),
+					// https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-FLOAT
+					Delegate: sql.NewStaticMapper("DECIMAL", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
 				},
 				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(sql.ClampDatetime())),

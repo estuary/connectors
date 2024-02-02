@@ -15,7 +15,8 @@ import (
 // strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to
 // an integer. The sqlserver driver doesn't appear to have any way to provide an integer value
 // larger than 8 bytes as a parameter (such as may go in a NUMERIC(38,0) column). The value provided
-// must always be an integer that fits in an int64.
+// must always be an integer that fits in an int64. This is a copy of sql.StdStrToInt, other than
+// using strconv.ParseInt instead of big.Int for the output.
 func strToInt() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
 		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
@@ -25,6 +26,11 @@ func strToInt() sql.ElementConverter {
 		if idx := strings.Index(str, "."); idx != -1 {
 			str = str[:idx]
 		}
+
+		// Flow validates strings like "1__234" and "123_" as integer formats. So we remove all
+		// underscores before trying to parse, as above on the assumption that the string is a valid
+		// formatted integer.
+		str = strings.ReplaceAll(str, "_", "")
 
 		out, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
