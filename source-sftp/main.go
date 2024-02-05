@@ -118,7 +118,12 @@ func (c config) DiscoverRoot() string {
 }
 
 func (c config) RecommendedName() string {
-	return strings.Trim(c.DiscoverRoot(), "/")
+	var name = strings.Trim(c.DiscoverRoot(), "/")
+	if name == "" {
+		return "root"
+	} else {
+		return name
+	}
 }
 
 func (c config) FilesAreMonotonic() bool {
