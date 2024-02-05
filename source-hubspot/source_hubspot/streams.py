@@ -371,7 +371,7 @@ class Stream(HttpStream, ABC):
     # a token expires in flight. As such, it should only need to
     # retry a single time at most. Any additional failures are real
     # and should be bubbled up as such.
-    @retry_401(max_tries=1)
+    @retry_401(max_tries=5)
     def handle_request(
         self,
         stream_slice: Mapping[str, Any] = None,
