@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -42,6 +43,15 @@ func (r resource) Validate() error {
 	return nil
 }
 
+type sshForwarding struct {
+	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
+	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
+}
+
+type tunnelConfig struct {
+	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
+}
+
 // config represents the endpoint configuration for mongodb
 type config struct {
 	Address  string `json:"address" jsonschema:"title=Address" jsonschema_description:"The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin." jsonschema_extras:"order=0"`
@@ -50,7 +60,8 @@ type config struct {
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the instance." jsonschema_extras:"order=3"`
 
 	// We still don't have any exposed advanced configurations
-	Advanced advancedConfig `json:"advanced" jsonschema:"-"`
+	Advanced      advancedConfig `json:"advanced" jsonschema:"-"`
+	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -95,8 +106,13 @@ func (c *config) ToURI() string {
 	}
 
 	uri.User = url.UserPassword(c.User, c.Password)
-
 	uri.Path = "/"
+
+	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:27017 to address
+	// through the bastion server, so we use the tunnel's address.
+	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		uri.Host = "localhost:27017"
+	}
 
 	return uri.String()
 }
@@ -111,6 +127,27 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// online-archive url instead of the regular mongodb url.
 	if strings.Contains(cfg.Address, "atlas-online-archive") {
 		return nil, fmt.Errorf("The provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
+	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		uri, err := url.Parse(cfg.Address)
+		if err != nil {
+			return nil, fmt.Errorf("parsing address for network tunnel: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: cfg.NetworkTunnel.SSHForwarding.SSHEndpoint,
+			PrivateKey:  []byte(cfg.NetworkTunnel.SSHForwarding.PrivateKey),
+			ForwardHost: uri.Hostname(),
+			ForwardPort: uri.Port(),
+			LocalPort:   "27017",
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		if err := tunnel.Start(); err != nil {
+			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+		}
 	}
 
 	// Create a new client and connect to the server
