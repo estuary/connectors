@@ -129,6 +129,9 @@ jobs:
           - connector: source-google-ads
             connector_type: capture
             python: true
+          - connector: source-facebook-marketing
+            connector_type: capture
+            python: true
 
     steps:
       - uses: actions/checkout@v2
