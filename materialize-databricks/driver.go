@@ -101,6 +101,7 @@ func newDatabricksDriver() *sql.Driver {
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
 				ConcurrentApply:      true,
+				MaxFieldCharLen:      255,
 			}, nil
 		},
 	}
@@ -450,7 +451,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if b.storeFile.encodeRow(converted); err != nil {
+		} else if err := b.storeFile.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 

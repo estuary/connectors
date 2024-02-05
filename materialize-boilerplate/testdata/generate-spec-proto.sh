@@ -28,11 +28,9 @@ function cleanup {
 }
 trap cleanup EXIT
 
-flowctl-go api build \
-    --build-id build-id \
-    --build-db ${TEMP_DIR}/build.db \
-    --network flow-test \
-    --source $1 \
-    --log.level info
+flowctl raw build \
+    --build-id test-build \
+    --db-path ${TEMP_DIR}/build.db \
+    --source $1
 
 sqlite3 ${TEMP_DIR}/build.db "select writefile('${OUTPUT}', spec) from built_materializations;"

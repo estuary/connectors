@@ -321,21 +321,12 @@ func (t *transactor) commit(ctx context.Context) error {
 	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
 
 	// This returns a single row with the error status of the query.
-	job, err := t.client.runQuery(ctx, query)
-	if err != nil {
+	if _, err := t.client.runQuery(ctx, query); err != nil {
 		return fmt.Errorf("commit query: %w", err)
 	}
 	log.Info("store: finished commit")
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"job":   job,
-			"error": err,
-		}).Error("Bigquery job failed")
-		return fmt.Errorf("merge error: %s", err)
-	} else {
-		return nil
-	}
+	return nil
 }
 
 func (t *transactor) Destroy() {

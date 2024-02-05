@@ -7,7 +7,7 @@ import (
 	"text/template"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/materialize-boilerplate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
@@ -112,6 +112,9 @@ type Endpoint struct {
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
+	// MaxFieldCharLen is the maximum length allowable by the destination for materialized column
+	// names. A value of 0 means no maximum length is enforced.
+	MaxFieldCharLen int
 }
 
 // PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and

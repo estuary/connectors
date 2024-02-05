@@ -30,12 +30,17 @@ type Constrainter interface {
 type Validator struct {
 	c  Constrainter
 	is *InfoSchema
+	// maxFieldLength is used to produce "forbidden" constraints on fields that are too long. If
+	// maxFieldLength is 0, no constraints are enforced. The length of a field name is in terms of
+	// characters, not bytes.
+	maxFieldLength int
 }
 
-func NewValidator(c Constrainter, is *InfoSchema) Validator {
+func NewValidator(c Constrainter, is *InfoSchema, maxFieldLength int) Validator {
 	return Validator{
-		c:  c,
-		is: is,
+		c:              c,
+		is:             is,
+		maxFieldLength: maxFieldLength,
 	}
 }
 
@@ -99,7 +104,7 @@ func (v Validator) ValidateBinding(
 		}
 	}
 
-	return constraints, nil
+	return forbidLongFields(v.maxFieldLength, boundCollection, constraints)
 }
 
 func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUpdates bool) map[string]*pm.Response_Validated_Constraint {
@@ -334,6 +339,67 @@ func findExistingBinding(resourcePath []string, storedSpec *pf.MaterializationSp
 		}
 	}
 	return nil, nil
+}
+
+// forbidLongFields returns a "forbidden" constraint for fields with names longer than maxLength. It
+// will return an error if a field that would otherwise be required has a name that is too long, or
+// if all of the projections of a location that is required have names that are too long - at least
+// one of the projections of a required location must be able to be materialized. If maxLength is 0
+// no restrictions are enforced.
+func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints map[string]*pm.Response_Validated_Constraint) (map[string]*pm.Response_Validated_Constraint, error) {
+	if maxLength == 0 {
+		return constraints, nil
+	}
+
+	requiredLocations := make(map[string]bool)
+	for field, constraint := range constraints {
+		tooLong := len([]rune(field)) > maxLength
+
+		p := collection.GetProjection(field)
+
+		if constraint.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED {
+			if _, ok := requiredLocations[p.Ptr]; !ok {
+				requiredLocations[p.Ptr] = false
+			}
+			if !tooLong {
+				// At least one projection of this required location is not too long to be materialized.
+				requiredLocations[p.Ptr] = true
+			}
+		}
+
+		if !tooLong {
+			continue
+		}
+
+		if constraint.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED {
+			return nil, fmt.Errorf(
+				"field '%s' is required to be materialized but has a length of %d which exceeds the maximum length allowable by the destination of %d",
+				field,
+				len(field),
+				maxLength,
+			)
+		}
+
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = fmt.Sprintf(
+			"Field '%s' has a length of %d which exceeds the maximum length allowable by the destination of %d. Use an alternate projection with a shorter name to materialize this location",
+			field,
+			len(field),
+			maxLength,
+		)
+	}
+
+	for location, hasAllowable := range requiredLocations {
+		if !hasAllowable {
+			return nil, fmt.Errorf(
+				"at least one field from location '%s' is required to be materialized, but all projections exceed the maximum length allowable by the destination of %d: must provide an alternate projection with a shorter name",
+				location,
+				maxLength,
+			)
+		}
+	}
+
+	return constraints, nil
 }
 
 type StringWithNumericFormat string
