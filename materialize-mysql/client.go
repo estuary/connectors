@@ -142,13 +142,13 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	return alterColumnStmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, alterColumnStmt)
-		return checkIdentifierLengthError(err)
+		return err
 	}, nil
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
-	return checkIdentifierLengthError(err)
+	return err
 }
 
 func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
@@ -188,29 +188,4 @@ func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, mater
 
 func (c *client) Close() {
 	c.db.Close()
-}
-
-func checkIdentifierLengthError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	// Handling for errors resulting from identifiers being too long.
-	// TODO(whb): At some point we could consider moving this into `Validate` to check
-	// identifier lengths, rather than passing validate but failing in apply. I'm holding
-	// off on that for now since I don't know if the 64 character limit is universal, or
-	// specific to certain versions of MySQL/MariaDB.
-	var mysqlErr *mysql.MySQLError
-	if errors.As(err, &mysqlErr) {
-		// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
-		switch mysqlErr.Number {
-		case 1059:
-			err = fmt.Errorf("%w.\nPossible resolutions include:\n%s\n%s\n%s",
-				err,
-				"1. Adding a projection to rename this field, see https://go.estuary.dev/docs-projections",
-				"2. Exclude the field, see https://go.estuary.dev/docs-field-selection",
-				"3. Disable the corresponding binding")
-		}
-	}
-	return err
 }

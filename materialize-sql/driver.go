@@ -97,7 +97,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	if err != nil {
 		return nil, err
 	}
-	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect}, is)
+	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect}, is, endpoint.MaxFieldCharLen)
 
 	if p := is.AmbiguousResourcePaths(resourcePaths); len(p) > 0 {
 		// This is mostly a sanity-check since it is very unlikely to happen, given that Flow
