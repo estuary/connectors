@@ -122,12 +122,12 @@ class SourceFacebookMarketing(AbstractSource):
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
             ),
-            AdsInsights(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["ad_id"], **insights_args),
+            AdsInsights(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
             AdsInsightsAgeAndGender(page_size=config.page_size, max_batch_size=config.max_batch_size,source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsCountry(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsRegion(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsDma(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsPlatformAndDevice(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
+            AdsInsightsCountry(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsRegion(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsDma(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsPlatformAndDevice(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
             AdsInsightsActionType(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
             Campaigns(
                 api=api,
@@ -163,15 +163,15 @@ class SourceFacebookMarketing(AbstractSource):
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
             ),
-            # Activities(
-            #     api=api,
-            #     start_date=config.start_date,
-            #     end_date=config.end_date,
-            #     include_deleted=config.include_deleted,
-            #     page_size=config.page_size,
-            #     max_batch_size=config.max_batch_size,
-            #     source_defined_primary_key=["actor_id"],
-            # ),
+            Activities(
+                api=api,
+                start_date=config.start_date,
+                end_date=config.end_date,
+                include_deleted=config.include_deleted,
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["object_id", "actor_id", "application_id", "event_time", "event_type"],
+            ),
         ]
 
         return streams + self.get_custom_insights_streams(api, config)
