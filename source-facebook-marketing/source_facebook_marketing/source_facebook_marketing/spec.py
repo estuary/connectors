@@ -82,8 +82,8 @@ class InsightConfig(BaseModel):
     insights_lookback_window: Optional[PositiveInt] = Field(
         title="Custom Insights Lookback Window",
         description="The attribution window",
-        maximum=28,
-        mininum=1,
+        # maximum=28,
+        # mininum=1,
         default=28,
     )
 
@@ -197,8 +197,8 @@ class ConnectorConfig(BaseConfig):
             "so you can retrieve refreshed insights from the past by setting this parameter. "
             "If you set a custom lookback window value in Facebook account, please provide the same value here."
         ),
-        maximum=28,
-        mininum=1,
+        # maximum=28,
+        # mininum=1,
         default=28,
     )
 
@@ -217,6 +217,6 @@ class ConnectorConfig(BaseConfig):
     action_breakdowns_allow_empty: bool = Field(
         description="Allows action_breakdowns to be an empty list",
         default=True,
-        airbyte_hidden=True,
+        # airbyte_hidden=True,
     )
 
