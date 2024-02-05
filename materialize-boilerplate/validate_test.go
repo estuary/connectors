@@ -21,6 +21,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/increment-backfill.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullable-key.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/long-fields.flow.yaml
 
 //go:embed testdata/validate/generated_specs
 var validateFS embed.FS
@@ -44,6 +45,7 @@ func TestValidate(t *testing.T) {
 		existingSpec       *pf.MaterializationSpec
 		proposedSpec       *pf.MaterializationSpec
 		fieldNameTransform func(string) string
+		maxFieldLength     int
 	}
 
 	tests := []testCase{
@@ -54,6 +56,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "same binding again - standard updates",
@@ -62,6 +65,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "new materialization - delta updates",
@@ -70,6 +74,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "same binding again - delta updates",
@@ -78,6 +83,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "binding update with incompatible changes",
@@ -86,6 +92,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "fields exist in destination but not in collection",
@@ -94,6 +101,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "fewer-fields.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "change root document projection for standard updates",
@@ -102,6 +110,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "change root document projection for delta updates",
@@ -110,6 +119,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "increment backfill counter",
@@ -118,6 +128,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "table already exists with identical spec",
@@ -126,6 +137,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "table already exists with incompatible proposed spec",
@@ -134,6 +146,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "new materialization with ambiguous fields",
@@ -142,6 +155,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "table already exists with a column for an ambiguous field for a new materialization",
@@ -150,6 +164,7 @@ func TestValidate(t *testing.T) {
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
+			maxFieldLength:     0,
 		},
 		{
 			name:               "update an existing materialization with ambiguous fields",
@@ -158,6 +173,16 @@ func TestValidate(t *testing.T) {
 			existingSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
+			maxFieldLength:     0,
+		},
+		{
+			name:               "field names over the length limit are forbidden",
+			deltaUpdates:       false,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "long-fields.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     20,
 		},
 	}
 
@@ -165,7 +190,7 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := NewValidator(testConstrainter{}, is)
+			validator := NewValidator(testConstrainter{}, is, tt.maxFieldLength)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
@@ -183,11 +208,53 @@ func TestValidate(t *testing.T) {
 	}
 	cupaloy.SnapshotT(t, snap.String())
 
+	t.Run("at least one required location must not be too long", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "long-fields.flow.proto")
+
+		require.Equal(t, "key", proposed.Bindings[0].Collection.Projections[3].Field)
+		proposed.Bindings[0].Collection.Projections[3].Field = "keyRenamedToSomethingThatIsReallyLong"
+
+		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
+		validator := NewValidator(testConstrainter{}, is, 20)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil,
+		)
+
+		require.ErrorContains(t, err, "at least one field from location '/key' is required to be materialized, but all projections exceed the maximum length allowable by the destination")
+	})
+
+	t.Run("a required field cannot be too long", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "long-fields.flow.proto")
+
+		// This is somewhat contrived because currently the only way a field can be required is if
+		// it has already been materialized, and is either the root document projection or a
+		// collection key.
+		is := testInfoSchemaFromSpec(t, proposed, simpleTestTransform)
+		validator := NewValidator(testConstrainter{}, is, 20)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil,
+		)
+
+		require.ErrorContains(t, err, "field 'longKeyLongKeyLongKey' is required to be materialized but has a length of 21 which exceeds the maximum length allowable by the destination")
+	})
+
 	t.Run("can't decrement backfill counter", func(t *testing.T) {
 		existing := loadValidateSpec(t, "increment-backfill.flow.proto")
 		proposed := loadValidateSpec(t, "base.flow.proto")
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
+		validator := NewValidator(testConstrainter{}, is, 0)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -208,7 +275,7 @@ func TestValidate(t *testing.T) {
 		existing.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
+		validator := NewValidator(testConstrainter{}, is, 0)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -229,7 +296,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
+		validator := NewValidator(testConstrainter{}, is, 0)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -250,7 +317,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Name = pf.Collection("other")
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
+		validator := NewValidator(testConstrainter{}, is, 0)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -271,7 +338,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Inference.DefaultJson = nil
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
+		validator := NewValidator(testConstrainter{}, is, 0)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -289,7 +356,7 @@ func TestValidate(t *testing.T) {
 		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
+		validator := NewValidator(testConstrainter{}, is, 0)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},

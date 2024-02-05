@@ -218,6 +218,7 @@ func newSnowflakeDriver() *sql.Driver {
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
 				ConcurrentApply:      true,
+				MaxFieldCharLen:      255,
 			}, nil
 		},
 	}

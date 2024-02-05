@@ -175,4 +175,13 @@ update an existing materialization with ambiguous fields:
 {"Field":"secondBadField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondBadField' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
 {"Field":"secondbadfield","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'secondbadfield' would be materialized as 'secondbadfield', which is ambiguous with fields [SECONDBADFIELD,secondBadField]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
 
+field names over the length limit are forbidden:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"longKeyLongKeyLongKey","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Field 'longKeyLongKeyLongKey' has a length of 21 which exceeds the maximum length allowable by the destination of 20. Use an alternate projection with a shorter name to materialize this field."}
+{"Field":"longValueLongValueLongValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Field 'longValueLongValueLongValue' has a length of 27 which exceeds the maximum length allowable by the destination of 20. Use an alternate projection with a shorter name to materialize this field."}
+{"Field":"value","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
 
