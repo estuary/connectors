@@ -1,6 +1,5 @@
 ---
 type: object
-additionalProperties: true
 properties:
   id:
     type: string
@@ -12,7 +11,6 @@ properties:
       type: integer
   backdated_time:
     type: string
-    format: date-time
   backdated_time_granularity:
     type:
       - "null"
@@ -29,7 +27,6 @@ properties:
       type: string
   created_time:
     type: string
-    format: date-time
   custom_labels:
     type:
       - "null"
@@ -107,7 +104,6 @@ properties:
       - boolean
   scheduled_publish_time:
     type: string
-    format: date-time
   source:
     type:
       - "null"
@@ -122,7 +118,6 @@ properties:
       - string
   updated_time:
     type: string
-    format: date-time
   views:
     type:
       - "null"

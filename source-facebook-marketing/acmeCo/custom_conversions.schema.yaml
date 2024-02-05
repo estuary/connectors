@@ -14,7 +14,6 @@ properties:
       - string
   creation_time:
     type: string
-    format: date-time
   custom_event_type:
     type:
       - "null"
@@ -46,7 +45,6 @@ properties:
       - string
   first_fired_time:
     type: string
-    format: date-time
   is_archived:
     type:
       - "null"
@@ -57,7 +55,6 @@ properties:
       - boolean
   last_fired_time:
     type: string
-    format: date-time
   name:
     type:
       - "null"

@@ -1,6 +1,6 @@
 ---
-type: object
-additionalProperties: true
+type:
+  - object
 properties:
   bid_type:
     type:
@@ -29,12 +29,10 @@ properties:
           type: string
         created_time:
           type: string
-          format: date-time
         name:
           type: string
         updated_time:
           type: string
-          format: date-time
   bid_amount:
     type:
       - "null"
@@ -89,12 +87,10 @@ properties:
     type:
       - "null"
       - string
-    format: date-time
   created_time:
     type:
       - "null"
       - string
-    format: date-time
   name:
     type:
       - "null"

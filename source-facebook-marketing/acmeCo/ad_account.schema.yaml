@@ -75,7 +75,6 @@ properties:
       type: string
   created_time:
     type: string
-    format: date-time
   currency:
     type:
       - "null"
@@ -171,10 +170,6 @@ properties:
         type:
           - "null"
           - integer
-  has_advertiser_opted_in_odax:
-    type:
-      - "null"
-      - boolean
   has_migrated_permissions:
     type:
       - "null"

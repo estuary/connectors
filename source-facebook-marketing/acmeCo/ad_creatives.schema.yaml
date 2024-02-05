@@ -1,6 +1,4 @@
 ---
-type: object
-additionalProperties: true
 properties:
   body:
     type:
@@ -37,12 +35,10 @@ properties:
           type: string
         created_time:
           type: string
-          format: date-time
         name:
           type: string
         updated_time:
           type: string
-          format: date-time
   applink_treatment:
     type:
       - "null"
@@ -250,7 +246,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -259,7 +254,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             text:
               type:
                 - "null"
@@ -302,7 +296,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -311,7 +304,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             type:
               type:
                 - "null"
@@ -387,7 +379,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -396,7 +387,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             text:
               type:
                 - "null"
@@ -431,7 +421,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -440,7 +429,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             text:
               type:
                 - "null"
@@ -512,7 +500,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -521,7 +508,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             hash:
               type:
                 - "null"
@@ -649,7 +635,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -658,7 +643,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             carousel_see_more_url:
               type:
                 - "null"
@@ -717,7 +701,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -726,7 +709,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             text:
               type:
                 - "null"
@@ -761,7 +743,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
                   name:
                     type:
                       - "null"
@@ -770,7 +751,6 @@ properties:
                     type:
                       - "null"
                       - string
-                    format: date-time
             caption_ids:
               type:
                 - "null"

@@ -101,10 +101,10 @@ class AccessToken(BaseModel):
     )
 
 class Credentials(BaseModel):
-    access_token_sops: Any
+    access_token: Any
     auth_type: str
-    client_id_sops: Any
-    client_secret_sops: Any
+    client_id: Any
+    client_secret: Any
 
     model_config = ConfigDict(from_attributes=True)
 

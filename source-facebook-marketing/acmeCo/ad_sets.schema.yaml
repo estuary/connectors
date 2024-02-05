@@ -1,6 +1,6 @@
 ---
-type: object
-additionalProperties: true
+type:
+  - object
 properties:
   name:
     type:
@@ -10,7 +10,6 @@ properties:
     type:
       - "null"
       - string
-    format: date-time
   promoted_object:
     type:
       - "null"
@@ -60,7 +59,6 @@ properties:
     type:
       - "null"
       - string
-    format: date-time
   daily_budget:
     type:
       - "null"
@@ -81,12 +79,10 @@ properties:
     type:
       - "null"
       - string
-    format: date-time
   start_time:
     type:
       - "null"
       - string
-    format: date-time
   lifetime_budget:
     type:
       - "null"
@@ -1740,10 +1736,8 @@ properties:
           type: string
         created_time:
           type: string
-          format: date-time
         updated_time:
           type: string
-          format: date-time
   _meta:
     type: object
     properties:

@@ -11,63 +11,67 @@ captures:
           - source-facebook-marketing
         config: connector_config.yaml
     bindings:
-      # - resource:
-      #     stream: ad_account
-      #     syncMode: full_refresh
-      #   target: acmeCo/ad_account
-      # - resource:
-      #     stream: ad_sets
-      #     syncMode: incremental
-      #   target: acmeCo/ad_sets
-      # - resource:
-      #     stream: ads
-      #     syncMode: incremental
-      #   target: acmeCo/ads
-      # - resource:
-      #     stream: ad_creatives
-      #     syncMode: full_refresh
-      #   target: acmeCo/ad_creatives
-      # - resource:
-      #     stream: ads_insights
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights
-      # - resource:
-      #     stream: ads_insights_age_and_gender
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights_age_and_gender
-      # - resource:
-      #     stream: ads_insights_country
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights_country
-      # - resource:
-      #     stream: ads_insights_region
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights_region
-      # - resource:
-      #     stream: ads_insights_dma
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights_dma
-      # - resource:
-      #     stream: ads_insights_platform_and_device
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights_platform_and_device
-      # - resource:
-      #     stream: ads_insights_action_type
-      #     syncMode: incremental
-      #   target: acmeCo/ads_insights_action_type
+      - resource:
+          stream: ad_account
+          syncMode: full_refresh
+        target: acmeCo/ad_account
+      - resource:
+          stream: ad_sets
+          syncMode: incremental
+        target: acmeCo/ad_sets
+      - resource:
+          stream: ads
+          syncMode: incremental
+        target: acmeCo/ads
+      - resource:
+          stream: ad_creatives
+          syncMode: full_refresh
+        target: acmeCo/ad_creatives
+      - resource:
+          stream: ads_insights
+          syncMode: incremental
+        target: acmeCo/ads_insights
+      - resource:
+          stream: ads_insights_age_and_gender
+          syncMode: incremental
+        target: acmeCo/ads_insights_age_and_gender
+      - resource:
+          stream: ads_insights_country
+          syncMode: incremental
+        target: acmeCo/ads_insights_country
+      - resource:
+          stream: ads_insights_region
+          syncMode: incremental
+        target: acmeCo/ads_insights_region
+      - resource:
+          stream: ads_insights_dma
+          syncMode: incremental
+        target: acmeCo/ads_insights_dma
+      - resource:
+          stream: ads_insights_platform_and_device
+          syncMode: incremental
+        target: acmeCo/ads_insights_platform_and_device
+      - resource:
+          stream: ads_insights_action_type
+          syncMode: incremental
+        target: acmeCo/ads_insights_action_type
       - resource:
           stream: campaigns
           syncMode: incremental
         target: acmeCo/campaigns
-      # - resource:
-      #     stream: custom_conversions
-      #     syncMode: full_refresh
-      #   target: acmeCo/custom_conversions
-      # - resource:
-      #     stream: images
-      #     syncMode: incremental
-      #   target: acmeCo/images
-      # - resource:
-      #     stream: videos
-      #     syncMode: incremental
-      #   target: acmeCo/videos
+      - resource:
+          stream: custom_conversions
+          syncMode: full_refresh
+        target: acmeCo/custom_conversions
+      - resource:
+          stream: images
+          syncMode: incremental
+        target: acmeCo/images
+      - resource:
+          stream: videos
+          syncMode: incremental
+        target: acmeCo/videos
+      - resource:
+          stream: customads_insights_publisher_platform
+          syncMode: incremental
+        target: acmeCo/customads_insights_publisher_platform

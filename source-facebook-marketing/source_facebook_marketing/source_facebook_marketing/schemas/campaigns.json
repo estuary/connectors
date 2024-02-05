@@ -107,5 +107,5 @@
       "type": "string"
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"]
 }

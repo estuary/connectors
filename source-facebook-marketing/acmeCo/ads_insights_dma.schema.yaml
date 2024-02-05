@@ -1,6 +1,4 @@
 ---
-type: object
-additionalProperties: true
 properties:
   account_currency:
     type:

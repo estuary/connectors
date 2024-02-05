@@ -74,6 +74,13 @@ collections:
     schema: custom_conversions.schema.yaml
     key:
       - /id
+  acmeCo/customads_insights_publisher_platform:
+    schema: customads_insights_publisher_platform.schema.yaml
+    key:
+      - /date_start
+      - /account_id
+      - /ad_id
+      - /publisher_platform
   acmeCo/images:
     schema: images.schema.yaml
     key:
