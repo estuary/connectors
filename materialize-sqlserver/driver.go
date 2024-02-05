@@ -191,6 +191,7 @@ func newSqlServerDriver() *sql.Driver {
 				NewTransactor:        prepareNewTransactor(templates),
 				Tenant:               tenant,
 				ConcurrentApply:      false,
+				MaxFieldCharLen:      128,
 			}, nil
 		},
 	}
