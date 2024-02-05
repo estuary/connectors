@@ -7288,6 +7288,12 @@
                 "string"
               ]
             },
+            "hs_email_sent_count": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_email_sent_via": {
               "type": [
                 "null",
