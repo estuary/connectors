@@ -105,8 +105,8 @@ class State(BaseModel):
             return (parsed_state, index)
 
         except Exception as e:
-            logger.error("Failed to parse incoming state: ", e)
-            raise e
+            logger.error("Failed to parse incoming state, letting it ride: ", e)
+            return (State(), {})
 
 class CaptureShim(Connector):
     delegate: Source
