@@ -11,5 +11,6 @@ shim_airbyte_cdk.CaptureShim(
                 "access_token": "/access_token"
             },
             "accessTokenUrlTemplate": "https://graph.facebook.com/v19.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
-        }
+        },
+    usesSchemaInference=False
 ).main()
