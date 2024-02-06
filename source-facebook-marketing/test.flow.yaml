@@ -4,6 +4,8 @@ import:
 captures:
   acmeCo/source-facebook-marketing:
     endpoint:
+      # connector:
+      #   image: ghcr.io/estuary/source-facebook-marketing:testing
       local:
         command:
           - python

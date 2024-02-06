@@ -96,7 +96,10 @@ class AdsInsights(FBMarketingIncrementalStream):
     @property
     def primary_key(self) -> Optional[Union[str, List[str], List[List[str]]]]:
         """Build complex PK based on slices and breakdowns"""
-        return ["date_start", "account_id", "ad_id"] + self.breakdowns
+        # return ["date_start", "account_id", "ad_id"] + self.breakdowns
+        # We missed these key fields in airbyte-to-flow, so we're intentionally
+        # breaking this logic to retain consistency and avoid re-versioning collections.
+        return ["date_start", "account_id", "ad_id"]
 
     @property
     def insights_lookback_period(self):
