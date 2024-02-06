@@ -163,15 +163,15 @@ class SourceFacebookMarketing(AbstractSource):
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
             ),
-            # Activities(
-            #     api=api,
-            #     start_date=config.start_date,
-            #     end_date=config.end_date,
-            #     include_deleted=config.include_deleted,
-            #     page_size=config.page_size,
-            #     max_batch_size=config.max_batch_size,
-            #     source_defined_primary_key=["object_id", "actor_id", "application_id", "event_time", "event_type"],
-            # ),
+            Activities(
+                api=api,
+                start_date=config.start_date,
+                end_date=config.end_date,
+                include_deleted=config.include_deleted,
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["object_id", "actor_id", "application_id", "event_time", "event_type"],
+            ),
         ]
 
         return streams + self.get_custom_insights_streams(api, config)
