@@ -346,33 +346,37 @@
           "type": "integer"
         },
         "credentials": {
-          "title": "Credentials",
+          "title": "OAuthCredentials",
           "type": "object",
           "properties": {
             "access_token": {
-              "title": "Access Token"
+              "title": "Access Token",
+              "airbyte_secret": true,
+              "type": "string"
             },
             "auth_type": {
               "title": "Auth Type",
+              "default": "OAuth Credentials",
+              "order": 0,
               "type": "string"
             },
             "client_id": {
-              "title": "Client Id"
+              "title": "Client Id",
+              "airbyte_secret": true,
+              "type": "string"
             },
             "client_secret": {
-              "title": "Client Secret"
-            },
-            "model_config": {
-              "title": "Model Config",
-              "default": {
-                "from_attributes": true
-              },
-              "type": "object"
+              "title": "Client Secret",
+              "airbyte_secret": true,
+              "type": "string"
             }
           },
           "required": [
-            "auth_type"
-          ]
+            "access_token",
+            "client_id",
+            "client_secret"
+          ],
+          "x-oauth2-provider": "facebook"
         },
         "action_breakdowns_allow_empty": {
           "title": "Action Breakdowns Allow Empty",
