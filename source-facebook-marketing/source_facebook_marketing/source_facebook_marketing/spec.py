@@ -5,7 +5,7 @@
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Annotated
+from typing import Any, Dict, List, Optional, Type, Annotated, Union
 
 from airbyte_cdk.sources.config import BaseConfig
 from facebook_business.adobjects.adsinsights import AdsInsights
@@ -100,14 +100,26 @@ class AccessToken(BaseModel):
         airbyte_secret=True,
     )
 
-class Credentials(BaseModel):
-    access_token: Any
-    auth_type: str
-    client_id: Any
-    client_secret: Any
+class OAuthCredentials(BaseModel):
+    access_token: str = Field(
+        airbyte_secret=True
+    )
 
-    # model_config = ConfigDict(json_schema_extra={'x-oauth2-provider': "facebook"}, from_attributes=True)
-    # model_config = ConfigDict(from_attributes=True)
+    auth_type: str = Field(
+        default="OAuth Credentials",
+        order=0,
+    )
+    client_id: str = Field(
+        airbyte_secret=True
+    )
+    client_secret: str = Field(
+        airbyte_secret=True
+    )
+
+    class Config:
+        schema_extra = {
+            "x-oauth2-provider": "facebook"
+        }
 
 class ConnectorConfig(BaseConfig):
     """Connector config"""
@@ -213,7 +225,7 @@ class ConnectorConfig(BaseConfig):
         default=50,
     )
 
-    credentials: Annotated[Credentials, Field(**{"x-oauth2-provider": "facebook"})]
+    credentials: OAuthCredentials# Annotated[Union[OAuthCredentials], Field(discriminator="auth_type")]
 
     action_breakdowns_allow_empty: bool = Field(
         description="Allows action_breakdowns to be an empty list",
