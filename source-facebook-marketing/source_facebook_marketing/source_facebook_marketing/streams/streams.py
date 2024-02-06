@@ -114,7 +114,6 @@ class Activities(FBMarketingIncrementalStream):
 
     entity_prefix = "activity"
     cursor_field = "event_time"
-    primary_key = None
 
     def list_objects(self, fields: List[str], params: Mapping[str, Any]) -> Iterable:
         return self._api.account.get_activities(fields=fields, params=params)
