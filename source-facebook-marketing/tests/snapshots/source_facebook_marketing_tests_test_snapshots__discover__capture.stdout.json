@@ -518,8 +518,7 @@
             "row_id"
           ]
         }
-      },
-      "x-infer-schema": true
+      }
     },
     "key": [
       "/id"
@@ -3192,8 +3191,7 @@
             "row_id"
           ]
         }
-      },
-      "x-infer-schema": true
+      }
     },
     "key": [
       "/id"
@@ -6503,8 +6501,7 @@
             "row_id"
           ]
         }
-      },
-      "x-infer-schema": true
+      }
     },
     "key": [
       "/id"
@@ -12181,8 +12178,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/id"
@@ -15908,8 +15904,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -19649,8 +19644,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -23384,8 +23378,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -27119,8 +27112,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -30854,8 +30846,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -34601,8 +34592,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -38330,8 +38320,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
@@ -38524,8 +38513,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/id"
@@ -38660,8 +38648,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/id"
@@ -38738,8 +38725,7 @@
           ]
         },
         "created_time": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "hash": {
           "type": [
@@ -38766,8 +38752,7 @@
           ]
         },
         "updated_time": {
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "height": {
           "type": [
@@ -38792,8 +38777,7 @@
             "row_id"
           ]
         }
-      },
-      "x-infer-schema": true
+      }
     },
     "key": [
       "/id"
@@ -39001,11 +38985,111 @@
             "row_id"
           ]
         }
-      },
-      "x-infer-schema": true
+      }
     },
     "key": [
       "/id"
+    ]
+  },
+  {
+    "recommendedName": "activities",
+    "resourceConfig": {
+      "stream": "activities",
+      "syncMode": "incremental"
+    },
+    "documentSchema": {
+      "properties": {
+        "actor_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "actor_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "application_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "application_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_time_in_timezone": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "event_time": {
+          "type": "string"
+        },
+        "event_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "extra_data": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "object_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "object_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "object_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "translated_event_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/object_id",
+      "/actor_id",
+      "/application_id",
+      "/event_time",
+      "/event_type"
     ]
   },
   {
@@ -39196,8 +39280,7 @@
       },
       "type": [
         "object"
-      ],
-      "x-infer-schema": true
+      ]
     },
     "key": [
       "/date_start",
