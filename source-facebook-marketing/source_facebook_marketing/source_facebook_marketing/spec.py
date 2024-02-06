@@ -5,7 +5,7 @@
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Annotated
 
 from airbyte_cdk.sources.config import BaseConfig
 from facebook_business.adobjects.adsinsights import AdsInsights
@@ -106,7 +106,8 @@ class Credentials(BaseModel):
     client_id: Any
     client_secret: Any
 
-    model_config = ConfigDict(from_attributes=True)
+    # model_config = ConfigDict(json_schema_extra={'x-oauth2-provider': "facebook"}, from_attributes=True)
+    # model_config = ConfigDict(from_attributes=True)
 
 class ConnectorConfig(BaseConfig):
     """Connector config"""
@@ -212,7 +213,7 @@ class ConnectorConfig(BaseConfig):
         default=50,
     )
 
-    credentials: Credentials
+    credentials: Annotated[Credentials, Field(**{"x-oauth2-provider": "facebook"})]
 
     action_breakdowns_allow_empty: bool = Field(
         description="Allows action_breakdowns to be an empty list",

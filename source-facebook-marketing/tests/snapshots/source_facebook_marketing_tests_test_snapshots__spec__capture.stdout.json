@@ -347,31 +347,30 @@
         },
         "credentials": {
           "title": "Credentials",
-          "type": "object",
-          "properties": {
-            "access_token": {
-              "title": "Access Token"
-            },
-            "auth_type": {
-              "title": "Auth Type",
-              "type": "string"
-            },
-            "client_id": {
-              "title": "Client Id"
-            },
-            "client_secret": {
-              "title": "Client Secret"
-            },
-            "model_config": {
-              "title": "Model Config",
-              "default": {
-                "from_attributes": true
+          "x-oauth2-provider": "facebook",
+          "allOf": [
+            {
+              "title": "Credentials",
+              "type": "object",
+              "properties": {
+                "access_token": {
+                  "title": "Access Token"
+                },
+                "auth_type": {
+                  "title": "Auth Type",
+                  "type": "string"
+                },
+                "client_id": {
+                  "title": "Client Id"
+                },
+                "client_secret": {
+                  "title": "Client Secret"
+                }
               },
-              "type": "object"
+              "required": [
+                "auth_type"
+              ]
             }
-          },
-          "required": [
-            "auth_type"
           ]
         },
         "action_breakdowns_allow_empty": {
