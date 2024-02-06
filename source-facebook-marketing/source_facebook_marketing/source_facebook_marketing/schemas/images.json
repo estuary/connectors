@@ -48,8 +48,7 @@
       "type": ["null", "string"]
     },
     "updated_time": {
-      "type": "string",
-      "format": "date-time"
+      "type": "string"
     },
     "height": {
       "type": ["null", "integer"]
