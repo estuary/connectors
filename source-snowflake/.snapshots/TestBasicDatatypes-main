@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/test_basicdatatypes_77528227": 3 Documents
+# ================================
+{"BDATA":"7loRpQ==","BIT":false,"DATA":"DCBA","FDATA":2.64,"ID":3,"X":0,"Y":0,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_BasicDatatypes_77528227","seq":2,"off":0}}}
+{"BDATA":"/w==","BIT":false,"DATA":"    ","FDATA":0.00001,"ID":4,"X":-9999,"Y":100,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_BasicDatatypes_77528227","seq":2,"off":1}}}
+{"BDATA":null,"BIT":null,"DATA":null,"FDATA":null,"ID":5,"X":null,"Y":null,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_BasicDatatypes_77528227","seq":2,"off":2}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"streams":{"PUBLIC%2Ftest_BasicDatatypes_77528227":{"off":0,"seq":3,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_BASICDATATYPES_77528227"}}}
+

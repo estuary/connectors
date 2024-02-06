@@ -30,6 +30,7 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./source-mongodb
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture

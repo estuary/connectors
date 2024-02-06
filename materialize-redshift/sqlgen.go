@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -104,13 +105,19 @@ var rsDialect = func() sql.Dialect {
 				// A schema isn't required to be set on the endpoint or any resource, and if its
 				// empty the default Redshift schema "public" will implicitly be used. Also note
 				// that Redshift lowercases all identifiers.
-				return sql.InfoTableLocation{TableSchema: "public", TableName: strings.ToLower(path[0])}
+				return sql.InfoTableLocation{
+					TableSchema: "public",
+					TableName:   truncatedIdentifier(strings.ToLower(path[0])),
+				}
 			} else {
-				return sql.InfoTableLocation{TableSchema: strings.ToLower(path[0]), TableName: strings.ToLower(path[1])}
+				return sql.InfoTableLocation{
+					TableSchema: truncatedIdentifier(strings.ToLower(path[0])),
+					TableName:   truncatedIdentifier(strings.ToLower(path[1])),
+				}
 			}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
-			return strings.ToLower(field)
+			return truncatedIdentifier(strings.ToLower(field))
 		}),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
@@ -298,3 +305,26 @@ TRUNCATECOLUMNS;
 )
 
 const varcharTableAlter = "ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(MAX);"
+
+// truncatedIdentifier produces a truncated form of an identifier, in accordance with Redshift's
+// automatic truncation of identifiers that are over 127 bytes in length. For example, if a Flow
+// collection or field name is over 127 bytes in length, Redshift will let a table/column be created
+// with that as an identifier, but automatically truncates the identifier when interacting with it.
+// This means we have to be aware of this possible truncation when querying the information_schema
+// view.
+func truncatedIdentifier(in string) string {
+	maxByteLength := 127
+
+	if len(in) <= maxByteLength {
+		return in
+	}
+
+	bytes := []byte(in)
+	for maxByteLength >= 0 && !utf8.Valid(bytes[:maxByteLength]) {
+		// Don't mangle multi-byte characters; this seems to be consistent with Redshift truncation
+		// as well.
+		maxByteLength -= 1
+	}
+
+	return string(bytes[:maxByteLength])
+}

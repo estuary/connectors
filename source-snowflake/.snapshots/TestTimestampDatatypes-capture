@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test_timestampdatatypes_38028141": 2 Documents
+# ================================
+{"HMS":"0001-01-01T09:25:27Z","TSNTZ":"1991-08-31T09:25:27Z","TSTZ":"1991-08-31T09:25:27Z","YMD":"1991-08-31T00:00:00Z","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_TimestampDatatypes_38028141","seq":0,"off":0}}}
+{"HMS":"0001-01-01T06:13:44Z","TSNTZ":"1991-11-25T06:13:44Z","TSTZ":"1991-11-25T06:13:44Z","YMD":"1991-11-25T00:00:00Z","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_TimestampDatatypes_38028141","seq":0,"off":1}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"streams":{"PUBLIC%2Ftest_TimestampDatatypes_38028141":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_TIMESTAMPDATATYPES_38028141"}}}
+

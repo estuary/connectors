@@ -27,7 +27,7 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0"`
+	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
 	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
 	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
 	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
@@ -251,6 +251,14 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
 	}
+	// TODO: remove after migration
+	for _, item := range d.cp {
+		if len(item.StagedDir) == 0 {
+			log.WithField("state", string(state)).Info("found old checkpoint format, ignoring the checkpoint and starting clean")
+			d.cp = make(checkpoint)
+			break
+		}
+	}
 
 	return nil
 }
@@ -446,9 +454,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Table    string
-	Query    string
-	ToDelete string
+	Table     string
+	Query     string
+	StagedDir string
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -490,15 +498,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if b.store.mustMerge {
 			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:    b.target.Identifier,
-				Query:    renderWithDir(b.store.mergeInto, dir),
-				ToDelete: dir,
+				Table:     b.target.Identifier,
+				Query:     renderWithDir(b.store.mergeInto, dir),
+				StagedDir: dir,
 			}
 		} else {
 			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:    b.target.Identifier,
-				Query:    renderWithDir(b.store.copyInto, dir),
-				ToDelete: dir,
+				Table:     b.target.Identifier,
+				Query:     renderWithDir(b.store.copyInto, dir),
+				StagedDir: dir,
 			}
 		}
 	}
@@ -528,9 +536,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
 	for stateKey, item := range d.cp {
-		if len(item.Query) == 0 {
-			continue
-		}
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if !d.hasStateKey(stateKey) {
@@ -552,7 +557,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 		log.WithField("table", item.Table).Info("store: finished query")
 
-		d.deleteFiles(ctx, []string{item.ToDelete})
+		d.deleteFiles(ctx, []string{item.StagedDir})
 	}
 
 	log.Info("store: finished committing changes")

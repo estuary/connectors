@@ -5,5 +5,5 @@ Checksum: 2ba231d6535812a5c4865e86f3d25af98c99407e9d8f5feea0b24c43be1632ee
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.captureoversizedfields_64819605":{"backfilled":4,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"test%2Fcaptureoversizedfields_64819605":{"backfilled":4,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
 

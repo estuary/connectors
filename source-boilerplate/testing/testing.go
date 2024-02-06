@@ -64,6 +64,7 @@ func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Respon
 	}
 
 	validation, err := cs.Driver.Validate(ctx, &pc.Request_Validate{
+		Name:       "acmeCo/test-capture/source-something",
 		ConfigJson: endpointSpecJSON,
 		Bindings:   bindings,
 	})
@@ -156,7 +157,7 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		Open: &pc.Request_Open{
 			StateJson: cs.Checkpoint,
 			Capture: &flow.CaptureSpec{
-				Name:       flow.Capture("acmeCo/" + strings.Replace(t.Name(), "/", "-", -1) + "capture"),
+				Name:       "acmeCo/test-capture/source-something",
 				ConfigJson: endpointSpecJSON,
 				Bindings:   cs.Bindings,
 			},

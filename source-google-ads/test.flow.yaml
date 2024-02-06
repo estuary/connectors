@@ -1,0 +1,84 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-google-ads:
+    shards:
+      logLevel: debug
+    endpoint:
+      local:
+        command:
+          - python
+          # - "-m"
+          # - debugpy
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          - "-m"
+          - source-google-ads
+        config: connector_config.yaml
+    bindings:
+      - resource:
+          stream: ad_group_ads
+          syncMode: incremental
+        target: acmeCo/ad_group_ads
+      - resource:
+          stream: ad_group_ad_labels
+          syncMode: full_refresh
+        target: acmeCo/ad_group_ad_labels
+      - resource:
+          stream: ad_groups
+          syncMode: incremental
+        target: acmeCo/ad_groups
+      - resource:
+          stream: ad_group_labels
+          syncMode: full_refresh
+        target: acmeCo/ad_group_labels
+      - resource:
+          stream: accounts
+          syncMode: incremental
+        target: acmeCo/accounts
+      - resource:
+          stream: campaign_labels
+          syncMode: full_refresh
+        target: acmeCo/campaign_labels
+      - resource:
+          stream: click_view
+          syncMode: incremental
+        target: acmeCo/click_view
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+        target: acmeCo/campaigns
+      - resource:
+          stream: user_location_report
+          syncMode: incremental
+        target: acmeCo/user_location_report
+      - resource:
+          stream: account_performance_report
+          syncMode: incremental
+        target: acmeCo/account_performance_report
+      - resource:
+          stream: display_topics_performance_report
+          syncMode: incremental
+        target: acmeCo/display_topics_performance_report
+      - resource:
+          stream: display_keyword_performance_report
+          syncMode: incremental
+        target: acmeCo/display_keyword_performance_report
+      - resource:
+          stream: shopping_performance_report
+          syncMode: incremental
+        target: acmeCo/shopping_performance_report
+      - resource:
+          stream: ad_group_ad_report
+          syncMode: incremental
+        target: acmeCo/ad_group_ad_report
+      - resource:
+          stream: geographic_report
+          syncMode: incremental
+        target: acmeCo/geographic_report
+      - resource:
+          stream: keyword_report
+          syncMode: incremental
+        target: acmeCo/keyword_report

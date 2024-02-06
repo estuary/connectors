@@ -404,5 +404,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_capturewithcompoundtextandintegerkey_50810729":{"backfilled":400,"key_columns":["k1","k2","k3","k4"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_CaptureWithCompoundTextAndIntegerKey_50810729":{"backfilled":400,"key_columns":["k1","k2","k3","k4"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

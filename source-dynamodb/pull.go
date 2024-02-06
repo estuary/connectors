@@ -10,6 +10,7 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -35,6 +36,11 @@ const (
 
 	// Number of stream workers which may concurrently send requests for stream data.
 	streamConcurrency = 5
+
+	// Describe stream calls that are needed to get a shard listing are limited to 10 per second, so
+	// we need to do requests less often than that to avoid errors. See
+	// https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_streams_DescribeStream.html
+	listShardsPerSecond = 5
 )
 
 type table struct {
@@ -76,16 +82,16 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		checkpoint.Tables = make(map[boilerplate.StateKey]tableState)
 	}
 
-	migrated, err := migrateState(&checkpoint, open.Capture.Bindings)
-	if err != nil {
-		return err
+	c := capture{
+		client:            client,
+		stream:            stream,
+		config:            cfg,
+		state:             checkpoint,
+		listShardsLimiter: rate.NewLimiter(rate.Limit(listShardsPerSecond), 1),
 	}
 
-	c := capture{
-		client: client,
-		stream: stream,
-		config: cfg,
-		state:  checkpoint,
+	if err := stream.Ready(false); err != nil {
+		return err
 	}
 
 	tables := []*table{}
@@ -103,18 +109,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		tables = append(tables, t)
 	}
 
-	if err := stream.Ready(false); err != nil {
-		return err
-	}
-
 	eg, groupCtx := errgroup.WithContext(ctx)
-
-	if migrated {
-		if err := c.checkpoint(); err != nil {
-			return fmt.Errorf("updating migrated checkpoint: %w", err)
-		}
-	}
-
 	for _, table := range tables {
 		table := table
 		eg.Go(func() error {

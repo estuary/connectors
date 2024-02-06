@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -25,6 +27,27 @@ import (
 type driver struct{}
 
 func (d *driver) connect(ctx context.Context, cfg config) (*mongo.Client, error) {
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
+	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		uri, err := url.Parse(cfg.Address)
+		if err != nil {
+			return nil, fmt.Errorf("parsing address for network tunnel: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: cfg.NetworkTunnel.SSHForwarding.SSHEndpoint,
+			PrivateKey:  []byte(cfg.NetworkTunnel.SSHForwarding.PrivateKey),
+			ForwardHost: uri.Hostname(),
+			ForwardPort: uri.Port(),
+			LocalPort:   "27017",
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		if err := tunnel.Start(); err != nil {
+			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+		}
+	}
+
 	// Create a new client and connect to the server
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
 	if err != nil {

@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_prerequisites_18126986":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo.test_prerequisites_24315212":{"backfilled":0,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"dbo%2Ftest_Prerequisites_18126986":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_Prerequisites_24315212":{"backfilled":0,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

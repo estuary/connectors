@@ -1,0 +1,50 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key1: { type: integer }
+        key2: { type: boolean }
+        boolean: { type: boolean }
+        integer: { type: integer }
+        number: { type: number }
+        string: { type: string }
+      required: [key1, key2]
+    key: [/key1, /key2]
+
+  delta/updates:
+    schema:
+      type: object
+      properties:
+        theKey: { type: string }
+        aValue:
+          type: integer
+          description: A super-awesome value.
+      required: [theKey]
+    key: [/theKey]
+
+  no_values:
+    schema:
+      type: object
+      properties:
+        key1: { type: integer }
+        key2: { type: boolean }
+      required: [key1, key2]
+    key: [/key1, /key2]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+      - source: delta/updates
+        resource: { table: "Delta Updates" }
+      - source: no_values
+        resource: { table: "No Values" }
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_replicationdeletes_65713151":{"backfilled":5,"key_columns":["id"],"mode":"Active"}}}
+{"bindingStateV1":{"test%2Fgeneric_replicationdeletes_65713151":{"backfilled":5,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
 
