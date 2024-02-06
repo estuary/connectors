@@ -19655,9 +19655,7 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id",
-      "/age",
-      "/gender"
+      "/ad_id"
     ]
   },
   {
@@ -23392,8 +23390,7 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id",
-      "/country"
+      "/ad_id"
     ]
   },
   {
@@ -27128,8 +27125,7 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id",
-      "/region"
+      "/ad_id"
     ]
   },
   {
@@ -30864,8 +30860,7 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id",
-      "/dma"
+      "/ad_id"
     ]
   },
   {
@@ -34612,10 +34607,7 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id",
-      "/publisher_platform",
-      "/platform_position",
-      "/impression_device"
+      "/ad_id"
     ]
   },
   {
@@ -39210,8 +39202,7 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id",
-      "/publisher_platform"
+      "/ad_id"
     ]
   }
 ]
