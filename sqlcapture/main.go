@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -345,5 +346,10 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	return c.Run(ctx)
+	err = c.Run(ctx)
+	if errors.Is(err, errWatermarkNotReached) {
+		log.Warn("replication stream closed unexpectedly")
+		return nil
+	}
+	return err
 }
