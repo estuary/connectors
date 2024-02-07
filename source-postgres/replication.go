@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"sync"
 	"sync/atomic"
@@ -202,7 +203,15 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 
 	go func() {
 		var err = s.run(streamCtx)
+		// Context cancellation typically occurs only in tests, and for test stability
+		// it should be considered a clean shutdown and not necessarily an error.
 		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		// Unexpected EOF errors come from dropped connections or database restarts
+		// and should be considered a clean shutdown and not necessarily an error since
+		// most of the time we'll just restart and continue where we left off.
+		if errors.Is(err, io.ErrUnexpectedEOF) {
 			err = nil
 		}
 		// Always take up to 1 second to notify the database that we're done
