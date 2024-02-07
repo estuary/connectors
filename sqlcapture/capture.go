@@ -170,6 +170,10 @@ const (
 	streamProgressInterval     = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
+var (
+	errWatermarkNotReached = fmt.Errorf("replication stream closed before reaching watermark")
+)
+
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and cache the result. This is used at startup when
@@ -593,7 +597,7 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return fmt.Errorf("replication stream closed before reaching watermark")
+	return errWatermarkNotReached
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
