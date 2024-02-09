@@ -36,6 +36,10 @@ type sshForwarding struct {
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
 }
 
+type sshServer struct {
+	PublicKey string `json:"publicKey" jsonschema:"title=SSH Public Key,description=Public key to allow SSH connections (allows reverse port-forwarding)" jsonschema_extras:"secret=true,multiline=true"`
+}
+
 type tunnelConfig struct {
 	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
 }
@@ -53,7 +57,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	SSLMode   string     `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	SshServer *sshServer `json:"sshServer,omitempty" jsonschema:"title=SSH Server,description=Optionally run an SSH server in the connector container"`
 }
 
 // Validate the configuration.
@@ -197,6 +202,12 @@ func newPostgresDriver() *sql.Driver {
 				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 				if err := tunnel.Start(); err != nil {
 					return nil, fmt.Errorf("error starting network tunnel: %w", err)
+				}
+			}
+
+			if cfg.Advanced.SshServer != nil && cfg.Advanced.SshServer.PublicKey != "" {
+				if err := networkTunnel.StartServer(ctx, cfg.Advanced.SshServer.PublicKey); err != nil {
+					return nil, fmt.Errorf("starting ssh server: %w", err)
 				}
 			}
 

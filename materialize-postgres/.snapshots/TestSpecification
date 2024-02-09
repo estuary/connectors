@@ -49,6 +49,24 @@
             ],
             "title": "SSL Mode",
             "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          },
+          "sshServer": {
+            "properties": {
+              "publicKey": {
+                "type": "string",
+                "title": "SSH Public Key",
+                "description": "Public key to allow SSH connections (allows reverse port-forwarding)",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "publicKey"
+            ],
+            "title": "SSH Server",
+            "description": "Optionally run an SSH server in the connector container"
           }
         },
         "additionalProperties": false,

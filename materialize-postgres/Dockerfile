@@ -29,14 +29,27 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-postgres/...
 ################################################################################
 FROM ${BASE_IMAGE}
 
+# Must run as root in order to run sshd
+USER root
+
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
+
+# TODO(phil): remove apt caches
+RUN apt-get update && apt-get install -y ssh
+
+RUN mkdir -p /run/sshd && \
+ chmod 755 /run/sshd && \
+ mkdir -p /root/.ssh && \
+ chmod 700 /root/.ssh && \
+ ssh-keygen -A
+
 
 COPY --from=builder /builder/connector ./materialize-postgres
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
-# Avoid running the connector as root.
-USER nonroot:nonroot
+EXPOSE 22
+LABEL dev.estuary.port-public.22=true
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
