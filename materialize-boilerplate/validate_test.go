@@ -243,27 +243,6 @@ func TestValidate(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("can't materialize two collections to the same target", func(t *testing.T) {
-		existing := loadValidateSpec(t, "base.flow.proto")
-		proposed := loadValidateSpec(t, "base.flow.proto")
-
-		proposed.Bindings[0].Collection.Name = pf.Collection("other")
-
-		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is)
-
-		_, err := validator.ValidateBinding(
-			[]string{"key_value"},
-			false,
-			proposed.Bindings[0].Backfill,
-			proposed.Bindings[0].Collection,
-			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
-			existing,
-		)
-
-		require.ErrorContains(t, err, "cannot add a new binding to materialize collection 'other' to '[key_value]' because an existing binding for collection 'key/value' is already materializing to '[key_value]'")
-	})
-
 	t.Run("can't materialize a nullable collection key with no default value", func(t *testing.T) {
 		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
 

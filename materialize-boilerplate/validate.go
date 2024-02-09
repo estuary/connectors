@@ -323,8 +323,7 @@ func (v Validator) ambiguousFieldIsSelected(p pf.Projection, fieldSelection []st
 	return false
 }
 
-// findExistingBinding locates a binding within an existing stored specification, and verifies that
-// there are no target path conflicts with a proposed binding that does not already exist.
+// findExistingBinding locates a binding within an existing stored specification.
 func findExistingBinding(
 	resourcePath []string,
 	proposedCollection pf.Collection,
@@ -335,19 +334,7 @@ func findExistingBinding(
 	}
 	for _, existingBinding := range storedSpec.Bindings {
 		if existingBinding.Collection.Name == proposedCollection && slices.Equal(resourcePath, existingBinding.ResourcePath) {
-			// The binding already exists for this collection and is being materialized to the
-			// target.
 			return existingBinding, nil
-		} else if slices.Equal(resourcePath, existingBinding.ResourcePath) {
-			// There is a binding already materializing to the target, but for a different
-			// collection.
-			return nil, fmt.Errorf(
-				"cannot add a new binding to materialize collection '%s' to '%s' because an existing binding for collection '%s' is already materializing to '%s'",
-				proposedCollection.String(),
-				resourcePath,
-				existingBinding.Collection.Name,
-				resourcePath,
-			)
 		}
 	}
 	return nil, nil
