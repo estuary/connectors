@@ -48,7 +48,7 @@ func (v Validator) ValidateBinding(
 	fieldConfigJsonMap map[string]json.RawMessage,
 	storedSpec *pf.MaterializationSpec,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
-	existingBinding, err := findExistingBinding(path, boundCollection.Name, storedSpec)
+	existingBinding, err := findExistingBinding(path, storedSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -324,16 +324,12 @@ func (v Validator) ambiguousFieldIsSelected(p pf.Projection, fieldSelection []st
 }
 
 // findExistingBinding locates a binding within an existing stored specification.
-func findExistingBinding(
-	resourcePath []string,
-	proposedCollection pf.Collection,
-	storedSpec *pf.MaterializationSpec,
-) (*pf.MaterializationSpec_Binding, error) {
+func findExistingBinding(resourcePath []string, storedSpec *pf.MaterializationSpec) (*pf.MaterializationSpec_Binding, error) {
 	if storedSpec == nil {
 		return nil, nil // Binding is trivially not found
 	}
 	for _, existingBinding := range storedSpec.Bindings {
-		if existingBinding.Collection.Name == proposedCollection && slices.Equal(resourcePath, existingBinding.ResourcePath) {
+		if slices.Equal(resourcePath, existingBinding.ResourcePath) {
 			return existingBinding, nil
 		}
 	}

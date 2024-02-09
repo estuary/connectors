@@ -112,7 +112,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		// The existing binding spec is used to extract various properties that can't be learned
 		// from introspecting the destination system, such as the backfill counter and if the
 		// materialization was previously delta updates.
-		existingBinding, err := findExistingBinding(binding.ResourcePath, binding.Collection.Name, storedSpec)
+		existingBinding, err := findExistingBinding(binding.ResourcePath, storedSpec)
 		if err != nil {
 			return nil, fmt.Errorf("finding existing binding: %w", err)
 		}
