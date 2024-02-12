@@ -206,7 +206,8 @@ func newPostgresDriver() *sql.Driver {
 			}
 
 			if cfg.Advanced.SshServer != nil && cfg.Advanced.SshServer.PublicKey != "" {
-				if err := networkTunnel.StartServer(ctx, cfg.Advanced.SshServer.PublicKey); err != nil {
+				// Assume the revers port-forward will be started on port 5432, and wait for that port be opened
+				if err := networkTunnel.StartServer(ctx, cfg.Advanced.SshServer.PublicKey, 5432); err != nil {
 					return nil, fmt.Errorf("starting ssh server: %w", err)
 				}
 			}
