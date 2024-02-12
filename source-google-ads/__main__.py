@@ -14,7 +14,7 @@ def urlencode_field(field: str):
 
 accessTokenBody = {
     "grant_type": "authorization_code",
-    "client_id": "{{{ 'client_id' }}}",
+    "client_id": "{{{ client_id }}}",
     "client_secret": "{{{ client_secret }}}",
     "redirect_uri": "{{{ redirect_uri }}}",
     "code": "{{{ code }}}",
