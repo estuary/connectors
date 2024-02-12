@@ -787,35 +787,31 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 // is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
 // is only available on provisioned Redshift.
 func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket, prefix, table string, copyIntoErr error) error {
-	if strings.Contains(copyIntoErr.Error(), "Cannot COPY into nonexistent table") {
-		// If the target table does not exist, there will be no information in
-		// `sys_load_error_detail`, and the error message from Redshift is good enough as-is to
-		// spell out the reason and table involved in the error.
-		return copyIntoErr
-	}
-
 	// The transaction has failed. It must be finish being rolled back before using its underlying
 	// connection again.
 	txn.Rollback(ctx)
 	conn := txn.Conn()
 
-	log.WithFields(log.Fields{
-		"table": table,
-		"err":   copyIntoErr.Error(),
-	}).Warn("COPY INTO error")
-
 	loadErrInfo, err := getLoadErrorInfo(ctx, conn, bucket, prefix)
 	if err != nil {
-		return fmt.Errorf("COPY INTO error for table '%s' but could not query sys_load_error_detail: %w", table, err)
+		// If querying sys_load_error_detail fails for some reason, return the original error back
+		// unchanged, but log why sys_load_error_detail could not be queried. Some errors (target
+		// table doesn't exist, cluster ran out of memory, and maybe others) don't result in an
+		// error being added to sys_load_error_detail, but do have a descriptive error message from
+		// the COPY INTO operation.
+		log.WithError(err).Info("COPY INTO error but could not query sys_load_error_detail")
+		return copyIntoErr
 	}
 
 	log.WithFields(log.Fields{
-		"errMsg":    loadErrInfo.errMsg,
-		"errCode":   loadErrInfo.errCode,
-		"colName":   loadErrInfo.colName,
-		"colType":   loadErrInfo.colType,
-		"colLength": loadErrInfo.colLength,
-	}).Warn("loadErrInfo")
+		"table":       table,
+		"copyInfoErr": copyIntoErr,
+		"errMsg":      loadErrInfo.errMsg,
+		"errCode":     loadErrInfo.errCode,
+		"colName":     loadErrInfo.colName,
+		"colType":     loadErrInfo.colType,
+		"colLength":   loadErrInfo.colLength,
+	}).Info("loadErrInfo")
 
 	// See https://docs.aws.amazon.com/redshift/latest/dg/r_Load_Error_Reference.html for load error
 	// codes.
