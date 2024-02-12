@@ -17,6 +17,7 @@
           "description": "",
           "title": "Google Credentials",
           "order": 0,
+          "x-oauth2-provider": "google",
           "required": [
             "developer_token",
             "client_id",
