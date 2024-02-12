@@ -1,5 +1,6 @@
 from flow_sdk import shim_airbyte_cdk
 from source_google_ads import SourceGoogleAds
+import json
 
 
 def wrap_with_braces(body: str, count: int):
@@ -11,12 +12,19 @@ def wrap_with_braces(body: str, count: int):
 def urlencode_field(field: str):
     return f"{wrap_with_braces('#urlencode',2)}{wrap_with_braces(field,3)}{wrap_with_braces('/urlencode',2)}"
 
+accessTokenBody = {
+    "grant_type": "authorization_code",
+    "client_id": "{{{ 'client_id' }}}",
+    "client_secret": "{{{ client_secret }}}",
+    "redirect_uri": "{{{ redirect_uri }}}",
+    "code": "{{{ code }}}",
+}
 
 shim_airbyte_cdk.CaptureShim(
     delegate=SourceGoogleAds(),
     oauth2={
         "provider": "google",
-        "accessTokenBody": r"{\"grant_type\": \"authorization_code\", \"client_id\": \"{{{ 'client_id' }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
+        "accessTokenBody": json.dumps(accessTokenBody),
         "authUrlTemplate": (
             f"https://accounts.google.com/o/oauth2/auth?"
             f"access_type=offline&"
