@@ -1,0 +1,83 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-recurly:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-recurly
+        config:
+          credentials:
+            - api_key: 
+    bindings:
+      # - resource:
+      #     stream: accounts
+      #     syncMode: incremental
+      #   target: acmeCo/accounts
+      - resource:
+          stream: account_coupon_redemptions
+          syncMode: incremental
+        target: acmeCo/account_coupon_redemptions
+      - resource:
+          stream: account_notes
+          syncMode: incremental
+        target: acmeCo/account_notes
+      - resource:
+          stream: add_ons
+          syncMode: incremental
+        target: acmeCo/add_ons
+      - resource:
+          stream: billing_infos
+          syncMode: incremental
+        target: acmeCo/billing_infos
+      - resource:
+          stream: coupons
+          syncMode: incremental
+        target: acmeCo/coupons
+      - resource:
+          stream: credit_payments
+          syncMode: incremental
+        target: acmeCo/credit_payments
+      - resource:
+          stream: export_dates
+          syncMode: full_refresh
+        target: acmeCo/export_dates
+      - resource:
+          stream: invoices
+          syncMode: incremental
+        target: acmeCo/invoices
+      - resource:
+          stream: line_items
+          syncMode: incremental
+        target: acmeCo/line_items
+      - resource:
+          stream: measured_units
+          syncMode: incremental
+        target: acmeCo/measured_units
+      - resource:
+          stream: plans
+          syncMode: incremental
+        target: acmeCo/plans
+      - resource:
+          stream: shipping_addresses
+          syncMode: incremental
+        target: acmeCo/shipping_addresses
+      - resource:
+          stream: shipping_methods
+          syncMode: incremental
+        target: acmeCo/shipping_methods
+      - resource:
+          stream: subscriptions
+          syncMode: incremental
+        target: acmeCo/subscriptions
+      - resource:
+          stream: transactions
+          syncMode: incremental
+        target: acmeCo/transactions
+      - resource:
+          stream: unique_coupons
+          syncMode: incremental
+        target: acmeCo/unique_coupons

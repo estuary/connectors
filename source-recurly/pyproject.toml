@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "source-recurly-estuary"
+version = "0.1.0"
+description = ""
+authors = []
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.11.6"
+
+airbyte-cdk = "^0.52"
+
+source_recurly = { path = "source_recurly" }
+
+flow-sdk = {path="../python", develop=true}
+debugpy = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

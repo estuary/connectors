@@ -223,7 +223,6 @@
         },
         "rate": {
           "type": "number",
-          "format": "float",
           "title": "Rate"
         },
         "tax_details": {

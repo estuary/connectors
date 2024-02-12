@@ -147,7 +147,6 @@
     },
     "amount": {
       "type": "number",
-      "format": "float",
       "title": "Total after discounts and taxes",
       "description": "`(quantity * unit_amount) - (discount + tax)`"
     },

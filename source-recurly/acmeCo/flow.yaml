@@ -1,0 +1,124 @@
+---
+collections:
+  acmeCo/account_coupon_redemptions:
+    schema: account_coupon_redemptions.schema.yaml
+    key:
+      - /id
+  acmeCo/account_notes:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 13
+          readOnly: true
+        account_id:
+          type: string
+          maxLength: 13
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              readOnly: true
+              maxLength: 13
+        message:
+          type:
+            - "null"
+            - string
+          maxLength: 2048
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/accounts:
+    schema: accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/add_ons:
+    schema: add_ons.schema.yaml
+    key:
+      - /id
+  acmeCo/billing_infos:
+    schema: billing_infos.schema.yaml
+    key:
+      - /id
+  acmeCo/coupons:
+    schema: coupons.schema.yaml
+    key:
+      - /id
+  acmeCo/credit_payments:
+    schema: credit_payments.schema.yaml
+    key:
+      - /id
+  acmeCo/export_dates:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        dates:
+          type:
+            - "null"
+            - array
+          items:
+            type:
+              - "null"
+              - string
+            maxLength: 256
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
+  acmeCo/invoices:
+    schema: invoices.schema.yaml
+    key:
+      - /id
+  acmeCo/line_items:
+    schema: line_items.schema.yaml
+    key:
+      - /id
+  acmeCo/measured_units:
+    schema: measured_units.schema.yaml
+    key:
+      - /id
+  acmeCo/plans:
+    schema: plans.schema.yaml
+    key:
+      - /id
+  acmeCo/shipping_addresses:
+    schema: shipping_addresses.schema.yaml
+    key:
+      - /id
+  acmeCo/shipping_methods:
+    schema: shipping_methods.schema.yaml
+    key:
+      - /id
+  acmeCo/subscriptions:
+    schema: subscriptions.schema.yaml
+    key:
+      - /id
+  acmeCo/transactions:
+    schema: transactions.schema.yaml
+    key:
+      - /id
+  acmeCo/unique_coupons:
+    schema: unique_coupons.schema.yaml
+    key:
+      - /id

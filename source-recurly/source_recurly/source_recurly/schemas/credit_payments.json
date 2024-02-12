@@ -75,7 +75,6 @@
     },
     "amount": {
       "type": "number",
-      "format": "float",
       "title": "Amount",
       "description": "Total credit payment amount applied to the charge invoice."
     },

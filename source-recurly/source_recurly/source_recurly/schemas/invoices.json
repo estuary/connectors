@@ -204,7 +204,6 @@
     },
     "balance": {
       "type": ["null", "number"],
-      "format": "float",
       "title": "Balance",
       "description": "The outstanding balance remaining on this invoice."
     },

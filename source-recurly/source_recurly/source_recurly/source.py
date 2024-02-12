@@ -43,13 +43,13 @@ class SourceRecurly(AbstractSource):
     def check_connection(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> Tuple[bool, Optional[Any]]:
         try:
             # Checking the API key by trying a test API call to get the first account
-            self._client(config["api_key"]).list_accounts().first()
+            self._client(config["credentials"]["api_key"]).list_accounts().first()
             return True, None
         except ApiError as err:
             return False, err.args[0]
 
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
-        client = self._client(api_key=config["api_key"])
+        client = self._client(api_key=config["credentials"]["api_key"])
 
         args = {"client": client, "begin_time": config.get("begin_time"), "end_time": config.get("end_time")}
 

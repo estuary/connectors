@@ -116,7 +116,6 @@
           },
           "unit_amount": {
             "type": "number",
-            "format": "float",
             "title": "Discount Amount",
             "description": "Value of the fixed discount that this coupon applies."
           }
