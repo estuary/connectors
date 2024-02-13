@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"path"
@@ -21,6 +24,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
@@ -60,7 +64,33 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
+	// Compress the spec bytes to store, since we are using a VARBYTE column with a limit of 1MB.
+	// TODO(whb): This will go away when we start passing in the last validated spec to Validate
+	// calls and stop needing to persist a spec at all.
+	// updateSpec.Parameters
+	specB64 := updateSpec.Parameters[1] // The second parameter is the spec
+	specBytes, err := base64.StdEncoding.DecodeString(specB64.(string))
+	if err != nil {
+		return fmt.Errorf("decoding base64 spec prior to compressing: %w", err)
+	}
+
+	// Sanity check that this is indeed a spec. By all rights this is totally unnecessary but it
+	// makes me feel a little better about indexing updateSpec.Parameters up above.
+	var spec pf.MaterializationSpec
+	if err := spec.Unmarshal(specBytes); err != nil {
+		return fmt.Errorf("application logic error - specBytes was not a spec: %w", err)
+	}
+
+	var gzb bytes.Buffer
+	w := gzip.NewWriter(&gzb)
+	if _, err := w.Write(specBytes); err != nil {
+		return fmt.Errorf("compressing spec bytes: %w", err)
+	} else if err := w.Close(); err != nil {
+		return fmt.Errorf("closing gzip writer: %w", err)
+	}
+	updateSpec.Parameters[1] = base64.StdEncoding.EncodeToString(gzb.Bytes())
+
+	_, err = c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
 	return err
 }
 
@@ -198,12 +228,30 @@ func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, mater
 		return "", "", err
 	}
 
-	specBytes, err := hex.DecodeString(specHex)
+	specBytesFromHex, err := hex.DecodeString(specHex)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("hex.DecodeString: %w", err)
 	}
 
-	return string(specBytes), version, nil
+	specBytes, err := base64.StdEncoding.DecodeString(string(specBytesFromHex))
+	if err != nil {
+		return "", "", fmt.Errorf("base64.DecodeString: %w", err)
+	}
+
+	// Handle specs that were persisted prior to compressing their byte content, as well as current
+	// specs that are compressed.
+	if specBytes[0] == 0x1f && specBytes[1] == 0x8b { // Valid gzip header bytes
+		if r, err := gzip.NewReader(bytes.NewReader(specBytes)); err != nil {
+			return "", "", err
+		} else if specBytes, err = io.ReadAll(r); err != nil {
+			return "", "", fmt.Errorf("reading compressed specBytes: %w", err)
+		}
+	} else {
+		// Legacy spec that hasn't been re-persisted yet.
+		log.Info("loaded uncompressed spec")
+	}
+
+	return base64.StdEncoding.EncodeToString(specBytes), version, nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
