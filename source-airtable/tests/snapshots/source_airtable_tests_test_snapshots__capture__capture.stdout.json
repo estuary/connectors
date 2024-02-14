@@ -8,7 +8,7 @@
       "_meta": {
         "row_id": 1
       },
-      "cost": 200.0,
+      "cost": 200,
       "name": "Pepperoni",
       "status": "In progress",
       "ts": "redacted-timestamp"
@@ -23,7 +23,7 @@
       "_meta": {
         "row_id": 2
       },
-      "cost": 100.0,
+      "cost": 100,
       "name": "Pineapple",
       "status": "Done",
       "ts": "redacted-timestamp"
@@ -38,7 +38,7 @@
       "_meta": {
         "row_id": 3
       },
-      "cost": 300.0,
+      "cost": 300,
       "name": "Cheese",
       "status": "To do",
       "ts": "redacted-timestamp"
