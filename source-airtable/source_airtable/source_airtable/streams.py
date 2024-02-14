@@ -4,6 +4,7 @@
 
 
 from abc import ABC
+from copy import deepcopy
 from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
 import requests
@@ -162,15 +163,25 @@ class AirtableStream(HttpStream, ABC):
             params["offset"] = next_page_token
         return params
 
+    def normalize_fields(self, fields):
+        normalized_fields = deepcopy(fields)
+        
+        for field, value in normalized_fields.items():
+            if isinstance(value, dict) and "specialValue" in value:
+                normalized_fields.update({ field: value.get("specialValue") })
+
+        return normalized_fields
+
     def process_records(self, records) -> Iterable[Mapping[str, Any]]:
         for record in records:
             data = record.get("fields")
+
             if len(data) > 0:
                 yield {
                     "_airtable_id": record.get("id"),
                     "_airtable_created_time": record.get("createdTime"),
                     "_airtable_table_name": self.table_name,
-                    **{SchemaHelpers.clean_name(k): v for k, v in data.items()},
+                    **{SchemaHelpers.clean_name(k): v for k, v in self.normalize_fields(data).items()},
                 }
 
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
