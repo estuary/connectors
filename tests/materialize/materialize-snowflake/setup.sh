@@ -6,20 +6,29 @@ set -o nounset
 
 export SNOWFLAKE_HOST="${SNOWFLAKE_HOST}"
 export SNOWFLAKE_ACCOUNT="${SNOWFLAKE_ACCOUNT}"
-export SNOWFLAKE_USER="${SNOWFLAKE_USER}"
-export SNOWFLAKE_PASSWORD="${SNOWFLAKE_PASSWORD}"
 export SNOWFLAKE_DATABASE="${SNOWFLAKE_DATABASE}"
 export SNOWFLAKE_SCHEMA="${SNOWFLAKE_SCHEMA}"
 export SNOWFLAKE_WAREHOUSE="${SNOWFLAKE_WAREHOUSE}"
 
+export SNOWFLAKE_AUTH_TYPE="${SNOWFLAKE_AUTH_TYPE}"
+# if auth type is user_password
+export SNOWFLAKE_USER="${SNOWFLAKE_USER:-}"
+export SNOWFLAKE_PASSWORD="${SNOWFLAKE_PASSWORD:-}"
+# if auth type is jwt
+export SNOWFLAKE_PRIVATE_KEY="$(cat ${SNOWFLAKE_PRIVATE_KEY:-} | jq -sR . | sed -e 's/^"//' -e 's/"$//')"
+
 config_json_template='{
    "host":      "$SNOWFLAKE_HOST",
    "account":   "$SNOWFLAKE_ACCOUNT",
-   "user":      "$SNOWFLAKE_USER",
-   "password":  "$SNOWFLAKE_PASSWORD",
    "database":  "$SNOWFLAKE_DATABASE",
    "schema":    "$SNOWFLAKE_SCHEMA",
    "warehouse": "$SNOWFLAKE_WAREHOUSE",
+   "credentials": {
+     "auth_type": "$SNOWFLAKE_AUTH_TYPE",
+     "user": "$SNOWFLAKE_USER",
+     "password": "$SNOWFLAKE_PASSWORD",
+     "private_key": "$SNOWFLAKE_PRIVATE_KEY"
+   },
    "advanced": {
       "updateDelay": "0s"
     }
