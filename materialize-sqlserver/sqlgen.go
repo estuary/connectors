@@ -114,7 +114,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 				func(s string) bool {
 					return sql.IsSimpleIdentifier(s) && !slices.Contains(SQLSERVER_RESERVED_WORDS, strings.ToLower(s))
 				},
-				sql.QuoteTransform("\"", "\\\""),
+				sql.QuoteTransform(`"`, `""`),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
