@@ -118,7 +118,13 @@ func TestNormalizeIndexName(t *testing.T) {
 			name:       "dots",
 			byteLength: maxByteLength,
 			input:      ".some..collection",
-			want:       "some__collection",
+			want:       "some..collection",
+		},
+		{
+			name:       "normalized characters",
+			byteLength: maxByteLength,
+			input:      `??weird*<"\/,|>?:#index`,
+			want:       "weird___________index",
 		},
 		{
 			name:       "capitalized",
