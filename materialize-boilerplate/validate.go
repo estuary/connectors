@@ -34,13 +34,25 @@ type Validator struct {
 	// maxFieldLength is 0, no constraints are enforced. The length of a field name is in terms of
 	// characters, not bytes.
 	maxFieldLength int
+
+	// CaseInsensitiveFields is used to indicate if fields that differ only in capitalization will
+	// conflict in the materialized resource. For example, "thisfield" and "thisField" may have
+	// their capitalization preserved from the information_schema view (or equivalent), but the
+	// materialized resource creation will still result in an error due to conflicts.
+	caseInsensitiveFields bool
 }
 
-func NewValidator(c Constrainter, is *InfoSchema, maxFieldLength int) Validator {
+func NewValidator(
+	c Constrainter,
+	is *InfoSchema,
+	maxFieldLength int,
+	caseInsensitiveFields bool,
+) Validator {
 	return Validator{
-		c:              c,
-		is:             is,
-		maxFieldLength: maxFieldLength,
+		c:                     c,
+		is:                    is,
+		maxFieldLength:        maxFieldLength,
+		caseInsensitiveFields: caseInsensitiveFields,
 	}
 }
 
@@ -307,10 +319,20 @@ func (v Validator) validateMatchesExistingBinding(
 // of ambiguous fields, only a single one of them can be materialized.
 func (v Validator) ambiguousFields(p pf.Projection, ps []pf.Projection) []string {
 	ambiguous := []string{}
-	endpointFieldName := v.is.translateField(p.Field)
+
+	compareFields := func(f1, f2 string) bool {
+		f1 = v.is.translateField(f1)
+		f2 = v.is.translateField(f2)
+
+		if v.caseInsensitiveFields {
+			return strings.EqualFold(f1, f2)
+		}
+
+		return f1 == f2
+	}
 
 	for _, pp := range ps {
-		if p.Field != pp.Field && endpointFieldName == v.is.translateField(pp.Field) {
+		if p.Field != pp.Field && compareFields(p.Field, pp.Field) {
 			ambiguous = append(ambiguous, pp.Field)
 		}
 	}

@@ -190,7 +190,7 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := NewValidator(testConstrainter{}, is, tt.maxFieldLength)
+			validator := NewValidator(testConstrainter{}, is, tt.maxFieldLength, true)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
@@ -215,7 +215,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Field = "keyRenamedToSomethingThatIsReallyLong"
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 20)
+		validator := NewValidator(testConstrainter{}, is, 20, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -236,7 +236,7 @@ func TestValidate(t *testing.T) {
 		// it has already been materialized, and is either the root document projection or a
 		// collection key.
 		is := testInfoSchemaFromSpec(t, proposed, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 20)
+		validator := NewValidator(testConstrainter{}, is, 20, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -254,7 +254,7 @@ func TestValidate(t *testing.T) {
 		existing := loadValidateSpec(t, "increment-backfill.flow.proto")
 		proposed := loadValidateSpec(t, "base.flow.proto")
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0)
+		validator := NewValidator(testConstrainter{}, is, 0, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -275,7 +275,7 @@ func TestValidate(t *testing.T) {
 		existing.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0)
+		validator := NewValidator(testConstrainter{}, is, 0, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -296,7 +296,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0)
+		validator := NewValidator(testConstrainter{}, is, 0, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -317,7 +317,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Inference.DefaultJson = nil
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0)
+		validator := NewValidator(testConstrainter{}, is, 0, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -335,7 +335,7 @@ func TestValidate(t *testing.T) {
 		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0)
+		validator := NewValidator(testConstrainter{}, is, 0, true)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},

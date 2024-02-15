@@ -109,9 +109,6 @@ type Endpoint struct {
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
-	// MaxFieldCharLen is the maximum length allowable by the destination for materialized column
-	// names. A value of 0 means no maximum length is enforced.
-	MaxFieldCharLen int
 }
 
 // PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and
