@@ -1,0 +1,94 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  label:
+    type:
+      - "null"
+      - string
+  displayOrder:
+    type:
+      - "null"
+      - integer
+  active:
+    type:
+      - "null"
+      - boolean
+  stages:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        label:
+          type:
+            - "null"
+            - string
+        displayOrder:
+          type:
+            - "null"
+            - integer
+        metadata:
+          type:
+            - "null"
+            - object
+          properties:
+            isClosed:
+              type:
+                - "null"
+                - string
+            probability:
+              type:
+                - "null"
+                - string
+        stageId:
+          type:
+            - "null"
+            - string
+        createdAt:
+          type:
+            - "null"
+            - integer
+        updatedAt:
+          type:
+            - "null"
+            - integer
+        active:
+          type:
+            - "null"
+            - boolean
+  objectType:
+    type:
+      - "null"
+      - string
+  objectTypeId:
+    type:
+      - "null"
+      - string
+  pipelineId:
+    type:
+      - "null"
+      - string
+  createdAt:
+    type:
+      - "null"
+      - integer
+  updatedAt:
+    type:
+      - "null"
+      - integer
+  default:
+    type:
+      - "null"
+      - boolean
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true
