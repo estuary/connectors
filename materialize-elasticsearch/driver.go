@@ -305,19 +305,22 @@ func normalizeIndexName(index string, truncateLimit int) string {
 	afterPrefix := false
 	var b strings.Builder
 	for _, r := range index {
-		// Replace disallowed characters with underscore. Of the various problematic characters in
-		// an Elasticsearch index name, a "." is the only one that Flow allows in a collection name.
-		if r == '.' {
+		// Replace disallowed characters with underscore. Most of the characters in this list are
+		// named in the docs, but ES will also truncate index names that contain a '#' character to
+		// drop everything including & after that '#' character, so we'll normalize those too.
+		if slices.Contains([]rune{'*', '<', '"', ' ', '\\', '/', ',', '|', '>', '?', ':', '#'}, r) {
 			r = '_'
 		}
 
-		// Strip disallowed prefixes that may be present in a Flow collection name. A '.' is also a
-		// bad prefix, but those were already replaced with '_' above.
-		if !afterPrefix && (r == '-' || r == '_') {
+		// Strip disallowed prefixes. The prefix may now be an underscore from the replacement
+		// above, and we'll strip that too.
+		if !afterPrefix && slices.Contains([]rune{'_', '-', '+', '.'}, r) {
 			continue
 		}
+
 		afterPrefix = true
 
+		// Index names must be lowercase.
 		char := strings.ToLower(string(r))
 		if b.Len()+len(char) > truncateLimit {
 			// Truncate extremely long names. These must be less than 255 bytes.
