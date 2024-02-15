@@ -84,7 +84,7 @@ var pgDialect = func() sql.Dialect {
 				func(s string) bool {
 					return sql.IsSimpleIdentifier(s) && !slices.Contains(PG_RESERVED_WORDS, strings.ToLower(s))
 				},
-				sql.QuoteTransform("\"", "\\\""),
+				sql.QuoteTransform(`"`, `""`),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {

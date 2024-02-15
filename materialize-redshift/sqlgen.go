@@ -124,7 +124,7 @@ var rsDialect = func() sql.Dialect {
 				func(s string) bool {
 					return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(REDSHIFT_RESERVED_WORDS, strings.ToLower(s))
 				},
-				sql.QuoteTransform("\"", "\"\""),
+				sql.QuoteTransform(`"`, `""`),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {

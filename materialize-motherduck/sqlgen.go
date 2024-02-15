@@ -65,7 +65,7 @@ var duckDialect = func() sql.Dialect {
 				func(s string) bool {
 					return sql.IsSimpleIdentifier(s) && !slices.Contains(DUCKDB_RESERVED_WORDS, strings.ToUpper(s))
 				},
-				sql.QuoteTransform("\"", "\"\""),
+				sql.QuoteTransform(`"`, `""`),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
