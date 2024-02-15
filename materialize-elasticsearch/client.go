@@ -238,7 +238,7 @@ func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error
 			// Validate response.
 			return rp
 		},
-		func(f string) string { return f },
+		translateField,
 	)
 
 	var indexMeta map[string]indexMetaResponse
