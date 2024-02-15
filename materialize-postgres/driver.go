@@ -211,7 +211,6 @@ func newPostgresDriver() *sql.Driver {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				MaxFieldCharLen:     0, // Postgres automatically truncates column names that are too long
 			}, nil
 		},
 	}

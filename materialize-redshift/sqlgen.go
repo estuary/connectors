@@ -136,8 +136,10 @@ var rsDialect = func() sql.Dialect {
 		// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
 		// create columns as nullable to preserve the ability to change collection schema fields from
 		// required to not required or remove fields from the materialization.
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    0, // Redshift automatically truncates column names that are too long
+		CaseInsensitiveColumns: true,
 	}
 }()
 

@@ -249,7 +249,6 @@ func newRedshiftDriver() *sql.Driver {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				MaxFieldCharLen:     0, // Redshift automatically truncates column names that are too long
 			}, nil
 		},
 	}

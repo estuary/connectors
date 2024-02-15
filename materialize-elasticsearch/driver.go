@@ -387,8 +387,8 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	if err != nil {
 		return nil, fmt.Errorf("getting infoSchema for validate: %w", err)
 	}
-	// ElasticSearch has no limits on mapping field names by default.
-	validator := boilerplate.NewValidator(constrainter{}, is, 0)
+	// ElasticSearch has no limits on mapping field names by default and they are case sensitive.
+	validator := boilerplate.NewValidator(constrainter{}, is, 0, false)
 
 	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
