@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -32,6 +34,14 @@ func (f *fileBuffer) Close() error {
 		return err
 	}
 	return nil
+}
+
+// we keep track of files we upload so that we can send them to Snowpipe in an
+// insertFiles RPC
+// https://docs.snowflake.com/user-guide/data-load-snowpipe-rest-apis#label-rest-api-insertfiles
+type fileRecord struct {
+	Path string
+	Size int
 }
 
 // stagedFile manages uploading a sequence of local files produced by reading from Load/Store
@@ -79,6 +89,9 @@ type stagedFile struct {
 	// References to the current file being written.
 	buf     *fileBuffer
 	encoder *sql.CountingEncoder
+
+	// list of uploaded files
+	uploaded []fileRecord
 
 	// Per-transaction coordination.
 	putFiles chan string
@@ -201,6 +214,23 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			return fmt.Errorf("putWorker PUT to stage: %w", err)
 		} else if !strings.EqualFold("uploaded", status) {
 			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
+		}
+
+		log.WithFields(log.Fields{
+			"source":     source,
+			"target":     target,
+			"targetSize": targetSize,
+			"file":       file,
+			"uuid":       f.uuid,
+		}).Info("uploading file")
+
+		if size, err := strconv.Atoi(targetSize); err != nil {
+			return fmt.Errorf("parsing targetSize: %w", err)
+		} else {
+			f.uploaded = append(f.uploaded, fileRecord{
+				Path: target,
+				Size: size,
+			})
 		}
 
 		// Once the file has been staged to Snowflake we don't need it locally anymore and can
