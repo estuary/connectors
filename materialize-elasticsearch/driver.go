@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -465,11 +466,14 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		fields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
-		floatFields := make([]bool, len(fields))
-		for idx := range fields {
-			if prop, err := propForField(fields[idx], b); err != nil {
-				return nil, nil, fmt.Errorf("propForField in NewTransactor: %w", err)
+		allFields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
+		fields := make([]string, 0, len(allFields))
+		floatFields := make([]bool, len(allFields))
+
+		for idx, field := range allFields {
+			fields = append(fields, translateField(field))
+			if prop, err := propForField(field, b); err != nil {
+				return nil, nil, err
 			} else if prop.Type == elasticTypeDouble {
 				floatFields[idx] = true
 			}
@@ -491,6 +495,45 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		indexToBinding: indexToBinding,
 	}
 	return transactor, &pm.Response_Opened{}, nil
+}
+
+var (
+	// ElasticSearch has a number of pre-defined "Metadata" fields (see
+	// https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-fields.html) that
+	// exist for every index, and trying to create an index with a separate mapping with any of
+	// these names will fail with a "field is defined more than once" sort of error. All we can
+	// really do is differentiate our Flow field by appending "_flow" to the name of the field to
+	// allow the field to be created.
+	elasticReservedFields []string = []string{
+		"_index",
+		"_id",
+		"_source",
+		"_size",
+		"_doc_count",
+		"_field_names",
+		"_ignored",
+		"_routing",
+		"_tier",
+		// _meta is itself a metadata field, and is for custom application-specific metadata.
+		// Notably, you can explicitly create a mapping for the _meta field, so it seems reasonable
+		// to allow Flow collection data to be materialized as this field if it exists and is in the
+		// field selection.
+	}
+
+	reservedFieldSuffix string = "_flow"
+)
+
+func translateField(f string) string {
+	// ElasticSearch allows dots in field names, but it then treats these fields as an object
+	// hierarchy with nested fields. This isn't what we want, so dots are substituted with
+	// underscores.
+	f = strings.ReplaceAll(f, ".", "_")
+
+	if slices.Contains(elasticReservedFields, f) {
+		f = f + reservedFieldSuffix
+	}
+
+	return f
 }
 
 func main() { boilerplate.RunMain(new(driver)) }
