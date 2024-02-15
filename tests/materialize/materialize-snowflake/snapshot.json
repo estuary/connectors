@@ -31,31 +31,53 @@
       "mergePatch": true,
       "updated": {
         "duplicate_keys_delta": {
-          "Query": "\nCOPY INTO duplicate_keys_delta (\n\tid, flow_published_at, int, str, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n);\n",
+          "PipeFiles": [
+            {
+              "Path": "<uuid>",
+              "Size": 275
+            }
+          ],
+          "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA",
+          "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta"
         },
         "duplicate_keys_delta_exclude_flow_doc": {
-          "Query": "\nCOPY INTO duplicate_keys_delta_exclude_flow_doc (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
+          "PipeFiles": [
+            {
+              "Path": "<uuid>",
+              "Size": 140
+            }
+          ],
+          "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
+          "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta_exclude_flow_doc"
         },
         "duplicate_keys_standard": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n);\n",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_standard"
         },
         "formatted_strings": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time, $1[9] AS flow_document\n\tFROM <uuid>\n);\n",
           "StagedDir": "<uuid>",
           "Table": "formatted_strings"
         },
         "multiple_types": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nCOPY INTO multiple_types (\n\tid, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS array_int, $1[2] AS bool_field, $1[3] AS float_field, $1[4] AS flow_published_at, $1[5] AS multiple, $1[6] AS nested, $1[7] AS nullable_int, $1[8] AS str_field, $1[9] AS flow_document\n\tFROM <uuid>\n);\n",
           "StagedDir": "<uuid>",
           "Table": "multiple_types"
         },
         "simple": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nCOPY INTO simple (\n\tid, canary, flow_published_at, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at, $1[3] AS flow_document\n\tFROM <uuid>\n);\n",
           "StagedDir": "<uuid>",
           "Table": "simple"
@@ -278,31 +300,61 @@
       "mergePatch": true,
       "updated": {
         "duplicate_keys_delta": {
-          "Query": "\nCOPY INTO duplicate_keys_delta (\n\tid, flow_published_at, int, str, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n);\n",
+          "PipeFiles": [
+            {
+              "Path": "<uuid>",
+              "Size": 275
+            },
+            {
+              "Path": "<uuid>",
+              "Size": 271
+            }
+          ],
+          "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA",
+          "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta"
         },
         "duplicate_keys_delta_exclude_flow_doc": {
-          "Query": "\nCOPY INTO duplicate_keys_delta_exclude_flow_doc (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
+          "PipeFiles": [
+            {
+              "Path": "<uuid>",
+              "Size": 140
+            },
+            {
+              "Path": "<uuid>",
+              "Size": 137
+            }
+          ],
+          "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
+          "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta_exclude_flow_doc"
         },
         "duplicate_keys_standard": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nMERGE INTO duplicate_keys_standard AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n) AS r\nON l.id = r.id\nWHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.flow_published_at, l.int = r.int, l.str = r.str, l.flow_document = r.flow_document\nWHEN NOT MATCHED THEN\n\tINSERT (id, flow_published_at, int, str, flow_document)\n\tVALUES (r.id, r.flow_published_at, r.int, r.str, r.flow_document);\n",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_standard"
         },
         "formatted_strings": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time, $1[9] AS flow_document\n\tFROM <uuid>\n);\n",
           "StagedDir": "<uuid>",
           "Table": "formatted_strings"
         },
         "multiple_types": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS array_int, $1[2] AS bool_field, $1[3] AS float_field, $1[4] AS flow_published_at, $1[5] AS multiple, $1[6] AS nested, $1[7] AS nullable_int, $1[8] AS str_field, $1[9] AS flow_document\n\tFROM <uuid>\n) AS r\nON l.id = r.id\nWHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field, l.flow_document = r.flow_document\nWHEN NOT MATCHED THEN\n\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.id, r.array_int, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field, r.flow_document);\n",
           "StagedDir": "<uuid>",
           "Table": "multiple_types"
         },
         "simple": {
+          "PipeFiles": null,
+          "PipeName": "",
           "Query": "\nCOPY INTO simple (\n\tid, canary, flow_published_at, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at, $1[3] AS flow_document\n\tFROM <uuid>\n);\n",
           "StagedDir": "<uuid>",
           "Table": "simple"
