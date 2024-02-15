@@ -16,7 +16,7 @@ class SchemaTypes:
 
     string: Dict = {"type": ["null", "string"]}
 
-    number: Dict = {"type": ["null", "number"]}
+    number: Dict = {"type": ["null", "number", "string"], "format": "number"}
 
     boolean: Dict = {"type": ["null", "boolean"]}
 

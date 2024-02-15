@@ -40,8 +40,10 @@
         "cost": {
           "type": [
             "null",
-            "number"
-          ]
+            "number",
+            "string"
+          ],
+          "format": "number"
         },
         "_meta": {
           "type": "object",
