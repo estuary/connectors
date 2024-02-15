@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"text/template"
@@ -11,6 +12,15 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
+
+// Databricks does not allow column names to contain these characters. Attempting to create a column
+// with any of them causes an error, so they must be replaced with underscores. Ref:
+// https://docs.databricks.com/en/error-messages/error-classes.html#delta_invalid_characters_in_column_name
+var columnSanitizerRegexp = regexp.MustCompile(`[ ,;{}\(\)]`)
+
+func translateFlowField(f string) string {
+	return columnSanitizerRegexp.ReplaceAllString(f, "_")
+}
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	switch ii := te.(type) {
@@ -89,15 +99,33 @@ var databricksDialect = func() sql.Dialect {
 				TableName:   strings.ToLower(path[1]),
 			}
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
-		// https://docs.databricks.com/en/sql/language-manual/sql-ref-identifiers.html
-		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
-			sql.PassThroughTransform(
-				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !slices.Contains(DATABRICKS_RESERVED_WORDS, strings.ToLower(s))
-				},
-				sql.QuoteTransform("`", "``"),
-			))),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateFlowField(field) }),
+		Identifierer: sql.IdentifierFn(func(path ...string) string {
+			// Sanitize column names per Databricks' restrictions. Table names do not have to be
+			// sanitized in the same way, although they have different requirements. Table names are
+			// sanitized via the resource path response, so further sanitization for table names is
+			// not necessary or desirable.
+			//
+			// Column names are specifically sanitized here by relying on the fact that a column
+			// name will always be a single element, whereas a table name will be a resource path
+			// consisting of both the schema and table that is two elements long.
+
+			notQuoted := func(s string) bool {
+				return sql.IsSimpleIdentifier(s) && !slices.Contains(DATABRICKS_RESERVED_WORDS, strings.ToLower(s))
+			}
+			quoteTf := sql.QuoteTransform("`", "``")
+
+			if len(path) == 1 {
+				translated := translateFlowField(path[0])
+				if notQuoted(translated) {
+					return translated
+				} else {
+					return quoteTf(translated)
+				}
+			} else {
+				return sql.JoinTransform(".", sql.PassThroughTransform(notQuoted, quoteTf))(path...)
+			}
+		}),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
