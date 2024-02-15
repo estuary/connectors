@@ -328,4 +328,16 @@ add and remove many fields:
 {"Name":"requiredObject","Nullable":"YES","Type":"STRING"}
 {"Name":"requiredString","Nullable":"YES","Type":"STRING"}
 
+Challenging Field Names Materialized Columns:
+{"Name":"123","Nullable":"YES","Type":"STRING"}
+{"Name":"123startsWithDigits","Nullable":"YES","Type":"STRING"}
+{"Name":"________-_problematicKey_______","Nullable":"NO","Type":"STRING"}
+{"Name":"________-_problematicValue_______","Nullable":"YES","Type":"STRING"}
+{"Name":"_dollar_signs","Nullable":"YES","Type":"STRING"}
+{"Name":"_id","Nullable":"NO","Type":"STRING"}
+{"Name":"a_string_with_quote_characters","Nullable":"YES","Type":"STRING"}
+{"Name":"flow_document","Nullable":"NO","Type":"STRING"}
+{"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP"}
+{"Name":"value-with-separated-words","Nullable":"YES","Type":"STRING"}
+{"Name":"value_with-separated_words","Nullable":"YES","Type":"STRING"}
 

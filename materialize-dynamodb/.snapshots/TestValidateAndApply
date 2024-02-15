@@ -175,4 +175,7 @@ remove a single required field:
 add and remove many fields:
 {"AttributeName":"key","AttributeType":"S"}
 
+Challenging Field Names Materialized Columns:
+{"AttributeName":" ,;{}().- problematicKey � 𐀀 嶲 ","AttributeType":"S"}
+{"AttributeName":"_id","AttributeType":"S"}
 
