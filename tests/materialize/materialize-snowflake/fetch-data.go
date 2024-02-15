@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
 	"math"
 	"os"
+	"strings"
 
 	sf "github.com/snowflakedb/gosnowflake"
 )
