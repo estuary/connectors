@@ -49,8 +49,6 @@ func mustGetCfg(t *testing.T) config {
 }
 
 func TestValidateAndApply(t *testing.T) {
-	t.Skip("tests currently disabled because of a MotherDuck/DuckDB bug that makes it impossible to add columns with JSON types to existing tables")
-
 	ctx := context.Background()
 
 	cfg := mustGetCfg(t)
@@ -62,10 +60,6 @@ func TestValidateAndApply(t *testing.T) {
 		database: cfg.Database,
 	}
 
-	db, err := cfg.db(ctx)
-	require.NoError(t, err)
-	defer db.Close()
-
 	boilerplate.RunValidateAndApplyTestCases(
 		t,
 		newDuckDriver(),
@@ -74,6 +68,10 @@ func TestValidateAndApply(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
+			db, err := cfg.db(ctx)
+			require.NoError(t, err)
+			defer db.Close()
+
 			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
 			require.NoError(t, err)
 
@@ -81,6 +79,10 @@ func TestValidateAndApply(t *testing.T) {
 		},
 		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
+
+			db, err := cfg.db(ctx)
+			require.NoError(t, err)
+			defer db.Close()
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table)))
 

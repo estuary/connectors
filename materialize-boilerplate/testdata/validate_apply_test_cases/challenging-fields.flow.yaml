@@ -1,0 +1,48 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        # A particularly problematic field:
+        #   - Leading and trailing spaces
+        #   - A few common characters that often cause problems
+        #   - � (U+FFFD) is near the "end" of the Unicode Basic Multilingual Plane
+        #   - 𐀀 (U+10000) is at the start of the UTF-8 supplementary characters
+        #   - 嶲 (U+2F9F4) is a character toward the end of the UTF-8 supplementary range
+        " ,;{}().- problematicKey � 𐀀 嶲 ": { type: string }
+        # Reserved column name on some systems (MongoDB, Elasticsearch)
+        "_id": { type: string }
+        "value with separated words": { type: string }
+        "value.with.separated.words": { type: string }
+        "value-with-separated-words": { type: string }
+        "value_with_separated_words": { type: string }
+        "value.with-separated_words": { type: string }
+        "valueWithDifferentCaps": { type: string }
+        "valuewithdifferentcaps": { type: string }
+        "VALUEWITHDIFFERENTCAPS": { type: string }
+        " ,;{}().- problematicValue � 𐀀 嶲 ": { type: string }
+        "123startsWithDigits": { type: string }
+        "123": { type: string } # Only digits
+        'a"string`with`quote''characters': { type: string }
+        "$dollar$signs": { type: string }
+      required:
+        - " ,;{}().- problematicKey � 𐀀 嶲 "
+        - "_id"
+    key:
+      - "/ ,;{}().- problematicKey � 𐀀 嶲 "
+      - "/_id"
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

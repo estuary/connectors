@@ -328,4 +328,22 @@ add and remove many fields:
 {"Name":"requiredObject","Nullable":"YES","Type":"json"}
 {"Name":"requiredString","Nullable":"YES","Type":"text"}
 
+Challenging Field Names Materialized Columns:
+{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":"NO","Type":"text"}
+{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":"YES","Type":"text"}
+{"Name":"$dollar$signs","Nullable":"YES","Type":"text"}
+{"Name":"123","Nullable":"YES","Type":"text"}
+{"Name":"123startsWithDigits","Nullable":"YES","Type":"text"}
+{"Name":"VALUEWITHDIFFERENTCAPS","Nullable":"YES","Type":"text"}
+{"Name":"_id","Nullable":"NO","Type":"text"}
+{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"text"}
+{"Name":"flow_document","Nullable":"NO","Type":"json"}
+{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
+{"Name":"value with separated words","Nullable":"YES","Type":"text"}
+{"Name":"value-with-separated-words","Nullable":"YES","Type":"text"}
+{"Name":"value.with-separated_words","Nullable":"YES","Type":"text"}
+{"Name":"value.with.separated.words","Nullable":"YES","Type":"text"}
+{"Name":"valueWithDifferentCaps","Nullable":"YES","Type":"text"}
+{"Name":"value_with_separated_words","Nullable":"YES","Type":"text"}
+{"Name":"valuewithdifferentcaps","Nullable":"YES","Type":"text"}
 
