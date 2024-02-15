@@ -482,7 +482,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			var fileRequests = make([]FileRequest, len(item.PipeFiles))
 			for i, f := range item.PipeFiles {
 				fileRequests[i] = FileRequest{
-					Path: "/" + f.Path,
+					Path: f.Path,
 					Size: f.Size,
 				}
 			}
