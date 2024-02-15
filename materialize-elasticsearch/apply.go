@@ -71,7 +71,7 @@ func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.Materializ
 
 		actions = append(actions, fmt.Sprintf(
 			"add mapping %q to index %q with type %q",
-			newProjection.Field,
+			translateField(newProjection.Field),
 			binding.ResourcePath[0],
 			prop.Type,
 		))
@@ -81,7 +81,7 @@ func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.Materializ
 		for _, newProjection := range bindingUpdate.NewProjections {
 			if prop, err := propForField(newProjection.Field, binding); err != nil {
 				return err
-			} else if err := e.client.addMappingToIndex(ctx, binding.ResourcePath[0], newProjection.Field, prop); err != nil {
+			} else if err := e.client.addMappingToIndex(ctx, binding.ResourcePath[0], translateField(newProjection.Field), prop); err != nil {
 				return err
 			}
 		}
