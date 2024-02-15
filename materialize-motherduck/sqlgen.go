@@ -71,8 +71,10 @@ var duckDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    0, // Duckdb has no apparent limit on how long column names can be
+		CaseInsensitiveColumns: true,
 	}
 }()
 
