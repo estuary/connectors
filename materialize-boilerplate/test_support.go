@@ -21,6 +21,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema-changed.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema-nullable.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/challenging-fields.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/remove-single-optional.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/remove-single-required.flow.yaml
 
@@ -68,7 +69,7 @@ func RunValidateAndApplyTestCases(
 		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 		// Initial apply with no previously existing table.
-		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes))
+		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		sch := dumpSchema(t)
@@ -81,7 +82,7 @@ func RunValidateAndApplyTestCases(
 		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 		// Apply again - this should be a no-op.
-		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes))
+		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 		require.Equal(t, sch, dumpSchema(t))
 
@@ -102,12 +103,12 @@ func RunValidateAndApplyTestCases(
 		validateRes, err = driver.Validate(ctx, validateReq(nullable, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
-		_, err = driver.Apply(ctx, applyReq(nullable, configJson, resourceConfigJson, validateRes))
+		_, err = driver.Apply(ctx, applyReq(nullable, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		// A second apply of the nullable schema should be a no-op.
 		sch = dumpSchema(t)
-		_, err = driver.Apply(ctx, applyReq(nullable, configJson, resourceConfigJson, validateRes))
+		_, err = driver.Apply(ctx, applyReq(nullable, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 		require.Equal(t, sch, dumpSchema(t))
 
@@ -123,7 +124,7 @@ func RunValidateAndApplyTestCases(
 		snap.WriteString("\nBig Schema Changed Types With Table Replacement Constraints:\n")
 		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
-		_, err = driver.Apply(ctx, applyReq(changed, configJson, resourceConfigJson, validateRes))
+		_, err = driver.Apply(ctx, applyReq(changed, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 		snap.WriteString("\nBig Schema Materialized Resource Schema Changed Types With Table Replacement:\n")
 		snap.WriteString(dumpSchema(t) + "\n")
@@ -161,19 +162,38 @@ func RunValidateAndApplyTestCases(
 				// Validate and Apply the base spec.
 				validateRes, err := driver.Validate(ctx, validateReq(initial, configJson, resourceConfigJson))
 				require.NoError(t, err)
-				_, err = driver.Apply(ctx, applyReq(initial, configJson, resourceConfigJson, validateRes))
+				_, err = driver.Apply(ctx, applyReq(initial, configJson, resourceConfigJson, validateRes, true))
 				require.NoError(t, err)
 
 				// Validate and Apply the updated spec.
 				validateRes, err = driver.Validate(ctx, validateReq(tt.newSpec, configJson, resourceConfigJson))
 				require.NoError(t, err)
-				_, err = driver.Apply(ctx, applyReq(tt.newSpec, configJson, resourceConfigJson, validateRes))
+				_, err = driver.Apply(ctx, applyReq(tt.newSpec, configJson, resourceConfigJson, validateRes, true))
 				require.NoError(t, err)
 
 				snap.WriteString(tt.name + ":\n")
 				snap.WriteString(string(dumpSchema(t)) + "\n")
 			})
 		}
+	})
+
+	t.Run("validate and apply fields with challenging names", func(t *testing.T) {
+		defer cleanup(t, pf.Materialization("test/sqlite"))
+
+		fixture := loadSpec(t, "challenging-fields.flow.proto")
+
+		// Validate and apply twice to make sure that a re-application does not attempt to re-create
+		// any columns. This makes sure we are able to read back the schema we have created
+		// correctly.
+		for idx := 0; idx < 2; idx++ {
+			validateRes, err := driver.Validate(ctx, validateReq(fixture, configJson, resourceConfigJson))
+			require.NoError(t, err)
+			_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, false))
+			require.NoError(t, err)
+		}
+
+		snap.WriteString("Challenging Field Names Materialized Columns:\n")
+		snap.WriteString(dumpSchema(t))
 	})
 
 	cupaloy.SnapshotT(t, snap.String())
@@ -198,12 +218,12 @@ func validateReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceC
 }
 
 // applyReq conjures a pm.Request_Apply from a spec and validate response.
-func applyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated) *pm.Request_Apply {
+func applyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
 	spec.ConfigJson = config
 	spec.Bindings[0].ResourceConfigJson = resourceConfig
 	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
 	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
-	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection)
+	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
 
 	req := &pm.Request_Apply{
 		Materialization: spec,
@@ -214,11 +234,11 @@ func applyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConf
 }
 
 // selectedFields creates a field selection that includes all possible fields.
-func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec) pf.FieldSelection {
+func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
 	out := pf.FieldSelection{}
 
 	for field, constraint := range binding.Constraints {
-		if constraint.Type.IsForbidden() {
+		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
 			continue
 		}
 
@@ -226,7 +246,13 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 		if proj.IsPrimaryKey {
 			out.Keys = append(out.Keys, field)
 		} else if proj.IsRootDocumentProjection() {
-			out.Document = field
+			if out.Document == "" {
+				out.Document = field
+			} else {
+				// Handle cases with more than one root document projection selected - the "first"
+				// one is the document, and the rest are materialized as values.
+				out.Values = append(out.Values, field)
+			}
 		} else {
 			out.Values = append(out.Values, field)
 		}
