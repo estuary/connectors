@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"text/template"
@@ -43,17 +44,15 @@ func newTableConfig(ep *sql.Endpoint) sql.Resource {
 
 // Validate the resource configuration.
 func (r tableConfig) Validate() error {
-	var forbiddenChars = ". /"
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
-	}
-	if strings.ContainsAny(r.Table, forbiddenChars) {
-		return fmt.Errorf("table name %q contains one of the forbidden characters %q", r.Table, forbiddenChars)
 	}
 
 	if r.Schema == "" {
 		return fmt.Errorf("missing schema")
 	}
+
+	var forbiddenChars = ". /"
 	if strings.ContainsAny(r.Schema, forbiddenChars) {
 		return fmt.Errorf("schema name %q contains one of the forbidden characters %q", r.Schema, forbiddenChars)
 	}
@@ -61,8 +60,12 @@ func (r tableConfig) Validate() error {
 	return nil
 }
 
+// Databricks does not allow these characters in table names, as well as some other obscure ASCII
+// control characters. Ref: https://docs.databricks.com/en/sql/language-manual/sql-ref-names.html
+var tableSanitizerRegex = regexp.MustCompile(`[\. \/]`)
+
 func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Schema, c.Table}
+	return []string{c.Schema, tableSanitizerRegex.ReplaceAllString(c.Table, "_")}
 }
 
 func (c tableConfig) DeltaUpdates() bool {
@@ -273,8 +276,17 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 	var b = &binding{target: target}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
-	b.loadFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.KeyNames())
-	b.storeFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.ColumnNames())
+
+	translatedFieldNames := func(in []string) []string {
+		out := make([]string, 0, len(in))
+		for _, f := range in {
+			out = append(out, translateFlowField(f))
+		}
+		return out
+	}
+
+	b.loadFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
+	b.storeFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
 
 	for _, m := range []struct {
 		sql *string
