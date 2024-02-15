@@ -8,6 +8,9 @@ function exportToJsonl() {
   go run ${TEST_DIR}/materialize-snowflake/fetch-data.go "$1" | jq "{ "_table": \"$1\", rows: . }"
 }
 
+
+sleep 10
+
 exportToJsonl "simple"
 exportToJsonl "duplicate_keys_standard"
 exportToJsonl "duplicate_keys_delta"
