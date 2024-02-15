@@ -109,6 +109,7 @@ func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 		} else {
 			conf.PrivateKey = key
 		}
+		conf.User = c.Credentials.User
 	} else {
 		conf.Authenticator = sf.AuthTypeSnowflake
 		conf.User = c.User
@@ -248,6 +249,14 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		Type:    "string",
 		Default: JWT,
 		Const:   JWT,
+	})
+	jwtProps.Set("user", &jsonschema.Schema{
+		Title:       "User",
+		Description: "The Snowflake user login name",
+		Type:        "string",
+		Extras: map[string]interface{}{
+			"order": 1,
+		},
 	})
 	jwtProps.Set("private_key", &jsonschema.Schema{
 		Title:       "Private Key",

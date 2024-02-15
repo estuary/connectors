@@ -228,7 +228,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			return fmt.Errorf("parsing targetSize: %w", err)
 		} else {
 			f.uploaded = append(f.uploaded, fileRecord{
-				Path: target,
+				Path: fmt.Sprintf("%s/%s", f.uuid, target),
 				Size: size,
 			})
 		}
