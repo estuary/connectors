@@ -84,8 +84,10 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    64,
+		CaseInsensitiveColumns: true,
 	}
 }
 

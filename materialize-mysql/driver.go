@@ -326,7 +326,6 @@ func newMysqlDriver() *sql.Driver {
 				NewTransactor:        prepareNewTransactor(dialect, templates),
 				Tenant:               tenant,
 				ConcurrentApply:      false,
-				MaxFieldCharLen:      64,
 			}, nil
 		},
 	}

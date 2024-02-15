@@ -121,8 +121,10 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 			// parameterIndex starts at 0, but sqlserver parameters start at @p1
 			return fmt.Sprintf("@p%d", index+1)
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    128,
+		CaseInsensitiveColumns: true,
 	}
 }
 

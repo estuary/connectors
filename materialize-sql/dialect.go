@@ -14,6 +14,11 @@ type Dialect struct {
 	Placeholderer
 	TypeMapper
 	ColumnValidator
+
+	// MaxFieldCharLength is provided as the "maxFieldLength" parameter to boilerplate.NewValidator.
+	MaxColumnCharLength int
+	// CaseInsensitiveColumns is provided as the "caseInsensitiveFields" parameter to boilerplate.NewValidator.
+	CaseInsensitiveColumns bool
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.

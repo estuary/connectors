@@ -113,8 +113,10 @@ var bqDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    300,
+		CaseInsensitiveColumns: true,
 	}
 }()
 
