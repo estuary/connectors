@@ -213,7 +213,7 @@ func (r tableConfig) Validate() error {
 }
 
 func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Table}
+	return []string{translateFlowIdentifier(c.Table)}
 }
 
 func (c tableConfig) DeltaUpdates() bool {
