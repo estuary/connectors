@@ -113,7 +113,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				isSimpleIdentifier,
-				sql.QuoteTransform("\"", "\\\""),
+				sql.QuoteTransform(`"`, `""`),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
