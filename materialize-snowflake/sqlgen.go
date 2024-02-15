@@ -130,6 +130,8 @@ type templates struct {
 	loadQuery         *template.Template
 	copyInto          *template.Template
 	mergeInto         *template.Template
+	pipeName          *template.Template
+	createPipe        *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -212,6 +214,26 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end -}}
 {{ end }}
 
+{{ define "pipe_name" -}}
+flow_pipe_{{ $.Binding }}_{{ Last $.Path }}
+{{- end }}
+{{ define "createPipe" }}
+CREATE OR REPLACE PIPE {{ template "pipe_name" $.Table }}
+  COMMENT = 'Pipe for table {{ $.Table.Path }}'
+  AS COPY INTO {{ $.Table.Identifier }} (
+	{{ range $ind, $key := $.Table.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier -}}
+	{{- end }}
+) FROM (
+	SELECT {{ range $ind, $key := $.Table.Columns }}
+	{{- if $ind }}, {{ end -}}
+	$1[{{$ind}}] AS {{$key.Identifier -}}
+	{{- end }}
+	FROM @flow_v1/{{ $.RandomUUID }}
+);
+{{ end }}
+
 {{ define "copyInto" }}
 COPY INTO {{ $.Table.Identifier }} (
 	{{ range $ind, $key := $.Table.Columns }}
@@ -275,6 +297,8 @@ WHEN NOT MATCHED THEN
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		copyInto:          tplAll.Lookup("copyInto"),
 		mergeInto:         tplAll.Lookup("mergeInto"),
+		pipeName:          tplAll.Lookup("pipe_name"),
+		createPipe:        tplAll.Lookup("createPipe"),
 	}
 }
 

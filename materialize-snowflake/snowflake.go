@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -22,107 +21,6 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
 )
-
-// config represents the endpoint configuration for snowflake.
-// It must match the one defined for the source specs (flow.yaml) in Rust.
-type config struct {
-	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
-	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
-	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
-	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
-	Schema    string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=5"`
-	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=6"`
-	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
-
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
-}
-
-// ToURI converts the Config to a DSN string.
-func (c *config) ToURI(tenant string) string {
-	// Build a DSN connection string.
-	var configCopy = c.asSnowflakeConfig(tenant)
-	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
-	// Without this, the authentication token will expire after 4 hours of inactivity.
-	// The Params map will not have been initialized if the endpoint config didn't specify
-	// it, so we check and initialize here if needed.
-	if configCopy.Params == nil {
-		configCopy.Params = make(map[string]*string)
-	}
-	configCopy.Params["client_session_keep_alive"] = &trueString
-	dsn, err := sf.DSN(&configCopy)
-	if err != nil {
-		panic(fmt.Errorf("building snowflake dsn: %w", err))
-	}
-
-	return dsn
-}
-
-func (c *config) asSnowflakeConfig(tenant string) sf.Config {
-	var maxStatementCount string = "0"
-	var json string = "json"
-	return sf.Config{
-		Account:     c.Account,
-		Host:        c.Host,
-		User:        c.User,
-		Password:    c.Password,
-		Database:    c.Database,
-		Schema:      c.Schema,
-		Warehouse:   c.Warehouse,
-		Role:        c.Role,
-		Application: fmt.Sprintf("%s_EstuaryFlow", tenant),
-		Params: map[string]*string{
-			// By default Snowflake expects the number of statements to be provided
-			// with every request. By setting this parameter to zero we are allowing a
-			// variable number of statements to be executed in a single request
-			"MULTI_STATEMENT_COUNT":  &maxStatementCount,
-			"GO_QUERY_RESULT_FORMAT": &json,
-		},
-	}
-}
-
-var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
-
-func validHost(h string) error {
-	hasProtocol := strings.Contains(h, "://")
-	missingDomain := !hostRe.MatchString(h)
-
-	if hasProtocol && missingDomain {
-		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com and not include a protocol)", h)
-	} else if hasProtocol {
-		return fmt.Errorf("invalid host %q (must not include a protocol)", h)
-	} else if missingDomain {
-		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com)", h)
-	}
-
-	return nil
-}
-
-func (c *config) Validate() error {
-	var requiredProperties = [][]string{
-		{"account", c.Account},
-		{"host", c.Host},
-		{"user", c.User},
-		{"password", c.Password},
-		{"database", c.Database},
-		{"schema", c.Schema},
-	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
-		}
-	}
-
-	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
-		return err
-	}
-
-	return validHost(c.Host)
-}
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`
@@ -225,8 +123,9 @@ func newSnowflakeDriver() *sql.Driver {
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
-	cfg *config
-	db  *stdsql.DB
+	cfg        *config
+	db         *stdsql.DB
+	pipeClient *PipeClient
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -278,10 +177,20 @@ func newTransactor(
 		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
 
+	var pipeClient *PipeClient
+
+	if cfg.Credentials.AuthType == JWT {
+		pipeClient, err = NewPipeClient(cfg, ep.Tenant)
+		if err != nil {
+			return nil, fmt.Errorf("NewPipeCLient: %w", err)
+		}
+	}
+
 	var d = &transactor{
-		cfg:       cfg,
-		templates: renderTemplates(dialect),
-		db:        db,
+		cfg:        cfg,
+		templates:  renderTemplates(dialect),
+		db:         db,
+		pipeClient: pipeClient,
 	}
 
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -317,7 +226,8 @@ func newTransactor(
 }
 
 type binding struct {
-	target sql.Table
+	target   sql.Table
+	pipeName string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery string
@@ -338,6 +248,24 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 
 	d.load.stage = newStagedFile(os.TempDir())
 	d.store.stage = newStagedFile(os.TempDir())
+
+	// If this is a delta updates binding and we are using JWT auth type, this binding
+	// can use snowpipe
+	if target.DeltaUpdates && t.cfg.Credentials.AuthType == JWT {
+		if pipeName, err := sql.RenderTableTemplate(target, t.templates.pipeName); err != nil {
+			return fmt.Errorf("pipeName template: %w", err)
+		} else {
+			d.pipeName = fmt.Sprintf("%s.%s.%s", t.cfg.Database, t.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
+		}
+
+		if createPipe, err := sql.RenderTableTemplate(target, t.templates.pipeName); err != nil {
+			return fmt.Errorf("createPipe template: %w", err)
+		} else if _, err := t.db.ExecContext(ctx, createPipe); err != nil {
+			return fmt.Errorf("creating pipe for table %q: %w", target.Path, err)
+		} else {
+			log.WithField("q", createPipe).Info("creating pipe")
+		}
+	}
 
 	t.bindings = append(t.bindings, d)
 	return nil
@@ -446,6 +374,8 @@ type checkpointItem struct {
 	Table     string
 	Query     string
 	StagedDir string
+	PipeName  string
+	PipeFiles []fileRecord
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -495,6 +425,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					StagedDir: dir,
 				}
 			}
+		} else if b.pipeName != "" {
+			d.cp[b.target.StateKey] = &checkpointItem{
+				Table:     b.target.Identifier,
+				StagedDir: dir,
+				PipeFiles: b.store.stage.uploaded,
+				PipeName:  b.pipeName,
+			}
 		} else {
 			if copyIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.copyInto); err != nil {
 				return nil, fmt.Errorf("copyInto template: %w", err)
@@ -535,11 +472,30 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		log.WithField("table", item.Table).Info("store: starting query")
-		if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
-			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-		} else {
-			results[stateKey] = result
+		if len(item.Query) > 0 {
+			log.WithField("table", item.Table).Info("store: starting query")
+			if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
+				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+			} else {
+				results[stateKey] = result
+			}
+		} else if len(item.PipeFiles) > 0 {
+			var fileRequests = make([]FileRequest, len(item.PipeFiles))
+			for i, f := range item.PipeFiles {
+				fileRequests[i] = FileRequest{
+					Path: "/" + f.Path,
+					Size: f.Size,
+				}
+			}
+
+			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
+				return nil, fmt.Errorf("snowpipe insertFiles: %w", err)
+			} else if report, err := d.pipeClient.InsertReport(item.PipeName, ""); err != nil {
+				return nil, fmt.Errorf("snowpipe insertReports: %w", err)
+			} else {
+				// TODO: make me DEBUG
+				log.WithField("response", resp).Info(fmt.Sprintf("insertFiles sucesssful %+v", report))
+			}
 		}
 	}
 
