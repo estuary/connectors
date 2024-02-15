@@ -10,6 +10,38 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
+// MySQL does not allow identifiers to have trailing spaces or characters with code points greater
+// than U+FFFF. (ref https://dev.mysql.com/doc/refman/8.0/en/identifiers.html). These disallowed
+// characters will be sanitized with an underscore.
+func translateFlowIdentifier(f string) string {
+	var out string
+	onlySpaces := true
+
+	// Build the output string from the reversed input, since we need to account for trailing
+	// spaces.
+	for idx := len(f) - 1; idx >= 0; idx-- {
+		c := f[idx]
+
+		if c != ' ' {
+			onlySpaces = false
+		}
+
+		if onlySpaces || rune(c) > 0xFFFF {
+			out = "_" + out
+			continue
+		}
+		out = string(c) + out
+	}
+
+	return out
+}
+
+func identifierSanitizer(delegate func(string) string) func(string) string {
+	return func(text string) string {
+		return delegate(translateFlowIdentifier(text))
+	}
+}
+
 var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
@@ -72,14 +104,14 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			// name of the database.
 			return sql.InfoTableLocation{TableSchema: database, TableName: path[0]}
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateFlowIdentifier(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
-			sql.PassThroughTransform(
+			identifierSanitizer(sql.PassThroughTransform(
 				func(s string) bool {
 					return sql.IsSimpleIdentifier(s) && !slices.Contains(MYSQL_RESERVED_WORDS, strings.ToLower(s))
 				},
-				sql.QuoteTransform("`", "\\`"),
-			))),
+				sql.QuoteTransform("`", "``"),
+			)))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
