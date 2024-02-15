@@ -47,7 +47,7 @@ func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
 	}
 
 	var account = strings.ToUpper(cfg.Account)
-	var user = strings.ToUpper(cfg.User)
+	var user = strings.ToUpper(cfg.Credentials.User)
 	var qualifiedUser = fmt.Sprintf("%s.%s", account, user)
 
 	fingerprint, err := publicKeyFingerprint(key.Public().(*rsa.PublicKey))

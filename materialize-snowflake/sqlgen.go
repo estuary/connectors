@@ -218,19 +218,19 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 flow_pipe_{{ $.Binding }}_{{ Last $.Path }}
 {{- end }}
 {{ define "createPipe" }}
-CREATE OR REPLACE PIPE {{ template "pipe_name" $.Table }}
-  COMMENT = 'Pipe for table {{ $.Table.Path }}'
-  AS COPY INTO {{ $.Table.Identifier }} (
-	{{ range $ind, $key := $.Table.Columns }}
+CREATE OR REPLACE PIPE {{ template "pipe_name" . }}
+  COMMENT = 'Pipe for table {{ $.Path }}'
+  AS COPY INTO {{ $.Identifier }} (
+	{{ range $ind, $key := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier -}}
 	{{- end }}
 ) FROM (
-	SELECT {{ range $ind, $key := $.Table.Columns }}
+	SELECT {{ range $ind, $key := $.Columns }}
 	{{- if $ind }}, {{ end -}}
 	$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM @flow_v1/{{ $.RandomUUID }}
+	FROM @flow_v1
 );
 {{ end }}
 
