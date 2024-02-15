@@ -328,4 +328,19 @@ add and remove many fields:
 {"Name":"requiredobject","Nullable":"YES","Type":"super"}
 {"Name":"requiredstring","Nullable":"YES","Type":"character varying"}
 
+Challenging Field Names Materialized Columns:
+{"Name":" ,;{}().- problematickey � 𐀀 嶲 ","Nullable":"YES","Type":"character varying"}
+{"Name":" ,;{}().- problematicvalue � 𐀀 嶲 ","Nullable":"YES","Type":"character varying"}
+{"Name":"$dollar$signs","Nullable":"YES","Type":"character varying"}
+{"Name":"123","Nullable":"YES","Type":"character varying"}
+{"Name":"123startswithdigits","Nullable":"YES","Type":"character varying"}
+{"Name":"_id","Nullable":"YES","Type":"character varying"}
+{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"character varying"}
+{"Name":"flow_document","Nullable":"YES","Type":"super"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
+{"Name":"value with separated words","Nullable":"YES","Type":"character varying"}
+{"Name":"value-with-separated-words","Nullable":"YES","Type":"character varying"}
+{"Name":"value.with-separated_words","Nullable":"YES","Type":"character varying"}
+{"Name":"value.with.separated.words","Nullable":"YES","Type":"character varying"}
+{"Name":"value_with_separated_words","Nullable":"YES","Type":"character varying"}
 

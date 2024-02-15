@@ -328,4 +328,19 @@ add and remove many fields:
 {"Name":"REQUIREDSTRING","Nullable":"YES","Type":"TEXT"}
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
 
+Challenging Field Names Materialized Columns:
+{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":"NO","Type":"TEXT"}
+{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":"YES","Type":"TEXT"}
+{"Name":"$dollar$signs","Nullable":"YES","Type":"TEXT"}
+{"Name":"123","Nullable":"YES","Type":"TEXT"}
+{"Name":"123startsWithDigits","Nullable":"YES","Type":"TEXT"}
+{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"VALUE_WITH_SEPARATED_WORDS","Nullable":"YES","Type":"TEXT"}
+{"Name":"_ID","Nullable":"NO","Type":"TEXT"}
+{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"TEXT"}
+{"Name":"value with separated words","Nullable":"YES","Type":"TEXT"}
+{"Name":"value-with-separated-words","Nullable":"YES","Type":"TEXT"}
+{"Name":"value.with-separated_words","Nullable":"YES","Type":"TEXT"}
+{"Name":"value.with.separated.words","Nullable":"YES","Type":"TEXT"}
 

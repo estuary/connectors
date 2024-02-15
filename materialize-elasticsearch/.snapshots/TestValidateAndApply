@@ -323,4 +323,21 @@ add and remove many fields:
 {"Field":"requiredObject","Type":"flattened"}
 {"Field":"requiredString","Type":"text"}
 
+Challenging Field Names Materialized Columns:
+{"Field":" ,;{}()_- problematicKey � 𐀀 嶲 ","Type":"keyword"}
+{"Field":" ,;{}()_- problematicValue � 𐀀 嶲 ","Type":"text"}
+{"Field":"$dollar$signs","Type":"text"}
+{"Field":"123","Type":"text"}
+{"Field":"123startsWithDigits","Type":"text"}
+{"Field":"VALUEWITHDIFFERENTCAPS","Type":"text"}
+{"Field":"_id_flow","Type":"keyword"}
+{"Field":"_meta/flow_truncated","Type":"boolean"}
+{"Field":"a\"string`with`quote'characters","Type":"text"}
+{"Field":"flow_document","Type":"flattened"}
+{"Field":"flow_published_at","Type":"date"}
+{"Field":"value with separated words","Type":"text"}
+{"Field":"value-with-separated-words","Type":"text"}
+{"Field":"valueWithDifferentCaps","Type":"text"}
+{"Field":"value_with-separated_words","Type":"text"}
+{"Field":"valuewithdifferentcaps","Type":"text"}
 
