@@ -109,14 +109,14 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) (map[string]propert
 		if p, err := propForField(v, b); err != nil {
 			return nil, fmt.Errorf("buildIndexProperties: %w", err)
 		} else {
-			props[v] = p
+			props[translateField(v)] = p
 		}
 	}
 
 	if d := b.FieldSelection.Document; d != "" {
 		// Do not index the root document projection, since this would be less useful than other
 		// selected fields and potentially costly.
-		props[d] = property{Type: elasticTypeFlattened, Index: boolPtr(false)}
+		props[translateField(d)] = property{Type: elasticTypeFlattened, Index: boolPtr(false)}
 	}
 
 	return props, nil
