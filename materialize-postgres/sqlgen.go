@@ -91,8 +91,10 @@ var pgDialect = func() sql.Dialect {
 			// parameterIndex starts at 0, but postgres parameters start at $1
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
+		CaseInsensitiveColumns: false,
 	}
 }()
 

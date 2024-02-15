@@ -201,8 +201,8 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
 	}
 	// Attribute names can be up to 64kb in length, which is for all practical purposes unlimited
-	// length.
-	validator := boilerplate.NewValidator(constrainter{}, is, 0)
+	// length, and they are case sensitive.
+	validator := boilerplate.NewValidator(constrainter{}, is, 0, false)
 
 	var bindings = []*pm.Response_Validated_Binding{}
 	for i, binding := range req.Bindings {

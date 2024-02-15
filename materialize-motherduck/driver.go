@@ -172,7 +172,6 @@ func newDuckDriver() *sql.Driver {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				MaxFieldCharLen:     0, // Duckdb has no apparent limit on how long column names can be
 			}, nil
 		},
 	}
