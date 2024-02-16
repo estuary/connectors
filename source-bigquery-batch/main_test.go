@@ -190,7 +190,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 		ProjectID:       *projectID,
 		Dataset:         *testDataset,
 		Advanced: advancedConfig{
-			PollInterval: "200ms",
+			PollSchedule: "200ms",
 		},
 	}
 
