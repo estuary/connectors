@@ -149,7 +149,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 		User:     *dbCaptureUser,
 		Password: *dbCapturePass,
 		Advanced: advancedConfig{
-			PollInterval: "200ms",
+			PollSchedule: "200ms",
 		},
 	}
 
