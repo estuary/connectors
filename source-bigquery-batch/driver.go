@@ -14,6 +14,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/encrow"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -49,7 +50,7 @@ type Resource struct {
 	Name         string   `json:"name" jsonschema:"title=Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
 	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) which will be rendered and then executed." jsonschema_extras:"multiline=true,order=3"`
 	Cursor       []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=2"`
-	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query (overrides the connector default setting)" jsonschema_extras:"order=1"`
+	PollSchedule string   `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting)" jsonschema_extras:"order=1"`
 }
 
 // Validate checks that the resource spec possesses all required properties.
@@ -69,9 +70,9 @@ func (r Resource) Validate() error {
 	if slices.Contains(r.Cursor, "") {
 		return fmt.Errorf("cursor column names can't be empty (got %q)", r.Cursor)
 	}
-	if r.PollInterval != "" {
-		if _, err := time.ParseDuration(r.PollInterval); err != nil {
-			return fmt.Errorf("invalid poll interval %q: %w", r.PollInterval, err)
+	if r.PollSchedule != "" {
+		if err := schedule.Validate(r.PollSchedule); err != nil {
+			return fmt.Errorf("invalid polling schedule %q: %w", r.PollSchedule, err)
 		}
 	}
 	return nil
@@ -575,7 +576,7 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 		"name":   res.Name,
 		"tmpl":   res.Template,
 		"cursor": res.Cursor,
-		"poll":   res.PollInterval,
+		"poll":   res.PollSchedule,
 	}).Info("starting worker")
 
 	var queryTemplate, err = template.New("query").Parse(res.Template)
@@ -616,34 +617,26 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"CursorFields": quotedCursorNames,
 	}
 
-	// Polling interval can be configured per binding. If unset, falls back to the
-	// connector global polling interval.
-	var pollStr = c.Config.Advanced.PollInterval
-	if res.PollInterval != "" {
-		pollStr = res.PollInterval
+	// Polling schedule can be configured per binding. If unset, falls back to the
+	// connector global polling schedule.
+	var pollScheduleStr = c.Config.Advanced.PollSchedule
+	if res.PollSchedule != "" {
+		pollScheduleStr = res.PollSchedule
 	}
-	pollInterval, err := time.ParseDuration(pollStr)
+	var pollSchedule, err = schedule.Parse(pollScheduleStr)
 	if err != nil {
-		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
-	}
-
-	// Sleep until it's been more than <pollInterval> since the last iteration.
-	if !state.LastPolled.IsZero() && time.Since(state.LastPolled) < pollInterval {
-		var sleepDuration = time.Until(state.LastPolled.Add(pollInterval))
-		log.WithFields(log.Fields{
-			"name": res.Name,
-			"wait": sleepDuration.String(),
-			"poll": pollInterval.String(),
-		}).Info("waiting for next poll")
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(sleepDuration):
-		}
+		return fmt.Errorf("failed to parse polling schedule %q: %w", pollScheduleStr, err)
 	}
 	log.WithFields(log.Fields{
 		"name": res.Name,
-		"poll": pollInterval.String(),
+		"poll": pollScheduleStr,
+	}).Info("waiting for next scheduled poll")
+	if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
+		return err
+	}
+	log.WithFields(log.Fields{
+		"name": res.Name,
+		"poll": pollScheduleStr,
 		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("ready to poll")
 

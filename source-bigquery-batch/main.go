@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
@@ -25,7 +25,7 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	PollInterval string `json:"poll,omitempty" jsonschema:"title=Default Poll Interval,description=How often to execute fetch queries. Defaults to 24 hours if unset."`
+	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Defaults to '24h' if unset."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -46,9 +46,9 @@ func (c *Config) Validate() error {
 	if !json.Valid([]byte(c.CredentialsJSON)) {
 		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 	}
-	if c.Advanced.PollInterval != "" {
-		if _, err := time.ParseDuration(c.Advanced.PollInterval); err != nil {
-			return fmt.Errorf("invalid default poll interval %q: %w", c.Advanced.PollInterval, err)
+	if c.Advanced.PollSchedule != "" {
+		if err := schedule.Validate(c.Advanced.PollSchedule); err != nil {
+			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
 	}
 	return nil
@@ -56,8 +56,8 @@ func (c *Config) Validate() error {
 
 // SetDefaults fills in the default values for unset optional parameters.
 func (c *Config) SetDefaults() {
-	if c.Advanced.PollInterval == "" {
-		c.Advanced.PollInterval = "24h"
+	if c.Advanced.PollSchedule == "" {
+		c.Advanced.PollSchedule = "24h"
 	}
 }
 
