@@ -533,7 +533,7 @@ func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *p
 	return c.dialect.ValidateColumn(existing, *p)
 }
 
-func (constrainter) DescriptionForType(p *pf.Projection) string {
+func (constrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
 	desc := "[" + strings.Join(p.Inference.Types, ",") + "]"
 
 	if p.Inference.String_ != nil {
@@ -548,5 +548,5 @@ func (constrainter) DescriptionForType(p *pf.Projection) string {
 		}
 	}
 
-	return desc
+	return desc, nil
 }
