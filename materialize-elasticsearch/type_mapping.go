@@ -31,8 +31,8 @@ type property struct {
 	Index  *bool               `json:"index,omitempty"`
 }
 
-func propForField(field string, binding *pf.MaterializationSpec_Binding) property {
-	return propForProjection(binding.Collection.GetProjection(field))
+func propForField(field string, binding *pf.MaterializationSpec_Binding) (property, error) {
+	return propForProjection(binding.Collection.GetProjection(field), binding.FieldSelection.FieldConfigJsonMap[field])
 }
 
 var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticPropertyType{
@@ -40,9 +40,20 @@ var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticProperty
 	boilerplate.StringFormatNumber:  elasticTypeDouble,
 }
 
-func propForProjection(p *pf.Projection) property {
+func propForProjection(p *pf.Projection, fc json.RawMessage) (property, error) {
+	type fieldConfig struct {
+		Keyword bool `json:"keyword"`
+	}
+
+	var conf fieldConfig
+	if fc != nil {
+		if err := json.Unmarshal(fc, &conf); err != nil {
+			return property{}, fmt.Errorf("unmarshalling raw field config: %w", err)
+		}
+	}
+
 	if numericString, ok := boilerplate.AsFormattedNumeric(p); ok {
-		return property{Type: numericStringTypes[numericString], Coerce: true}
+		return property{Type: numericStringTypes[numericString], Coerce: true}, nil
 	}
 
 	typesWithoutNull := func(ts []string) []string {
@@ -57,45 +68,49 @@ func propForProjection(p *pf.Projection) property {
 
 	switch t := typesWithoutNull(p.Inference.Types)[0]; t {
 	case pf.JsonTypeBoolean:
-		return property{Type: elasticTypeBoolean}
+		return property{Type: elasticTypeBoolean}, nil
 	case pf.JsonTypeInteger:
-		return property{Type: elasticTypeLong}
+		return property{Type: elasticTypeLong}, nil
 	case pf.JsonTypeString:
 		if p.Inference.String_.ContentEncoding == "base64" {
-			return property{Type: elasticTypeBinary}
+			return property{Type: elasticTypeBinary}, nil
 		}
 
 		switch f := p.Inference.String_.Format; f {
 		// Formats for "integer" and "number" are handled above.
 		case "date":
-			return property{Type: elasticTypeDate}
+			return property{Type: elasticTypeDate}, nil
 		case "date-time":
-			return property{Type: elasticTypeDate}
+			return property{Type: elasticTypeDate}, nil
 		case "ipv4":
-			return property{Type: elasticTypeIp}
+			return property{Type: elasticTypeIp}, nil
 		case "ipv6":
-			return property{Type: elasticTypeIp}
+			return property{Type: elasticTypeIp}, nil
 		default:
-			if p.IsPrimaryKey {
-				return property{Type: elasticTypeKeyword}
+			if p.IsPrimaryKey || conf.Keyword {
+				return property{Type: elasticTypeKeyword}, nil
 			} else {
-				return property{Type: elasticTypeText}
+				return property{Type: elasticTypeText}, nil
 			}
 		}
 	case pf.JsonTypeObject:
-		return property{Type: elasticTypeFlattened}
+		return property{Type: elasticTypeFlattened}, nil
 	case pf.JsonTypeNumber:
-		return property{Type: elasticTypeDouble}
+		return property{Type: elasticTypeDouble}, nil
 	default:
-		panic(fmt.Sprintf("unsupported type %T (%#v)", t, t))
+		return property{}, fmt.Errorf("propForProjection unsupported type %T (%#v)", t, t)
 	}
 }
 
-func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property {
+func buildIndexProperties(b *pf.MaterializationSpec_Binding) (map[string]property, error) {
 	props := make(map[string]property)
 
 	for _, v := range append(b.FieldSelection.Keys, b.FieldSelection.Values...) {
-		props[v] = propForField(v, b)
+		if p, err := propForField(v, b); err != nil {
+			return nil, fmt.Errorf("buildIndexProperties: %w", err)
+		} else {
+			props[v] = p
+		}
 	}
 
 	if d := b.FieldSelection.Document; d != "" {
@@ -104,7 +119,7 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property
 		props[d] = property{Type: elasticTypeFlattened, Index: boolPtr(false)}
 	}
 
-	return props
+	return props, nil
 }
 
 func boolPtr(b bool) *bool {
@@ -145,30 +160,20 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
-	prop := propForProjection(proposed).Type
-
-	if strings.EqualFold(existing.Type, string(elasticTypeText)) {
-		// Allow any of the "formatted string" types to be materialized into an existing text
-		// mapping.
-		return slices.Contains([]elasticPropertyType{
-			elasticTypeText,
-			elasticTypeKeyword,
-			elasticTypeBinary,
-			elasticTypeDate,
-			elasticTypeIp,
-		}, prop), nil
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
+	prop, err := propForProjection(proposed, fc)
+	if err != nil {
+		return false, err
 	}
 
-	if prop == elasticTypeText {
-		// Allow text fields to be materialized to either text mappings or keyword mappings.
-		return strings.EqualFold(existing.Type, string(elasticTypeText)) || strings.EqualFold(existing.Type, string(elasticTypeKeyword)), nil
-	}
-
-	// Otherwise, require that the types match exactly.
-	return strings.EqualFold(existing.Type, string(prop)), nil
+	return strings.EqualFold(existing.Type, string(prop.Type)), nil
 }
 
-func (constrainter) DescriptionForType(p *pf.Projection) string {
-	return string(propForProjection(p).Type)
+func (constrainter) DescriptionForType(p *pf.Projection, fc json.RawMessage) (string, error) {
+	prop, err := propForProjection(p, fc)
+	if err != nil {
+		return "", err
+	}
+
+	return string(prop.Type), nil
 }

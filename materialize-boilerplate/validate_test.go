@@ -523,8 +523,8 @@ func (testConstrainter) Compatible(existing EndpointField, proposed *pf.Projecti
 	return existing.Type == strings.Join(proposed.Inference.Types, ","), nil
 }
 
-func (testConstrainter) DescriptionForType(p *pf.Projection) string {
-	return strings.Join(p.Inference.Types, ", ")
+func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
+	return strings.Join(p.Inference.Types, ", "), nil
 }
 
 func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {

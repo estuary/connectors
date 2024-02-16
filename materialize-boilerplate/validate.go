@@ -23,7 +23,7 @@ type Constrainter interface {
 
 	// DescriptionForType produces a human-readable description for a type, which is used in
 	// constraint descriptions when there is an incompatible type change.
-	DescriptionForType(p *pf.Projection) string
+	DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error)
 }
 
 // Validator performs validation of a materialization binding.
@@ -230,7 +230,8 @@ func (v Validator) validateMatchesExistingBinding(
 		} else if existingField, err := v.is.GetField(path, p.Field); err == nil {
 			// All other fields that are already being materialized. Any error from GetField is
 			// because the field does not already exist.
-			if compatible, err := v.c.Compatible(existingField, &p, fieldConfigJsonMap[p.Field]); err != nil {
+			rawConfig := fieldConfigJsonMap[p.Field]
+			if compatible, err := v.c.Compatible(existingField, &p, rawConfig); err != nil {
 				return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", existingField.Name, p.Field, err)
 			} else if compatible {
 				if p.IsPrimaryKey {
@@ -248,13 +249,18 @@ func (v Validator) validateMatchesExistingBinding(
 					}
 				}
 			} else {
+				desc, err := v.c.DescriptionForType(&p, rawConfig)
+				if err != nil {
+					return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
+				}
+
 				c = &pm.Response_Validated_Constraint{
 					Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
 					Reason: fmt.Sprintf(
 						"Field '%s' is already being materialized as endpoint type '%s' and cannot be changed to type '%s'",
 						p.Field,
 						existingField.Type,
-						v.c.DescriptionForType(&p),
+						desc,
 					),
 				}
 			}
