@@ -59,7 +59,6 @@ WORKDIR /connector
 COPY --from=builder /builder/connector ./$CONNECTOR_NAME
 COPY --from=builder /builder/python ./python
 
-ENV PYTHONPATH="/connector/$CONNECTOR_NAME"
 # Arg substitution in CMD doesn't seem to work
 ENV CONNECTOR_NAME=$CONNECTOR_NAME
 CMD python -m $CONNECTOR_NAME
