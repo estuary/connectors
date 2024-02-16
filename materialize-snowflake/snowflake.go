@@ -139,6 +139,9 @@ type transactor struct {
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
+
+	// map of pipe name to beginMarker
+	pipeMarkers map[string]string
 }
 
 func (t *transactor) AckDelay() time.Duration {
@@ -187,10 +190,11 @@ func newTransactor(
 	}
 
 	var d = &transactor{
-		cfg:        cfg,
-		templates:  renderTemplates(dialect),
-		db:         db,
-		pipeClient: pipeClient,
+		cfg:         cfg,
+		templates:   renderTemplates(dialect),
+		db:          db,
+		pipeClient:  pipeClient,
+		pipeMarkers: make(map[string]string),
 	}
 
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -256,6 +260,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 			return fmt.Errorf("pipeName template: %w", err)
 		} else {
 			d.pipeName = fmt.Sprintf("%s.%s.%s", t.cfg.Database, t.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
+			t.pipeMarkers[d.pipeName] = ""
 		}
 
 		if createPipe, err := sql.RenderTableTemplate(target, t.templates.pipeName); err != nil {
@@ -455,16 +460,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
+type pipeRecord struct {
+	files []fileRecord
+}
+
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	var asyncCtx = sf.WithAsyncMode(ctx)
-	log.Info("store: starting committing changes")
-
 	// Run the queries using AsyncMode, which means that `ExecContext` will not block
 	// until the query is successful, rather we will store the results of these queries
 	// in a map so that we can then call `RowsAffected` on them, blocking until
 	// the queries are actually executed and done
+	var asyncCtx = sf.WithAsyncMode(ctx)
+	log.Info("store: starting committing changes")
+
 	var results = make(map[string]stdsql.Result)
+	var pipes = make(map[string]pipeRecord)
 	for stateKey, item := range d.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
@@ -480,6 +490,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				results[stateKey] = result
 			}
 		} else if len(item.PipeFiles) > 0 {
+			log.WithField("table", item.Table).Info("store: starting pipe requests")
 			var fileRequests = make([]FileRequest, len(item.PipeFiles))
 			for i, f := range item.PipeFiles {
 				fileRequests[i] = FileRequest{
@@ -490,11 +501,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
 				return nil, fmt.Errorf("snowpipe insertFiles: %w", err)
-			} else if report, err := d.pipeClient.InsertReport(item.PipeName, ""); err != nil {
-				return nil, fmt.Errorf("snowpipe insertReports: %w", err)
 			} else {
 				// TODO: make me DEBUG
-				log.WithField("response", resp).Info(fmt.Sprintf("insertFiles sucesssful %+v", report))
+				log.WithField("response", resp).Info(fmt.Sprintf("insertFiles sucesssful"))
+			}
+
+			pipes[item.PipeName] = pipeRecord{
+				files: item.PipeFiles,
 			}
 		}
 	}
@@ -507,6 +520,32 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		log.WithField("table", item.Table).Info("store: finished query")
 
 		d.deleteFiles(ctx, []string{item.StagedDir})
+	}
+
+	// Keep asking for a report on the files that have been submitted for processing
+	// until they have all been successful, or an error has been thrown
+	for len(pipes) > 0 {
+		for pipeName, record := range pipes {
+			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
+			if err != nil {
+				return nil, fmt.Errorf("snowpipe insertReports: %w", err)
+			}
+
+			for _, reportFile := range report.Files {
+				for _, recordFile := range record.files {
+					if reportFile.Path == recordFile.Path {
+						if reportFile.Status == "LOADED" {
+							d.pipeMarkers[pipeName] = report.NextBeginMark
+							delete(pipes, pipeName)
+						} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
+							return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
+						}
+					}
+				}
+			}
+		}
+
+		time.Sleep(5 * time.Second)
 	}
 
 	log.Info("store: finished committing changes")
