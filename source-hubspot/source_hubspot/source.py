@@ -4,6 +4,7 @@
 
 import logging
 from itertools import chain
+from pathlib import Path
 from typing import Any, List, Mapping, Optional, Tuple
 
 import requests
@@ -11,7 +12,7 @@ from airbyte_cdk.logger import AirbyteLogger
 from airbyte_cdk.sources import AbstractSource
 from airbyte_cdk.sources.streams import Stream
 from requests import HTTPError
-from source_hubspot.streams import (
+from .streams import (
     API,
     Campaigns,
     Companies,
@@ -43,6 +44,7 @@ from source_hubspot.streams import (
     Tickets,
     Workflows,
 )
+
 
 
 class SourceHubspot(AbstractSource):
