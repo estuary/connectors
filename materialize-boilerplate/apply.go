@@ -199,12 +199,12 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 
 		if err := group.Wait(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("executing concurrent apply actions: %w", err)
 		}
 	} else {
 		for _, a := range actions {
 			if err := a(ctx); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("executing apply actions: %w", err)
 			}
 		}
 	}

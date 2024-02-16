@@ -468,7 +468,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		fields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
 		floatFields := make([]bool, len(fields))
 		for idx := range fields {
-			if propForField(fields[idx], b).Type == elasticTypeDouble {
+			if prop, err := propForField(fields[idx], b); err != nil {
+				return nil, nil, fmt.Errorf("propForField in NewTransactor: %w", err)
+			} else if prop.Type == elasticTypeDouble {
 				floatFields[idx] = true
 			}
 		}

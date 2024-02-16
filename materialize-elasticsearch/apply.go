@@ -28,8 +28,13 @@ func (e *elasticApplier) CreateResource(ctx context.Context, spec *pf.Materializ
 		return "", nil, fmt.Errorf("parsing resource config: %w", err)
 	}
 
+	props, err := buildIndexProperties(binding)
+	if err != nil {
+		return "", nil, err
+	}
+
 	return fmt.Sprintf("create index %q", binding.ResourcePath[0]), func(ctx context.Context) error {
-		return e.client.createIndex(ctx, binding.ResourcePath[0], res.Shards, e.cfg.Advanced.Replicas, buildIndexProperties(binding))
+		return e.client.createIndex(ctx, binding.ResourcePath[0], res.Shards, e.cfg.Advanced.Replicas, props)
 	}, nil
 }
 
@@ -52,8 +57,13 @@ func (e *elasticApplier) ReplaceResource(ctx context.Context, spec *pf.Materiali
 		return "", nil, fmt.Errorf("parsing resource config: %w", err)
 	}
 
+	props, err := buildIndexProperties(binding)
+	if err != nil {
+		return "", nil, err
+	}
+
 	return fmt.Sprintf("replace index %q", binding.ResourcePath[0]), func(ctx context.Context) error {
-		return e.client.replaceIndex(ctx, binding.ResourcePath[0], res.Shards, e.cfg.Advanced.Replicas, buildIndexProperties(binding))
+		return e.client.replaceIndex(ctx, binding.ResourcePath[0], res.Shards, e.cfg.Advanced.Replicas, props)
 	}, nil
 }
 
@@ -67,7 +77,11 @@ func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.Materializ
 
 	var actions []string
 	for _, newProjection := range bindingUpdate.NewProjections {
-		prop := propForField(newProjection.Field, binding)
+		prop, err := propForField(newProjection.Field, binding)
+		if err != nil {
+			return "", nil, err
+		}
+
 		actions = append(actions, fmt.Sprintf(
 			"add mapping %q to index %q with type %q",
 			newProjection.Field,
@@ -78,8 +92,9 @@ func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.Materializ
 
 	return strings.Join(actions, "\n"), func(ctx context.Context) error {
 		for _, newProjection := range bindingUpdate.NewProjections {
-			prop := propForField(newProjection.Field, binding)
-			if err := e.client.addMappingToIndex(ctx, binding.ResourcePath[0], newProjection.Field, prop); err != nil {
+			if prop, err := propForField(newProjection.Field, binding); err != nil {
+				return err
+			} else if err := e.client.addMappingToIndex(ctx, binding.ResourcePath[0], newProjection.Field, prop); err != nil {
 				return err
 			}
 		}

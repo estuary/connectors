@@ -221,7 +221,7 @@ func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.
 	return strings.EqualFold(existing.Type, string(mapType(proposed).ddbScalarType)), nil
 }
 
-func (constrainter) DescriptionForType(p *pf.Projection) string {
+func (constrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
 	out := ""
 	switch t := mapType(p).ddbScalarType; t {
 	case types.ScalarAttributeTypeS:
@@ -232,7 +232,7 @@ func (constrainter) DescriptionForType(p *pf.Projection) string {
 		out = "binary"
 	}
 
-	return out
+	return out, nil
 }
 
 func infoSchema(ctx context.Context, db *dynamodb.Client, tableNames []string) (*boilerplate.InfoSchema, error) {
