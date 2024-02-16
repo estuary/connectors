@@ -1,6 +1,6 @@
 import urllib
 from flow_sdk import shim_airbyte_cdk
-from source_hubspot import SourceHubspot
+from .source_hubspot import SourceHubspot
 
 scopes = [
     "forms",
