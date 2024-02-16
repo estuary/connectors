@@ -195,17 +195,22 @@ type insertReportURLTemplate struct {
 }
 
 type fileReport struct {
-	Path           string `json:"path"`
-	StageLocation  string `json:"stageLocation"`
-	FileSize       int    `json:"fileSize"`
-	TimeReceived   string `json:"timeReceived"`
-	LastInsertTime string `json:"lastInsertTime"`
-	RowsInserted   int    `json:"rowsInserted"`
-	RowsParsed     int    `json:"rowsParsed"`
-	ErrorsSeen     int    `json:"errorsSeen"`
-	ErrorLimit     int    `json:"errorLimit"`
-	Complete       bool   `json:"complete"`
-	Status         string `json:"status"`
+	Path                   string `json:"path"`
+	StageLocation          string `json:"stageLocation"`
+	FileSize               int    `json:"fileSize"`
+	TimeReceived           string `json:"timeReceived"`
+	LastInsertTime         string `json:"lastInsertTime"`
+	RowsInserted           int    `json:"rowsInserted"`
+	RowsParsed             int    `json:"rowsParsed"`
+	ErrorsSeen             int    `json:"errorsSeen"`
+	ErrorLimit             int    `json:"errorLimit"`
+	FirstError             string `json:"firstError"`
+	FirstErrorLineNum      int    `json:"firstErrorLineNum"`
+	FirstErrorCharacterPos int    `json:"firstErrorCharacterPos"`
+	FirstErrorColumnName   int    `json:"firstErrorColumnName"`
+	SystemError            string `json:"systemError"`
+	Complete               bool   `json:"complete"`
+	Status                 string `json:"status"`
 }
 
 type InsertReportResponse struct {
@@ -234,11 +239,6 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("User-Agent", userAgent)
 
-	log.WithFields(log.Fields{
-		"url":     url,
-		"headers": req.Header,
-	}).Warn("pipe client")
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("insertReport request: %w", err)
@@ -260,6 +260,12 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 	if err != nil {
 		return nil, fmt.Errorf("parsing response of insertReport failed: %w", err)
 	}
+
+	log.WithFields(log.Fields{
+		"url":      url,
+		"headers":  req.Header,
+		"response": response,
+	}).Warn("insertReport")
 
 	return &response, nil
 }
