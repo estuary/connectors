@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
@@ -27,7 +27,7 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	PollInterval string `json:"poll,omitempty" jsonschema:"title=Default Poll Interval,description=How often to execute fetch queries. Defaults to 5 minutes if unset."`
+	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Defaults to '5m' if unset."`
 	SSLMode      string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 }
 
@@ -43,9 +43,9 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	if c.Advanced.PollInterval != "" {
-		if _, err := time.ParseDuration(c.Advanced.PollInterval); err != nil {
-			return fmt.Errorf("invalid default poll interval %q: %w", c.Advanced.PollInterval, err)
+	if c.Advanced.PollSchedule != "" {
+		if err := schedule.Validate(c.Advanced.PollSchedule); err != nil {
+			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
 	}
 	return nil
@@ -60,8 +60,8 @@ func (c *Config) SetDefaults() {
 		c.Address += ":5432"
 	}
 
-	if c.Advanced.PollInterval == "" {
-		c.Advanced.PollInterval = "5m"
+	if c.Advanced.PollSchedule == "" {
+		c.Advanced.PollSchedule = "5m"
 	}
 }
 
