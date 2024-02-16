@@ -669,8 +669,8 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"CursorFields": quotedCursorNames,
 	}
 
-	// Polling interval can be configured per binding. If unset, falls back to the
-	// connector global polling interval.
+	// Polling schedule can be configured per binding. If unset, falls back to the
+	// connector global polling schedule.
 	var pollScheduleStr = c.Config.Advanced.PollSchedule
 	if res.PollSchedule != "" {
 		pollScheduleStr = res.PollSchedule
@@ -679,7 +679,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	if err != nil {
 		return fmt.Errorf("failed to parse polling schedule %q: %w", pollScheduleStr, err)
 	}
-
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,

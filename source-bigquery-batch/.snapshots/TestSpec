@@ -27,8 +27,8 @@
         "properties": {
           "poll": {
             "type": "string",
-            "title": "Default Poll Interval",
-            "description": "How often to execute fetch queries. Defaults to 24 hours if unset."
+            "title": "Default Polling Schedule",
+            "description": "When and how often to execute fetch queries. Defaults to '24h' if unset."
           }
         },
         "additionalProperties": false,
@@ -73,8 +73,8 @@
       },
       "poll": {
         "type": "string",
-        "title": "Poll Interval",
-        "description": "How often to execute the fetch query (overrides the connector default setting)",
+        "title": "Polling Schedule",
+        "description": "When and how often to execute the fetch query (overrides the connector default setting)",
         "order": 1
       }
     },
