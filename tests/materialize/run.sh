@@ -45,6 +45,7 @@ export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/multiple-data-types"
 export TEST_COLLECTION_FORMATTED_STRINGS="tests/formatted-strings"
 export TEST_COLLECTION_LONG_STRING="tests/long-string"
 export TEST_COLLECTION_COMPOUND_KEY="tests/compound-key"
+export TEST_COLLECTION_SYMBOLS="tests/symbols"
 
 source ${TEST_DIR}/${CONNECTOR}/setup.sh || bail "setup failed"
 

@@ -81,6 +81,15 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "symbols"
+    },
+    "source": "${TEST_COLLECTION_SYMBOLS}",
+    "fields": {
+      "recommended": true
+    }
   }
 ]'
 

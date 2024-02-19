@@ -32,6 +32,8 @@ transactions:
       - [false, { "yin": "b", "yan": "a", "num": 0, "_meta": {"uuid": "1b953992-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "yin": "ab", "yan": "", "num": 0, "_meta": {"uuid": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "yin": "", "yan": "ab", "num": 0, "_meta": {"uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"}}]
+    tests/symbols:
+      - [false, { "id": "test", "testing (%s)": "test", "_meta": {"uuid": "fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f"}}]
 
   - tests/simple:
       - [false, { "id": 7, "canary": "pieced", "_meta": {"uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"}}]
