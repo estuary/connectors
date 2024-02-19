@@ -63,8 +63,13 @@ func TestSQLGeneration(t *testing.T) {
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
+			var tf = tableAndFile{
+				Table: tbl,
+				File:  "test-file",
+			}
+
 			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(&snap, &tbl))
+			require.NoError(t, tpl.Execute(&snap, &tf))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
 	}
@@ -123,8 +128,13 @@ func TestSQLGeneration(t *testing.T) {
 	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, testDialect)
 	require.NoError(t, err)
 
+	var tf = tableAndFile{
+		Table: tableNoValues,
+		File:  "test-file",
+	}
+
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	require.NoError(t, templates["mergeInto"].Execute(&snap, &tableNoValues))
+	require.NoError(t, templates["mergeInto"].Execute(&snap, &tf))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 
 	cupaloy.SnapshotT(t, snap.String())
