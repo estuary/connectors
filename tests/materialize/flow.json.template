@@ -80,6 +80,17 @@
         "type": "object"
       },
       "key": ["/yin", "/yan"]
+    },
+    "tests/symbols": {
+      "schema": {
+        "properties": {
+           "id": { "type": "string" },
+          "testing (%s)": { "type": "string" }
+        },
+        "required": ["testing (%s)"],
+        "type": "object"
+      },
+      "key": ["/testing (%s)"]
     }
   },
 

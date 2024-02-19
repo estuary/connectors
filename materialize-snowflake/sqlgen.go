@@ -10,6 +10,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	log "github.com/sirupsen/logrus"
 )
 
 // For historical reasons, we do not quote identifiers starting with an underscore or any letter,
@@ -210,19 +211,19 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 -- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
 
 {{ define "loadQuery" }}
-{{ if $.Document -}}
-SELECT {{ $.Binding }}, {{ $.Identifier }}.{{ $.Document.Identifier }}
-	FROM {{ $.Identifier }}
+{{ if $.Table.Document -}}
+SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
+	FROM {{ $.Table.Identifier }}
 	JOIN (
-		SELECT {{ range $ind, $key := $.Keys }}
+		SELECT {{ range $ind, $key := $.Table.Keys }}
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 		{{- end }}
-		FROM %s
+		FROM {{ $.File }}
 	) AS r
-	ON {{ range $ind, $key := $.Keys }}
+	ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
@@ -230,55 +231,55 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end }}
 
 {{ define "copyInto" }}
-COPY INTO {{ $.Identifier }} (
-	{{ range $ind, $key := $.Columns }}
+COPY INTO {{ $.Table.Identifier }} (
+	{{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier -}}
 	{{- end }}
 ) FROM (
-	SELECT {{ range $ind, $key := $.Columns }}
+	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
 	$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM %s
+	FROM {{ $.File }}
 );
 {{ end }}
 
 
 {{ define "mergeInto" }}
-MERGE INTO {{ $.Identifier }} AS l
+MERGE INTO {{ $.Table.Identifier }} AS l
 USING (
-	SELECT {{ range $ind, $key := $.Columns }}
+	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM %s
+	FROM {{ $.File }}
 ) AS r
-ON {{ range $ind, $key := $.Keys }}
+ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
-{{- if $.Document }}
-WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Document.Identifier }}) THEN
+{{- if $.Table.Document }}
+WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
-	UPDATE SET {{ range $ind, $key := $.Values }}
+	UPDATE SET {{ range $ind, $key := $.Table.Values }}
 	{{- if $ind }}, {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end -}}
-{{- if $.Document -}}
-{{ if $.Values }}, {{ end }}l.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
+{{- if $.Table.Document -}}
+{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 {{- end }}
 WHEN NOT MATCHED THEN
 	INSERT (
-	{{- range $ind, $key := $.Columns }}
+	{{- range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier -}}
 	{{- end -}}
 )
 	VALUES (
-	{{- range $ind, $key := $.Columns }}
+	{{- range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		r.{{$key.Identifier -}}
 	{{- end -}}
@@ -304,3 +305,20 @@ FILE_FORMAT = (
 )
 COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
 ;`
+
+type tableAndFile struct {
+	Table sql.Table
+	File  string
+}
+
+// RenderTableTemplate is a simple implementation of rendering a template with a Table
+// as its context. It's here for demonstration purposes mostly. Feel free to not use it.
+func RenderTableAndFileTemplate(tf tableAndFile, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &tf); err != nil {
+		return "", err
+	}
+	var s = w.String()
+	log.WithField("rendered", s).WithField("tableAndFile", tf).Debug("rendered template")
+	return s, nil
+}
