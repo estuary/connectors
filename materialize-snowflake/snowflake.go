@@ -336,21 +336,10 @@ type binding struct {
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var d = new(binding)
-	var err error
 	d.target = target
 
 	d.load.stage = newStagedFile(os.TempDir())
 	d.store.stage = newStagedFile(os.TempDir())
-
-	if d.load.loadQuery, err = sql.RenderTableTemplate(target, t.templates["loadQuery"]); err != nil {
-		return fmt.Errorf("loadQuery template: %w", err)
-	}
-	if d.store.copyInto, err = sql.RenderTableTemplate(target, t.templates["copyInto"]); err != nil {
-		return fmt.Errorf("copyInto template: %w", err)
-	}
-	if d.store.mergeInto, err = sql.RenderTableTemplate(target, t.templates["mergeInto"]); err != nil {
-		return fmt.Errorf("mergeInto template: %w", err)
-	}
 
 	t.bindings = append(t.bindings, d)
 	return nil
@@ -384,8 +373,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
+		} else if subqueries[i], err = RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates["loadQuery"]); err != nil {
+			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			subqueries[i] = renderWithDir(b.load.loadQuery, dir)
 			toDelete = append(toDelete, dir)
 		}
 	}
@@ -498,16 +488,24 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:     b.target.Identifier,
-				Query:     renderWithDir(b.store.mergeInto, dir),
-				StagedDir: dir,
+			if mergeIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates["mergeInto"]); err != nil {
+				return nil, fmt.Errorf("mergeInto template: %w", err)
+			} else {
+				d.cp[b.target.StateKey] = &checkpointItem{
+					Table:     b.target.Identifier,
+					Query:     mergeIntoQuery,
+					StagedDir: dir,
+				}
 			}
 		} else {
-			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:     b.target.Identifier,
-				Query:     renderWithDir(b.store.copyInto, dir),
-				StagedDir: dir,
+			if copyIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates["copyInto"]); err != nil {
+				return nil, fmt.Errorf("copyInto template: %w", err)
+			} else {
+				d.cp[b.target.StateKey] = &checkpointItem{
+					Table:     b.target.Identifier,
+					Query:     copyIntoQuery,
+					StagedDir: dir,
+				}
 			}
 		}
 	}
@@ -520,10 +518,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 	}, nil
-}
-
-func renderWithDir(tpl string, dir string) string {
-	return fmt.Sprintf(tpl, dir)
 }
 
 // Acknowledge merges data from temporary table to main table
@@ -606,9 +600,9 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 }
 
 func (d *transactor) Destroy() {
-	d.db.Close()
 	d.load.conn.Close()
 	d.store.conn.Close()
+	d.db.Close()
 }
 
 func main() {

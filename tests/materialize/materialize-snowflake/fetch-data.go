@@ -90,7 +90,7 @@ func main() {
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
-		log.Fatal(fmt.Errorf("queryContext: %w", err))
+		log.Fatal(fmt.Errorf("queryContext %q: %w", query, err))
 	}
 
 	cols, err := rows.Columns()
