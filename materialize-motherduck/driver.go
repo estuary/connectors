@@ -162,18 +162,17 @@ func newDuckDriver() *sql.Driver {
 			metaSpecs, metaCheckpoints := sql.MetaTables([]string{cfg.Database, cfg.Schema})
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              duckDialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      &metaCheckpoints,
-				NewClient:            newClient,
-				CreateTableTemplate:  tplCreateTargetTable,
-				ReplaceTableTemplate: tplReplaceTargetTable,
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
-				ConcurrentApply:      false,
-				MaxFieldCharLen:      0, // Duckdb has no apparent limit on how long column names can be
+				Config:              cfg,
+				Dialect:             duckDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				NewClient:           newClient,
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
+				ConcurrentApply:     false,
+				MaxFieldCharLen:     0, // Duckdb has no apparent limit on how long column names can be
 			}, nil
 		},
 	}

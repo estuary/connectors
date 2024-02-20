@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -210,15 +209,14 @@ func newSnowflakeDriver() *sql.Driver {
 				MetaSpecs: &metaSpecs,
 				// Snowflake does not use the checkpoint table, instead we use the recovery log
 				// as the authoritative checkpoint and idempotent apply pattern
-				MetaCheckpoints:      nil,
-				NewClient:            newClient,
-				CreateTableTemplate:  templates["createTargetTable"],
-				ReplaceTableTemplate: templates["replaceTargetTable"],
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
-				ConcurrentApply:      true,
-				MaxFieldCharLen:      255,
+				MetaCheckpoints:     nil,
+				NewClient:           newClient,
+				CreateTableTemplate: templates.createTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
+				ConcurrentApply:     true,
+				MaxFieldCharLen:     255,
 			}, nil
 		},
 	}
@@ -238,7 +236,7 @@ type transactor struct {
 		conn  *stdsql.Conn
 		fence *sql.Fence
 	}
-	templates   map[string]*template.Template
+	templates   templates
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
@@ -373,7 +371,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
-		} else if subqueries[i], err = RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates["loadQuery"]); err != nil {
+		} else if subqueries[i], err = RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.loadQuery); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			toDelete = append(toDelete, dir)
@@ -488,7 +486,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			if mergeIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates["mergeInto"]); err != nil {
+			if mergeIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.mergeInto); err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			} else {
 				d.cp[b.target.StateKey] = &checkpointItem{
@@ -498,7 +496,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				}
 			}
 		} else {
-			if copyIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates["copyInto"]); err != nil {
+			if copyIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.copyInto); err != nil {
 				return nil, fmt.Errorf("copyInto template: %w", err)
 			} else {
 				d.cp[b.target.StateKey] = &checkpointItem{

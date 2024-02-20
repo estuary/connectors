@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	sql "github.com/estuary/connectors/materialize-sql"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"regexp"
 	"slices"
 	"strings"
 	"text/template"
+
+	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
@@ -112,16 +113,15 @@ var starburstDialect = func() sql.Dialect {
 }()
 
 type templates struct {
-	fetchVersionAndSpec        *template.Template
-	createTargetTable          *template.Template
-	createOrReplaceTargetTable *template.Template
-	alterTableColumns          *template.Template
-	createLoadTempTable        *template.Template
-	dropLoadTempTable          *template.Template
-	loadQuery                  *template.Template
-	createStoreTempTable       *template.Template
-	dropStoreTempTable         *template.Template
-	mergeIntoTarget            *template.Template
+	fetchVersionAndSpec  *template.Template
+	createTargetTable    *template.Template
+	alterTableColumns    *template.Template
+	createLoadTempTable  *template.Template
+	dropLoadTempTable    *template.Template
+	loadQuery            *template.Template
+	createStoreTempTable *template.Template
+	dropStoreTempTable   *template.Template
+	mergeIntoTarget      *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -148,16 +148,6 @@ WHERE
 
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
-    {{- range $ind, $col := $.Columns }}
-    {{- if $ind }},{{ end }}
-    {{$col.Identifier}} {{$col.DDL}}
-    {{- end }}
-)
-COMMENT {{ Literal $.Comment }}
-{{ end }}
-
-{{ define "createOrReplaceTargetTable" }}
-CREATE OR REPLACE TABLE {{$.Identifier}} (
     {{- range $ind, $col := $.Columns }}
     {{- if $ind }},{{ end }}
     {{$col.Identifier}} {{$col.DDL}}
@@ -253,15 +243,14 @@ ALTER TABLE {{.TableIdentifier}} ADD COLUMN {{.ColumnIdentifier}} {{.NullableDDL
 
   `)
 	return templates{
-		fetchVersionAndSpec:        tplAll.Lookup("fetchVersionAndSpec"),
-		createTargetTable:          tplAll.Lookup("createTargetTable"),
-		createOrReplaceTargetTable: tplAll.Lookup("createOrReplaceTargetTable"),
-		alterTableColumns:          tplAll.Lookup("alterTableColumns"),
-		createLoadTempTable:        tplAll.Lookup("createLoadTempTable"),
-		dropLoadTempTable:          tplAll.Lookup("dropLoadTempTable"),
-		loadQuery:                  tplAll.Lookup("loadQuery"),
-		createStoreTempTable:       tplAll.Lookup("createStoreTempTable"),
-		dropStoreTempTable:         tplAll.Lookup("dropStoreTempTable"),
-		mergeIntoTarget:            tplAll.Lookup("mergeIntoTarget"),
+		fetchVersionAndSpec:  tplAll.Lookup("fetchVersionAndSpec"),
+		createTargetTable:    tplAll.Lookup("createTargetTable"),
+		alterTableColumns:    tplAll.Lookup("alterTableColumns"),
+		createLoadTempTable:  tplAll.Lookup("createLoadTempTable"),
+		dropLoadTempTable:    tplAll.Lookup("dropLoadTempTable"),
+		loadQuery:            tplAll.Lookup("loadQuery"),
+		createStoreTempTable: tplAll.Lookup("createStoreTempTable"),
+		dropStoreTempTable:   tplAll.Lookup("dropStoreTempTable"),
+		mergeIntoTarget:      tplAll.Lookup("mergeIntoTarget"),
 	}
 }

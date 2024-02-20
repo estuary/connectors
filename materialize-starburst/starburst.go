@@ -5,6 +5,9 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"time"
+
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -13,8 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	_ "github.com/trinodb/trino-go-client/trino"
 	"go.gazette.dev/core/consumer/protocol"
-	"net/url"
-	"time"
 )
 
 // config represents the endpoint configuration for starburst.
@@ -125,15 +126,14 @@ func newStarburstDriver() *sql.Driver {
 			var templates = renderTemplates(starburstDialect)
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              starburstDialect,
-				MetaSpecs:            &metaSpecs,
-				NewClient:            newClient,
-				CreateTableTemplate:  templates.createTargetTable,
-				ReplaceTableTemplate: templates.createOrReplaceTargetTable,
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
+				Config:              cfg,
+				Dialect:             starburstDialect,
+				MetaSpecs:           &metaSpecs,
+				NewClient:           newClient,
+				CreateTableTemplate: templates.createTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
 			}, nil
 		},
 	}

@@ -34,7 +34,6 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tpl := range []*template.Template{
 		tplCreateTargetTable,
-		tplReplaceTargetTable,
 		tplStoreQuery,
 	} {
 		var testcase = table.Identifier + " " + tpl.Name()

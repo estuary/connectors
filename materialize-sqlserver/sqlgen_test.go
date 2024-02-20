@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -41,22 +42,19 @@ func TestSQLGeneration(t *testing.T) {
 
 	var snap strings.Builder
 
-	var templateNames = []string{
-		"tempLoadTableName",
-		"tempStoreTableName",
-		"tempLoadTruncate",
-		"tempStoreTruncate",
-		"createLoadTable",
-		"createStoreTable",
-		"createTargetTable",
-		"replaceTargetTable",
-		"directCopy",
-		"mergeInto",
-		"loadInsert",
-		"loadQuery",
-	}
-	for _, key := range templateNames {
-		var tpl = templates[key]
+	for _, tpl := range []*template.Template{
+		templates.tempLoadTableName,
+		templates.tempStoreTableName,
+		templates.tempLoadTruncate,
+		templates.tempStoreTruncate,
+		templates.createLoadTable,
+		templates.createStoreTable,
+		templates.createTargetTable,
+		templates.directCopy,
+		templates.mergeInto,
+		templates.loadInsert,
+		templates.loadQuery,
+	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -67,7 +65,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin alter table add columns ---\n")
-	require.NoError(t, templates["alterTableColumns"].Execute(&snap, sqlDriver.TableAlter{
+	require.NoError(t, templates.alterTableColumns.Execute(&snap, sqlDriver.TableAlter{
 		Table: table1,
 		AddColumns: []sqlDriver.Column{
 			{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
@@ -86,7 +84,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin Fence Update ---\n")
-	require.NoError(t, templates["updateFence"].Execute(&snap, fence))
+	require.NoError(t, templates.updateFence.Execute(&snap, fence))
 	snap.WriteString("--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())

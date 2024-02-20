@@ -46,8 +46,7 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
 		for _, tpl := range []*template.Template{
-			templates["createTargetTable"],
-			templates["replaceTargetTable"],
+			templates.createTargetTable,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -57,9 +56,9 @@ func TestSQLGeneration(t *testing.T) {
 		}
 
 		for _, tpl := range []*template.Template{
-			templates["loadQuery"],
-			templates["copyInto"],
-			templates["mergeInto"],
+			templates.loadQuery,
+			templates.copyInto,
+			templates.mergeInto,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -113,7 +112,7 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	} {
 		snap.WriteString("--- Begin " + testcase.name + " ---")
-		require.NoError(t, templates["alterTableColumns"].Execute(&snap, sqlDriver.TableAlter{
+		require.NoError(t, templates.alterTableColumns.Execute(&snap, sqlDriver.TableAlter{
 			Table:        table1,
 			AddColumns:   testcase.addColumns,
 			DropNotNulls: testcase.dropNotNulls,
@@ -134,7 +133,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	require.NoError(t, templates["mergeInto"].Execute(&snap, &tf))
+	require.NoError(t, templates.mergeInto.Execute(&snap, &tf))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 
 	cupaloy.SnapshotT(t, snap.String())

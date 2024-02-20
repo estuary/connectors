@@ -109,9 +109,11 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return err
 }
 
-func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
-	return tr.TableReplaceSql, func(ctx context.Context) error {
-		_, err := c.query(ctx, tr.TableReplaceSql)
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("DROP TABLE %s;", bqDialect.Identifier(path...))
+
+	return stmt, func(ctx context.Context) error {
+		_, err := c.query(ctx, stmt)
 		return err
 	}, nil
 }

@@ -154,12 +154,11 @@ func (c *client) createIndex(ctx context.Context, index string, shards *int, rep
 	return nil
 }
 
-// replaceIndex first deletes any existing index by the provided name, then creates it anew.
-func (c *client) replaceIndex(ctx context.Context, index string, shards *int, replicas *int, indexProps map[string]property) error {
+// deleteIndex deletes an index with the provided name.
+func (c *client) deleteIndex(ctx context.Context, index string) error {
 	res, err := c.es.Indices.Delete(
 		[]string{index},
 		c.es.Indices.Delete.WithContext(ctx),
-		c.es.Indices.Delete.WithIgnoreUnavailable(true),
 	)
 	if err != nil {
 		return fmt.Errorf("deleting existing index: %w", err)
@@ -167,29 +166,6 @@ func (c *client) replaceIndex(ctx context.Context, index string, shards *int, re
 	defer res.Body.Close()
 	if res.IsError() {
 		return fmt.Errorf("delete index error response [%s] %s", res.Status(), res.String())
-	}
-
-	params := createIndexParams{
-		Settings: indexSettings{
-			Shards:   shards,
-			Replicas: replicas,
-		},
-		Mappings: indexMappings{
-			Properties: indexProps,
-		},
-	}
-
-	createResp, err := c.es.Indices.Create(
-		index,
-		c.es.Indices.Create.WithContext(ctx),
-		c.es.Indices.Create.WithBody(esutil.NewJSONReader(params)),
-	)
-	if err != nil {
-		return fmt.Errorf("replaceIndex: %w", err)
-	}
-	defer createResp.Body.Close()
-	if createResp.IsError() {
-		return fmt.Errorf("replaceIndex error response [%s] %s", createResp.Status(), createResp.String())
 	}
 
 	return nil

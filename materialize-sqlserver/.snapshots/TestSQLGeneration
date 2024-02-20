@@ -99,44 +99,6 @@ CREATE TABLE "Delta Updates" (
 END;
 --- End "Delta Updates" createTargetTable ---
 
---- Begin target_table replaceTargetTable ---
-
-BEGIN TRANSACTION;
-DROP TABLE IF EXISTS target_table;
-
-IF OBJECT_ID(N'target_table', 'U') IS NULL BEGIN
-CREATE TABLE target_table (
-		key1 BIGINT NOT NULL,
-		"key!2" BIT NOT NULL,
-		"Camel_Case" BIGINT,
-		"a Time" DATETIME2,
-		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
-		lower_case BIGINT,
-		"value" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
-		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
-
-		PRIMARY KEY (key1, "key!2")
-);
-END;
-
-COMMIT TRANSACTION;
---- End target_table replaceTargetTable ---
-
---- Begin "Delta Updates" replaceTargetTable ---
-
-BEGIN TRANSACTION;
-DROP TABLE IF EXISTS "Delta Updates";
-
-IF OBJECT_ID(N'Delta Updates', 'U') IS NULL BEGIN
-CREATE TABLE "Delta Updates" (
-		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
-		"aValue" BIGINT
-);
-END;
-
-COMMIT TRANSACTION;
---- End "Delta Updates" replaceTargetTable ---
-
 --- Begin target_table directCopy ---
 
 	INSERT INTO target_table 

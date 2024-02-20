@@ -152,7 +152,23 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 	})
 }
 
-func renderTemplates(dialect sql.Dialect) map[string]*template.Template {
+type templates struct {
+	tempLoadTableName  *template.Template
+	tempStoreTableName *template.Template
+	tempLoadTruncate   *template.Template
+	tempStoreTruncate  *template.Template
+	createLoadTable    *template.Template
+	createStoreTable   *template.Template
+	alterTableColumns  *template.Template
+	createTargetTable  *template.Template
+	directCopy         *template.Template
+	mergeInto          *template.Template
+	loadInsert         *template.Template
+	loadQuery          *template.Template
+	updateFence        *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 -- Local (session-level) temporary tables are prefixed with a # sign in SQLServer
 {{ define "temp_load_name" -}}
@@ -183,15 +199,6 @@ CREATE TABLE {{$.Identifier}} (
 	{{- end }}
 );
 END;
-{{ end }}
-
--- Templated replacement of a materialized table.
-
-{{ define "replaceTargetTable" }}
-BEGIN TRANSACTION;
-DROP TABLE IF EXISTS {{$.Identifier}};
-{{ template "createTargetTable" . }}
-COMMIT TRANSACTION;
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns.
@@ -358,20 +365,19 @@ UPDATE {{ Identifier $.TablePath }}
 {{ end }}
 	`)
 
-	return map[string]*template.Template{
-		"tempLoadTableName":  tplAll.Lookup("temp_load_name"),
-		"tempStoreTableName": tplAll.Lookup("temp_store_name"),
-		"tempLoadTruncate":   tplAll.Lookup("truncateTempLoadTable"),
-		"tempStoreTruncate":  tplAll.Lookup("truncateTempStoreTable"),
-		"createLoadTable":    tplAll.Lookup("createLoadTable"),
-		"createStoreTable":   tplAll.Lookup("createStoreTable"),
-		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
-		"createTargetTable":  tplAll.Lookup("createTargetTable"),
-		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
-		"directCopy":         tplAll.Lookup("directCopy"),
-		"mergeInto":          tplAll.Lookup("mergeInto"),
-		"loadInsert":         tplAll.Lookup("loadInsert"),
-		"loadQuery":          tplAll.Lookup("loadQuery"),
-		"updateFence":        tplAll.Lookup("updateFence"),
+	return templates{
+		tempLoadTableName:  tplAll.Lookup("temp_load_name"),
+		tempStoreTableName: tplAll.Lookup("temp_store_name"),
+		tempLoadTruncate:   tplAll.Lookup("truncateTempLoadTable"),
+		tempStoreTruncate:  tplAll.Lookup("truncateTempStoreTable"),
+		createLoadTable:    tplAll.Lookup("createLoadTable"),
+		createStoreTable:   tplAll.Lookup("createStoreTable"),
+		alterTableColumns:  tplAll.Lookup("alterTableColumns"),
+		createTargetTable:  tplAll.Lookup("createTargetTable"),
+		directCopy:         tplAll.Lookup("directCopy"),
+		mergeInto:          tplAll.Lookup("mergeInto"),
+		loadInsert:         tplAll.Lookup("loadInsert"),
+		loadQuery:          tplAll.Lookup("loadQuery"),
+		updateFence:        tplAll.Lookup("updateFence"),
 	}
 }

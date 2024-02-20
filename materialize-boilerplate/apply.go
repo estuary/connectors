@@ -54,15 +54,15 @@ type Applier interface {
 	PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, exists bool) (string, ActionApplyFn, error)
 
 	// CreateResource creates a new resource in the endpoint. It is called only if the resource does
-	// not already exist.
+	// not already exist, either because it is brand new or because it was previously deleted as
+	// part of a resource replacement.
 	CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, ActionApplyFn, error)
 
-	// ReplaceResource replaces a resource in the endpoint so that it can start materializing from
-	// the beginning. It will only be called if the materialized resource exists in the destination
-	// system, the resource exists in the prior spec, and the backfill counter of the new spec is
-	// greater than the prior spec. It is usually carried out with a "CREATE OR REPLACE ..." sort of
-	// action.
-	ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, ActionApplyFn, error)
+	// DeleteResource deletes a resource from the endpoint. It is used for replacing a materialized
+	// resource when the `backfill` counter is incremented. It will only be called if the
+	// materialized resource exists in the destination system, the resource exists in the prior
+	// spec, and the backfill counter of the new spec is greater than the prior spec.
+	DeleteResource(ctx context.Context, path []string) (string, ActionApplyFn, error)
 
 	// UpdateResource updates an existing resource. The `BindingUpdate` contains specific
 	// information about what is changing for the resource. `NewProjections` are assured to not
@@ -125,13 +125,43 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 			}
 			addAction(desc, action)
 		} else if existingBinding != nil && existingBinding.Backfill != binding.Backfill {
-			// Resource does exist but the backfill counter is being increased, so it must be
-			// replaced.
-			desc, action, err := applier.ReplaceResource(ctx, req.Materialization, bindingIdx)
+			// Resource does exist but the backfill counter is being increased, so it must deleted
+			// and re-created anew.
+			deleteDesc, deleteAction, err := applier.DeleteResource(ctx, binding.ResourcePath)
 			if err != nil {
-				return nil, fmt.Errorf("getting ReplaceResource action: %w", err)
+				return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
 			}
-			addAction(desc, action)
+
+			createDesc, createAction, err := applier.CreateResource(ctx, req.Materialization, bindingIdx)
+			if err != nil {
+				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
+			}
+
+			if deleteAction == nil && createAction == nil {
+				// Currently only applicable to materialize-sqlite.
+				continue
+			}
+
+			desc := []string{deleteDesc}
+			if createDesc != "" {
+				desc = append(desc, createDesc)
+			}
+
+			action = func(ctx context.Context) error {
+				if err := deleteAction(ctx); err != nil {
+					return err
+				}
+
+				if createAction != nil {
+					if err := createAction(ctx); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}
+
+			addAction(strings.Join(desc, "\n"), action)
 		} else {
 			// Resource does exist and may need updated for changes in the binding specification.
 			params := BindingUpdate{

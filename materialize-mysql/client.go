@@ -135,7 +135,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	var alterColumnStmtBuilder strings.Builder
-	if err := renderTemplates(c.ep.Dialect)["alterTableColumns"].Execute(&alterColumnStmtBuilder, ta); err != nil {
+	if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 		return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 	}
 	alterColumnStmt := alterColumnStmtBuilder.String()
@@ -151,21 +151,12 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return err
 }
 
-func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
-	stmts := []string{
-		// `TableReplaceSql` is only the "create table" part, and we need to also include the
-		// statement to drop the table first. Also see additional comments in sqlgen.go.
-		fmt.Sprintf("DROP TABLE IF EXISTS %s;", tr.Identifier),
-		tr.TableReplaceSql,
-	}
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
-	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
-		for _, stmt := range stmts {
-			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-				return err
-			}
-		}
-		return nil
+	return stmt, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, stmt)
+		return err
 	}, nil
 }
 
