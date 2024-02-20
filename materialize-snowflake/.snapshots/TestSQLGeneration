@@ -21,29 +21,6 @@ COMMENT ON COLUMN "a-schema".target_table.string IS 'auto-generated projection o
 COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
 --- End "a-schema".target_table createTargetTable ---
 
---- Begin "a-schema".target_table replaceTargetTable ---
-CREATE OR REPLACE TABLE "a-schema".target_table (
-	key1 INTEGER NOT NULL,
-	key2 BOOLEAN NOT NULL,
-	boolean BOOLEAN,
-	integer INTEGER,
-	number DOUBLE,
-	string STRING,
-	flow_document VARIANT NOT NULL,
-
-	PRIMARY KEY (key1, key2)
-);
-
-COMMENT ON TABLE "a-schema".target_table IS 'Generated for materialization test/sqlite of collection key/value';
-COMMENT ON COLUMN "a-schema".target_table.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
-COMMENT ON COLUMN "a-schema".target_table.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
-COMMENT ON COLUMN "a-schema".target_table.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
-COMMENT ON COLUMN "a-schema".target_table.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
-COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
---- End "a-schema".target_table replaceTargetTable ---
-
 --- Begin "a-schema".target_table loadQuery ---
 SELECT 0, "a-schema".target_table.flow_document
 	FROM "a-schema".target_table
@@ -90,18 +67,6 @@ COMMENT ON COLUMN "Delta Updates".theKey IS 'auto-generated projection of JSON a
 COMMENT ON COLUMN "Delta Updates".aValue IS 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- End "Delta Updates" createTargetTable ---
-
---- Begin "Delta Updates" replaceTargetTable ---
-CREATE OR REPLACE TABLE "Delta Updates" (
-	theKey STRING NOT NULL,
-	aValue INTEGER
-);
-
-COMMENT ON TABLE "Delta Updates" IS 'Generated for materialization test/sqlite of collection delta/updates';
-COMMENT ON COLUMN "Delta Updates".theKey IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
-COMMENT ON COLUMN "Delta Updates".aValue IS 'A super-awesome value.
-auto-generated projection of JSON at: /aValue with inferred types: [integer]';
---- End "Delta Updates" replaceTargetTable ---
 
 --- Begin "Delta Updates" loadQuery ---
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc

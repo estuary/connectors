@@ -172,18 +172,17 @@ func newBigQueryDriver() *sql.Driver {
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              bqDialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      &metaCheckpoints,
-				NewClient:            newClient,
-				CreateTableTemplate:  tplCreateTargetTable,
-				ReplaceTableTemplate: tplReplaceTargetTable,
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
-				ConcurrentApply:      true,
-				MaxFieldCharLen:      300,
+				Config:              cfg,
+				Dialect:             bqDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				NewClient:           newClient,
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
+				ConcurrentApply:     true,
+				MaxFieldCharLen:     300,
 			}, nil
 		},
 	}

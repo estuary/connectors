@@ -119,7 +119,24 @@ func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
 	})
 }
 
-func renderTemplates(dialect sql.Dialect) map[string]*template.Template {
+type templates struct {
+	tempTableName     *template.Template
+	tempTruncate      *template.Template
+	createLoadTable   *template.Template
+	createUpdateTable *template.Template
+	createTargetTable *template.Template
+	alterTableColumns *template.Template
+	updateLoad        *template.Template
+	updateReplace     *template.Template
+	updateTruncate    *template.Template
+	storeLoad         *template.Template
+	loadQuery         *template.Template
+	loadLoad          *template.Template
+	installFence      *template.Template
+	updateFence       *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_load_name" -}}
 flow_temp_load_table_{{ $.Binding }}
@@ -147,18 +164,6 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	)
 	{{- end }}
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin {{- if $.Comment }} COMMENT={{Literal $.Comment}} {{- end }};
-{{ end }}
-
--- Templated replacement of a materialized table, sort of. MySQL doesn't
--- have a CREATE OR REPLACE TABLE operation generally, nor does it support
--- transactional DDL, and to make matters worse the go driver support for
--- multi-statement queries is kind of janky. As such, this is only the
--- "create table" part of the drop & create that is necessary for table
--- replacement. The logic in Apply for the driver must execute the statement
--- for dropping the table prior to running this query.
-
-{{ define "replaceTargetTable" }}
-{{- template "createTargetTable" . }}
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns and/or
@@ -357,22 +362,21 @@ UPDATE {{ Identifier $.TablePath }}
 {{ end }}
 `)
 
-	return map[string]*template.Template{
-		"tempTableName":      tplAll.Lookup("temp_load_name"),
-		"tempTruncate":       tplAll.Lookup("truncateTempTable"),
-		"createLoadTable":    tplAll.Lookup("createLoadTable"),
-		"createUpdateTable":  tplAll.Lookup("createUpdateTable"),
-		"createTargetTable":  tplAll.Lookup("createTargetTable"),
-		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
-		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
-		"updateLoad":         tplAll.Lookup("updateLoad"),
-		"updateReplace":      tplAll.Lookup("updateReplace"),
-		"updateTruncate":     tplAll.Lookup("truncateUpdateTable"),
-		"storeLoad":          tplAll.Lookup("storeLoad"),
-		"loadQuery":          tplAll.Lookup("loadQuery"),
-		"loadLoad":           tplAll.Lookup("loadLoad"),
-		"installFence":       tplAll.Lookup("installFence"),
-		"updateFence":        tplAll.Lookup("updateFence"),
+	return templates{
+		tempTableName:     tplAll.Lookup("temp_load_name"),
+		tempTruncate:      tplAll.Lookup("truncateTempTable"),
+		createLoadTable:   tplAll.Lookup("createLoadTable"),
+		createUpdateTable: tplAll.Lookup("createUpdateTable"),
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		updateLoad:        tplAll.Lookup("updateLoad"),
+		updateReplace:     tplAll.Lookup("updateReplace"),
+		updateTruncate:    tplAll.Lookup("truncateUpdateTable"),
+		storeLoad:         tplAll.Lookup("storeLoad"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		loadLoad:          tplAll.Lookup("loadLoad"),
+		installFence:      tplAll.Lookup("installFence"),
+		updateFence:       tplAll.Lookup("updateFence"),
 	}
 }
 

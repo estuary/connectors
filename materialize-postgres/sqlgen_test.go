@@ -41,7 +41,6 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tpl := range []*template.Template{
 		tplCreateTargetTable,
-		tplReplaceTargetTable,
 		tplCreateLoadTable,
 		tplLoadInsert,
 		tplLoadQuery,

@@ -178,17 +178,6 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
--- Templated creation or replacement of a target table. Redshift doesn't have a
--- "OR REPLACE" type of operation, but it does support transactional DDL for
--- dropping and creating tables.
-
-{{ define "replaceTargetTable" }}
-BEGIN TRANSACTION;
-DROP TABLE IF EXISTS {{$.Identifier}};
-{{ template "createTargetTable" . }}
-COMMIT;
-{{ end }}
-
 -- Idempotent creation of the load table for staging load keys.
 
 {{ define "createLoadTable" }}
@@ -294,14 +283,13 @@ TRUNCATECOLUMNS;
 {{- end }}
 {{ end }}
 `)
-	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
-	tplReplaceTargetTable = tplAll.Lookup("replaceTargetTable")
-	tplCreateLoadTable    = tplAll.Lookup("createLoadTable")
-	tplCreateStoreTable   = tplAll.Lookup("createStoreTable")
-	tplMergeInto          = tplAll.Lookup("mergeInto")
-	tplLoadQuery          = tplAll.Lookup("loadQuery")
-	tplUpdateFence        = tplAll.Lookup("updateFence")
-	tplCopyFromS3         = tplAll.Lookup("copyFromS3")
+	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
+	tplCreateStoreTable  = tplAll.Lookup("createStoreTable")
+	tplMergeInto         = tplAll.Lookup("mergeInto")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
+	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCopyFromS3        = tplAll.Lookup("copyFromS3")
 )
 
 const varcharTableAlter = "ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(MAX);"

@@ -315,18 +315,17 @@ func newMysqlDriver() *sql.Driver {
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              dialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      &metaCheckpoints,
-				NewClient:            newClient,
-				CreateTableTemplate:  templates["createTargetTable"],
-				ReplaceTableTemplate: templates["replaceTargetTable"],
-				NewResource:          newTableConfig,
-				NewTransactor:        prepareNewTransactor(dialect, templates),
-				Tenant:               tenant,
-				ConcurrentApply:      false,
-				MaxFieldCharLen:      64,
+				Config:              cfg,
+				Dialect:             dialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				NewClient:           newClient,
+				CreateTableTemplate: templates.createTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       prepareNewTransactor(dialect, templates),
+				Tenant:              tenant,
+				ConcurrentApply:     false,
+				MaxFieldCharLen:     64,
 			}, nil
 		},
 	}
@@ -351,7 +350,7 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 
 type transactor struct {
 	dialect   sql.Dialect
-	templates map[string]*template.Template
+	templates templates
 	// Variables exclusively used by Load.
 	load struct {
 		conn     *stdsql.Conn
@@ -370,7 +369,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 func prepareNewTransactor(
 	dialect sql.Dialect,
-	templates map[string]*template.Template,
+	templates templates,
 ) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
@@ -461,16 +460,16 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createLoadTableSQL, t.templates["createLoadTable"]},
-		{&b.createUpdateTableSQL, t.templates["createUpdateTable"]},
-		{&b.loadLoadSQL, t.templates["loadLoad"]},
-		{&b.loadQuerySQL, t.templates["loadQuery"]},
-		{&b.storeLoadSQL, t.templates["storeLoad"]},
-		{&b.updateLoadSQL, t.templates["updateLoad"]},
-		{&b.updateReplaceSQL, t.templates["updateReplace"]},
-		{&b.updateTruncateSQL, t.templates["updateTruncate"]},
-		{&b.tempTableName, t.templates["tempTableName"]},
-		{&b.tempTruncate, t.templates["tempTruncate"]},
+		{&b.createLoadTableSQL, t.templates.createLoadTable},
+		{&b.createUpdateTableSQL, t.templates.createUpdateTable},
+		{&b.loadLoadSQL, t.templates.loadLoad},
+		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.storeLoadSQL, t.templates.storeLoad},
+		{&b.updateLoadSQL, t.templates.updateLoad},
+		{&b.updateReplaceSQL, t.templates.updateReplace},
+		{&b.updateTruncateSQL, t.templates.updateTruncate},
+		{&b.tempTableName, t.templates.tempTableName},
+		{&b.tempTruncate, t.templates.tempTruncate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -878,7 +877,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			var fenceUpdate strings.Builder
-			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
+			if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 

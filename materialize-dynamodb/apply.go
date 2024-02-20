@@ -82,14 +82,9 @@ func (e *ddbApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 
 }
 
-func (e *ddbApplier) ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
-	binding := spec.Bindings[bindingIndex]
-
-	tableName := binding.ResourcePath[0]
-	attrs, schema := tableConfigFromBinding(binding.Collection.Projections)
-
-	return fmt.Sprintf("replace table %q", tableName), func(ctx context.Context) error {
-		return replaceTable(ctx, e.client, tableName, attrs, schema)
+func (e *ddbApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return fmt.Sprintf("delete table %q", path[0]), func(ctx context.Context) error {
+		return deleteTable(ctx, e.client, path[0])
 	}, nil
 }
 
@@ -181,25 +176,16 @@ func createTable(
 	return fmt.Errorf("table %s was created but did not become ready in time", name)
 }
 
-func replaceTable(
-	ctx context.Context,
-	client *client,
-	name string,
-	attrs []types.AttributeDefinition,
-	keySchema []types.KeySchemaElement,
-) error {
+func deleteTable(ctx context.Context, client *client, name string) error {
 	var errNotFound *types.ResourceNotFoundException
 
 	if _, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(name),
 	}); err != nil {
-		if !errors.As(err, &errNotFound) {
-			// Any error other than the table already not existing is a problem.
-			return fmt.Errorf("deleting existing table: %w", err)
-		}
+		return fmt.Errorf("deleting existing table: %w", err)
 	}
 
-	// Wait for the table to be fully deleted before creating it anew.
+	// Wait for the table to be fully deleted.
 	attempts := 30
 	for {
 		if attempts < 0 {
@@ -211,7 +197,7 @@ func replaceTable(
 		})
 		if err != nil {
 			if errors.As(err, &errNotFound) {
-				break
+				return nil
 			}
 			return fmt.Errorf("waiting for table deletion to finish: %w", err)
 		}
@@ -224,8 +210,6 @@ func replaceTable(
 		time.Sleep(1 * time.Second)
 		attempts -= 1
 	}
-
-	return createTable(ctx, client, name, attrs, keySchema)
 }
 
 func tableConfigFromBinding(projections []pf.Projection) ([]types.AttributeDefinition, []types.KeySchemaElement) {

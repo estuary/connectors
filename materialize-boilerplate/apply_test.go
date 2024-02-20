@@ -95,7 +95,8 @@ func TestApply(t *testing.T) {
 			want: testResults{
 				createdMetaTables: true,
 				putSpec:           true,
-				replaceResources:  1,
+				deletedResources:  1,
+				createdResources:  1,
 			},
 		},
 		{
@@ -149,7 +150,7 @@ type testResults struct {
 	createdMetaTables     bool
 	putSpec               bool
 	createdResources      int
-	replaceResources      int
+	deletedResources      int
 	addedProjections      int
 	nullabledProjections  int
 	changedToDeltaUpdates bool
@@ -193,14 +194,12 @@ func (a *testApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec,
 	}, nil
 }
 
-func (a *testApplier) ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, ActionApplyFn, error) {
-	binding := spec.Bindings[bindingIndex]
-
-	return fmt.Sprintf("replace resource for collection %q", binding.Collection.Name.String()), func(ctx context.Context) error {
+func (a *testApplier) DeleteResource(ctx context.Context, path []string) (string, ActionApplyFn, error) {
+	return fmt.Sprintf("delete resource %q", path), func(ctx context.Context) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 
-		a.results.replaceResources += 1
+		a.results.deletedResources += 1
 		return nil
 	}, nil
 }

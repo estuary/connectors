@@ -119,13 +119,11 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return err
 }
 
-func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
-	// TODO(whb): There's a chance that if a previous driver checkpoint was persisted before the
-	// actual data load completed, these table replacements will not be compatible with the data
-	// referenced by the persisted driver checkpoint. This is pretty unlikely to happen, and will be
-	// resolved when we incorporate the use of state keys, which incorporate the backfill counter.
-	return tr.TableReplaceSql, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, tr.TableReplaceSql)
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("DROP TABLE %s;", databricksDialect.Identifier(path...))
+
+	return stmt, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }

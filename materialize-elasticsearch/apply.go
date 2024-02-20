@@ -46,24 +46,11 @@ func (e *elasticApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSp
 	return fmt.Sprintf("update stored materialization spec and set version = %s", version), func(ctx context.Context) error {
 		return e.client.putSpec(ctx, spec, version)
 	}, nil
-
 }
 
-func (e *elasticApplier) ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
-	binding := spec.Bindings[bindingIndex]
-
-	var res resource
-	if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-		return "", nil, fmt.Errorf("parsing resource config: %w", err)
-	}
-
-	props, err := buildIndexProperties(binding)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return fmt.Sprintf("replace index %q", binding.ResourcePath[0]), func(ctx context.Context) error {
-		return e.client.replaceIndex(ctx, binding.ResourcePath[0], res.Shards, e.cfg.Advanced.Replicas, props)
+func (e *elasticApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return fmt.Sprintf("delete index %q", path[0]), func(ctx context.Context) error {
+		return e.client.deleteIndex(ctx, path[0])
 	}, nil
 }
 
