@@ -172,17 +172,6 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ) COMMENT {{ Literal $.Comment }};
 {{ end }}
 
--- Templated creation or replacement of a target table. It's exactly the
--- same as createTargetTable, except it uses CREATE OR REPLACE.
-{{ define "replaceTargetTable" }}
-CREATE OR REPLACE TABLE {{$.Identifier}} (
-  {{- range $ind, $col := $.Columns }}
-  {{- if $ind }},{{ end }}
-  {{$col.Identifier}} {{$col.DDL}} COMMENT {{ Literal $col.Comment }}
-  {{- end }}
-) COMMENT {{ Literal $.Comment }};
-{{ end }}
-
 -- Templated query which performs table alterations by adding columns.
 -- Dropping nullability constraints must be handled separately, since
 -- Databricks does not support modifying multiple columns in a single
@@ -318,20 +307,19 @@ SELECT -1, ""
 	);
 {{ end }}
   `)
-	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
-	tplReplaceTargetTable = tplAll.Lookup("replaceTargetTable")
-	tplAlterTableColumns  = tplAll.Lookup("alterTableColumns")
-	tplCreateLoadTable    = tplAll.Lookup("createLoadTable")
-	tplCreateStoreTable   = tplAll.Lookup("createStoreTable")
-	tplLoadQuery          = tplAll.Lookup("loadQuery")
-	tplTruncateLoad       = tplAll.Lookup("truncateLoadTable")
-	tplTruncateStore      = tplAll.Lookup("truncateStoreTable")
-	tplDropLoad           = tplAll.Lookup("dropLoadTable")
-	tplDropStore          = tplAll.Lookup("dropStoreTable")
-	tplCopyIntoDirect     = tplAll.Lookup("copyIntoDirect")
-	tplCopyIntoLoad       = tplAll.Lookup("copyIntoLoad")
-	tplCopyIntoStore      = tplAll.Lookup("copyIntoStore")
-	tplMergeInto          = tplAll.Lookup("mergeInto")
+	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
+	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
+	tplCreateStoreTable  = tplAll.Lookup("createStoreTable")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
+	tplTruncateLoad      = tplAll.Lookup("truncateLoadTable")
+	tplTruncateStore     = tplAll.Lookup("truncateStoreTable")
+	tplDropLoad          = tplAll.Lookup("dropLoadTable")
+	tplDropStore         = tplAll.Lookup("dropStoreTable")
+	tplCopyIntoDirect    = tplAll.Lookup("copyIntoDirect")
+	tplCopyIntoLoad      = tplAll.Lookup("copyIntoLoad")
+	tplCopyIntoStore     = tplAll.Lookup("copyIntoStore")
+	tplMergeInto         = tplAll.Lookup("mergeInto")
 )
 
 type Template struct {

@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/bradleyjkemp/cupaloy"
 	"os"
 	"strings"
 	"testing"
 	"text/template"
+
+	"github.com/bradleyjkemp/cupaloy"
 
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -36,7 +37,6 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		templates.fetchVersionAndSpec,
 		templates.createTargetTable,
-		templates.createOrReplaceTargetTable,
 		templates.createLoadTempTable,
 		templates.dropLoadTempTable,
 		templates.loadQuery,

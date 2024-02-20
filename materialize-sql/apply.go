@@ -13,26 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ApplyActions is a list of actions that must be taken to bring an endpoint into consistency with a
-// proposed materialization change, by creating new tables and/or altering existing columns.
-type ApplyActions struct {
-	CreateTables  []TableCreate
-	AlterTables   []TableAlter
-	ReplaceTables []TableReplace
-}
-
 // TableCreate is a new table that needs to be created.
 type TableCreate struct {
 	Table
 	TableCreateSql string
-
-	ResourceConfigJson json.RawMessage
-}
-
-// TableReplace is a replacement of an existing table.
-type TableReplace struct {
-	Table
-	TableReplaceSql string
 
 	ResourceConfigJson json.RawMessage
 }
@@ -194,22 +178,8 @@ func (a *sqlApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 	}, nil
 }
 
-func (a *sqlApplier) ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
-	table, err := getTable(a.endpoint, spec, bindingIndex)
-	if err != nil {
-		return "", nil, err
-	}
-
-	replaceStatement, err := RenderTableTemplate(table, a.endpoint.ReplaceTableTemplate)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return a.client.ReplaceTable(ctx, TableReplace{
-		Table:              table,
-		TableReplaceSql:    replaceStatement,
-		ResourceConfigJson: spec.Bindings[bindingIndex].ResourceConfigJson,
-	})
+func (a *sqlApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return a.client.DeleteTable(ctx, path)
 }
 
 func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {

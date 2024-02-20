@@ -20,7 +20,8 @@ put spec with version "aVersion"
 
 * replace binding:
 create meta tables
-replace resource for collection "key/value"
+delete resource ["key_value"]
+create resource for collection "key/value"
 put spec with version "aVersion"
 
 * field is newly nullable:

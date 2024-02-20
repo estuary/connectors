@@ -201,18 +201,17 @@ func newPostgresDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              pgDialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      &metaCheckpoints,
-				NewClient:            newClient,
-				CreateTableTemplate:  tplCreateTargetTable,
-				ReplaceTableTemplate: tplReplaceTargetTable,
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
-				ConcurrentApply:      false,
-				MaxFieldCharLen:      0, // Postgres automatically truncates column names that are too long
+				Config:              cfg,
+				Dialect:             pgDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				NewClient:           newClient,
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
+				ConcurrentApply:     false,
+				MaxFieldCharLen:     0, // Postgres automatically truncates column names that are too long
 			}, nil
 		},
 	}

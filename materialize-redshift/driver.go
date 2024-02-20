@@ -239,18 +239,17 @@ func newRedshiftDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              rsDialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      &metaCheckpoints,
-				NewClient:            newClient,
-				CreateTableTemplate:  tplCreateTargetTable,
-				ReplaceTableTemplate: tplReplaceTargetTable,
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
-				ConcurrentApply:      true,
-				MaxFieldCharLen:      0, // Redshift automatically truncates column names that are too long
+				Config:              cfg,
+				Dialect:             rsDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				NewClient:           newClient,
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
+				ConcurrentApply:     true,
+				MaxFieldCharLen:     0, // Redshift automatically truncates column names that are too long
 			}, nil
 		},
 	}

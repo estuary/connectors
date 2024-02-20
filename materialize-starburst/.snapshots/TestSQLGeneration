@@ -23,19 +23,6 @@ CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 COMMENT 'Generated for materialization test/sqlite of collection key/value'
 --- End "a-schema".target_table createTargetTable ---
 
---- Begin "a-schema".target_table createOrReplaceTargetTable ---
-CREATE OR REPLACE TABLE "a-schema".target_table (
-    key1 BIGINT,
-    key2 BOOLEAN,
-    boolean BOOLEAN,
-    integer BIGINT,
-    number DOUBLE,
-    string VARCHAR,
-    flow_document VARCHAR
-)
-COMMENT 'Generated for materialization test/sqlite of collection key/value'
---- End "a-schema".target_table createOrReplaceTargetTable ---
-
 --- Begin "a-schema".target_table createLoadTempTable ---
 CREATE TABLE "a-schema".target_table_load_temp (
 	key1 BIGINT,
