@@ -5,13 +5,6 @@ CREATE TABLE IF NOT EXISTS db.schema.delta_updates (
 );
 --- End db.schema.delta_updates createTargetTable ---
 
---- Begin db.schema.delta_updates replaceTargetTable ---
-CREATE OR REPLACE TABLE db.schema.delta_updates (
-	"theKey" VARCHAR NOT NULL,
-	"aValue" BIGINT
-);
---- End db.schema.delta_updates replaceTargetTable ---
-
 --- Begin db.schema.delta_updates storeQuery ---
 INSERT INTO db.schema.delta_updates BY NAME
 SELECT * FROM read_json(

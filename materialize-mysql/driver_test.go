@@ -165,10 +165,10 @@ func TestFencingCases(t *testing.T) {
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		dialect,
-		templates["createTargetTable"],
+		templates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
-			if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
+			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 			return c.ExecStatements(ctx, []string{fenceUpdate.String()})

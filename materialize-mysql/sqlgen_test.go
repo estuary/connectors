@@ -43,16 +43,15 @@ func TestSQLGeneration(t *testing.T) {
 	var snap strings.Builder
 
 	for _, tpl := range []*template.Template{
-		templates["createTargetTable"],
-		templates["replaceTargetTable"],
-		templates["createLoadTable"],
-		templates["tempTruncate"],
-		templates["loadLoad"],
-		templates["loadQuery"],
-		templates["storeLoad"],
-		templates["updateLoad"],
-		templates["updateReplace"],
-		templates["updateTruncate"],
+		templates.createTargetTable,
+		templates.createLoadTable,
+		templates.tempTruncate,
+		templates.loadLoad,
+		templates.loadQuery,
+		templates.storeLoad,
+		templates.updateLoad,
+		templates.updateReplace,
+		templates.updateTruncate,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -102,7 +101,7 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	} {
 		snap.WriteString("--- Begin " + testcase.name + " ---\n")
-		require.NoError(t, templates["alterTableColumns"].Execute(&snap, sqlDriver.TableAlter{
+		require.NoError(t, templates.alterTableColumns.Execute(&snap, sqlDriver.TableAlter{
 			Table:        table1,
 			AddColumns:   testcase.addColumns,
 			DropNotNulls: testcase.dropNotNulls,
@@ -119,11 +118,11 @@ func TestSQLGeneration(t *testing.T) {
 		KeyEnd:          0xffeeddcc,
 	}
 	snap.WriteString("--- Begin Fence Install ---\n")
-	require.NoError(t, templates["installFence"].Execute(&snap, fence))
+	require.NoError(t, templates.installFence.Execute(&snap, fence))
 	snap.WriteString("--- End Fence Install ---\n")
 
 	snap.WriteString("--- Begin Fence Update ---\n")
-	require.NoError(t, templates["updateFence"].Execute(&snap, fence))
+	require.NoError(t, templates.updateFence.Execute(&snap, fence))
 	snap.WriteString("--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())

@@ -37,13 +37,12 @@ type Client interface {
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error
 
-	// Replace table replaces a table, using a CREATE OR REPLACE type of statement, or by dropping
-	// and creating the table anew (preferably within a transaction). It should return a string
-	// describing the action (the SQL statements it will run) and a callback function to execute in
-	// order to complete the action.
-	ReplaceTable(ctx context.Context, tr TableReplace) (string, boilerplate.ActionApplyFn, error)
+	// DeleteTable deletes a table in preparation for creating it anew as part of re-backfilling the
+	// binding. It should return a string describing the action (the SQL statements it will run) and
+	// a callback function to execute in order to complete the action.
+	DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
 
-	// AlterTable takes the actions needed per the TableAlter. Like ReplaceTable, it should return a
+	// AlterTable takes the actions needed per the TableAlter. Like DeleteTable, it should return a
 	// description of the action in the form of SQL statements, and a callback to do the action.
 	AlterTable(ctx context.Context, ta TableAlter) (string, boilerplate.ActionApplyFn, error)
 
@@ -100,8 +99,6 @@ type Endpoint struct {
 	NewClient func(context.Context, *Endpoint) (Client, error)
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
-	// ReplaceTableTemplate evaluates a Table into an endpoint statement which creates or replaces it.
-	ReplaceTableTemplate *template.Template
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource

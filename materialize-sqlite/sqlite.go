@@ -123,7 +123,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return err
 }
 
-func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
 	return "", nil, nil
 }
 

@@ -69,17 +69,9 @@ func (a *mongoApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec
 	}, nil
 }
 
-func (a *mongoApplier) ReplaceResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
-	binding := spec.Bindings[bindingIndex]
-
-	res, err := resolveResourceConfig(binding.ResourceConfigJson)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return fmt.Sprintf("drop collection %q", res.Collection), func(ctx context.Context) error {
-		// All we do here is drop the collection, since it will be re-created automatically.
-		return a.client.Database(a.cfg.Database).Collection(res.Collection).Drop(ctx)
+func (a *mongoApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return fmt.Sprintf("drop collection %q", path[1]), func(ctx context.Context) error {
+		return a.client.Database(path[0]).Collection(path[1]).Drop(ctx)
 	}, nil
 }
 

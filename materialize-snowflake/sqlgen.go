@@ -124,7 +124,15 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 	}
 }
 
-func renderTemplates(dialect sql.Dialect) map[string]*template.Template {
+type templates struct {
+	createTargetTable *template.Template
+	alterTableColumns *template.Template
+	loadQuery         *template.Template
+	copyInto          *template.Template
+	mergeInto         *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_name" -}}
 flow_temp_table_{{ $.Binding }}
@@ -134,32 +142,6 @@ flow_temp_table_{{ $.Binding }}
 
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
-{{- range $ind, $col := $.Columns }}
-{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.DDL}}
-{{- end }}
-{{- if not $.DeltaUpdates }},
-
-	PRIMARY KEY (
-	{{- range $ind, $key := $.Keys }}
-	{{- if $ind }}, {{end -}}
-	{{$key.Identifier}}
-	{{- end -}}
-)
-{{- end }}
-);
-
-COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
-{{- range $col := .Columns }}
-COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
-{{- end}}
-{{ end }}
-
--- Templated creation or replacement of a target table. It's exactly the
--- same as createTargetTable, except it uses CREATE OR REPLACE.
-
-{{ define "replaceTargetTable" }}
-CREATE OR REPLACE TABLE {{$.Identifier}} (
 {{- range $ind, $col := $.Columns }}
 {{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{$col.DDL}}
@@ -287,13 +269,12 @@ WHEN NOT MATCHED THEN
 {{ end }}
   `)
 
-	return map[string]*template.Template{
-		"createTargetTable":  tplAll.Lookup("createTargetTable"),
-		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
-		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
-		"loadQuery":          tplAll.Lookup("loadQuery"),
-		"copyInto":           tplAll.Lookup("copyInto"),
-		"mergeInto":          tplAll.Lookup("mergeInto"),
+	return templates{
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		copyInto:          tplAll.Lookup("copyInto"),
+		mergeInto:         tplAll.Lookup("mergeInto"),
 	}
 }
 

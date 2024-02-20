@@ -113,25 +113,11 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return err
 }
 
-func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
-	var res tableConfig
-	if tr.ResourceConfigJson != nil {
-		if err := pf.UnmarshalStrict(tr.ResourceConfigJson, &res); err != nil {
-			return "", nil, fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tr.Source.String(), err)
-		}
-	}
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("DROP TABLE %s;", pgDialect.Identifier(path...))
 
-	statements := []string{}
-	if res.AdditionalSql != "" {
-		statements = append(statements, txnStatements(tr.TableReplaceSql, res.AdditionalSql))
-	} else {
-		statements = append(statements, tr.TableReplaceSql)
-	}
-
-	query := strings.Join(statements, "\n")
-
-	return query, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, query)
+	return stmt, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }

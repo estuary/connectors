@@ -90,18 +90,17 @@ func newDatabricksDriver() *sql.Driver {
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
-				Config:               cfg,
-				Dialect:              databricksDialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      nil,
-				NewClient:            newClient,
-				CreateTableTemplate:  tplCreateTargetTable,
-				ReplaceTableTemplate: tplReplaceTargetTable,
-				NewResource:          newTableConfig,
-				NewTransactor:        newTransactor,
-				Tenant:               tenant,
-				ConcurrentApply:      true,
-				MaxFieldCharLen:      255,
+				Config:              cfg,
+				Dialect:             databricksDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     nil,
+				NewClient:           newClient,
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				Tenant:              tenant,
+				ConcurrentApply:     true,
+				MaxFieldCharLen:     255,
 			}, nil
 		},
 	}
