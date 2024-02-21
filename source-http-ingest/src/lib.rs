@@ -53,6 +53,7 @@ fn paths_schema_default() -> Vec<String> {
 
 fn paths_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
     serde_json::from_value(serde_json::json!({
+        "title": "URL paths",
         "type": "array",
         "items": {
             "type": "string",
@@ -64,6 +65,7 @@ fn paths_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
 
 fn require_auth_token_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
     serde_json::from_value(serde_json::json!({
+        "title": "Authentication token",
         "type": ["string", "null"],
         "secret": true,
     }))
