@@ -70,14 +70,15 @@ func New(config Config) (*Client, error) {
 	}
 
 	var response loginResponse
-	err = json.Unmarshal([]byte(respBuf.String()), &response)
+	var respStr = respBuf.String()
+	err = json.Unmarshal([]byte(respStr), &response)
 
 	if err != nil {
 		return nil, fmt.Errorf("parsing response body of login request to get access token failed: %s, %w", respBuf, err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("login request to get access token failed: %w", err)
+		return nil, fmt.Errorf("login request to get access token failed (%d): %s", resp.StatusCode, respStr)
 	}
 
 	expiryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", response.ExpiresIn))
@@ -148,14 +149,15 @@ func (c *Client) RefreshToken() error {
 	}
 
 	var response refreshResponse
-	err = json.Unmarshal([]byte(respBuf.String()), &response)
+	var respStr = respBuf.String()
+	err = json.Unmarshal([]byte(respStr), &response)
 
 	if err != nil {
 		return fmt.Errorf("parsing response body of login request to get access token failed: %s, %w", respBuf, err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("refresh request to get access token failed: %w", err)
+		return fmt.Errorf("refresh request to get access token failed (%d): %s", resp.StatusCode, respStr)
 	}
 
 	expiryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", response.ExpiresIn))
@@ -202,7 +204,7 @@ func (c *Client) Query(query string) (*QueryResponse, error) {
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
+		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf.String())
 	}
 
 	var queryResponse QueryResponse
