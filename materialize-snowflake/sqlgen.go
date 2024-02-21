@@ -291,8 +291,17 @@ WHEN NOT MATCHED THEN
 	{{- end -}}
 );
 {{ end }}
+
+{{ define "copyHistory" }}
+SELECT * FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+  TABLE_NAME=>{{ $.Table.Identifier }},
+  START_TIME=>{{ $.StartTime }}
+) WHERE
+FILE_NAME IN ({{ Join $.Files }})
+{{ end }}
   `)
 
+<<<<<<< HEAD
 	return templates{
 		createTargetTable: tplAll.Lookup("createTargetTable"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),
@@ -301,6 +310,18 @@ WHEN NOT MATCHED THEN
 		mergeInto:         tplAll.Lookup("mergeInto"),
 		pipeName:          tplAll.Lookup("pipe_name"),
 		createPipe:        tplAll.Lookup("createPipe"),
+=======
+	return map[string]*template.Template{
+		"pipeName":           tplAll.Lookup("pipe_name"),
+		"createTargetTable":  tplAll.Lookup("createTargetTable"),
+		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
+		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
+		"createPipe":         tplAll.Lookup("createPipe"),
+		"loadQuery":          tplAll.Lookup("loadQuery"),
+		"copyInto":           tplAll.Lookup("copyInto"),
+		"mergeInto":          tplAll.Lookup("mergeInto"),
+		"copyHistory":        tplAll.Lookup("copyHistory"),
+>>>>>>> 552b966a (materialize-snowflake: createPipe after ack, copy_history)
 	}
 }
 
