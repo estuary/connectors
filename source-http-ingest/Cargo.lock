@@ -379,7 +379,7 @@ dependencies = [
 [[package]]
 name = "doc"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#91e9f39aa5ac11bb55c41861bd0bddd398d8fe22"
+source = "git+https://github.com/estuary/flow#d7cb2f8b2f459cbf2950eee491a37cb50c42ca57"
 dependencies = [
  "base64 0.13.1",
  "bumpalo",
@@ -855,7 +855,7 @@ dependencies = [
 [[package]]
 name = "json"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#91e9f39aa5ac11bb55c41861bd0bddd398d8fe22"
+source = "git+https://github.com/estuary/flow#d7cb2f8b2f459cbf2950eee491a37cb50c42ca57"
 dependencies = [
  "addr",
  "bigdecimal",
@@ -1239,7 +1239,7 @@ checksum = "c55e02e35260070b6f716a2423c2ff1c3bb1642ddca6f99e1f26d06268a0e2d2"
 dependencies = [
  "bytes",
  "heck",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -1260,7 +1260,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efb6c9a1dd1def8e2124d17e83a20af56f1570d6c2d2bd9e266ccb768df3840e"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.46",
@@ -1278,7 +1278,7 @@ dependencies = [
 [[package]]
 name = "proto-flow"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#91e9f39aa5ac11bb55c41861bd0bddd398d8fe22"
+source = "git+https://github.com/estuary/flow#d7cb2f8b2f459cbf2950eee491a37cb50c42ca57"
 dependencies = [
  "bytes",
  "pbjson",
@@ -1293,7 +1293,7 @@ dependencies = [
 [[package]]
 name = "proto-gazette"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#91e9f39aa5ac11bb55c41861bd0bddd398d8fe22"
+source = "git+https://github.com/estuary/flow#d7cb2f8b2f459cbf2950eee491a37cb50c42ca57"
 dependencies = [
  "bytes",
  "pbjson",
@@ -2056,7 +2056,7 @@ checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 [[package]]
 name = "tuple"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#91e9f39aa5ac11bb55c41861bd0bddd398d8fe22"
+source = "git+https://github.com/estuary/flow#d7cb2f8b2f459cbf2950eee491a37cb50c42ca57"
 dependencies = [
  "memchr",
  "serde_json",
