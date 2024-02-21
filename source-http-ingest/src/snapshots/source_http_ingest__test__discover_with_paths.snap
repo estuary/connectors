@@ -14,9 +14,6 @@ expression: result
       },
       "key": [
         "/_meta/webhookId"
-      ],
-      "resourcePath": [
-        "/foo"
       ]
     },
     {
@@ -29,9 +26,6 @@ expression: result
       },
       "key": [
         "/_meta/webhookId"
-      ],
-      "resourcePath": [
-        "/bar/baz"
       ]
     }
   ]
