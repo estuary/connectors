@@ -4,7 +4,7 @@ use anyhow::Context;
 use axum::{
     body::Bytes,
     error_handling::HandleErrorLayer,
-    extract::{DefaultBodyLimit, Json, Path, State},
+    extract::{DefaultBodyLimit, Json, Path, Query, State},
     routing, BoxError, Router,
 };
 use http::status::StatusCode;
@@ -68,16 +68,20 @@ pub async fn run_server(
 // If you turn on debug logging, you get a pretty decent request handling log from just this attribute :)
 #[tracing::instrument(
     level = "debug",
-    skip(handler, request_headers, body),
+    skip(handler, request_headers, body, query_params),
     fields(response_status)
 )]
 async fn handle_webhook(
     State(handler): State<Arc<Handler>>,
     request_headers: axum::http::header::HeaderMap,
     Path(path): Path<String>,
+    Query(query_params): Query<serde_json::Map<String, serde_json::Value>>,
     body: Bytes,
 ) -> (StatusCode, Json<Value>) {
-    let resp = match handler.handle_webhook(path, request_headers, body).await {
+    let resp = match handler
+        .handle_webhook(path, request_headers, query_params, body)
+        .await
+    {
         Ok(resp) => resp,
         Err(err) => {
             tracing::error!(error = %err, "failed to handle request");
@@ -120,6 +124,7 @@ mod pointers {
         pub static ref ID: Pointer = Pointer::from_str("/_meta/webhookId");
         pub static ref TS: Pointer = Pointer::from_str("/_meta/receivedAt");
         pub static ref HEADERS: Pointer = Pointer::from_str("/_meta/headers");
+        pub static ref QUERY_PARAMS: Pointer = Pointer::from_str("/_meta/query");
     }
 }
 
@@ -129,6 +134,7 @@ impl CollectionHandler {
         mut object: Value,
         id: String,
         headers: serde_json::Map<String, Value>,
+        query_params: serde_json::Map<String, Value>,
         ts: String,
     ) -> anyhow::Result<(u32, Value)> {
         if !object.is_object() {
@@ -148,6 +154,15 @@ impl CollectionHandler {
         if let Some(loc) = pointers::HEADERS.create_value(&mut object) {
             *loc = Value::Object(headers);
         }
+
+        // It seems like most people probably won't use query parameters at all, so only include
+        // them if non-empty. That way, users who don't use them won't have columns added for them
+        // in their materializations.
+        if !query_params.is_empty() {
+            if let Some(loc) = pointers::QUERY_PARAMS.create_value(&mut object) {
+                *loc = Value::Object(query_params);
+            }
+        }
         Ok((self.binding_index, object))
     }
 
@@ -157,6 +172,7 @@ impl CollectionHandler {
         &self,
         body: Value,
         request_headers: axum::http::header::HeaderMap,
+        query_params: serde_json::Map<String, serde_json::Value>,
     ) -> anyhow::Result<Vec<(u32, Value)>> {
         let header_id = if let Some(header_key) = self.id_header.as_ref() {
             // If the config specified a header to use as the id, then require it to be present.
@@ -188,7 +204,7 @@ impl CollectionHandler {
         match body {
             obj @ Value::Object(_) => {
                 let id = header_id.unwrap_or_else(new_uuid);
-                let prepped = self.prepare_doc(obj, id, header_json, ts)?;
+                let prepped = self.prepare_doc(obj, id, header_json, query_params, ts)?;
                 Ok(vec![prepped])
             }
             Value::Array(arr) => {
@@ -200,7 +216,13 @@ impl CollectionHandler {
                         .as_ref()
                         .map(|header| format!("{header}/{i}"))
                         .unwrap_or_else(new_uuid);
-                    prepped.push(self.prepare_doc(inner, id, header_json.clone(), ts.clone())?);
+                    prepped.push(self.prepare_doc(
+                        inner,
+                        id,
+                        header_json.clone(),
+                        query_params.clone(),
+                        ts.clone(),
+                    )?);
                 }
                 Ok(prepped)
             }
@@ -282,6 +304,7 @@ impl Handler {
         &self,
         collection_path: String,
         request_headers: axum::http::header::HeaderMap,
+        query_params: serde_json::Map<String, serde_json::Value>,
         body: Bytes,
     ) -> anyhow::Result<(StatusCode, Json<Value>)> {
         if let Some(expected_header) = self.require_auth_header.as_ref() {
@@ -337,7 +360,8 @@ impl Handler {
         };
 
         tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "acquired lock on handler");
-        let enhanced_docs = match collection.prepare_documents(json, request_headers) {
+        let enhanced_docs = match collection.prepare_documents(json, request_headers, query_params)
+        {
             Ok(docs) => docs,
             Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err, &collection_path)),
         };
@@ -545,6 +569,7 @@ mod test {
     fn openapi_spec_generation() {
         let endpoint_config = EndpointConfig {
             require_auth_token: Some("testToken".to_string()),
+            paths: Vec::new(),
         };
         let binding0 = Binding {
             collection: serde_json::from_value(serde_json::json!({
