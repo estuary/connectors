@@ -126,6 +126,14 @@ type transactor struct {
 	cfg        *config
 	db         *stdsql.DB
 	pipeClient *PipeClient
+
+	// We initialise pipes (with a create or replace query) on the first Store
+	// to ensure that queries running as part of the first recovery Acknowledge
+	// do not create duplicates. Queries running on a pipe or idempotent so long
+	// as the pipe is not removed or replaced. The replace clause of the query
+	// will wipe the history of the pipe and so lead to duplicate documents
+	pipesInit bool
+
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -253,25 +261,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	d.load.stage = newStagedFile(os.TempDir())
 	d.store.stage = newStagedFile(os.TempDir())
 
-	// If this is a delta updates binding and we are using JWT auth type, this binding
-	// can use snowpipe
-	if target.DeltaUpdates && t.cfg.Credentials.AuthType == JWT {
-		if pipeName, err := sql.RenderTableTemplate(target, t.templates.pipeName); err != nil {
-			return fmt.Errorf("pipeName template: %w", err)
-		} else {
-			d.pipeName = fmt.Sprintf("%s.%s.%s", t.cfg.Database, t.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
-			t.pipeMarkers[d.pipeName] = ""
-		}
-
-		if createPipe, err := sql.RenderTableTemplate(target, t.templates.pipeName); err != nil {
-			return fmt.Errorf("createPipe template: %w", err)
-		} else if _, err := t.db.ExecContext(ctx, createPipe); err != nil {
-			return fmt.Errorf("creating pipe for table %q: %w", target.Path, err)
-		} else {
-			log.WithField("q", createPipe).Info("creating pipe")
-		}
-	}
-
 	t.bindings = append(t.bindings, d)
 	return nil
 }
@@ -386,6 +375,32 @@ type checkpointItem struct {
 type checkpoint = map[string]*checkpointItem
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
+	if !d.pipesInit {
+		log.Info("store: initialising pipes")
+		for _, b := range d.bindings {
+			// If this is a delta updates binding and we are using JWT auth type, this binding
+			// can use snowpipe
+			if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
+				if pipeName, err := sql.RenderTableTemplate(b.target, d.templates.pipeName); err != nil {
+					return nil, fmt.Errorf("pipeName template: %w", err)
+				} else {
+					b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
+					d.pipeMarkers[b.pipeName] = ""
+				}
+
+				if createPipe, err := sql.RenderTableTemplate(b.target, d.templates.createPipe); err != nil {
+					return nil, fmt.Errorf("createPipe template: %w", err)
+				} else if _, err := d.db.ExecContext(it.Context(), createPipe); err != nil {
+					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
+				} else {
+					log.WithField("q", createPipe).Info("creating pipe")
+				}
+			}
+		}
+
+		d.pipesInit = true
+	}
+
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -462,6 +477,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 type pipeRecord struct {
 	files []fileRecord
+	dir   string
 }
 
 // Acknowledge merges data from temporary table to main table
@@ -508,9 +524,12 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			pipes[item.PipeName] = pipeRecord{
 				files: item.PipeFiles,
+				dir:   item.StagedDir,
 			}
 		}
 	}
+
+	var hasPipes = len(pipes) > 0
 
 	for stateKey, r := range results {
 		var item = d.cp[stateKey]
@@ -524,11 +543,28 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
+	var tries = 0
+	var maxTries = 5
 	for len(pipes) > 0 {
 		for pipeName, record := range pipes {
 			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe insertReports: %w", err)
+			}
+
+			// If the files have already been loaded, when we submit a request to
+			// load those files again, our request will not show up in reports.
+			// One way to find out whether the files were successfully loaded is to check
+			// the COPY_HISTORY to make sure they are there. If they are not, then something
+			// may be wrong.
+			if len(report.Files) == 0 {
+				if tries >= maxTries {
+          var rows, err := d.store.conn.QueryContext(ctx, "SELECT * FROM TABLE(information_schema.copy_history(TABLE_NAME=>"
+					return nil, fmt.Errorf("could not get a report on the snowpipe request, restarting to try again.")
+				}
+				tries = tries + 1
+
+				continue
 			}
 
 			for _, reportFile := range report.Files {
@@ -537,6 +573,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 						if reportFile.Status == "LOADED" {
 							d.pipeMarkers[pipeName] = report.NextBeginMark
 							delete(pipes, pipeName)
+							d.deleteFiles(ctx, []string{record.dir})
 						} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 							return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
 						}
@@ -566,6 +603,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+
+	if hasPipes {
+		return nil, fmt.Errorf("artificial error")
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
