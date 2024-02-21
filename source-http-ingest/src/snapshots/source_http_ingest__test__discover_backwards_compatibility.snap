@@ -14,9 +14,6 @@ expression: result
       },
       "key": [
         "/_meta/webhookId"
-      ],
-      "resourcePath": [
-        "webhook-data"
       ]
     }
   ]
