@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -182,6 +184,7 @@ func (c *Client) Query(query string) (*QueryResponse, error) {
 	}
 
 	var url = fmt.Sprintf("https://%s/?database=%s", c.config.EngineURL, c.config.Database)
+	log.WithField("url", url).Debug("query request")
 	var req, err = http.NewRequest("POST", url, strings.NewReader(query))
 	if err != nil {
 		return nil, fmt.Errorf("creating query request failed: %w", err)
