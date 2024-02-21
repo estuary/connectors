@@ -7,6 +7,17 @@ expression: schema
   "title": "EndpointConfig",
   "type": "object",
   "properties": {
+    "paths": {
+      "description": "List of URL paths to accept requests at.\n\nDiscovery will return a separate collection for each given path. Paths must be provided without any percent encoding, and should not include any query parameters or fragment.",
+      "default": [
+        "/webhook-data"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "/.+"
+      }
+    },
     "requireAuthToken": {
       "description": "Optional bearer token to authenticate webhook requests.\n\nWARNING: If this is empty or unset, then anyone who knows the URL of the connector will be able to write data to your collections.",
       "default": null,
