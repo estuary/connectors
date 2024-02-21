@@ -1,6 +1,8 @@
 pub mod server;
 pub mod transactor;
 
+use std::collections::HashSet;
+
 use anyhow::Context;
 
 use proto_flow::{
@@ -32,6 +34,32 @@ pub struct EndpointConfig {
     #[serde(default)]
     #[schemars(schema_with = "require_auth_token_schema")]
     require_auth_token: Option<String>,
+
+    /// List of URL paths to accept requests at.
+    ///
+    /// Discovery will return a separate collection for each given path. Paths must be provided
+    /// without any percent encoding, and should not include any query parameters or fragment.
+    #[serde(default)]
+    #[schemars(default = "paths_schema_default", schema_with = "paths_schema")]
+    paths: Vec<String>,
+}
+
+/// Sets the default value that's used only in the JSON schema. This is _not_ the default that's used
+/// when deserializing the endpoint config, because we need to preserve backward compatibility with
+/// existing tasks that don't have `paths` in their endpoint configs.
+fn paths_schema_default() -> Vec<String> {
+    vec!["/webhook-data".to_string()]
+}
+
+fn paths_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
+    serde_json::from_value(serde_json::json!({
+        "type": "array",
+        "items": {
+            "type": "string",
+            "pattern": "/.+",
+        }
+    }))
+    .unwrap()
 }
 
 fn require_auth_token_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
@@ -205,14 +233,25 @@ async fn do_spec(mut stdout: io::Stdout) -> anyhow::Result<()> {
 }
 
 async fn do_discover(config: &str, mut stdout: io::Stdout) -> anyhow::Result<()> {
-    // make sure we can parse the config, just as an extra sanity check
-    let _ = serde_json::from_str::<EndpointConfig>(config).context("parsing endpoint config")?;
-    let bindings = vec![discovered_webhook_collection()];
+    let config =
+        serde_json::from_str::<EndpointConfig>(config).context("parsing endpoint config")?;
+    let discovered = generate_discover_response(config)?;
     let response = Response {
-        discovered: Some(Discovered { bindings }),
+        discovered: Some(discovered),
         ..Default::default()
     };
     write_capture_response(response, &mut stdout).await
+}
+
+fn generate_discover_response(endpoint_config: EndpointConfig) -> anyhow::Result<Discovered> {
+    let mut bindings = Vec::new();
+    for path in endpoint_config.paths.iter() {
+        bindings.push(discovered_webhook_collection(Some(&path)));
+    }
+    if bindings.is_empty() {
+        bindings.push(discovered_webhook_collection(None));
+    }
+    Ok(Discovered { bindings })
 }
 
 async fn do_validate(
@@ -222,6 +261,12 @@ async fn do_validate(
 ) -> anyhow::Result<()> {
     let config =
         serde_json::from_str::<EndpointConfig>(config).context("deserializing endpoint config")?;
+    // So that we can validate that they are all present in the bindings.
+    let mut endpoint_paths = config
+        .paths
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<HashSet<_>>();
     let mut output = Vec::with_capacity(bindings.len());
     let mut typed_bindings = Vec::with_capacity(bindings.len());
     for ValidateBinding {
@@ -236,6 +281,9 @@ async fn do_validate(
         let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
 
+        if let Some(rp) = &resource_config.path {
+            endpoint_paths.remove(rp.as_str());
+        }
         output.push(ValidatedBinding {
             resource_path: resource_config.resource_path(),
         });
@@ -243,6 +291,10 @@ async fn do_validate(
             collection: collection.clone(),
             resource_config,
         });
+    }
+    if !endpoint_paths.is_empty() {
+        let missing = endpoint_paths.into_iter().collect::<Vec<_>>();
+        anyhow::bail!("endpoint config contains paths [{}], which are not represented in the list of bindings", missing.join(", "));
     }
 
     // Check to make sure we can successfully create an openapi spec
@@ -286,12 +338,14 @@ pub async fn write_capture_response(
     Ok(())
 }
 
-fn discovered_webhook_collection() -> DiscoveredBinding {
-    let resource_config = ResourceConfig::default();
+fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
+    let mut resource_config = ResourceConfig::default();
+    resource_config.stream = path.map(|s| s.to_owned());
+    resource_config.path = path.map(|s| s.to_owned());
     DiscoveredBinding {
         disable: false,
         resource_path: resource_config.resource_path(),
-        recommended_name: "webhook-data".to_string(),
+        recommended_name: path.map(|p| p.trim_matches('/')).unwrap_or("webhook-data").to_string(),
         resource_config_json: serde_json::to_string(&resource_config).unwrap(),
         document_schema_json: serde_json::to_string(&serde_json::json!({
             "type": "object",
@@ -340,5 +394,27 @@ mod test {
     fn resource_config_schema() {
         let schema = schema_for::<ResourceConfig>();
         insta::assert_json_snapshot!(schema);
+    }
+
+    #[test]
+    fn test_discover_backwards_compatibility() {
+        // Previous versions of the connector did not have `paths`, and the goal is to ensure
+        // that tasks created with those configurations will still have the same url paths.
+        // Look in the snapshot to ensure that the `path` of the discovered resource is empty.
+        let config: EndpointConfig = serde_json::from_str("{}").unwrap();
+        assert!(config.paths.is_empty());
+        let result = generate_discover_response(config).unwrap();
+        insta::assert_json_snapshot!(result);
+    }
+
+    #[test]
+    fn test_discover_with_paths() {
+        // Ensure that the resources have `path` and `stream` set based on the paths passed here.
+        let config = EndpointConfig {
+            require_auth_token: None,
+            paths: vec!["/foo".to_string(), "/bar/baz".to_string()],
+        };
+        let result = generate_discover_response(config).unwrap();
+        insta::assert_json_snapshot!(result);
     }
 }
