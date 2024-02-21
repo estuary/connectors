@@ -136,6 +136,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 				ResourcePath: res.Path(),
 			})
 	}
+
 	return resp, nil
 }
 
