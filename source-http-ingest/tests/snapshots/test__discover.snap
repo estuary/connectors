@@ -49,10 +49,7 @@ expression: result
           "idFromHeader": null,
           "path": null,
           "stream": null
-        },
-        "resourcePath": [
-          "webhook-data"
-        ]
+        }
       }
     ]
   }

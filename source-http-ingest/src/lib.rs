@@ -344,7 +344,6 @@ fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
     resource_config.path = path.map(|s| s.to_owned());
     DiscoveredBinding {
         disable: false,
-        resource_path: resource_config.resource_path(),
         recommended_name: path.map(|p| p.trim_matches('/')).unwrap_or("webhook-data").to_string(),
         resource_config_json: serde_json::to_string(&resource_config).unwrap(),
         document_schema_json: serde_json::to_string(&serde_json::json!({
@@ -377,6 +376,7 @@ fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
         }))
         .unwrap(),
         key: vec!["/_meta/webhookId".to_string()],
+        resource_path: Vec::new(), // deprecated field
     }
 }
 
