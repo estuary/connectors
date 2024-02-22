@@ -68,6 +68,17 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if err != nil {
 		return fmt.Errorf("connecting to database: %w", err)
 	}
+
+	// Log some basic information about the database we are connected to if possible. buildInfo is
+	// an administrator command so it may not be available on all databases / configurations.
+	if info, err := getBuildInfo(ctx, client); err != nil {
+		log.WithError(err).Info("could not query buildInfo")
+	} else {
+		log.WithFields(log.Fields{
+			"version": info.Version,
+		}).Info("buildInfo")
+	}
+
 	log.Info("connected to database")
 
 	defer func() {
@@ -796,4 +807,19 @@ func idToString(value interface{}) string {
 		panic(fmt.Sprintf("could not marshal interface{} to json: %s", err))
 	}
 	return string(j)
+}
+
+type buildInfo struct {
+	Version string `bson:"version"`
+}
+
+func getBuildInfo(ctx context.Context, client *mongo.Client) (buildInfo, error) {
+	var info buildInfo
+	if res := client.Database("admin").RunCommand(ctx, bson.D{{"buildInfo", 1}}); res.Err() != nil {
+		return info, res.Err()
+	} else if err := res.Decode(&info); err != nil {
+		return info, err
+	} else {
+		return info, nil
+	}
 }
