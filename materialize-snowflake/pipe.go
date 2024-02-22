@@ -55,8 +55,6 @@ func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
 		return nil, err
 	}
 
-	log.WithField("fingerprint", fingerprint).Warn("pipe client")
-
 	var claims = &jwt.RegisteredClaims{
 		IssuedAt: jwt.NewNumericDate(time.Now()),
 		// TODO: automatically refresh the JWT token
@@ -71,14 +69,12 @@ func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("signing key: %w", err)
 	}
-	log.WithField("token", jwtToken).Warn("pipe client")
 
 	var dsn = cfg.ToURI(tenant)
 	dsnURL, err := url.Parse(fmt.Sprintf("https://%s", dsn))
 	if err != nil {
 		return nil, fmt.Errorf("parsing snowflake dsn: %w", err)
 	}
-	log.WithField("dsn", dsn).WithField("dsnURL", dsnURL).Warn("pipe client")
 
 	var insertFilesTpl = template.Must(template.New("insertFiles").Parse(insertFilesRawTpl))
 	var insertReportTpl = template.Must(template.New("insertFiles").Parse(insertReportRawTpl))
@@ -164,7 +160,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 		"url":  url,
 		"body": string(reqBodyJson),
 		"resp": respBuf.String(),
-	}).Warn("pipe client")
+	}).Info("pipe client")
 
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
@@ -265,7 +261,7 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 		"url":      url,
 		"headers":  req.Header,
 		"response": response,
-	}).Warn("insertReport")
+	}).Info("insertReport")
 
 	return &response, nil
 }

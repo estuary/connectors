@@ -453,6 +453,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.store.conn.QueryRowContext(ctx, "SELECT CURRENT_TIMESTAMP()").Scan(&currentTime); err != nil {
 				return nil, fmt.Errorf("querying current timestamp: %w", err)
 			}
+			log.WithField("currentTime", currentTime).Info("got time")
 			d.cp[b.target.StateKey] = &checkpointItem{
 				Table:         b.target.Identifier,
 				StagedDir:     dir,
@@ -479,7 +480,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		log.WithField("checkpoint", string(checkpointJSON)).Info("emitting checkpoint")
 
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 	}, nil
@@ -552,7 +552,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
-	var hasPipes = len(pipes) > 0
+	//var hasPipes = len(pipes) > 0
 
 	for stateKey, r := range results {
 		var item = d.cp[stateKey]
@@ -619,7 +619,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 						"status":            status,
 						"firstErrorMessage": firstErrorMessage,
 						"pipeName":          pipeName,
-					}).Debug("snowpipe: copy history row")
+					}).Info("snowpipe: copy history row")
 
 					for _, recordFile := range record.files {
 						if recordFile.Path == fileName {
@@ -641,8 +641,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipes[pipeName])
 				} else {
 					delete(pipes, pipeName)
+					continue
 				}
 			}
+
+			tries = 0
 
 			for _, reportFile := range report.Files {
 				for _, recordFile := range record.files {
@@ -665,7 +668,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			}
 		}
 
-		time.Sleep(20 * time.Second)
+		time.Sleep(6 * time.Second)
 	}
 
 	log.Info("store: finished committing changes")
@@ -688,9 +691,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
 
-	if hasPipes {
+	/*if hasPipes {
 		return nil, fmt.Errorf("artificial error")
-	}
+	}*/
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
