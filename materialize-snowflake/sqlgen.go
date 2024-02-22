@@ -132,6 +132,7 @@ type templates struct {
 	mergeInto         *template.Template
 	pipeName          *template.Template
 	createPipe        *template.Template
+	copyHistory       *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -291,15 +292,14 @@ WHEN NOT MATCHED THEN
 {{ end }}
 
 {{ define "copyHistory" }}
-SELECT * FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
-  TABLE_NAME=>{{ $.Table.Identifier }},
-  START_TIME=>{{ $.StartTime }}
-) WHERE
-FILE_NAME IN ({{ Join $.Files }})
+SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+  TABLE_NAME=>'{{ $.Table.Identifier }}',
+  START_TIME=>TO_TIMESTAMP_LTZ('{{ $.StartTime }}')
+)) WHERE
+FILE_NAME IN ('{{ Join $.Files "','" }}')
 {{ end }}
   `)
 
-<<<<<<< HEAD
 	return templates{
 		createTargetTable: tplAll.Lookup("createTargetTable"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),
@@ -308,18 +308,7 @@ FILE_NAME IN ({{ Join $.Files }})
 		mergeInto:         tplAll.Lookup("mergeInto"),
 		pipeName:          tplAll.Lookup("pipe_name"),
 		createPipe:        tplAll.Lookup("createPipe"),
-=======
-	return map[string]*template.Template{
-		"pipeName":           tplAll.Lookup("pipe_name"),
-		"createTargetTable":  tplAll.Lookup("createTargetTable"),
-		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
-		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
-		"createPipe":         tplAll.Lookup("createPipe"),
-		"loadQuery":          tplAll.Lookup("loadQuery"),
-		"copyInto":           tplAll.Lookup("copyInto"),
-		"mergeInto":          tplAll.Lookup("mergeInto"),
-		"copyHistory":        tplAll.Lookup("copyHistory"),
->>>>>>> 552b966a (materialize-snowflake: createPipe after ack, copy_history)
+		copyHistory:       tplAll.Lookup("copyHistory"),
 	}
 }
 
@@ -339,12 +328,39 @@ type tableAndFile struct {
 
 // RenderTableTemplate is a simple implementation of rendering a template with a Table
 // as its context. It's here for demonstration purposes mostly. Feel free to not use it.
-func RenderTableAndFileTemplate(tf tableAndFile, tpl *template.Template) (string, error) {
+func RenderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &tf); err != nil {
+	if err := tpl.Execute(&w, &tableAndFile{Table: table, File: file}); err != nil {
 		return "", err
 	}
 	var s = w.String()
-	log.WithField("rendered", s).WithField("tableAndFile", tf).Debug("rendered template")
+	log.WithFields(log.Fields{
+		"rendered": s,
+		"table":    table,
+		"file":     file,
+	}).Debug("rendered template")
+	return s, nil
+}
+
+type copyHistory struct {
+	Table     sql.Table
+	Files     []string
+	StartTime string
+}
+
+// RenderTableTemplate is a simple implementation of rendering a template with a Table
+// as its context. It's here for demonstration purposes mostly. Feel free to not use it.
+func RenderCopyHistoryTemplate(table sql.Table, files []string, startTime string, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &copyHistory{Table: table, Files: files, StartTime: startTime}); err != nil {
+		return "", err
+	}
+	var s = w.String()
+	log.WithFields(log.Fields{
+		"rendered":  s,
+		"table":     table,
+		"files":     files,
+		"startTime": startTime,
+	}).Debug("rendered template")
 	return s, nil
 }

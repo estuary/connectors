@@ -293,7 +293,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
-		} else if subqueries[i], err = RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.loadQuery); err != nil {
+		} else if subqueries[i], err = RenderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			toDelete = append(toDelete, dir)
@@ -365,16 +365,19 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Table     string
-	Query     string
-	StagedDir string
-	PipeName  string
-	PipeFiles []fileRecord
+	Table         string
+	Query         string
+	StagedDir     string
+	PipeName      string
+	PipeFiles     []fileRecord
+	PipeStartTime string
 }
 
 type checkpoint = map[string]*checkpointItem
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
+	var ctx = it.Context()
+
 	if !d.pipesInit {
 		log.Info("store: initialising pipes")
 		for _, b := range d.bindings {
@@ -390,7 +393,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 				if createPipe, err := sql.RenderTableTemplate(b.target, d.templates.createPipe); err != nil {
 					return nil, fmt.Errorf("createPipe template: %w", err)
-				} else if _, err := d.db.ExecContext(it.Context(), createPipe); err != nil {
+				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
 					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
 				} else {
 					log.WithField("q", createPipe).Info("creating pipe")
@@ -409,7 +412,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
-		if err := b.store.stage.start(it.Context(), d.db); err != nil {
+		if err := b.store.stage.start(ctx, d.db); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
@@ -436,7 +439,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			if mergeIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.mergeInto); err != nil {
+			if mergeIntoQuery, err := RenderTableAndFileTemplate(b.target, dir, d.templates.mergeInto); err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			} else {
 				d.cp[b.target.StateKey] = &checkpointItem{
@@ -446,14 +449,20 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				}
 			}
 		} else if b.pipeName != "" {
-			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:     b.target.Identifier,
-				StagedDir: dir,
-				PipeFiles: b.store.stage.uploaded,
-				PipeName:  b.pipeName,
+			var currentTime string
+			if err := d.store.conn.QueryRowContext(ctx, "SELECT CURRENT_TIMESTAMP()").Scan(&currentTime); err != nil {
+				return nil, fmt.Errorf("querying current timestamp: %w", err)
 			}
+			d.cp[b.target.StateKey] = &checkpointItem{
+				Table:         b.target.Identifier,
+				StagedDir:     dir,
+				PipeFiles:     b.store.stage.uploaded,
+				PipeName:      b.pipeName,
+				PipeStartTime: currentTime,
+			}
+
 		} else {
-			if copyIntoQuery, err := RenderTableAndFileTemplate(tableAndFile{Table: b.target, File: dir}, d.templates.copyInto); err != nil {
+			if copyIntoQuery, err := RenderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
 				return nil, fmt.Errorf("copyInto template: %w", err)
 			} else {
 				d.cp[b.target.StateKey] = &checkpointItem{
@@ -470,14 +479,27 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
+		log.WithField("checkpoint", string(checkpointJSON)).Info("emitting checkpoint")
 
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 	}, nil
 }
 
 type pipeRecord struct {
-	files []fileRecord
-	dir   string
+	files     []fileRecord
+	dir       string
+	binding   *binding
+	startTime string
+}
+
+// When a file has been successfully loaded, we remove it from the pipe record
+func (record *pipeRecord) fileLoaded(file string) {
+	for i, f := range record.files {
+		if f.Path == file {
+			record.files = append(record.files[:i], record.files[i+1:]...)
+			break
+		}
+	}
 }
 
 // Acknowledge merges data from temporary table to main table
@@ -490,7 +512,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	log.Info("store: starting committing changes")
 
 	var results = make(map[string]stdsql.Result)
-	var pipes = make(map[string]pipeRecord)
+	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
@@ -518,13 +540,14 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
 				return nil, fmt.Errorf("snowpipe insertFiles: %w", err)
 			} else {
-				// TODO: make me DEBUG
-				log.WithField("response", resp).Info(fmt.Sprintf("insertFiles sucesssful"))
+				log.WithField("response", resp).Debug(fmt.Sprintf("insertFiles sucesssful"))
 			}
 
-			pipes[item.PipeName] = pipeRecord{
-				files: item.PipeFiles,
-				dir:   item.StagedDir,
+			pipes[item.PipeName] = &pipeRecord{
+				files:     item.PipeFiles,
+				dir:       item.StagedDir,
+				binding:   d.bindingByStateKey(stateKey),
+				startTime: item.PipeStartTime,
 			}
 		}
 	}
@@ -544,12 +567,12 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
 	var tries = 0
-	var maxTries = 5
+	var maxTries = 10
 	for len(pipes) > 0 {
 		for pipeName, record := range pipes {
 			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
 			if err != nil {
-				return nil, fmt.Errorf("snowpipe insertReports: %w", err)
+				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
 			}
 
 			// If the files have already been loaded, when we submit a request to
@@ -558,13 +581,67 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// the COPY_HISTORY to make sure they are there. If they are not, then something
 			// may be wrong.
 			if len(report.Files) == 0 {
-				if tries >= maxTries {
-          var rows, err := d.store.conn.QueryContext(ctx, "SELECT * FROM TABLE(information_schema.copy_history(TABLE_NAME=>"
-					return nil, fmt.Errorf("could not get a report on the snowpipe request, restarting to try again.")
+				if tries < maxTries {
+					tries = tries + 1
+					continue
 				}
-				tries = tries + 1
 
-				continue
+				log.WithField("tries", tries).Info("snowpipe: no files in report, fetching copy history from warehouse")
+
+				var fileNames = make([]string, len(record.files))
+				for i, f := range record.files {
+					fileNames[i] = f.Path
+				}
+
+				query, err := RenderCopyHistoryTemplate(record.binding.target, fileNames, record.startTime, d.templates.copyHistory)
+				if err != nil {
+					return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
+				}
+
+				rows, err := d.store.conn.QueryContext(ctx, query)
+				if err != nil {
+					return nil, fmt.Errorf("snowpipe: fetching copy history: %w", err)
+				}
+				defer rows.Close()
+
+				var (
+					fileName          string
+					status            string
+					firstErrorMessage *string
+				)
+				for rows.Next() {
+					if err := rows.Scan(&fileName, &status, &firstErrorMessage); err != nil {
+						return nil, fmt.Errorf("scanning copy history row: %w", err)
+					}
+
+					log.WithFields(log.Fields{
+						"fileName":          fileName,
+						"status":            status,
+						"firstErrorMessage": firstErrorMessage,
+						"pipeName":          pipeName,
+					}).Debug("snowpipe: copy history row")
+
+					for _, recordFile := range record.files {
+						if recordFile.Path == fileName {
+							if status == "Loaded" {
+								pipes[pipeName].fileLoaded(fileName)
+								d.deleteFiles(ctx, []string{record.dir})
+							} else {
+								return nil, fmt.Errorf("unexpected status %q for files in pipe %q: %s", status, pipeName, firstErrorMessage)
+							}
+						}
+					}
+				}
+
+				if err := rows.Err(); err != nil {
+					return nil, fmt.Errorf("snowpipe: reading copy history: %w", err)
+				}
+
+				if len(pipes[pipeName].files) > 0 {
+					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipes[pipeName])
+				} else {
+					delete(pipes, pipeName)
+				}
 			}
 
 			for _, reportFile := range report.Files {
@@ -572,17 +649,23 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					if reportFile.Path == recordFile.Path {
 						if reportFile.Status == "LOADED" {
 							d.pipeMarkers[pipeName] = report.NextBeginMark
-							delete(pipes, pipeName)
+							pipes[pipeName].fileLoaded(recordFile.Path)
 							d.deleteFiles(ctx, []string{record.dir})
 						} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 							return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
+						} else if reportFile.Status == "LOAD_IN_PROGRESS" {
+							continue
 						}
 					}
 				}
 			}
+
+			if len(pipes[pipeName].files) == 0 {
+				delete(pipes, pipeName)
+			}
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(20 * time.Second)
 	}
 
 	log.Info("store: finished committing changes")
@@ -620,6 +703,16 @@ func (d *transactor) hasStateKey(stateKey string) bool {
 	}
 
 	return false
+}
+
+func (d *transactor) bindingByStateKey(stateKey string) *binding {
+	for _, b := range d.bindings {
+		if b.target.StateKey == stateKey {
+			return b
+		}
+	}
+
+	return nil
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
