@@ -106,42 +106,42 @@ CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
 ) COMMENT 'Generated for materialization test/sqlite of collection key/value';
 --- End `a-schema`.target_table createTargetTable ---
 
---- Begin `default`.`Delta Updates` createLoadTable ---
-CREATE TABLE IF NOT EXISTS `flow_temp_load_table_shard-range_1_Delta Updates` (
+--- Begin `default`.`Delta_Updates` createLoadTable ---
+CREATE TABLE IF NOT EXISTS `flow_temp_load_table_shard-range_1_Delta_Updates` (
 	`theKey` STRING NOT NULL
 );
---- End `default`.`Delta Updates` createLoadTable ---
+--- End `default`.`Delta_Updates` createLoadTable ---
 
---- Begin `default`.`Delta Updates` createStoreTable ---
-CREATE TABLE IF NOT EXISTS `flow_temp_store_table_shard-range_1_Delta Updates` (
+--- Begin `default`.`Delta_Updates` createStoreTable ---
+CREATE TABLE IF NOT EXISTS `flow_temp_store_table_shard-range_1_Delta_Updates` (
 	`theKey` STRING NOT NULL,
 	`aValue` BIGINT
 );
---- End `default`.`Delta Updates` createStoreTable ---
+--- End `default`.`Delta_Updates` createStoreTable ---
 
---- Begin `default`.`Delta Updates` loadQuery ---
+--- Begin `default`.`Delta_Updates` loadQuery ---
 SELECT -1, ""
---- End `default`.`Delta Updates` loadQuery ---
+--- End `default`.`Delta_Updates` loadQuery ---
 
---- Begin `default`.`Delta Updates` truncateLoadTable ---
-TRUNCATE TABLE `flow_temp_load_table_shard-range_1_Delta Updates`;
---- End `default`.`Delta Updates` truncateLoadTable ---
+--- Begin `default`.`Delta_Updates` truncateLoadTable ---
+TRUNCATE TABLE `flow_temp_load_table_shard-range_1_Delta_Updates`;
+--- End `default`.`Delta_Updates` truncateLoadTable ---
 
---- Begin `default`.`Delta Updates` truncateStoreTable ---
-TRUNCATE TABLE `flow_temp_store_table_shard-range_1_Delta Updates`;
---- End `default`.`Delta Updates` truncateStoreTable ---
+--- Begin `default`.`Delta_Updates` truncateStoreTable ---
+TRUNCATE TABLE `flow_temp_store_table_shard-range_1_Delta_Updates`;
+--- End `default`.`Delta_Updates` truncateStoreTable ---
 
---- Begin `default`.`Delta Updates` dropLoadTable ---
-DROP TABLE IF EXISTS `flow_temp_load_table_shard-range_1_Delta Updates`
---- End `default`.`Delta Updates` dropLoadTable ---
+--- Begin `default`.`Delta_Updates` dropLoadTable ---
+DROP TABLE IF EXISTS `flow_temp_load_table_shard-range_1_Delta_Updates`
+--- End `default`.`Delta_Updates` dropLoadTable ---
 
---- Begin `default`.`Delta Updates` dropStoreTable ---
-DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta Updates`
---- End `default`.`Delta Updates` dropStoreTable ---
+--- Begin `default`.`Delta_Updates` dropStoreTable ---
+DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta_Updates`
+--- End `default`.`Delta_Updates` dropStoreTable ---
 
---- Begin `default`.`Delta Updates` mergeInto ---
-	MERGE INTO `default`.`Delta Updates` AS l
-	USING `flow_temp_store_table_shard-range_1_Delta Updates` AS r
+--- Begin `default`.`Delta_Updates` mergeInto ---
+	MERGE INTO `default`.`Delta_Updates` AS l
+	USING `flow_temp_store_table_shard-range_1_Delta_Updates` AS r
 	ON l.`theKey` = r.`theKey`::STRING
 	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED THEN
@@ -149,10 +149,10 @@ DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta Updates`
 	WHEN NOT MATCHED THEN
 		INSERT (`theKey`, `aValue`)
 		VALUES (r.`theKey`::STRING, r.`aValue`::BIGINT);
---- End `default`.`Delta Updates` mergeInto ---
+--- End `default`.`Delta_Updates` mergeInto ---
 
---- Begin `default`.`Delta Updates` copyIntoDirect ---
-	COPY INTO `default`.`Delta Updates` FROM (
+--- Begin `default`.`Delta_Updates` copyIntoDirect ---
+	COPY INTO `default`.`Delta_Updates` FROM (
     SELECT
 		`theKey`::STRING, `aValue`::BIGINT
   FROM 'test-staging-path'
@@ -162,10 +162,10 @@ DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta Updates`
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
---- End `default`.`Delta Updates` copyIntoDirect ---
+--- End `default`.`Delta_Updates` copyIntoDirect ---
 
---- Begin `default`.`Delta Updates` copyIntoStore ---
-	COPY INTO `flow_temp_store_table_shard-range_1_Delta Updates` FROM (
+--- Begin `default`.`Delta_Updates` copyIntoStore ---
+	COPY INTO `flow_temp_store_table_shard-range_1_Delta_Updates` FROM (
     SELECT
 		_metadata.file_name as _metadata_file_name,
 		`theKey`::STRING, `aValue`::BIGINT
@@ -176,10 +176,10 @@ DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta Updates`
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
---- End `default`.`Delta Updates` copyIntoStore ---
+--- End `default`.`Delta_Updates` copyIntoStore ---
 
---- Begin `default`.`Delta Updates` copyIntoLoad ---
-	COPY INTO `flow_temp_load_table_shard-range_1_Delta Updates` FROM (
+--- Begin `default`.`Delta_Updates` copyIntoLoad ---
+	COPY INTO `flow_temp_load_table_shard-range_1_Delta_Updates` FROM (
     SELECT
       `theKey`::STRING
     FROM 'test-staging-path'
@@ -189,15 +189,15 @@ DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta Updates`
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
---- End `default`.`Delta Updates` copyIntoLoad ---
+--- End `default`.`Delta_Updates` copyIntoLoad ---
 
---- Begin `default`.`Delta Updates` createTargetTable ---
-CREATE TABLE IF NOT EXISTS `default`.`Delta Updates` (
+--- Begin `default`.`Delta_Updates` createTargetTable ---
+CREATE TABLE IF NOT EXISTS `default`.`Delta_Updates` (
   `theKey` STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
   `aValue` BIGINT COMMENT 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 ) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
---- End `default`.`Delta Updates` createTargetTable ---
+--- End `default`.`Delta_Updates` createTargetTable ---
 
 --- Begin alter table add columns ---
 ALTER TABLE `a-schema`.target_table ADD COLUMN
