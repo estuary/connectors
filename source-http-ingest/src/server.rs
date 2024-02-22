@@ -3,13 +3,11 @@ use crate::{transactor::Transactor, Binding, EndpointConfig};
 use anyhow::Context;
 use axum::{
     body::Bytes,
-    error_handling::HandleErrorLayer,
     extract::{DefaultBodyLimit, Json, Path, Query, State},
-    routing, BoxError, Router,
+    routing, Router,
 };
 use http::status::StatusCode;
 use serde_json::Value;
-use tower::ServiceBuilder;
 use tower_http::decompression::RequestDecompressionLayer;
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
 use utoipa_swagger_ui::SwaggerUi;
@@ -41,28 +39,21 @@ pub async fn run_server(
         .route("/*path", routing::post(handle_webhook).put(handle_webhook))
         // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
         .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
-        .layer(
-            // Handle decompression of request bodies. The order of these is important!
-            // This layer applies to all routes defined _before_ it, so the max body size is
-            // the size after decompression.
-            ServiceBuilder::new()
-                .layer(HandleErrorLayer::new(|error: BoxError| async move {
-                    tracing::info!(%error, "request body decompression error");
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "error decompressing request body",
-                    )
-                }))
-                .layer(RequestDecompressionLayer::new()),
-        )
+        // Handle decompression of request bodies. The order of these is important!
+        // This layer applies to all routes defined _before_ it, so the max body size is
+        // the size after decompression.
+        .layer(RequestDecompressionLayer::new())
         .with_state(Arc::new(handler));
 
     let address = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen_on_port()));
-    tracing::info!(%address, "listening for connections");
-    axum::Server::bind(&address)
-        .serve(router.into_make_service())
+    let listener = tokio::net::TcpListener::bind(address)
         .await
-        .map_err(anyhow::Error::from)
+        .context("listening on port")?;
+    tracing::info!(%address, "listening for connections");
+    axum::serve(listener, router.into_make_service())
+        .await
+        .context("running server")?;
+    Ok(())
 }
 
 // If you turn on debug logging, you get a pretty decent request handling log from just this attribute :)
