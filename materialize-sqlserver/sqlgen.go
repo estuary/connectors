@@ -52,7 +52,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	var jsonConverter = sql.WithElementConverter(sql.Compose(sql.StdByteArrayToStr, sql.JsonBytesConverter))
 
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
+		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.ClampInt64())),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
 		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),

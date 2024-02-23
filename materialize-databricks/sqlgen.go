@@ -55,7 +55,7 @@ var databricksDialect = func() sql.Dialect {
 		sql.ARRAY:    jsonMapper,
 		sql.BINARY:   sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
+		sql.INTEGER:  sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.ClampInt64())),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
 		sql.OBJECT:   jsonMapper,
 		sql.MULTIPLE: jsonMapper,

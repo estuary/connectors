@@ -46,7 +46,7 @@ var starburstDialect = func() sql.Dialect {
 		sql.ARRAY:    sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
 		sql.BINARY:   sql.NewStaticMapper("VARBINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
+		sql.INTEGER:  sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.ClampInt64())),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(doubleConverter)),
 		sql.OBJECT:   sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
 		sql.MULTIPLE: sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),

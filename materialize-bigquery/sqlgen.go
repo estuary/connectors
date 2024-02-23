@@ -60,7 +60,7 @@ var bqDialect = func() sql.Dialect {
 		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
 		sql.BINARY:   sql.NewStaticMapper("BYTES"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
-		sql.INTEGER:  sql.NewStaticMapper("INT64"),
+		sql.INTEGER:  sql.NewStaticMapper("INT64", sql.WithElementConverter(sql.ClampInt64())),
 		sql.NUMBER:   sql.NewStaticMapper("FLOAT64"),
 		sql.OBJECT:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),

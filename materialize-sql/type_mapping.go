@@ -3,6 +3,7 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"slices"
 	"strconv"
@@ -329,6 +330,19 @@ func ClampDate() ElementConverter {
 		}
 		return str, nil
 	})
+}
+
+// ClampInteger restricts values from JSON "integer" fields to the range of an int64 for systems
+// that do not allow values larger than that.
+func ClampInt64() ElementConverter {
+	return func(te tuple.TupleElement) (interface{}, error) {
+		switch te.(type) {
+		case uint64, *big.Int, float64:
+			return math.MaxInt64, nil
+		default:
+			return te, nil
+		}
+	}
 }
 
 // NullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
