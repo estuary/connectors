@@ -79,37 +79,37 @@ Big Schema Re-validated Constraints:
 Big Schema Changed Types Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"boolField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'boolean' and cannot be changed to type '[integer]'"}
+{"Field":"boolField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"intField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'intField' is already being materialized as endpoint type 'bigint' and cannot be changed to type '[string]'"}
+{"Field":"intField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'intField' is already being materialized as endpoint type 'BIGINT' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
-{"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'double precision' and cannot be changed to type '[boolean]'"}
-{"Field":"objField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'objField' is already being materialized as endpoint type 'json' and cannot be changed to type '[string]'"}
-{"Field":"stringDateField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'date' and cannot be changed to type '[string]'"}
-{"Field":"stringDateTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'timestamp with time zone' and cannot be changed to type '[string]'"}
-{"Field":"stringDurationField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDurationField' is already being materialized as endpoint type 'interval' and cannot be changed to type '[string]'"}
+{"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE PRECISION' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
+{"Field":"objField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'objField' is already being materialized as endpoint type 'JSON' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'DATE' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMP WITH TIME ZONE' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDurationField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDurationField' is already being materialized as endpoint type 'INTERVAL' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'text' and cannot be changed to type '[integer]'"}
+{"Field":"stringField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'TEXT' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringIntegerField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'numeric' and cannot be changed to type '[string]'"}
-{"Field":"stringIpv4Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIpv4Field' is already being materialized as endpoint type 'cidr' and cannot be changed to type '[string]'"}
-{"Field":"stringIpv6Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIpv6Field' is already being materialized as endpoint type 'cidr' and cannot be changed to type '[string]'"}
+{"Field":"stringIntegerField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'NUMERIC' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringIpv4Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIpv4Field' is already being materialized as endpoint type 'CIDR' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringIpv6Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIpv6Field' is already being materialized as endpoint type 'CIDR' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringMacAddr8Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringMacAddr8Field' is already being materialized as endpoint type 'macaddr8' and cannot be changed to type '[string]'"}
-{"Field":"stringMacAddrField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringMacAddrField' is already being materialized as endpoint type 'macaddr' and cannot be changed to type '[string]'"}
-{"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'numeric' and cannot be changed to type '[string]'"}
+{"Field":"stringMacAddr8Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringMacAddr8Field' is already being materialized as endpoint type 'MACADDR8' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringMacAddrField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringMacAddrField' is already being materialized as endpoint type 'MACADDR' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'NUMERIC' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringTimeField' is already being materialized as endpoint type 'time without time zone' and cannot be changed to type '[string]'"}
-{"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'numeric' and cannot be changed to type '[string]'"}
-{"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'numeric' and cannot be changed to type '[string]'"}
+{"Field":"stringTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringTimeField' is already being materialized as endpoint type 'TIME WITHOUT TIME ZONE' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'NUMERIC' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'NUMERIC' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
