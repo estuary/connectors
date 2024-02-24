@@ -28,9 +28,12 @@ logging.getLogger("airbyte").setLevel(logger.level)
 
 DOCS_URL = os.getenv("DOCS_URL")
 
+
 class StreamState(BaseModel):
     state: AirbyteStateMessage
     rowId: int
+
+
 """
 Airbyte doesn't appear to reduce state like we do. As a result,
 the Airbyte CDK is expecting its state input to look like a list of
@@ -38,6 +41,8 @@ AirbyteStateMessages. Since we _do_ reduce state, what we do here is
 keep track of the latest AirbyteStateMessage for each stream, and then
 just give Airbyte a list of all of the latest state messages on boot.
 """
+
+
 class State(BaseModel):
     bindingStateV1: t.Dict[str, StreamState] = {}
 
@@ -45,6 +50,7 @@ class State(BaseModel):
     Update the latest known state value for a particular stream,
     as identified by its state_key
     """
+
     def handle_message(self, msg: AirbyteStateMessage, state_key: str):
         if msg.stream == None:
             raise Exception(
@@ -71,13 +77,18 @@ class State(BaseModel):
             }
         }
     }
-    """    
-    def to_flow_state(self, index: dict[t.Tuple[str | None, str], t.List[int]], bindings: t.List[CaptureBinding]):
+    """
+
+    def to_flow_state(
+        self,
+        index: dict[t.Tuple[str | None, str], t.List[int]],
+        bindings: t.List[CaptureBinding],
+    ):
         for binding in bindings:
             if binding["stateKey"] in self.bindingStateV1:
-                namespace = binding["resourceConfig"].get("namespace",None)
+                namespace = binding["resourceConfig"].get("namespace", None)
                 stream = binding["resourceConfig"]["stream"]
-                rowId = index.get((namespace, stream), [0,1])[1]
+                rowId = index.get((namespace, stream), [0, 1])[1]
                 self.bindingStateV1[binding["stateKey"]].rowId = rowId
 
         return self.dict()
@@ -88,6 +99,7 @@ class State(BaseModel):
     as well as calculating the current binding-rowId index. We need to
     re-generate the index here as it's possible that binding indices have changed
     """
+
     @staticmethod
     def from_flow_state(state: dict | None, bindings: t.List[CaptureBinding]):
         try:
@@ -96,14 +108,18 @@ class State(BaseModel):
             index: dict[t.Tuple[str | None, str], t.List[int]] = {}
             for i, binding in enumerate(bindings):
                 if binding["stateKey"] in parsed_state.bindingStateV1:
-                    namespace = binding["resourceConfig"].get("namespace",None)
+                    namespace = binding["resourceConfig"].get("namespace", None)
                     stream = binding["resourceConfig"]["stream"]
-                    index[(namespace, stream)] = [i, parsed_state.bindingStateV1[binding["stateKey"]].rowId]
+                    index[(namespace, stream)] = [
+                        i,
+                        parsed_state.bindingStateV1[binding["stateKey"]].rowId,
+                    ]
             return (parsed_state, index)
 
         except Exception as e:
             logger.error("Failed to parse incoming state, letting it ride: ", e)
             return (State(), {})
+
 
 class CaptureShim(Connector):
     delegate: Source
@@ -216,7 +232,7 @@ class CaptureShim(Connector):
     def open(self, open: request.Open, emit: t.Callable[[Response], None]) -> None:
         streams: t.List[ConfiguredAirbyteStream] = []
         bindings = open["capture"]["bindings"]
-        
+
         # Index Key: (namespace, stream).
         # Indx Value: [binding index, next row_id].
         state, index = State.from_flow_state(open["state"], bindings)
@@ -253,7 +269,9 @@ class CaptureShim(Connector):
             if record := message.record:
                 entry = index.get((record.namespace, record.stream), None)
                 if entry is None:
-                    logger.warn(f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})")
+                    logger.warn(
+                        f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})"
+                    )
                     continue
 
                 record.data.setdefault("_meta", {})["row_id"] = entry[1]
@@ -269,15 +287,21 @@ class CaptureShim(Connector):
                 state_msg = t.cast(AirbyteStateMessage, state_msg)
 
                 if state_msg.type != AirbyteStateType.STREAM:
-                    raise Exception(
-                        f"Unsupported Airbyte state type {state_msg.type}"
-                    ) 
+                    raise Exception(f"Unsupported Airbyte state type {state_msg.type}")
 
-                binding_lookup = index.get((state_msg.stream.stream_descriptor.namespace, state_msg.stream.stream_descriptor.name), None)
+                binding_lookup = index.get(
+                    (
+                        state_msg.stream.stream_descriptor.namespace,
+                        state_msg.stream.stream_descriptor.name,
+                    ),
+                    None,
+                )
                 if binding_lookup is None:
-                    logger.warn(f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})")                
+                    logger.warn(
+                        f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})"
+                    )
                     continue
-                
+
                 # index values: [binding_index, row_id]
                 stream_binding: CaptureBinding = bindings[binding_lookup[0]]
 
@@ -286,7 +310,8 @@ class CaptureShim(Connector):
                     Response(
                         checkpoint=response.Checkpoint(
                             state=flow.ConnectorState(
-                                updated=state.to_flow_state(index, bindings), mergePatch=False
+                                updated=state.to_flow_state(index, bindings),
+                                mergePatch=False,
                             )
                         )
                     )
@@ -346,7 +371,9 @@ class CaptureShim(Connector):
         emit(
             Response(
                 checkpoint=response.Checkpoint(
-                    state=flow.ConnectorState(updated=state.to_flow_state(index, bindings), mergePatch=False)
+                    state=flow.ConnectorState(
+                        updated=state.to_flow_state(index, bindings), mergePatch=False
+                    )
                 )
             )
         )
@@ -372,5 +399,5 @@ resource_config_schema = {
         },
     },
     "required": ["stream", "syncMode"],
-    "title": "ResourceSpec"
+    "title": "ResourceSpec",
 }
