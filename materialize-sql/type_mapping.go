@@ -47,26 +47,7 @@ type Projection struct {
 // BuildProjections returns the Projections extracted from a Binding.
 func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Projection, document *Projection) {
 	var do = func(field string) Projection {
-		var p = Projection{
-			Projection:     *spec.Collection.GetProjection(field),
-			RawFieldConfig: spec.FieldSelection.FieldConfigJsonMap[field],
-		}
-
-		var source = "auto-generated"
-		if p.Explicit {
-			source = "user-provided"
-		}
-		p.Comment = fmt.Sprintf("%s projection of JSON at: %s with inferred types: %s",
-			source, p.Ptr, p.Inference.Types)
-
-		if p.Inference.Description != "" {
-			p.Comment = p.Inference.Description + "\n" + p.Comment
-		}
-		if p.Inference.Title != "" {
-			p.Comment = p.Inference.Title + "\n" + p.Comment
-		}
-
-		return p
+		return buildProjection(spec.Collection.GetProjection(field), spec.FieldSelection.FieldConfigJsonMap[field])
 	}
 
 	for _, field := range spec.FieldSelection.Keys {
@@ -81,6 +62,29 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 	}
 
 	return
+}
+
+func buildProjection(p *pf.Projection, rawFieldConfig json.RawMessage) Projection {
+	var out = Projection{
+		Projection:     *p,
+		RawFieldConfig: rawFieldConfig,
+	}
+
+	var source = "auto-generated"
+	if out.Explicit {
+		source = "user-provided"
+	}
+	out.Comment = fmt.Sprintf("%s projection of JSON at: %s with inferred types: %s",
+		source, out.Ptr, out.Inference.Types)
+
+	if out.Inference.Description != "" {
+		out.Comment = out.Inference.Description + "\n" + out.Comment
+	}
+	if out.Inference.Title != "" {
+		out.Comment = out.Inference.Title + "\n" + out.Comment
+	}
+
+	return out
 }
 
 // AsFlatType returns the Projection's FlatType.
@@ -533,20 +537,13 @@ func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *p
 	return c.dialect.ValidateColumn(existing, *p)
 }
 
-func (constrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
-	desc := "[" + strings.Join(p.Inference.Types, ",") + "]"
+func (c constrainter) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
+	pp := buildProjection(p, rawFieldConfig)
 
-	if p.Inference.String_ != nil {
-		if p.Inference.String_.Format != "" {
-			desc += " format: " + p.Inference.String_.Format
-		}
-		if p.Inference.String_.ContentType != "" {
-			desc += " content-type: " + p.Inference.String_.ContentType
-		}
-		if p.Inference.String_.ContentEncoding != "" {
-			desc += " content-encoding: " + p.Inference.String_.ContentEncoding
-		}
+	mapped, err := c.dialect.MapType(&pp)
+	if err != nil {
+		return "", fmt.Errorf("mapping type: %w", err)
 	}
 
-	return desc, nil
+	return mapped.NullableDDL, nil
 }
