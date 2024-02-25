@@ -228,14 +228,14 @@ class Events(AsanaStream):
         return "events"
 
     def read_records(self, *args, **kwargs):
-        # Check if sync token is available
-
         yield from super().read_records(*args, **kwargs)
 
         # After reading records, update the sync token
         self.sync_token = self.get_latest_sync_token()
 
     def get_latest_sync_token(self) -> str:
+        if not getattr(self, "state"):
+            self.state = {}
         latest_sync_token = self.state.get(
             "last_sync_token"
         )  # Get the previous sync token
