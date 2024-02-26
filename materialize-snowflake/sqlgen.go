@@ -297,7 +297,7 @@ WHEN NOT MATCHED THEN
 {{ define "copyHistory" }}
 SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
   TABLE_NAME=>'{{ $.Table.Identifier }}',
-  START_TIME=>DATEADD(MINUTE, -5, TO_TIMESTAMP_LTZ('{{ $.StartTime }}'))
+  START_TIME=>DATEADD(MINUTE, -30, TO_TIMESTAMP_LTZ('{{ $.StartTime }}'))
 )) WHERE
 FILE_NAME IN ('{{ Join $.Files "','" }}')
 {{ end }}
