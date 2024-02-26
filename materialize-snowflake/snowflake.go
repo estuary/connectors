@@ -490,11 +490,9 @@ type pipeRecord struct {
 
 // When a file has been successfully loaded, we remove it from the pipe record
 func (pipe *pipeRecord) fileLoaded(file string) {
-	log.WithField("file", file).Debug("file loaded")
 	for i, f := range pipe.files {
 		if f.Path == file {
 			pipe.files = append(pipe.files[:i], pipe.files[i+1:]...)
-			log.WithField("file", file).Debug("file loaded: removed from file list")
 			break
 		}
 	}
