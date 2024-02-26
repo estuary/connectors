@@ -10,7 +10,7 @@ airbyte-cdk = "^0.52"
 flow-sdk = {path="../python", develop = true}
 jsonlines = "^4.0.0"
 mypy = "^1.5"
-orjson = "^3.9.7"
+orjson = "^3.9.15"
 pydantic = "1.10.12"
 python = ">=3.11,<3.12"
 requests = "^2.31.0"
