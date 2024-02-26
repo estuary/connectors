@@ -491,9 +491,11 @@ type pipeRecord struct {
 
 // When a file has been successfully loaded, we remove it from the pipe record
 func (pipe *pipeRecord) fileLoaded(file string) {
+	log.WithField("file", file).Debug("file loaded")
 	for i, f := range pipe.files {
 		if f.Path == file {
 			pipe.files = append(pipe.files[:i], pipe.files[i+1:]...)
+			log.WithField("file", file).Debug("file loaded: removed from file list")
 			break
 		}
 	}
@@ -572,6 +574,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
 			}
 
+			var hasItemsInProgress = false
+
 			// If the files have already been loaded, when we submit a request to
 			// load those files again, our request will not show up in reports.
 			// One way to find out whether the files were successfully loaded is to check
@@ -606,6 +610,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					status            string
 					firstErrorMessage *string
 				)
+
+				var loadedFiles []string
 				for rows.Next() {
 					if err := rows.Scan(&fileName, &status, &firstErrorMessage); err != nil {
 						return nil, fmt.Errorf("scanning copy history row: %w", err)
@@ -618,32 +624,27 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 						"pipeName":          pipeName,
 					}).Info("snowpipe: copy history row")
 
-					var loadedFiles []string
-					for _, pipeFile := range pipe.files {
-						if pipeFile.Path == fileName {
-							if status == "Loaded" {
-								loadedFiles = append(loadedFiles, fileName)
-							} else if status == "Load in progress" {
-								tries = 0
-							} else {
-								return nil, fmt.Errorf("unexpected status %q for files in pipe %q: %s", status, pipeName, firstErrorMessage)
-							}
-						}
+					if status == "Loaded" {
+						loadedFiles = append(loadedFiles, fileName)
+					} else if status == "Load in progress" {
+						hasItemsInProgress = true
+					} else {
+						return nil, fmt.Errorf("unexpected status %q for files in pipe %q: %s", status, pipeName, firstErrorMessage)
 					}
+				}
 
-					for _, fileName := range loadedFiles {
-						pipes[pipeName].fileLoaded(fileName)
-						d.deleteFiles(ctx, []string{fileName})
-					}
+				for _, fileName := range loadedFiles {
+					pipe.fileLoaded(fileName)
 				}
 
 				if err := rows.Err(); err != nil {
 					return nil, fmt.Errorf("snowpipe: reading copy history: %w", err)
 				}
 
-				if len(pipes[pipeName].files) > 0 {
-					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipes[pipeName])
+				if len(pipe.files) > 0 && !hasItemsInProgress {
+					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
 				} else {
+					d.deleteFiles(ctx, []string{pipe.dir})
 					delete(pipes, pipeName)
 					continue
 				}
@@ -653,26 +654,22 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			var loadedFiles []string
 			for _, reportFile := range report.Files {
-				for _, pipeFile := range pipe.files {
-					if reportFile.Path == pipeFile.Path {
-						if reportFile.Status == "LOADED" {
-							d.pipeMarkers[pipeName] = report.NextBeginMark
-							loadedFiles = append(loadedFiles, pipeFile.Path)
-						} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
-							return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
-						} else if reportFile.Status == "LOAD_IN_PROGRESS" {
-							continue
-						}
-					}
+				if reportFile.Status == "LOADED" {
+					d.pipeMarkers[pipeName] = report.NextBeginMark
+					loadedFiles = append(loadedFiles, reportFile.Path)
+				} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
+					return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
+				} else if reportFile.Status == "LOAD_IN_PROGRESS" {
+					continue
 				}
 			}
 
 			for _, fileName := range loadedFiles {
-				pipes[pipeName].fileLoaded(fileName)
-				d.deleteFiles(ctx, []string{fileName})
+				pipe.fileLoaded(fileName)
 			}
 
-			if len(pipes[pipeName].files) == 0 {
+			if len(pipe.files) == 0 {
+				d.deleteFiles(ctx, []string{pipe.dir})
 				delete(pipes, pipeName)
 			}
 		}
@@ -729,7 +726,7 @@ func (d *transactor) bindingByStateKey(stateKey string) *binding {
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	for _, f := range files {
-		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE '%s'", f)); err != nil {
+		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
 			log.WithFields(log.Fields{
 				"file": f,
 				"err":  err,
