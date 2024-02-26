@@ -395,8 +395,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					return nil, fmt.Errorf("createPipe template: %w", err)
 				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
 					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
-				} else {
-					log.WithField("q", createPipe).Info("creating pipe")
 				}
 			}
 		}
@@ -620,15 +618,22 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 						"pipeName":          pipeName,
 					}).Info("snowpipe: copy history row")
 
+					var loadedFiles []string
 					for _, recordFile := range record.files {
 						if recordFile.Path == fileName {
 							if status == "Loaded" {
-								pipes[pipeName].fileLoaded(fileName)
+								loadedFiles = append(loadedFiles, fileName)
 								d.deleteFiles(ctx, []string{record.dir})
+							} else if status == "Load in progress" {
+								tries = 0
 							} else {
 								return nil, fmt.Errorf("unexpected status %q for files in pipe %q: %s", status, pipeName, firstErrorMessage)
 							}
 						}
+					}
+
+					for _, fileName := range loadedFiles {
+						pipes[pipeName].fileLoaded(fileName)
 					}
 				}
 
@@ -646,12 +651,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			tries = 0
 
+			var loadedFiles []string
 			for _, reportFile := range report.Files {
 				for _, recordFile := range record.files {
 					if reportFile.Path == recordFile.Path {
 						if reportFile.Status == "LOADED" {
 							d.pipeMarkers[pipeName] = report.NextBeginMark
-							pipes[pipeName].fileLoaded(recordFile.Path)
+							loadedFiles = append(loadedFiles, recordFile.Path)
 							d.deleteFiles(ctx, []string{record.dir})
 						} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 							return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
@@ -660,6 +666,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 						}
 					}
 				}
+			}
+
+			for _, fileName := range loadedFiles {
+				pipes[pipeName].fileLoaded(fileName)
 			}
 
 			if len(pipes[pipeName].files) == 0 {
