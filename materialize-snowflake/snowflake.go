@@ -489,10 +489,10 @@ type pipeRecord struct {
 }
 
 // When a file has been successfully loaded, we remove it from the pipe record
-func (record *pipeRecord) fileLoaded(file string) {
-	for i, f := range record.files {
+func (pipe *pipeRecord) fileLoaded(file string) {
+	for i, f := range pipe.files {
 		if f.Path == file {
-			record.files = append(record.files[:i], record.files[i+1:]...)
+			pipe.files = append(pipe.files[:i], pipe.files[i+1:]...)
 			break
 		}
 	}
@@ -565,7 +565,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var tries = 0
 	var maxTries = 10
 	for len(pipes) > 0 {
-		for pipeName, record := range pipes {
+		for pipeName, pipe := range pipes {
 			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
@@ -584,12 +584,12 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 				log.WithField("tries", tries).Info("snowpipe: no files in report, fetching copy history from warehouse")
 
-				var fileNames = make([]string, len(record.files))
-				for i, f := range record.files {
+				var fileNames = make([]string, len(pipe.files))
+				for i, f := range pipe.files {
 					fileNames[i] = f.Path
 				}
 
-				query, err := RenderCopyHistoryTemplate(record.binding.target, fileNames, record.startTime, d.templates.copyHistory)
+				query, err := RenderCopyHistoryTemplate(pipe.binding.target, fileNames, pipe.startTime, d.templates.copyHistory)
 				if err != nil {
 					return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
 				}
@@ -618,11 +618,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					}).Info("snowpipe: copy history row")
 
 					var loadedFiles []string
-					for _, recordFile := range record.files {
-						if recordFile.Path == fileName {
+					for _, pipeFile := range pipe.files {
+						if pipeFile.Path == fileName {
 							if status == "Loaded" {
 								loadedFiles = append(loadedFiles, fileName)
-								d.deleteFiles(ctx, []string{record.dir})
 							} else if status == "Load in progress" {
 								tries = 0
 							} else {
@@ -633,6 +632,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 					for _, fileName := range loadedFiles {
 						pipes[pipeName].fileLoaded(fileName)
+						d.deleteFiles(ctx, []string{fileName})
 					}
 				}
 
@@ -652,12 +652,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			var loadedFiles []string
 			for _, reportFile := range report.Files {
-				for _, recordFile := range record.files {
-					if reportFile.Path == recordFile.Path {
+				for _, pipeFile := range pipe.files {
+					if reportFile.Path == pipeFile.Path {
 						if reportFile.Status == "LOADED" {
 							d.pipeMarkers[pipeName] = report.NextBeginMark
-							loadedFiles = append(loadedFiles, recordFile.Path)
-							d.deleteFiles(ctx, []string{record.dir})
+							loadedFiles = append(loadedFiles, pipeFile.Path)
 						} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 							return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
 						} else if reportFile.Status == "LOAD_IN_PROGRESS" {
@@ -669,6 +668,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			for _, fileName := range loadedFiles {
 				pipes[pipeName].fileLoaded(fileName)
+				d.deleteFiles(ctx, []string{fileName})
 			}
 
 			if len(pipes[pipeName].files) == 0 {
@@ -728,7 +728,7 @@ func (d *transactor) bindingByStateKey(stateKey string) *binding {
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	for _, f := range files {
-		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
+		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE '%s'", f)); err != nil {
 			log.WithFields(log.Fields{
 				"file": f,
 				"err":  err,
