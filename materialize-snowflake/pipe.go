@@ -77,7 +77,7 @@ func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
 	}
 
 	var insertFilesTpl = template.Must(template.New("insertFiles").Parse(insertFilesRawTpl))
-	var insertReportTpl = template.Must(template.New("insertFiles").Parse(insertReportRawTpl))
+	var insertReportTpl = template.Must(template.New("insertReport").Parse(insertReportRawTpl))
 
 	return &PipeClient{
 		cfg:             cfg,
@@ -160,7 +160,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 		"url":  url,
 		"body": string(reqBodyJson),
 		"resp": respBuf.String(),
-	}).Info("pipe client")
+	}).Debug("pipe client")
 
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
@@ -173,7 +173,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}
 
 	if response.Status != "SUCCESS" {
-		return nil, fmt.Errorf("response status %q", response.Status)
+		return nil, fmt.Errorf("response status %q, %s", response.Status, respBuf)
 	}
 
 	return &response, nil

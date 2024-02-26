@@ -38,7 +38,7 @@
             }
           ],
           "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA",
-          "PipeStartTime: "<timestamp>",
+          "PipeStartTime": "<timestamp>",
           "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta"
@@ -51,7 +51,7 @@
             }
           ],
           "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
-          "PipeStartTime: "<timestamp>",
+          "PipeStartTime": "<timestamp>",
           "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta_exclude_flow_doc"
@@ -320,7 +320,7 @@
             }
           ],
           "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA",
-          "PipeStartTime: "<timestamp>",
+          "PipeStartTime": "<timestamp>",
           "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta"
@@ -337,7 +337,7 @@
             }
           ],
           "PipeName": "MAHDI_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
-          "PipeStartTime: "<timestamp>",
+          "PipeStartTime": "<timestamp>",
           "Query": "",
           "StagedDir": "<uuid>",
           "Table": "duplicate_keys_delta_exclude_flow_doc"
