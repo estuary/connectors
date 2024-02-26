@@ -128,10 +128,13 @@ type transactor struct {
 
 	// We initialise pipes (with a create or replace query) on the first Store
 	// to ensure that queries running as part of the first recovery Acknowledge
-	// do not create duplicates. Queries running on a pipe or idempotent so long
+	// do not create duplicates. Queries running on a pipe are idempotent so long
 	// as the pipe is not removed or replaced. The replace clause of the query
 	// will wipe the history of the pipe and so lead to duplicate documents
 	pipesInit bool
+
+	// map of pipe name to beginMarker cursors
+	pipeMarkers map[string]string
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -146,9 +149,6 @@ type transactor struct {
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
-
-	// map of pipe name to beginMarker
-	pipeMarkers map[string]string
 }
 
 func (t *transactor) AckDelay() time.Duration {
@@ -452,7 +452,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.store.conn.QueryRowContext(ctx, "SELECT CURRENT_TIMESTAMP()").Scan(&currentTime); err != nil {
 				return nil, fmt.Errorf("querying current timestamp: %w", err)
 			}
-			log.WithField("currentTime", currentTime).Info("got time")
 			d.cp[b.target.StateKey] = &checkpointItem{
 				Table:         b.target.Identifier,
 				StagedDir:     dir,
@@ -578,7 +577,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// load those files again, our request will not show up in reports.
 			// One way to find out whether the files were successfully loaded is to check
 			// the COPY_HISTORY to make sure they are there. If they are not, then something
-			// may be wrong.
+			// is wrong.
 			if len(report.Files) == 0 {
 				if tries < maxTries {
 					tries = tries + 1
