@@ -218,6 +218,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ define "pipe_name" -}}
 flow_pipe_{{ $.Binding }}_{{ Last $.Path }}
 {{- end }}
+
 {{ define "createPipe" }}
 CREATE OR REPLACE PIPE {{ template "pipe_name" . }}
   COMMENT = 'Pipe for table {{ $.Path }}'
@@ -361,6 +362,6 @@ func RenderCopyHistoryTemplate(table sql.Table, files []string, startTime string
 		"table":     table,
 		"files":     files,
 		"startTime": startTime,
-	}).Info("rendered template")
+	}).Debug("rendered template")
 	return s, nil
 }
