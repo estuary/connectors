@@ -222,7 +222,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			"targetSize": targetSize,
 			"file":       file,
 			"uuid":       f.uuid,
-		}).Info("uploading file")
+		}).Debug("uploading file")
 
 		if size, err := strconv.Atoi(targetSize); err != nil {
 			return fmt.Errorf("parsing targetSize: %w", err)
