@@ -59,11 +59,11 @@ func (c *config) ToURI(tenant string) string {
 	return dsn
 }
 
-func (c *config) privateKey() (*rsa.PrivateKey, error) {
-	if c.Credentials.AuthType == JWT {
+func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
+	if c.AuthType == JWT {
 		// When providing the PEM file in a JSON file, newlines can't be specified unless
 		// escaped, so here we allow a escape hatch to parse these PEM files
-		var pkString = strings.ReplaceAll(c.Credentials.PrivateKey, "\\n", "\n")
+		var pkString = strings.ReplaceAll(c.PrivateKey, "\\n", "\n")
 		var block, _ = pem.Decode([]byte(pkString))
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 			return nil, fmt.Errorf("parsing private key: %w", err)
@@ -104,7 +104,7 @@ func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 		conf.Authenticator = sf.AuthTypeJwt
 		// We run this as part of validate to ensure that there is no error, so
 		// this is not expected to error here
-		if key, err := c.privateKey(); err != nil {
+		if key, err := c.Credentials.privateKey(); err != nil {
 			panic(err)
 		} else {
 			conf.PrivateKey = key
@@ -167,10 +167,6 @@ func (c *config) Validate() error {
 		return err
 	}
 
-	if _, err := c.privateKey(); err != nil {
-		return err
-	}
-
 	return validHost(c.Host)
 }
 
@@ -211,6 +207,10 @@ func (c *credentialConfig) validateUserPassCreds() error {
 func (c *credentialConfig) validateJWTCreds() error {
 	if c.PrivateKey == "" {
 		return fmt.Errorf("missing private_key")
+	}
+
+	if _, err := c.privateKey(); err != nil {
+		return err
 	}
 
 	return nil
