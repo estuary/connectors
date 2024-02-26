@@ -41,7 +41,7 @@ func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
 func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
 	httpClient := http.Client{}
 
-	var key, err = cfg.privateKey()
+	var key, err = cfg.Credentials.privateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 		"url":      url,
 		"headers":  req.Header,
 		"response": response,
-	}).Info("insertReport")
+	}).Debug("insertReport")
 
 	return &response, nil
 }
