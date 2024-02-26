@@ -62,7 +62,7 @@ func (c *config) ToURI(tenant string) string {
 func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
 	if c.AuthType == JWT {
 		// When providing the PEM file in a JSON file, newlines can't be specified unless
-		// escaped, so here we allow a escape hatch to parse these PEM files
+		// escaped, so here we allow an escape hatch to parse these PEM files
 		var pkString = strings.ReplaceAll(c.PrivateKey, "\\n", "\n")
 		var block, _ = pem.Decode([]byte(pkString))
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
@@ -161,6 +161,7 @@ func (c *config) Validate() error {
 
 		c.Credentials.AuthType = UserPass
 		c.Credentials.Password = c.Password
+		c.Credentials.User = c.User
 	}
 
 	if err := c.Credentials.Validate(); err != nil {
@@ -197,6 +198,9 @@ func (c *credentialConfig) Validate() error {
 }
 
 func (c *credentialConfig) validateUserPassCreds() error {
+	if c.User == "" {
+		return fmt.Errorf("missing user")
+	}
 	if c.Password == "" {
 		return fmt.Errorf("missing password")
 	}
@@ -205,6 +209,9 @@ func (c *credentialConfig) validateUserPassCreds() error {
 }
 
 func (c *credentialConfig) validateJWTCreds() error {
+	if c.User == "" {
+		return fmt.Errorf("missing user")
+	}
 	if c.PrivateKey == "" {
 		return fmt.Errorf("missing private_key")
 	}
