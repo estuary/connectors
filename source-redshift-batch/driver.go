@@ -51,6 +51,10 @@ type Resource struct {
 	PollSchedule string   `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=1,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 }
 
+var templateFuncs = template.FuncMap{
+	"add": func(a, b int) int { return a + b },
+}
+
 // Validate checks that the resource spec possesses all required properties.
 func (r Resource) Validate() error {
 	var requiredProperties = [][]string{
@@ -62,7 +66,7 @@ func (r Resource) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	if _, err := template.New("query").Parse(r.Template); err != nil {
+	if _, err := template.New("query").Funcs(templateFuncs).Parse(r.Template); err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 	if slices.Contains(r.Cursor, "") {
@@ -600,7 +604,7 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 		"poll":   res.PollSchedule,
 	}).Info("starting worker")
 
-	var queryTemplate, err = template.New("query").Parse(res.Template)
+	var queryTemplate, err = template.New("query").Funcs(templateFuncs).Parse(res.Template)
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
