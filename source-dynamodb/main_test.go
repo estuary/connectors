@@ -302,9 +302,7 @@ func TestCaptureOperations(t *testing.T) {
 
 func commonSanitizers() map[string]*regexp.Regexp {
 	sanitizers := make(map[string]*regexp.Regexp)
-	for k, v := range st.DefaultSanitizers {
-		sanitizers[k] = v
-	}
+	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"<SHARD_ID>"`] = regexp.MustCompile(`"shardId\-\d+\-\w+"`)
 	sanitizers[`"<STREAM_ARN>"`] = regexp.MustCompile(`"arn:aws:dynamodb:\w+:\d+:.+?\.\d+"`)
 	sanitizers[`<UUID>`] = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)

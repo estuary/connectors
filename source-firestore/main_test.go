@@ -60,9 +60,7 @@ func TestMain(m *testing.M) {
 		DataKey:  "data",
 		FieldMap: log.FieldMap{log.FieldKeyTime: "@ts"},
 	})
-	for k, v := range st.DefaultSanitizers {
-		DefaultSanitizers[k] = v
-	}
+	DefaultSanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	DefaultSanitizers["project-id-123456"] = regexp.MustCompile(regexp.QuoteMeta(*testProjectID))
 	os.Exit(m.Run())
 }
