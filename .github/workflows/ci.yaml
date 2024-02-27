@@ -88,6 +88,7 @@ jobs:
           - source-mysql-batch
           - source-postgres
           - source-postgres-batch
+          - source-redshift-batch
           - source-s3
           - source-sftp
           - source-snowflake
