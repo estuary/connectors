@@ -409,12 +409,26 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 		opts = opts.SetStartAtOperationTime(startAt)
 	}
 
+	// Use a pipeline to project the fields we need from the change stream. Importantly, this
+	// suppresses fields like `updateDescription`, which contain a list of fields in the document
+	// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
+	// `updateDescription`, which can cause the change stream total BSON document size to exceed the
+	// 16MB limit.
+	pl := mongo.Pipeline{
+		{{Key: "$project", Value: bson.M{
+			"documentKey":   1,
+			"operationType": 1,
+			"fullDocument":  1,
+			"ns":            1,
+		}}},
+	}
+
 	// First attempt to do an instance-wide change stream, this is possible if we
 	// have readAnyDatabase access on the instance. If this fails for permission
 	// issues, we then attempt to do a database-level change stream. In the case
 	// of the database-level change stream we expect only a single database to be
 	// provided and do not support multiple databases in this mode.
-	cursor, err := client.Watch(ctx, mongo.Pipeline{}, opts)
+	cursor, err := client.Watch(ctx, pl, opts)
 	if err != nil {
 		// This error means events from the starting point are no longer available,
 		// which means we have hit a gap in between last run of the connector and
@@ -481,7 +495,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 		}
 
 		// this event is from a collection that we have no binding for, skip it, but
-		// still emit a checkpoint with the resule token updated so that we can stay
+		// still emit a checkpoint with the resume token updated so that we can stay
 		// on top of oplog events across the whole instance / database
 		if !ok {
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
