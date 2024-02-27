@@ -54,10 +54,10 @@ func (c *Config) Validate() error {
 // SetDefaults fills in the default values for unset optional parameters.
 func (c *Config) SetDefaults() {
 	// The address config property should accept a host or host:port
-	// value, and if the port is unspecified it should be the PostgreSQL
-	// default 5432.
+	// value, and if the port is unspecified it should be the Redshift
+	// default 5439.
 	if !strings.Contains(c.Address, ":") {
-		c.Address += ":5432"
+		c.Address += ":5439"
 	}
 
 	if c.Advanced.PollSchedule == "" {
