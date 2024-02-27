@@ -515,9 +515,3 @@ func sanitize(sanitizers map[string]*regexp.Regexp, data json.RawMessage) json.R
 	}
 	return json.RawMessage(bs)
 }
-
-// DefaultSanitizers is a collection of generic capture output sanitizers which should
-// be applied to any type of database's captures.
-var DefaultSanitizers = map[string]*regexp.Regexp{
-	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`),
-}

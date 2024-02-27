@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"regexp"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -29,11 +30,13 @@ func TestDiscovery(t *testing.T) {
 			enableStream: true,
 		})
 
+		var sanitizers = make(map[string]*regexp.Regexp)
+		sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 		cs := &st.CaptureSpec{
 			Driver:       driver{},
 			EndpointSpec: &cfg,
 			Validator:    &st.SortedCaptureValidator{},
-			Sanitizers:   st.DefaultSanitizers,
+			Sanitizers:   testSanitizers,
 		}
 
 		cs.VerifyDiscover(ctx, t)
@@ -67,7 +70,7 @@ func TestDiscovery(t *testing.T) {
 			Driver:       driver{},
 			EndpointSpec: &cfg,
 			Validator:    &st.SortedCaptureValidator{},
-			Sanitizers:   st.DefaultSanitizers,
+			Sanitizers:   testSanitizers,
 		}
 
 		cs.VerifyDiscover(ctx, t)
@@ -113,9 +116,13 @@ func TestDiscovery(t *testing.T) {
 			Driver:       driver{},
 			EndpointSpec: &cfg,
 			Validator:    &st.SortedCaptureValidator{},
-			Sanitizers:   st.DefaultSanitizers,
+			Sanitizers:   testSanitizers,
 		}
 
 		cs.VerifyDiscover(ctx, t)
 	})
+}
+
+var testSanitizers = map[string]*regexp.Regexp{
+	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`),
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -36,7 +37,7 @@ func TestCapture(t *testing.T) {
 			},
 		},
 		Validator:  &st.SortedCaptureValidator{},
-		Sanitizers: st.DefaultSanitizers,
+		Sanitizers: testSanitizers,
 	}
 
 	captureCtx, cancelCapture := context.WithCancel(context.Background())
@@ -50,4 +51,8 @@ func TestCapture(t *testing.T) {
 
 	cupaloy.SnapshotT(t, capture.Summary())
 	capture.Reset()
+}
+
+var testSanitizers = map[string]*regexp.Regexp{
+	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`),
 }
