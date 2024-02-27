@@ -187,9 +187,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	}
 
 	var sanitizers = make(map[string]*regexp.Regexp)
-	for k, v := range st.DefaultSanitizers {
-		sanitizers[k] = v
-	}
+	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 	sanitizers[`"txid":999999`] = regexp.MustCompile(`"txid":[0-9]+`)
 	sanitizers[`"CursorNames":["txid"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["txid"\],"CursorValues":\[[0-9]+\]`)
