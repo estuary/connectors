@@ -128,7 +128,7 @@ func TestBasicCapture(t *testing.T) {
 				executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2)", tableName), i, fmt.Sprintf("Value for row %d", i))
 				log.WithField("i", i).Debug("inserted row")
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(10 * time.Second)
 			insertsDone.Store(true)
 		}()
 
@@ -228,10 +228,9 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	}
 
 	var sanitizers = make(map[string]*regexp.Regexp)
-	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
+	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
+	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
-	sanitizers[`"txid":999999`] = regexp.MustCompile(`"txid":[0-9]+`)
-	sanitizers[`"CursorNames":["txid"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["txid"\],"CursorValues":\[[0-9]+\]`)
 
 	return &st.CaptureSpec{
 		Driver:       redshiftDriver,
