@@ -36,42 +36,33 @@ from .streams import (
 
 
 class SourceAsana(AbstractSource):
-    def check_connection(
-        self, logger: AirbyteLogger, config: Mapping[str, Any]
-    ) -> Tuple[bool, Any]:
+    def check_connection(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> Tuple[bool, Any]:
         try:
-            workspaces_stream = Workspaces(
-                authenticator=self._get_authenticator(config)
-            )
+            workspaces_stream = Workspaces(authenticator=self._get_authenticator(config))
             next(workspaces_stream.read_records(sync_mode=SyncMode.full_refresh))
             return True, None
         except Exception as e:
             return False, e
 
     @staticmethod
-    def _get_authenticator(
-        config: dict,
-    ) -> Union[TokenAuthenticator, AsanaOauth2Authenticator]:
+    def _get_authenticator(config: dict) -> Union[TokenAuthenticator, AsanaOauth2Authenticator]:
         if "access_token" in config:
             # Before Oauth we had Person Access Token stored under "access_token"
             # config field, this code here is for backward compatibility
             return TokenAuthenticator(token=config["access_token"])
-        credentials = config.get("credentials")
-        if "personal_access_token" in credentials:
-            return TokenAuthenticator(token=credentials["personal_access_token"])
+        creds = config.get("credentials")
+        if "personal_access_token" in creds:
+            return TokenAuthenticator(token=creds["personal_access_token"])
         else:
             return AsanaOauth2Authenticator(
                 token_refresh_endpoint="https://app.asana.com/-/oauth_token",
-                client_secret=credentials["client_secret"],
-                client_id=credentials["client_id"],
-                refresh_token=credentials["refresh_token"],
+                client_secret=creds["client_secret"],
+                client_id=creds["client_id"],
+                refresh_token=creds["refresh_token"],
             )
 
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
-        args = {
-            "authenticator": self._get_authenticator(config),
-            "test_mode": config.get("test_mode", False),
-        }
+        args = {"authenticator": self._get_authenticator(config), "test_mode": config.get("test_mode", False)}
         streams = [
             AttachmentsCompact(**args),
             Attachments(**args),
@@ -93,10 +84,5 @@ class SourceAsana(AbstractSource):
             Workspaces(**args),
         ]
         if "organization_export_ids" in config:
-            streams.append(
-                OrganizationExports(
-                    organization_export_ids=config.get("organization_export_ids"),
-                    **args
-                )
-            )
+            streams.append(OrganizationExports(organization_export_ids=config.get("organization_export_ids"), **args))
         return streams
