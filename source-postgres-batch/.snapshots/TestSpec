@@ -35,6 +35,14 @@
             "description": "When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset.",
             "pattern": "^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"
           },
+          "discover_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Discovery Schema Selection",
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+          },
           "sslmode": {
             "type": "string",
             "enum": [
