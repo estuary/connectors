@@ -101,6 +101,45 @@ func TestBasicCapture(t *testing.T) {
 	})
 }
 
+func TestBasicDatatypes(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "13111208"
+	var tableName = fmt.Sprintf("test.basic_datatypes_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, a_real REAL, a_bool BOOL, a_date DATE, a_ts TIMESTAMP, a_tstz TIMESTAMPTZ)", tableName))
+
+	// Discover the table and verify discovery snapshot
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	t.Run("Discovery", func(t *testing.T) {
+		var summary = new(strings.Builder)
+		for idx, binding := range cs.Bindings {
+			fmt.Fprintf(summary, "Binding %d:\n", idx)
+			bs, err := json.MarshalIndent(binding, "  ", "  ")
+			require.NoError(t, err)
+			io.Copy(summary, bytes.NewReader(bs))
+			fmt.Fprintf(summary, "\n")
+		}
+		if len(cs.Bindings) == 0 {
+			fmt.Fprintf(summary, "(no output)")
+		}
+		cupaloy.SnapshotT(t, summary.String())
+	})
+
+	t.Run("Capture", func(t *testing.T) {
+		executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s(id, a_real, a_bool, a_date, a_ts, a_tstz) VALUES ($1,$2,$3,$4,$5,$6)", tableName),
+			100, -12.34, true, "2024-02-26", time.Date(2024, 02, 26, 12, 34, 56, 00, time.UTC), time.Date(2024, 02, 26, 12, 34, 56, 00, time.UTC))
+
+		// Run the capture for 5 seconds, which should be plenty to pull down a few rows.
+		var captureCtx, cancelCapture = context.WithCancel(ctx)
+		time.AfterFunc(5*time.Second, cancelCapture)
+		cs.Capture(captureCtx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
