@@ -1,0 +1,2 @@
+SELECT * FROM "testdata"."foobar" ORDER BY `ka`, `kb`, `kc`;
+

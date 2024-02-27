@@ -111,9 +111,9 @@ const redshiftQueryTemplate = `{{if .CursorFields -}}
 	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
       {{- range $j, $n := $.CursorFields -}}
 		{{- if lt $j $i -}}
-		  {{$n}} = @flow_cursor_value[{{$j}}] AND {{end -}}
+		  {{$n}} = ${{add $j 1}} AND {{end -}}
 	  {{- end -}}
-	  {{$k}} > ${{$i}}
+	  {{$k}} > ${{add $i 1}}
 	{{- end -}}
 	) 
   {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
