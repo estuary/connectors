@@ -6,6 +6,7 @@
 from abc import ABC
 from itertools import islice
 from typing import Any, Iterable, Mapping, MutableMapping, Optional, Type, Union
+from functools import cache
 
 import requests
 from airbyte_cdk.models import SyncMode
@@ -128,6 +129,19 @@ class AsanaStream(HttpStream, ABC):
             ):
                 yield {slice_field: record["gid"]}
 
+    @cache  # Caching this method, so we only make this request once
+    def get_current_user_data(self) -> dict:
+        url = f"{self.url_base}users/me"
+
+        auth_header = self.authenticator.get_auth_header()
+        headers = {"Accept": "application/json", **auth_header}
+
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+
+        return data["data"]
+
 
 class WorkspaceRelatedStream(AsanaStream, ABC):
     """
@@ -221,7 +235,7 @@ class CustomFields(WorkspaceRelatedStream):
 
 class Events(AsanaStream):
     primary_key = "created_at"
-    sync_token = None
+    sync_token: str = None
     raise_on_http_errors = False
 
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
@@ -251,12 +265,11 @@ class Events(AsanaStream):
         payload = response.json()
         self.sync_token = payload.get("sync")
 
-        if response.status_code == 412:  # Check if response is a 412 error
-            self.logger.warning(
-                "Sync token expired. Fetch the full dataset for this query now."
-            )
-        else:
-            yield from payload.get("data", [])
+        # Check if response is a 412 error
+        if response.status_code == HTTPStatus.PRECONDITION_FAILED:
+            self.logger.warning(payload["errors"][0]["message"])
+
+        yield from payload.get("data", [])
 
     def next_page_token(
         self, response: requests.Response
@@ -312,6 +325,27 @@ class PortfoliosCompact(WorkspaceRequestParamsRelatedStream):
     def path(self, **kwargs) -> str:
         return "portfolios"
 
+    def request_params(
+        self, stream_slice: Optional[dict] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
+        params = super().request_params(stream_slice=stream_slice, **kwargs)
+
+        user_data = self.get_current_user_data()
+        params["owner"] = user_data.get("gid")
+
+        return params
+
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
+        payload = response.json()
+
+        # Handle case of non-paid users
+        if response.status_code == HTTPStatus.PAYMENT_REQUIRED:
+            yield from []
+        else:
+            yield from payload.get("data", [])
+
 
 class Portfolios(AsanaStream):
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
@@ -326,6 +360,9 @@ class Portfolios(AsanaStream):
     def parse_response(
         self, response: requests.Response, **kwargs
     ) -> Iterable[Mapping]:
+        # Handle case of non-paid users
+        if response.status_code == HTTPStatus.PAYMENT_REQUIRED:
+            return []
         response_json = response.json()
         section_data = response_json.get("data", {})
         if isinstance(section_data, dict):  # Check if section_data is a dictionary
@@ -349,6 +386,17 @@ class PortfoliosMemberships(AsanaStream):
         params = super().request_params(stream_slice=stream_slice, **kwargs)
         params["portfolio"] = stream_slice["porfolio_gid"]
         return params
+
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
+        payload = response.json()
+
+        # Handle case of non-paid users
+        if response.status_code == HTTPStatus.PAYMENT_REQUIRED:
+            yield from []
+        else:
+            yield from payload.get("data", [])
 
 
 class SectionsCompact(ProjectRelatedStream):
