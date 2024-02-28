@@ -1,5 +1,8 @@
+import abc
+import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+from logging import Logger
 from typing import (
     Any,
     AsyncGenerator,
@@ -11,19 +14,9 @@ from typing import (
     Literal,
     TypeVar,
 )
-from logging import Logger
-from pydantic import (
-    AwareDatetime,
-    BaseModel,
-    Field,
-    NonNegativeInt,
-)
 from uuid import UUID
-import asyncio
-import abc
 
-
-from . import Task, request, response
+from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
     AccessToken,
@@ -32,6 +25,7 @@ from ..flow import (
     OAuth2Spec,
     ValidationError,
 )
+from . import Task, request, response
 
 LogCursor = AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -201,13 +195,15 @@ already observed through incremental replication.
 
 FetchChangesFn = Callable[
     [LogCursor, Logger],
-    Awaitable[tuple[AsyncGenerator[_BaseDocument, None], LogCursor]],
+    AsyncGenerator[_BaseDocument | LogCursor, None],
 ]
 """
 FetchChangesFn is a function which fetches available documents since the LogCursor.
-It returns a tuple of Documents and an update LogCursor which reflects progress
-against processing the log. If no documents are available, then it returns an
-empty AsyncGenerator rather than waiting indefinitely for more documents.
+It yields Documents until no changes remain, then yields one updated LogCursor
+which reflects progress made against processing the log, and then returns.
+
+If no documents are available at all, then it yields no documents and its
+argument LogCursor. It does NOT wait indefinitely for more documents.
 
 Implementations may block for brief periods to await documents, such as while
 awaiting a server response, but should not block forever as it prevents the
@@ -543,12 +539,16 @@ async def _binding_incremental_task(
     task.logger.info(f"resuming incremental replication", state)
 
     while True:
-        changes, next_cursor = await fetch_changes(state.cursor, task.logger)
 
+        next_cursor = state.cursor
         count = 0
-        async for doc in changes:
-            task.captured(binding_index, doc)
-            count += 1
+
+        async for item in fetch_changes(state.cursor, task.logger):
+            if isinstance(item, BaseDocument):
+                task.captured(binding_index, item)
+                count += 1
+            else:
+                next_cursor = item
 
         if count != 0 or next_cursor != state.cursor:
             state.cursor = next_cursor
