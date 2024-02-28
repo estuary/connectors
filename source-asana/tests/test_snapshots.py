@@ -8,7 +8,7 @@ def test_capture(request, snapshot):
             "flowctl",
             "preview",
             "--source",
-            request.config.rootdir + "/source-asana/test.flow.yaml",
+            request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
             "1",
             "--delay",
@@ -32,7 +32,7 @@ def test_discover(request, snapshot):
             "raw",
             "discover",
             "--source",
-            request.config.rootdir + "/source-asana/test.flow.yaml",
+            request.fspath.dirname + "/../test.flow.yaml",
             "-o",
             "json",
             "--emit-raw"
@@ -52,7 +52,7 @@ def test_spec(request, snapshot):
             "raw",
             "spec",
             "--source",
-            request.config.rootdir + "/source-asana/test.flow.yaml"
+            request.fspath.dirname + "/../test.flow.yaml",
         ],
         stdout=subprocess.PIPE,
         text=True,
