@@ -1,25 +1,21 @@
 [tool.poetry]
-name = "source-asana-estuary"
+name = "source_asana"
 version = "0.1.0"
 description = ""
 authors = ["Jonathan Wihl <jonathan@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
 
 [tool.poetry.dependencies]
-source_asana = { path = "source_asana", develop = true}
 airbyte-cdk = "^0.52"
-flow-sdk = {path="../python", develop = true}
-jsonlines = "^4.0.0"
-mypy = "^1.5"
-orjson = "^3.9.7"
-pydantic = "1.10.12"
-python = ">=3.11,<3.12"
-requests = "^2.31.0"
+estuary-cdk = {path="../estuary-cdk", develop = true}
+python = "^3.11"
 types-requests = "^2.31"
-pytest = "^7.4.3"
 
 [tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
 pytest = "^7.4.3"
-pytest-insta = "^0.2.0"
+pytest-insta = "^0.3.0"
+requests-mock = "^1.11.0"
 
 [build-system]
 requires = ["poetry-core"]

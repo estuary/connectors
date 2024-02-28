@@ -82,30 +82,32 @@
       }
     },
     "resourceConfigSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ResourceConfig",
+      "description": "ResourceConfig encodes a configured resource stream",
       "type": "object",
       "properties": {
         "stream": {
+          "title": "Stream",
+          "description": "Name of this stream",
           "type": "string"
         },
         "syncMode": {
-          "type": "string",
+          "title": "Sync Mode",
+          "description": "Sync this resource incrementally, or fully refresh it every run",
           "enum": [
-            "incremental",
-            "full_refresh"
-          ]
+            "full_refresh",
+            "incremental"
+          ],
+          "type": "string"
         },
         "namespace": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
+          "type": "string"
         },
         "cursorField": {
-          "type": [
-            "array",
-            "null"
-          ],
+          "title": "Cursor Field",
+          "type": "array",
           "items": {
             "type": "string"
           }
@@ -115,7 +117,7 @@
         "stream",
         "syncMode"
       ],
-      "title": "ResourceSpec"
+      "additionalProperties": false
     },
     "documentationUrl": "https://docsurl.com",
     "oauth2": {
