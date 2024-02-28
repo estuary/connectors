@@ -1,0 +1,26 @@
+---
+collections:
+  acmeCo/companies:
+    schema: companies.schema.yaml
+    key:
+      - /id
+  acmeCo/contacts:
+    schema: contacts.schema.yaml
+    key:
+      - /id
+  acmeCo/deals:
+    schema: deals.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements:
+    schema: engagements.schema.yaml
+    key:
+      - /id
+  acmeCo/properties:
+    schema: properties.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id
