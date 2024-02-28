@@ -10,6 +10,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
@@ -65,15 +66,8 @@ var starburstDialect = func() sql.Dialect {
 		},
 	}
 
-	translateIdentifier := func(in string) string {
-		if isSimpleIdentifier(in) {
-			return strings.ToLower(in)
-		}
-		return in
-	}
-
 	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"varchar"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"varchar"}, Validate: stringCompatible},
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
@@ -84,22 +78,22 @@ var starburstDialect = func() sql.Dialect {
 			if len(path) == 1 {
 				return sql.InfoTableLocation{
 					// If schema is not defined schema from resource configuration will be used
-					TableName: translateIdentifier(path[0]),
+					TableName: strings.ToLower(path[0]),
 				}
 			} else {
 				return sql.InfoTableLocation{
-					TableSchema: translateIdentifier(path[0]),
-					TableName:   translateIdentifier(path[1]),
+					TableSchema: strings.ToLower(path[0]),
+					TableName:   strings.ToLower(path[1]),
 				}
 			}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
-			return translateIdentifier(field)
+			return strings.ToLower(field)
 		}),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				isSimpleIdentifier,
-				sql.QuoteTransform("\"", "\\\""),
+				sql.QuoteTransform(`"`, `""`),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
@@ -107,10 +101,28 @@ var starburstDialect = func() sql.Dialect {
 		}),
 		// We are not using sql.NullableMapper so that all columns are created as nullable. This is
 		// necessary because Hive temp table which does not support NOT NULL
-		TypeMapper:      mapper,
-		ColumnValidator: columnValidator,
+		TypeMapper:             mapper,
+		ColumnValidator:        columnValidator,
+		MaxColumnCharLength:    0, // Starburst has no limit on how long column names can be that I can find
+		CaseInsensitiveColumns: true,
 	}
 }()
+
+// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
+// be materialized, since these are all materialized as VARCHAR columns.
+func stringCompatible(p pf.Projection) bool {
+	if sql.StringCompatible(p) {
+		return true
+	} else if sql.TypesOrNull(p.Inference.Types, []string{"array"}) {
+		return true
+	} else if sql.TypesOrNull(p.Inference.Types, []string{"object"}) {
+		return true
+	} else if sql.MultipleCompatible(p) {
+		return true
+	}
+
+	return false
+}
 
 type templates struct {
 	fetchVersionAndSpec  *template.Template

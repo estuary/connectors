@@ -261,7 +261,7 @@ func (v Validator) validateMatchesExistingBinding(
 					}
 				}
 			} else {
-				desc, err := v.c.DescriptionForType(&p, rawConfig)
+				newDesc, err := v.c.DescriptionForType(&p, rawConfig)
 				if err != nil {
 					return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
 				}
@@ -269,10 +269,11 @@ func (v Validator) validateMatchesExistingBinding(
 				c = &pm.Response_Validated_Constraint{
 					Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
 					Reason: fmt.Sprintf(
-						"Field '%s' is already being materialized as endpoint type '%s' and cannot be changed to type '%s'",
+						"Field '%s' is already being materialized as endpoint type '%s' but endpoint type '%s' is required by its schema '%s'",
 						p.Field,
-						existingField.Type,
-						desc,
+						strings.ToUpper(existingField.Type),
+						strings.ToUpper(newDesc),
+						fieldSchema(p),
 					),
 				}
 			}
@@ -460,4 +461,26 @@ func AsFormattedNumeric(projection *pf.Projection) (StringWithNumericFormat, boo
 
 	// Not a formatted numeric field.
 	return "", false
+}
+
+func fieldSchema(p pf.Projection) string {
+	var out strings.Builder
+
+	out.WriteString("{ type: [" + strings.Join(p.Inference.Types, ", ") + "]")
+
+	if p.Inference.String_ != nil {
+		if p.Inference.String_.Format != "" {
+			out.WriteString(", format: " + p.Inference.String_.Format)
+		}
+		if p.Inference.String_.ContentType != "" {
+			out.WriteString(", content-type: " + p.Inference.String_.ContentType)
+		}
+		if p.Inference.String_.ContentEncoding != "" {
+			out.WriteString(", content-encoding: " + p.Inference.String_.ContentEncoding)
+		}
+	}
+
+	out.WriteString(" }")
+
+	return out.String()
 }

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -24,12 +25,12 @@ import (
 )
 
 var (
-	dbAddress     = flag.String("db_address", "localhost:5432", "The database server address to use for tests")
-	dbName        = flag.String("db_name", "postgres", "Use the named database for tests")
-	dbControlUser = flag.String("db_control_user", "postgres", "The user for test setup/control operations")
-	dbControlPass = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
+	dbAddress     = flag.String("db_address", "default-workgroup.123456789012.us-east-1.redshift-serverless.amazonaws.com:5439", "The database server address to use for tests")
+	dbName        = flag.String("db_name", "dev", "Use the named database for tests")
 	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
 	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+	dbControlUser = flag.String("db_control_user", "", "The user for test setup/control operations, if different from the capture user")
+	dbControlPass = flag.String("db_control_pass", "", "The password the the test setup/control user, if different from the capture password")
 )
 
 func TestMain(m *testing.M) {
@@ -43,12 +44,44 @@ func TestMain(m *testing.M) {
 }
 
 func TestSpec(t *testing.T) {
-	response, err := postgresDriver.Spec(context.Background(), &pc.Request_Spec{})
+	response, err := redshiftDriver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, string(formatted))
+}
+
+func TestQueryTemplate(t *testing.T) {
+	res, err := redshiftDriver.GenerateResource("foobar", "testdata", "foobar", "BASE TABLE")
+	require.NoError(t, err)
+
+	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(res.Template)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		Name    string
+		IsFirst bool
+		Cursor  []string
+	}{
+		{Name: "FirstNoCursor", IsFirst: true, Cursor: nil},
+		{Name: "SubsequentNoCursor", IsFirst: false, Cursor: nil},
+		{Name: "FirstOneCursor", IsFirst: true, Cursor: []string{"`ka`"}},
+		{Name: "SubsequentOneCursor", IsFirst: false, Cursor: []string{"`ka`"}},
+		{Name: "FirstTwoCursor", IsFirst: true, Cursor: []string{"`ka`", "`kb`"}},
+		{Name: "SubsequentTwoCursor", IsFirst: false, Cursor: []string{"`ka`", "`kb`"}},
+		{Name: "FirstThreeCursor", IsFirst: true, Cursor: []string{"`ka`", "`kb`", "`kc`"}},
+		{Name: "SubsequentThreeCursor", IsFirst: false, Cursor: []string{"`ka`", "`kb`", "`kc`"}},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var buf = new(strings.Builder)
+			require.NoError(t, tmpl.Execute(buf, map[string]any{
+				"IsFirstQuery": tc.IsFirst,
+				"CursorFields": tc.Cursor,
+			}))
+			cupaloy.SnapshotT(t, buf.String())
+		})
+	}
 }
 
 func TestBasicCapture(t *testing.T) {
@@ -78,16 +111,24 @@ func TestBasicCapture(t *testing.T) {
 		cupaloy.SnapshotT(t, summary.String())
 	})
 
+	// Edit the discovered binding to use the ID column as a cursor
+	var res Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+	res.Cursor = []string{"id"}
+	resourceConfigBytes, err := json.Marshal(res)
+	require.NoError(t, err)
+	cs.Bindings[0].ResourceConfigJson = resourceConfigBytes
+
 	t.Run("Capture", func(t *testing.T) {
 		// Spawn a worker thread which will insert 50 rows of data in parallel with the capture.
 		var insertsDone atomic.Bool
 		go func() {
-			for i := 0; i < 250; i++ {
-				time.Sleep(100 * time.Millisecond)
+			for i := 0; i < 50; i++ {
+				time.Sleep(500 * time.Millisecond)
 				executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2)", tableName), i, fmt.Sprintf("Value for row %d", i))
 				log.WithField("i", i).Debug("inserted row")
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(10 * time.Second)
 			insertsDone.Store(true)
 		}()
 
@@ -154,7 +195,7 @@ func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	if controlPass == "" {
 		controlPass = *dbCapturePass
 	}
-	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, controlUser, controlPass, *dbAddress, *dbName)
+	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s?sslmode=require`, controlUser, controlPass, *dbAddress, *dbName)
 	log.WithField("uri", controlURI).Debug("opening database control connection")
 	var conn, err = sql.Open("pgx", controlURI)
 	require.NoError(t, err)
@@ -182,7 +223,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 		Password: *dbCapturePass,
 		Database: *dbName,
 		Advanced: advancedConfig{
-			PollSchedule: "200ms",
+			PollSchedule: "10s",
 		},
 	}
 
@@ -190,11 +231,9 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
-	sanitizers[`"txid":999999`] = regexp.MustCompile(`"txid":[0-9]+`)
-	sanitizers[`"CursorNames":["txid"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["txid"\],"CursorValues":\[[0-9]+\]`)
 
 	return &st.CaptureSpec{
-		Driver:       postgresDriver,
+		Driver:       redshiftDriver,
 		EndpointSpec: endpointSpec,
 		Validator:    &st.OrderedCaptureValidator{},
 		Sanitizers:   sanitizers,

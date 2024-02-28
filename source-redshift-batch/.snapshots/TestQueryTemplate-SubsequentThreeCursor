@@ -1,0 +1,2 @@
+SELECT * FROM "testdata"."foobar" WHERE (`ka` > $1) OR (`ka` = $1 AND `kb` > $2) OR (`ka` = $1 AND `kb` = $2 AND `kc` > $3) ORDER BY `ka`, `kb`, `kc`;
+

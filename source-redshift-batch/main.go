@@ -21,13 +21,13 @@ type Config struct {
 	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
 	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Database string         `json:"database" jsonschema:"default=dev,description=Logical database name to capture from." jsonschema_extras:"order=3"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 	// TODO(wgd): Add network tunnel support
 }
 
 type advancedConfig struct {
-	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	SSLMode         string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 }
@@ -55,14 +55,14 @@ func (c *Config) Validate() error {
 // SetDefaults fills in the default values for unset optional parameters.
 func (c *Config) SetDefaults() {
 	// The address config property should accept a host or host:port
-	// value, and if the port is unspecified it should be the PostgreSQL
-	// default 5432.
+	// value, and if the port is unspecified it should be the Redshift
+	// default 5439.
 	if !strings.Contains(c.Address, ":") {
-		c.Address += ":5432"
+		c.Address += ":5439"
 	}
 
 	if c.Advanced.PollSchedule == "" {
-		c.Advanced.PollSchedule = "5m"
+		c.Advanced.PollSchedule = "24h"
 	}
 }
 
@@ -87,7 +87,7 @@ func (c *Config) ToURI() string {
 	return uri.String()
 }
 
-func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
+func connectRedshift(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	log.WithFields(log.Fields{
 		"address":  cfg.Address,
 		"user":     cfg.User,
@@ -103,38 +103,34 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	return db, nil
 }
 
-const tableQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  SELECT xmin AS txid, * FROM %[1]s ORDER BY xmin::text::bigint;
+const redshiftQueryTemplate = `{{if .CursorFields -}}
+  {{- if .IsFirstQuery -}}
+    SELECT * FROM %[1]s
+  {{- else -}}
+    SELECT * FROM %[1]s
+	{{- range $i, $k := $.CursorFields -}}
+	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
+      {{- range $j, $n := $.CursorFields -}}
+		{{- if lt $j $i -}}
+		  {{$n}} = ${{add $j 1}} AND {{end -}}
+	  {{- end -}}
+	  {{$k}} > ${{add $i 1}}
+	{{- end -}}
+	) 
+  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
 {{- else -}}
-  SELECT xmin AS txid, * FROM %[1]s WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint;
-{{- end}}`
-
-// This is currently unused, but is a useful example of how the function
-// generatePostgresResource might be extended to support view discovery.
-const viewQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  {{- /* This query will be executed first, without cursor values */ -}}
   SELECT * FROM %[1]s;
-{{- else -}}
-  {{- /**************************************************************
-       * Subsequently (if cursor columns are listed in the resource *
-	   * config) this query will be executed with the value(s) from *
-	   * the last row of the previous query provided as parameters. *
-	   *                                                            *
-	   * Consult the connector documentation for examples.          *
-       **************************************************************/ -}}
-  SELECT * FROM %[1]s WHERE columnName > queryParameter;
-{{- end}}`
+{{- end}}
+`
 
 func quoteTableName(schema, table string) string {
 	return fmt.Sprintf(`"%s"."%s"`, schema, table)
 }
 
-func generatePostgresResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
+func generateRedshiftResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
 	var queryTemplate string
-	var cursorColumns []string
 	if strings.EqualFold(tableType, "BASE TABLE") {
-		queryTemplate = fmt.Sprintf(tableQueryTemplateTemplate, quoteTableName(schemaName, tableName))
-		cursorColumns = []string{"txid"}
+		queryTemplate = fmt.Sprintf(redshiftQueryTemplate, quoteTableName(schemaName, tableName))
 	} else {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
@@ -142,11 +138,10 @@ func generatePostgresResource(resourceName, schemaName, tableName, tableType str
 	return &Resource{
 		Name:     resourceName,
 		Template: queryTemplate,
-		Cursor:   cursorColumns,
 	}, nil
 }
 
-func translatePostgresValue(val any, databaseTypeName string) (any, error) {
+func translateRedshiftValue(val any, databaseTypeName string) (any, error) {
 	if val, ok := val.([]byte); ok {
 		switch {
 		case strings.EqualFold(databaseTypeName, "JSON"):
@@ -158,12 +153,12 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 	return val, nil
 }
 
-var postgresDriver = &BatchSQLDriver{
-	DocumentationURL: "https://go.estuary.dev/source-postgres-batch",
+var redshiftDriver = &BatchSQLDriver{
+	DocumentationURL: "https://go.estuary.dev/source-redshift-batch",
 	ConfigSchema:     generateConfigSchema(),
-	Connect:          connectPostgres,
-	GenerateResource: generatePostgresResource,
-	TranslateValue:   translatePostgresValue,
+	Connect:          connectRedshift,
+	GenerateResource: generateRedshiftResource,
+	TranslateValue:   translateRedshiftValue,
 }
 
 func generateConfigSchema() json.RawMessage {
@@ -175,5 +170,5 @@ func generateConfigSchema() json.RawMessage {
 }
 
 func main() {
-	boilerplate.RunMain(postgresDriver)
+	boilerplate.RunMain(redshiftDriver)
 }

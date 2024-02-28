@@ -56,7 +56,7 @@ binding update with incompatible changes:
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'object' and cannot be changed to type 'string'"}
+{"Field":"nonScalarValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -129,7 +129,7 @@ table already exists with incompatible proposed spec:
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'object' and cannot be changed to type 'string'"}
+{"Field":"nonScalarValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}

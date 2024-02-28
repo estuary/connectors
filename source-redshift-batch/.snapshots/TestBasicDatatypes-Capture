@@ -1,0 +1,9 @@
+# ================================
+# Collection "acmeCo/test/test_basic_datatypes_13111208": 1 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"a_bool":true,"a_date":"2024-02-26T00:00:00Z","a_real":-12.34000015258789,"a_ts":"2024-02-26T12:34:56Z","a_tstz":"2024-02-26T06:34:56-06:00","id":100}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_basic_datatypes_13111208":{"LastPolled":"<TIMESTAMP>"}}}
+

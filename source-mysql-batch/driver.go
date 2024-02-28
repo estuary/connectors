@@ -173,7 +173,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
-	tables, err := discoverTables(ctx, db)
+	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -261,7 +261,7 @@ type discoveredTable struct {
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
 }
 
-func discoverTables(ctx context.Context, db *client.Conn) ([]*discoveredTable, error) {
+func discoverTables(ctx context.Context, db *client.Conn, discoverSchemas []string) ([]*discoveredTable, error) {
 	var results, err = db.Execute(queryDiscoverTables)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering tables: %w", err)
@@ -270,10 +270,18 @@ func discoverTables(ctx context.Context, db *client.Conn) ([]*discoveredTable, e
 
 	var tables []*discoveredTable
 	for _, row := range results.Values {
+		var tableSchema = string(row[0].AsString())
+		var tableName = string(row[1].AsString())
+		var tableType = string(row[2].AsString())
+
+		if len(discoverSchemas) > 0 && !slices.Contains(discoverSchemas, tableSchema) {
+			log.WithFields(log.Fields{"schema": tableSchema, "table": tableName}).Debug("ignoring table")
+			continue
+		}
 		tables = append(tables, &discoveredTable{
-			Schema: string(row[0].AsString()),
-			Name:   string(row[1].AsString()),
-			Type:   string(row[2].AsString()),
+			Schema: tableSchema,
+			Name:   tableName,
+			Type:   tableType,
 		})
 	}
 	return tables, nil
