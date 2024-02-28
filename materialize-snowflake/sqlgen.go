@@ -296,8 +296,8 @@ WHEN NOT MATCHED THEN
 
 {{ define "copyHistory" }}
 SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
-  TABLE_NAME=>'{{ $.Table.Identifier }}',
-  START_TIME=>DATEADD(MINUTE, -30, TO_TIMESTAMP_LTZ('{{ $.StartTime }}'))
+  TABLE_NAME=>'{{ $.TableName }}',
+  START_TIME=>DATEADD(DAY, -14, CURRENT_TIMESTAMP())
 )) WHERE
 FILE_NAME IN ('{{ Join $.Files "','" }}')
 {{ end }}
@@ -329,8 +329,6 @@ type tableAndFile struct {
 	File  string
 }
 
-// RenderTableTemplate is a simple implementation of rendering a template with a Table
-// as its context. It's here for demonstration purposes mostly. Feel free to not use it.
 func RenderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &tableAndFile{Table: table, File: file}); err != nil {
@@ -346,24 +344,20 @@ func RenderTableAndFileTemplate(table sql.Table, file string, tpl *template.Temp
 }
 
 type copyHistory struct {
-	Table     sql.Table
+	TableName string
 	Files     []string
-	StartTime string
 }
 
-// RenderTableTemplate is a simple implementation of rendering a template with a Table
-// as its context. It's here for demonstration purposes mostly. Feel free to not use it.
-func RenderCopyHistoryTemplate(table sql.Table, files []string, startTime string, tpl *template.Template) (string, error) {
+func RenderCopyHistoryTemplate(tableName string, files []string, tpl *template.Template) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &copyHistory{Table: table, Files: files, StartTime: startTime}); err != nil {
+	if err := tpl.Execute(&w, &copyHistory{TableName: tableName, Files: files}); err != nil {
 		return "", err
 	}
 	var s = w.String()
 	log.WithFields(log.Fields{
 		"rendered":  s,
-		"table":     table,
+		"tableName": tableName,
 		"files":     files,
-		"startTime": startTime,
 	}).Debug("rendered template")
 	return s, nil
 }
