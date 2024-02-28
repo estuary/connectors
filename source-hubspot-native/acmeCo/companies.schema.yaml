@@ -1,0 +1,131 @@
+---
+$defs:
+  History:
+    additionalProperties: false
+    properties:
+      _meta:
+        allOf:
+          - $ref: "#/$defs/Meta"
+        default:
+          op: u
+          row_id: -1
+          uuid: 00000000-0000-0000-0000-000000000000
+        description: Document metadata
+      timestamp:
+        format: date-time
+        title: Timestamp
+        type: string
+      value:
+        title: Value
+        type: string
+      sourceType:
+        title: Sourcetype
+        type: string
+      sourceId:
+        anyOf:
+          - type: string
+          - type: "null"
+        default: ~
+        title: Sourceid
+      updatedByUserId:
+        anyOf:
+          - type: integer
+          - type: "null"
+        default: ~
+        title: Updatedbyuserid
+    required:
+      - timestamp
+      - value
+      - sourceType
+    title: History
+    type: object
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+      uuid:
+        default: 00000000-0000-0000-0000-000000000000
+        description: UUID of the Document
+        format: uuid
+        title: Uuid
+        type: string
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+      uuid: 00000000-0000-0000-0000-000000000000
+    description: Document metadata
+  id:
+    title: Id
+    type: integer
+  createdAt:
+    format: date-time
+    title: Createdat
+    type: string
+  updatedAt:
+    format: date-time
+    title: Updatedat
+    type: string
+  archived:
+    title: Archived
+    type: boolean
+  properties:
+    type: object
+    additionalProperties:
+      anyOf:
+        - type: string
+        - type: "null"
+    title: Properties
+  propertiesWithHistory:
+    additionalProperties:
+      items:
+        $ref: "#/$defs/History"
+      type: array
+    default: {}
+    title: Propertieswithhistory
+    type: object
+  associations:
+    additionalProperties: false
+    default: {}
+    title: Associations
+    type: object
+  contacts:
+    default: []
+    items:
+      type: integer
+    title: Contacts
+    type: array
+  deals:
+    default: []
+    items:
+      type: integer
+    title: Deals
+    type: array
+required:
+  - id
+  - createdAt
+  - updatedAt
+  - archived
+  - properties
+title: Company
+type: object
+x-infer-schema: true
