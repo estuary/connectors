@@ -188,9 +188,12 @@ func newTransactor(
 	}
 
 	var pipeClient *PipeClient
-
 	if cfg.Credentials.AuthType == JWT {
-		pipeClient, err = NewPipeClient(cfg, ep.Tenant)
+		var accountName string
+		if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
+			return nil, fmt.Errorf("fetching current account name: %w", err)
+		}
+		pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
 		if err != nil {
 			return nil, fmt.Errorf("NewPipeCLient: %w", err)
 		}
@@ -364,12 +367,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Table         string
-	Query         string
-	StagedDir     string
-	PipeName      string
-	PipeFiles     []fileRecord
-	PipeStartTime string
+	Table     string
+	Query     string
+	StagedDir string
+	PipeName  string
+	PipeFiles []fileRecord
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -387,7 +389,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					return nil, fmt.Errorf("pipeName template: %w", err)
 				} else {
 					b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
-					d.pipeMarkers[b.pipeName] = ""
 				}
 
 				if createPipe, err := sql.RenderTableTemplate(b.target, d.templates.createPipe); err != nil {
@@ -446,16 +447,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				}
 			}
 		} else if b.pipeName != "" {
-			var currentTime string
-			if err := d.store.conn.QueryRowContext(ctx, "SELECT CURRENT_TIMESTAMP()").Scan(&currentTime); err != nil {
-				return nil, fmt.Errorf("querying current timestamp: %w", err)
-			}
 			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:         b.target.Identifier,
-				StagedDir:     dir,
-				PipeFiles:     b.store.stage.uploaded,
-				PipeName:      b.pipeName,
-				PipeStartTime: currentTime,
+				Table:     b.target.Identifier,
+				StagedDir: dir,
+				PipeFiles: b.store.stage.uploaded,
+				PipeName:  b.pipeName,
 			}
 
 		} else {
@@ -484,8 +480,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 type pipeRecord struct {
 	files     []fileRecord
 	dir       string
-	binding   *binding
-	startTime string
+	tableName string
 }
 
 // When a file has been successfully loaded, we remove it from the pipe record
@@ -527,23 +522,19 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			log.WithField("table", item.Table).Info("store: starting pipe requests")
 			var fileRequests = make([]FileRequest, len(item.PipeFiles))
 			for i, f := range item.PipeFiles {
-				fileRequests[i] = FileRequest{
-					Path: f.Path,
-					Size: f.Size,
-				}
+				fileRequests[i] = FileRequest(f)
 			}
 
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
 				return nil, fmt.Errorf("snowpipe insertFiles: %w", err)
 			} else {
-				log.WithField("response", resp).Debug(fmt.Sprintf("insertFiles sucesssful"))
+				log.WithField("response", resp).Debug("insertFiles successful")
 			}
 
 			pipes[item.PipeName] = &pipeRecord{
 				files:     item.PipeFiles,
 				dir:       item.StagedDir,
-				binding:   d.bindingByStateKey(stateKey),
-				startTime: item.PipeStartTime,
+				tableName: item.Table,
 			}
 		}
 	}
@@ -591,7 +582,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					fileNames[i] = f.Path
 				}
 
-				query, err := RenderCopyHistoryTemplate(pipe.binding.target, fileNames, pipe.startTime, d.templates.copyHistory)
+				query, err := RenderCopyHistoryTemplate(pipe.tableName, fileNames, d.templates.copyHistory)
 				if err != nil {
 					return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
 				}
@@ -603,17 +594,21 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				defer rows.Close()
 
 				var (
-					fileName          string
-					status            string
-					firstErrorMessage *string
+					fileName                  string
+					status                    string
+					firstErrorMessageNullable stdsql.NullString
+					firstErrorMessage         string
 				)
 
 				var loadedFiles []string
 				for rows.Next() {
-					if err := rows.Scan(&fileName, &status, &firstErrorMessage); err != nil {
+					if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable); err != nil {
 						return nil, fmt.Errorf("scanning copy history row: %w", err)
 					}
 
+					if firstErrorMessageNullable.Valid {
+						firstErrorMessage = firstErrorMessageNullable.String
+					}
 					log.WithFields(log.Fields{
 						"fileName":          fileName,
 						"status":            status,
@@ -638,7 +633,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					return nil, fmt.Errorf("snowpipe: reading copy history: %w", err)
 				}
 
-				if len(pipe.files) > 0 && !hasItemsInProgress {
+				if hasItemsInProgress {
+					continue
+				}
+
+				if len(pipe.files) > 0 {
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
 				} else {
 					d.deleteFiles(ctx, []string{pipe.dir})

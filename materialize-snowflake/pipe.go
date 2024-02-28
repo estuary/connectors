@@ -26,7 +26,6 @@ type PipeClient struct {
 	httpClient      http.Client
 	insertFilesTpl  *template.Template
 	insertReportTpl *template.Template
-	account         string
 }
 
 func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
@@ -38,7 +37,7 @@ func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
 	return fmt.Sprintf("SHA256:%s", base64.StdEncoding.EncodeToString(hash[:])), nil
 }
 
-func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
+func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient, error) {
 	httpClient := http.Client{}
 
 	var key, err = cfg.Credentials.privateKey()
@@ -46,9 +45,8 @@ func NewPipeClient(cfg *config, tenant string) (*PipeClient, error) {
 		return nil, err
 	}
 
-	var account = strings.ToUpper(cfg.Account)
 	var user = strings.ToUpper(cfg.Credentials.User)
-	var qualifiedUser = fmt.Sprintf("%s.%s", account, user)
+	var qualifiedUser = fmt.Sprintf("%s.%s", accountName, user)
 
 	fingerprint, err := publicKeyFingerprint(key.Public().(*rsa.PublicKey))
 	if err != nil {
@@ -127,7 +125,9 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}
 
 	var w strings.Builder
-	c.insertFilesTpl.Execute(&w, urlTemplate)
+	if err := c.insertFilesTpl.Execute(&w, urlTemplate); err != nil {
+		return nil, fmt.Errorf("insertFiles template: %w", err)
+	}
 	var url = w.String()
 
 	reqBodyJson, err := json.Marshal(reqBody)
@@ -167,8 +167,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}
 
 	var response InsertFilesResponse
-	err = json.Unmarshal([]byte(respBuf.String()), &response)
-	if err != nil {
+	if err := json.Unmarshal([]byte(respBuf.String()), &response); err != nil {
 		return nil, fmt.Errorf("parsing response of insertFiles failed: %w", err)
 	}
 
@@ -252,8 +251,7 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 	}
 
 	var response InsertReportResponse
-	err = json.Unmarshal([]byte(respBuf.String()), &response)
-	if err != nil {
+	if err := json.Unmarshal([]byte(respBuf.String()), &response); err != nil {
 		return nil, fmt.Errorf("parsing response of insertReport failed: %w", err)
 	}
 
