@@ -1,0 +1,40 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+      uuid:
+        default: 00000000-0000-0000-0000-000000000000
+        description: UUID of the Document
+        format: uuid
+        title: Uuid
+        type: string
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+      uuid: 00000000-0000-0000-0000-000000000000
+    description: Document metadata
+title: Row
+type: object
+x-infer-schema: true
