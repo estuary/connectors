@@ -22,7 +22,9 @@ import (
 type PipeClient struct {
 	cfg             *config
 	base            string
+	accountName     string
 	token           string
+	expiry          time.Time
 	httpClient      http.Client
 	insertFilesTpl  *template.Template
 	insertReportTpl *template.Template
@@ -37,27 +39,21 @@ func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
 	return fmt.Sprintf("SHA256:%s", base64.StdEncoding.EncodeToString(hash[:])), nil
 }
 
-func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient, error) {
-	httpClient := http.Client{}
-
-	var key, err = cfg.Credentials.privateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	var user = strings.ToUpper(cfg.Credentials.User)
-	var qualifiedUser = fmt.Sprintf("%s.%s", accountName, user)
-
+func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (string, time.Time, error) {
 	fingerprint, err := publicKeyFingerprint(key.Public().(*rsa.PublicKey))
 	if err != nil {
-		return nil, err
+		return "", time.UnixMilli(0), err
 	}
+
+	var qualifiedUser = fmt.Sprintf("%s.%s", strings.ToUpper(accountName), strings.ToUpper(user))
+
+	var expiry = time.Now().Add(59 * time.Minute)
 
 	var claims = &jwt.RegisteredClaims{
 		IssuedAt: jwt.NewNumericDate(time.Now()),
 		// TODO: automatically refresh the JWT token
 		// JWT tokens for Snowflake can live up to an hour
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(59 * time.Minute)),
+		ExpiresAt: jwt.NewNumericDate(expiry),
 		Issuer:    fmt.Sprintf("%s.%s", qualifiedUser, fingerprint),
 		Subject:   qualifiedUser,
 	}
@@ -65,8 +61,14 @@ func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient,
 	var t = jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	jwtToken, err := t.SignedString(key)
 	if err != nil {
-		return nil, fmt.Errorf("signing key: %w", err)
+		return "", time.UnixMilli(0), fmt.Errorf("signing key: %w", err)
 	}
+
+	return jwtToken, expiry, nil
+}
+
+func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient, error) {
+	httpClient := http.Client{}
 
 	var dsn = cfg.ToURI(tenant)
 	dsnURL, err := url.Parse(fmt.Sprintf("https://%s", dsn))
@@ -74,14 +76,26 @@ func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient,
 		return nil, fmt.Errorf("parsing snowflake dsn: %w", err)
 	}
 
+	key, err := cfg.Credentials.privateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	jwtToken, expiry, err := generateJWTToken(key, cfg.Credentials.User, accountName)
+	if err != nil {
+		return nil, fmt.Errorf("creating jwt token: %w", err)
+	}
+
 	var insertFilesTpl = template.Must(template.New("insertFiles").Parse(insertFilesRawTpl))
 	var insertReportTpl = template.Must(template.New("insertReport").Parse(insertReportRawTpl))
 
 	return &PipeClient{
 		cfg:             cfg,
+		accountName:     accountName,
 		base:            dsnURL.Hostname(),
 		httpClient:      httpClient,
 		token:           jwtToken,
+		expiry:          expiry,
 		insertFilesTpl:  insertFilesTpl,
 		insertReportTpl: insertReportTpl,
 	}, nil
@@ -112,8 +126,30 @@ const insertFilesRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/i
 const contentType = "application/json;charset=UTF-8"
 const userAgent = "Estuary Technologies Flow"
 
+func (c *PipeClient) refreshJWT() error {
+	if time.Until(c.expiry).Minutes() < 5 {
+		var key, err = c.cfg.Credentials.privateKey()
+		if err != nil {
+			return err
+		}
+		jwtToken, expiry, err := generateJWTToken(key, c.cfg.Credentials.User, c.accountName)
+		if err != nil {
+			return fmt.Errorf("recreating jwt token: %w", err)
+		}
+
+		c.token = jwtToken
+		c.expiry = expiry
+	}
+
+	return nil
+}
+
 // pipeName must be a fully-qualified name, e.g.: database.schema.pipe
 func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertFilesResponse, error) {
+	if err := c.refreshJWT(); err != nil {
+		return nil, err
+	}
+
 	var urlTemplate = insertFilesURLTemplate{
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
@@ -214,6 +250,10 @@ type InsertReportResponse struct {
 }
 
 func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertReportResponse, error) {
+	if err := c.refreshJWT(); err != nil {
+		return nil, err
+	}
+
 	var urlTemplate = insertReportURLTemplate{
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
