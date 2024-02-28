@@ -851,6 +851,12 @@
                 "string"
               ]
             },
+            "hs_notes_next_activity_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_num_blockers": {
               "type": [
                 "null",
@@ -2625,6 +2631,12 @@
                 "string"
               ]
             },
+            "hs_notes_next_activity_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_id": {
               "type": [
                 "null",
@@ -4146,6 +4158,12 @@
                 "string"
               ]
             },
+            "hs_notes_next_activity_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_num_of_associated_line_items": {
               "type": [
                 "null",
@@ -5020,6 +5038,12 @@
               ]
             },
             "hs_next_step": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_notes_next_activity_type": {
               "type": [
                 "null",
                 "string"
@@ -6966,9 +6990,11 @@
         },
         "tickets": {
           "items": {
+            "format": "integer",
             "type": [
               "null",
-              "string"
+              "string",
+              "integer"
             ]
           },
           "type": [
@@ -13512,6 +13538,12 @@
                 "string"
               ]
             },
+            "hs_notes_next_activity_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_object_id": {
               "type": [
                 "null",
@@ -14777,6 +14809,12 @@
             },
             "hs_nextactivitydate": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_notes_next_activity_type": {
               "type": [
                 "null",
                 "string"
