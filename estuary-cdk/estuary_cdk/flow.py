@@ -94,6 +94,11 @@ class AccessToken(BaseModel):
     access_token: str
 
 
+class BasicAuth(BaseModel):
+    username: str
+    password: str
+
+
 @dataclass
 class ValidationError(Exception):
     """ValidationError is an exception type for one or more structured,

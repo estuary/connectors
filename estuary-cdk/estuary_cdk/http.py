@@ -3,11 +3,12 @@ from dataclasses import dataclass
 import abc
 import aiohttp
 import asyncio
+import base64
 import logging
 import time
 
 from . import Mixin, logger
-from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec
+from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
 
 
 # HTTPSession is an abstract base class for HTTP clients.
@@ -36,13 +37,20 @@ class TokenSource:
         scope: str = ""
 
     spec: OAuth2Spec
-    credentials: BaseOAuth2Credentials | AccessToken
+    credentials: BaseOAuth2Credentials | AccessToken | BasicAuth
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
 
-    async def fetch_token(self, session: HTTPSession) -> str:
+    async def fetch_token(self, session: HTTPSession) -> tuple[str, str]:
         if isinstance(self.credentials, AccessToken):
-            return self.credentials.access_token
+            return ("Bearer", self.credentials.access_token)
+        elif isinstance(self.credentials, BasicAuth):
+            return (
+                "Basic",
+                base64.b64encode(
+                    f"{self.credentials.username}:{self.credentials.password}".encode()
+                ).decode(),
+            )
 
         assert isinstance(self.credentials, BaseOAuth2Credentials)
         current_time = time.time()
@@ -51,7 +59,7 @@ class TokenSource:
             horizon = self._fetched_at + self._access_token.expires_in * 0.75
 
             if current_time < horizon:
-                return self._access_token.access_token
+                return ("Bearer", self._access_token.access_token)
 
         self._fetched_at = int(current_time)
         self._access_token = await self._fetch_oauth2_token(session, self.credentials)
@@ -60,7 +68,7 @@ class TokenSource:
             "fetched OAuth2 access token",
             {"at": self._fetched_at, "expires_in": self._access_token.expires_in},
         )
-        return self._access_token.access_token
+        return ("Bearer", self._access_token.access_token)
 
     async def _fetch_oauth2_token(
         self, session: HTTPSession, credentials: BaseOAuth2Credentials
@@ -156,8 +164,8 @@ class HTTPMixin(Mixin, HTTPSession):
 
         headers = {}
         if with_token and self.token_source is not None:
-            token = await self.token_source.fetch_token(self)
-            headers["Authorization"] = f"Bearer {token}"
+            token_type, token = await self.token_source.fetch_token(self)
+            headers["Authorization"] = f"{token_type} {token}"
 
         async with self.inner.request(
             headers=headers,
