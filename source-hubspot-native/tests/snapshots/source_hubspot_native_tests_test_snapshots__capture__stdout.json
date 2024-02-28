@@ -1152,7 +1152,7 @@
         "hs_analytics_source_data_2": "sample-contact",
         "hs_created_by_user_id": "63843671",
         "hs_date_entered_lead": "2024-02-08T02:36:27.739Z",
-        "hs_lastmodifieddate": "2024-02-27T06:53:41.988Z",
+        "hs_lastmodifieddate": "2024-02-28T22:41:14.697Z",
         "hs_num_blockers": "0",
         "hs_num_child_companies": "0",
         "hs_num_contacts_with_buying_roles": "0",
@@ -1181,7 +1181,7 @@
         "num_contacted_notes": "0",
         "num_conversion_events": "0",
         "num_notes": "1",
-        "numberofemployees": "15",
+        "numberofemployees": "16",
         "state": "NY",
         "timezone": "America/New_York",
         "twitterhandle": "EstuaryDev",
@@ -1419,6 +1419,13 @@
           {
             "sourceId": "userId:63843671",
             "sourceType": "CRM_UI",
+            "timestamp": "2024-02-28T22:41:14.697000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-28T22:41:14.697Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
             "timestamp": "2024-02-27T06:53:41.988000Z",
             "updatedByUserId": 63843671,
             "value": "2024-02-27T06:53:41.988Z"
@@ -1542,11 +1549,6 @@
             "sourceType": "API",
             "timestamp": "2024-02-15T18:06:45.989000Z",
             "value": "2024-02-15T18:06:45.989Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-02-15T18:06:15.612000Z",
-            "value": "2024-02-15T18:06:15.612Z"
           }
         ],
         "hs_num_blockers": [
@@ -1902,6 +1904,13 @@
           {
             "sourceId": "userId:63843671",
             "sourceType": "CRM_UI",
+            "timestamp": "2024-02-28T22:41:14.697000Z",
+            "updatedByUserId": 63843671,
+            "value": "16"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
             "timestamp": "2024-02-27T06:53:41.988000Z",
             "updatedByUserId": 63843671,
             "value": "15"
@@ -2031,13 +2040,6 @@
             "timestamp": "2024-02-15T16:22:08.223000Z",
             "updatedByUserId": 63843671,
             "value": "16"
-          },
-          {
-            "sourceId": "userId:63843671",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-02-15T16:21:49.250000Z",
-            "updatedByUserId": 63843671,
-            "value": "15"
           }
         ],
         "state": [
@@ -2102,7 +2104,7 @@
           }
         ]
       },
-      "updatedAt": "2024-02-27T06:53:41.988000Z"
+      "updatedAt": "2024-02-28T22:41:14.697000Z"
     }
   ],
   [
