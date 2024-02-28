@@ -1,21 +1,14 @@
 [tool.poetry]
-name = "source-pokemon"
+name = "source_pokemon"
 version = "0.1.0"
 description = ""
 authors = ["Johnny Graettinger <johnny@estuary.dev>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
-airbyte-cdk = "0.51.14"
-jsonlines = "^4.0.0"
-mypy = "^1.5"
-orjson = "^3.9.7"
-pydantic = "1.10.12"
+airbyte-cdk = "^0.52"
+estuary-cdk = {path="../estuary-cdk", develop = true}
 python = "^3.11"
-requests = "^2.31.0"
-types-requests = "^2.31.0.2"
-debugpy = "^1.8.0"
-flow_sdk = {path="../python"}
+types-requests = "^2.31"
 
 [build-system]
 requires = ["poetry-core"]
