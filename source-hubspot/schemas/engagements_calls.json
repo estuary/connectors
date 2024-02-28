@@ -209,7 +209,7 @@
     "tickets": {
       "type": ["null", "array"],
       "items": {
-        "type": ["null", "string", "integer],
+        "type": ["null", "string", "integer"],
         "format": "integer"
       }
     }
