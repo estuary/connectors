@@ -154,7 +154,7 @@ async def fetch_changes(
     http: HTTPSession,
     log_cursor: LogCursor,
     logger: Logger,
-) -> tuple[AsyncGenerator[CRMObject, None], LogCursor]:
+) -> AsyncGenerator[CRMObject | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
     # Walk pages of recent IDs until we see one which is as-old
@@ -176,17 +176,16 @@ async def fetch_changes(
 
     recent.sort()  # Oldest updates first.
 
-    async def fetcher() -> AsyncGenerator[CRMObject, None]:
-        for batch_it in itertools.batched(recent, 100):
-            batch = list(batch_it)
+    for batch_it in itertools.batched(recent, 100):
+        batch = list(batch_it)
 
-            documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-                cls, http, [id for _, id in batch]
-            )
-            for doc in documents.results:
-                yield doc
+        documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
+            cls, http, [id for _, id in batch]
+        )
+        for doc in documents.results:
+            yield doc
 
-    return fetcher(), recent[-1][0] if recent else log_cursor
+    yield recent[-1][0] if recent else log_cursor
 
 
 async def fetch_recent_companies(
@@ -228,9 +227,7 @@ async def fetch_recent_deals(
     url = f"{HUB}/deals/v1/deal/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
-    result = OldRecentDeals.model_validate_json(
-        await http.request(url, params=params)
-    )
+    result = OldRecentDeals.model_validate_json(await http.request(url, params=params))
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
         for r in result.results
