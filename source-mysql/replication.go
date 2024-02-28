@@ -419,6 +419,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			} else {
 				logrus.WithField("event", event.Header.EventType.String()).Debug("Generic Event")
 			}
+		case *replication.RowsQueryEvent:
+			logrus.WithField("query", string(data.Query)).Debug("ignoring Rows Query Event")
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
