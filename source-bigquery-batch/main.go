@@ -83,7 +83,22 @@ func connectBigQuery(ctx context.Context, cfg *Config) (*bigquery.Client, error)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
+
+	if err := executeQuery(ctx, client, "SELECT true;"); err != nil {
+		return nil, fmt.Errorf("error executing no-op query: %w", err)
+	}
 	return client, nil
+}
+
+func executeQuery(ctx context.Context, client *bigquery.Client, query string) error {
+	if job, err := client.Query(query).Run(ctx); err != nil {
+		return err
+	} else if js, err := job.Wait(ctx); err != nil {
+		return err
+	} else if js.Err() != nil {
+		return js.Err()
+	}
+	return nil
 }
 
 const tableQueryTemplateTemplate = `{{/* Default query template which adapts to cursor field selection */}}
