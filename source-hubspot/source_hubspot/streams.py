@@ -206,8 +206,8 @@ class API:
 
         return response.json()
 
-    @retry_connection_handler(max_tries=5, factor=5)
-    @retry_after_handler(max_tries=3)
+    @retry_connection_handler(max_tries=10, factor=5)
+    @retry_after_handler(max_tries=5)
     def get(
         self, url: str, params: MutableMapping[str, Any] = None
     ) -> Tuple[Union[MutableMapping[str, Any], List[MutableMapping[str, Any]]], requests.Response]:
@@ -367,11 +367,8 @@ class Stream(HttpStream, ABC):
             json_schema["properties"]["properties"] = {"type": "object", "properties": self.properties}
         return json_schema
 
-    # This 401 retry handler is only there to handle the case that
-    # a token expires in flight. As such, it should only need to
-    # retry a single time at most. Any additional failures are real
-    # and should be bubbled up as such.
-    @retry_401(max_tries=5)
+
+    @retry_401(max_tries=20)
     def handle_request(
         self,
         stream_slice: Mapping[str, Any] = None,
@@ -1328,6 +1325,7 @@ class ContactsListMemberships(Stream):
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
         params.update({"showListMemberships": True})
+        params.update({"count": 100})
         return params
 
 
