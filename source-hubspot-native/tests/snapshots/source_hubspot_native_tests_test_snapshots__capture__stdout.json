@@ -1131,7 +1131,7 @@
       "properties": {
         "address": "244 5th Avenue",
         "address2": "1277",
-        "annualrevenue": "10000000",
+        "annualrevenue": "1000000",
         "city": "New York",
         "country": "United States",
         "createdate": "2024-02-08T02:36:27.739Z",
@@ -1152,7 +1152,7 @@
         "hs_analytics_source_data_2": "sample-contact",
         "hs_created_by_user_id": "63843671",
         "hs_date_entered_lead": "2024-02-08T02:36:27.739Z",
-        "hs_lastmodifieddate": "2024-02-28T22:41:14.697Z",
+        "hs_lastmodifieddate": "2024-02-29T17:12:01.335Z",
         "hs_num_blockers": "0",
         "hs_num_child_companies": "0",
         "hs_num_contacts_with_buying_roles": "0",
@@ -1206,6 +1206,13 @@
           }
         ],
         "annualrevenue": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-29T17:12:01.335000Z",
+            "updatedByUserId": 63843671,
+            "value": "1000000"
+          },
           {
             "sourceType": "COMPANY_INSIGHTS",
             "timestamp": "2024-02-19T21:39:53.367000Z",
@@ -1419,6 +1426,13 @@
           {
             "sourceId": "userId:63843671",
             "sourceType": "CRM_UI",
+            "timestamp": "2024-02-29T17:12:01.335000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-29T17:12:01.335Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
             "timestamp": "2024-02-28T22:41:14.697000Z",
             "updatedByUserId": 63843671,
             "value": "2024-02-28T22:41:14.697Z"
@@ -1544,11 +1558,6 @@
             "timestamp": "2024-02-16T17:37:34.730000Z",
             "updatedByUserId": 63843671,
             "value": "2024-02-16T17:37:34.730Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-02-15T18:06:45.989000Z",
-            "value": "2024-02-15T18:06:45.989Z"
           }
         ],
         "hs_num_blockers": [
@@ -2104,7 +2113,7 @@
           }
         ]
       },
-      "updatedAt": "2024-02-28T22:41:14.697000Z"
+      "updatedAt": "2024-02-29T17:12:01.335000Z"
     }
   ],
   [
