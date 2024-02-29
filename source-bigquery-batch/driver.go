@@ -373,14 +373,18 @@ func recommendedCatalogName(table string) string {
 // Validate checks that the configuration appears correct and that we can connect
 // to the database and execute queries.
 func (drv *BatchSQLDriver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
-	// Perform discovery, which inherently validates that the config is well-formed
-	// and that we can connect to the database and execute (some) queries.
-	if _, err := drv.Discover(ctx, &pc.Request_Discover{
-		ConnectorType: req.ConnectorType,
-		ConfigJson:    req.ConfigJson,
-	}); err != nil {
+	// Unmarshal the configuration and verify that we can connect to the database
+	var cfg Config
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+	cfg.SetDefaults()
+
+	var db, err = drv.Connect(ctx, &cfg)
+	if err != nil {
 		return nil, err
 	}
+	defer db.Close()
 
 	// Unmarshal and validate resource bindings to make sure they're well-formed too.
 	var out []*pc.Response_Validated_Binding
