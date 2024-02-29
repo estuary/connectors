@@ -572,12 +572,12 @@ type batchMeta struct {
 }
 
 func (batch batchMeta) Write(converted []any) error {
-	record, err := rowToCSVRecord(converted)
-	if err != nil {
+	if record, err := rowToCSVRecord(converted); err != nil {
 		return fmt.Errorf("error encoding row to CSV: %w", err)
+	} else if err := batch.w.Write(record); err != nil {
+		return fmt.Errorf("writing csv record: %w", err)
 	}
 
-	batch.w.Write(record)
 	batch.w.Flush()
 	if err := batch.w.Error(); err != nil {
 		return fmt.Errorf("writing csv to buffer: %w", err)
@@ -586,7 +586,7 @@ func (batch batchMeta) Write(converted []any) error {
 	return nil
 }
 
-func setupBatch(ctx context.Context, readerSuffix string) batchMeta {
+func setupBatch(readerSuffix string) batchMeta {
 	var buff bytes.Buffer
 	var writer = csv.NewWriter(&buff)
 
@@ -643,9 +643,25 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	defer txn.Rollback()
 
+	var lastBinding = -1
 	var batches = make(map[int]batchMeta)
 	for it.Next() {
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+		}
+
 		var b = d.bindings[it.Binding]
+
+		if lastBinding != it.Binding {
+			// Drain the prior batch as naturally-ordered key groupings are cycled through.
+			lastBatch := batches[lastBinding]
+			if lastBatch.buff.Len() > 0 {
+				if err := drainBatch(ctx, txn, d.bindings[lastBinding].loadLoadSQL, lastBatch); err != nil {
+					return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
+				}
+			}
+			lastBinding = it.Binding
+		}
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -674,7 +690,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 
 			if _, ok := batches[it.Binding]; !ok {
-				batches[it.Binding] = setupBatch(ctx, fmt.Sprintf("load_%d", it.Binding))
+				batches[it.Binding] = setupBatch(fmt.Sprintf("load_%d", it.Binding))
 			}
 
 			if err := batches[it.Binding].Write(converted); err != nil {
@@ -817,8 +833,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		if _, ok := inserts[it.Binding]; !ok {
-			inserts[it.Binding] = setupBatch(ctx, fmt.Sprintf("store_%d", it.Binding))
-			updates[it.Binding] = setupBatch(ctx, fmt.Sprintf("update_%d", it.Binding))
+			inserts[it.Binding] = setupBatch(fmt.Sprintf("store_%d", it.Binding))
+			updates[it.Binding] = setupBatch(fmt.Sprintf("update_%d", it.Binding))
 		}
 
 		if it.Exists {
