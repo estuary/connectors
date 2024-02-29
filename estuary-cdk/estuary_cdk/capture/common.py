@@ -198,19 +198,34 @@ FetchChangesFn = Callable[
     AsyncGenerator[_BaseDocument | LogCursor, None],
 ]
 """
-FetchChangesFn is a function which fetches available documents since the LogCursor.
-It yields Documents until no changes remain, then yields one updated LogCursor
-which reflects progress made against processing the log, and then returns.
+FetchChangesFn fetches available checkpoints since the provided last LogCursor.
 
-If no documents are available at all, then it yields no documents and its
-argument LogCursor. It does NOT wait indefinitely for more documents.
+Checkpoints consist of a yielded sequence of documents followed by a LogCursor,
+where the LogCursor checkpoints those preceding documents.
 
-Implementations may block for brief periods to await documents, such as while
-awaiting a server response, but should not block forever as it prevents the
+Yielded LogCursors MUST be strictly increasing relative to the argument
+LogCursor and also to previously yielded LogCursors.
+
+It's an error if FetchChangesFn yields documents, and then returns without
+yielding a final LogCursor. NOTE(johnny): if needed, we could extend the
+contract to allow an explicit "roll back" sentinel.
+
+FetchChangesFn yields until no further checkpoints are readily available,
+and then returns. If no checkpoints are available at all,
+it returns yields nothing and returns.
+
+Implementations may block for brief periods to await checkpoints, such as while
+awaiting a server response, but MUST NOT block forever as it prevents the
 connector from exiting.
 
-Implementations should NOT sleep or implement their own coarse rate limit.
-Instead, configure a resource `interval` to enable periodic polling.
+Implementations MAY return early, such as if it's convenient to fetch only
+a next page of recent changes. If an implementation yields any checkpoints,
+then it is immediately re-invoked.
+
+Otherwise if it returns without yielding a checkpoint, then
+`ResourceConfig.interval` is respected between invocations.
+Implementations SHOULD NOT sleep or implement their own coarse rate limit
+(use `ResourceConfig.interval`).
 """
 
 
@@ -540,21 +555,42 @@ async def _binding_incremental_task(
 
     while True:
 
-        next_cursor = state.cursor
-        count = 0
+        checkpoints = 0
+        pending = False
 
         async for item in fetch_changes(state.cursor, task.logger):
             if isinstance(item, BaseDocument):
                 task.captured(binding_index, item)
-                count += 1
+                pending = True
             else:
-                next_cursor = item
 
-        if count != 0 or next_cursor != state.cursor:
-            state.cursor = next_cursor
-            task.checkpoint(connector_state)
+                # Ensure LogCursor types match and that they're strictly increasing.
+                is_larger = False
+                if isinstance(item, int) and isinstance(state.cursor, int):
+                    is_larger = item > state.cursor
+                elif isinstance(item, datetime) and isinstance(state.cursor, datetime):
+                    is_larger = item > state.cursor
+                else:
+                    raise RuntimeError(
+                        f"Implementation error: FetchChangesFn yielded LogCursor {item} of a different type than the last LogCursor {state.cursor}",
+                    )
 
-        if count != 0:
+                if not is_larger:
+                    raise RuntimeError(
+                        f"Implementation error: FetchChangesFn yielded LogCursor {item} which is not greater than the last LogCursor {state.cursor}",
+                    )
+
+                state.cursor = item
+                task.checkpoint(connector_state)
+                checkpoints += 1
+                pending = False
+
+        if pending:
+            raise RuntimeError(
+                "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
+            )
+
+        if checkpoints:
             continue  # Immediately fetch subsequent changes.
 
         # At this point we've fully caught up with the log and are idle.
