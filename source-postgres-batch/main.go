@@ -99,6 +99,8 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("error opening database connection: %w", err)
 	} else if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("error pinging database: %w", err)
+	} else if _, err := db.ExecContext(ctx, "SELECT true;"); err != nil {
+		return nil, fmt.Errorf("error executing no-op query: %w", err)
 	}
 	return db, nil
 }
