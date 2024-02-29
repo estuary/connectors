@@ -185,7 +185,8 @@ async def fetch_changes(
         for doc in documents.results:
             yield doc
 
-    yield recent[-1][0] if recent else log_cursor
+    if recent:
+        yield recent[-1][0]
 
 
 async def fetch_recent_companies(
