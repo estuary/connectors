@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS `default`.simple (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  canary STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS `default`.duplicate_keys_standard (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `default`.duplicate_keys_delta (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `default`.duplicate_keys_delta_exclude_flow_doc (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `default`.multiple_types (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  array_int STRING COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n  bool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n  float_field DOUBLE COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]',\n  nested STRING COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n  nullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n  str_field STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `default`.formatted_strings (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  date DATE COMMENT 'auto-generated projection of JSON at: /date with inferred types: [string]',\n  datetime TIMESTAMP COMMENT 'auto-generated projection of JSON at: /datetime with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n  int_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n  num_and_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n  num_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n  time STRING COMMENT 'auto-generated projection of JSON at: /time with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/formatted-strings';\n\nINSERT INTO `default`.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-databricks/materialize');"
+    "actionDescription": "\nCREATE TABLE IF NOT EXISTS `some-schema`.flow_materializations_v2 (\n  materialization STRING NOT NULL COMMENT 'The name of the materialization.',\n  version STRING NOT NULL COMMENT 'Version of the materialization.',\n  spec STRING NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.'\n) COMMENT 'This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.simple (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  canary STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_standard (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_delta (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_delta_exclude_flow_doc (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.multiple_types (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  array_int STRING COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n  bool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n  float_field DOUBLE COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]',\n  nested STRING COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n  nullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n  str_field STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.formatted_strings (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  date DATE COMMENT 'auto-generated projection of JSON at: /date with inferred types: [string]',\n  datetime TIMESTAMP COMMENT 'auto-generated projection of JSON at: /datetime with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n  int_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n  num_and_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n  num_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n  time STRING COMMENT 'auto-generated projection of JSON at: /time with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/formatted-strings';\n\nINSERT INTO `some-schema`.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-databricks/materialize');"
   }
 }
 {
@@ -11,12 +11,12 @@
     "state": {
       "mergePatch": true,
       "updated": {
-        "default%2Fduplicate_keys_delta": null,
-        "default%2Fduplicate_keys_delta_exclude_flow_doc": null,
-        "default%2Fduplicate_keys_standard": null,
-        "default%2Fformatted_strings": null,
-        "default%2Fmultiple_types": null,
-        "default%2Fsimple": null
+        "some-schema%2Fduplicate_keys_delta": null,
+        "some-schema%2Fduplicate_keys_delta_exclude_flow_doc": null,
+        "some-schema%2Fduplicate_keys_standard": null,
+        "some-schema%2Fformatted_strings": null,
+        "some-schema%2Fmultiple_types": null,
+        "some-schema%2Fsimple": null
       }
     }
   }
@@ -28,40 +28,40 @@
   "startedCommit": {
     "state": {
       "updated": {
-        "default%2Fduplicate_keys_delta": {
-          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fduplicate_keys_delta": {
+          "Query": "\n\tCOPY INTO `some-schema`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fduplicate_keys_delta_exclude_flow_doc": {
-          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fduplicate_keys_delta_exclude_flow_doc": {
+          "Query": "\n\tCOPY INTO `some-schema`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fduplicate_keys_standard": {
-          "Query": "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fduplicate_keys_standard": {
+          "Query": "\n\tCOPY INTO `some-schema`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fformatted_strings": {
-          "Query": "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fformatted_strings": {
+          "Query": "\n\tCOPY INTO `some-schema`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fmultiple_types": {
-          "Query": "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT, array_int::STRING, bool_field::BOOLEAN, float_field::DOUBLE, flow_published_at::TIMESTAMP, multiple::STRING, nested::STRING, nullable_int::BIGINT, str_field::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fmultiple_types": {
+          "Query": "\n\tCOPY INTO `some-schema`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT, array_int::STRING, bool_field::BOOLEAN, float_field::DOUBLE, flow_published_at::TIMESTAMP, multiple::STRING, nested::STRING, nullable_int::BIGINT, str_field::STRING, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fsimple": {
-          "Query": "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fsimple": {
+          "Query": "\n\tCOPY INTO `some-schema`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         }
       }
@@ -73,12 +73,12 @@
     "state": {
       "mergePatch": true,
       "updated": {
-        "default%2Fduplicate_keys_delta": null,
-        "default%2Fduplicate_keys_delta_exclude_flow_doc": null,
-        "default%2Fduplicate_keys_standard": null,
-        "default%2Fformatted_strings": null,
-        "default%2Fmultiple_types": null,
-        "default%2Fsimple": null
+        "some-schema%2Fduplicate_keys_delta": null,
+        "some-schema%2Fduplicate_keys_delta_exclude_flow_doc": null,
+        "some-schema%2Fduplicate_keys_standard": null,
+        "some-schema%2Fformatted_strings": null,
+        "some-schema%2Fmultiple_types": null,
+        "some-schema%2Fsimple": null
       }
     }
   }
@@ -274,40 +274,40 @@
   "startedCommit": {
     "state": {
       "updated": {
-        "default%2Fduplicate_keys_delta": {
-          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fduplicate_keys_delta": {
+          "Query": "\n\tCOPY INTO `some-schema`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fduplicate_keys_delta_exclude_flow_doc": {
-          "Query": "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fduplicate_keys_delta_exclude_flow_doc": {
+          "Query": "\n\tCOPY INTO `some-schema`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fduplicate_keys_standard": {
-          "Query": "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP, l.int = r.int::BIGINT, l.str = r.str::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT, r.flow_published_at::TIMESTAMP, r.int::BIGINT, r.str::STRING, r.flow_document::STRING);\n",
+        "some-schema%2Fduplicate_keys_standard": {
+          "Query": "\n\tMERGE INTO `some-schema`.duplicate_keys_standard AS l\n\tUSING `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP, l.int = r.int::BIGINT, l.str = r.str::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT, r.flow_published_at::TIMESTAMP, r.int::BIGINT, r.str::STRING, r.flow_document::STRING);\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fformatted_strings": {
-          "Query": "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fformatted_strings": {
+          "Query": "\n\tCOPY INTO `some-schema`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fmultiple_types": {
-          "Query": "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING `flow_temp_store_table_00000000_00000000_4_multiple_types` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int::STRING, l.bool_field = r.bool_field::BOOLEAN, l.float_field = r.float_field::DOUBLE, l.flow_published_at = r.flow_published_at::TIMESTAMP, l.multiple = r.multiple::STRING, l.nested = r.nested::STRING, l.nullable_int = r.nullable_int::BIGINT, l.str_field = r.str_field::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT, r.array_int::STRING, r.bool_field::BOOLEAN, r.float_field::DOUBLE, r.flow_published_at::TIMESTAMP, r.multiple::STRING, r.nested::STRING, r.nullable_int::BIGINT, r.str_field::STRING, r.flow_document::STRING);\n",
+        "some-schema%2Fmultiple_types": {
+          "Query": "\n\tMERGE INTO `some-schema`.multiple_types AS l\n\tUSING `flow_temp_store_table_00000000_00000000_4_multiple_types` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int::STRING, l.bool_field = r.bool_field::BOOLEAN, l.float_field = r.float_field::DOUBLE, l.flow_published_at = r.flow_published_at::TIMESTAMP, l.multiple = r.multiple::STRING, l.nested = r.nested::STRING, l.nullable_int = r.nullable_int::BIGINT, l.str_field = r.str_field::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT, r.array_int::STRING, r.bool_field::BOOLEAN, r.float_field::DOUBLE, r.flow_published_at::TIMESTAMP, r.multiple::STRING, r.nested::STRING, r.nullable_int::BIGINT, r.str_field::STRING, r.flow_document::STRING);\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         },
-        "default%2Fsimple": {
-          "Query": "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "some-schema%2Fsimple": {
+          "Query": "\n\tCOPY INTO `some-schema`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "ToDelete": [
-            "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>"
+            "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
           ]
         }
       }
@@ -319,12 +319,12 @@
     "state": {
       "mergePatch": true,
       "updated": {
-        "default%2Fduplicate_keys_delta": null,
-        "default%2Fduplicate_keys_delta_exclude_flow_doc": null,
-        "default%2Fduplicate_keys_standard": null,
-        "default%2Fformatted_strings": null,
-        "default%2Fmultiple_types": null,
-        "default%2Fsimple": null
+        "some-schema%2Fduplicate_keys_delta": null,
+        "some-schema%2Fduplicate_keys_delta_exclude_flow_doc": null,
+        "some-schema%2Fduplicate_keys_standard": null,
+        "some-schema%2Fformatted_strings": null,
+        "some-schema%2Fmultiple_types": null,
+        "some-schema%2Fsimple": null
       }
     }
   }
@@ -336,7 +336,7 @@
     "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
     "id": 1
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -345,7 +345,7 @@
     "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
     "id": 2
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -354,7 +354,7 @@
     "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
     "id": 3
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -363,7 +363,7 @@
     "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
     "id": 4
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -372,7 +372,7 @@
     "flow_published_at": "2023-07-12 18:19:57.165604+00:00",
     "id": 5
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -381,7 +381,7 @@
     "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
     "id": 6
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -390,7 +390,7 @@
     "flow_published_at": "2023-07-12 18:22:35.841647+00:00",
     "id": 7
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -399,7 +399,7 @@
     "flow_published_at": "2023-07-12 18:22:49.755893+00:00",
     "id": 8
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -408,7 +408,7 @@
     "flow_published_at": "2023-07-12 18:25:35.173533+00:00",
     "id": 9
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -417,7 +417,7 @@
     "flow_published_at": "2023-07-12 18:25:45.520064+00:00",
     "id": 10
   },
-  "table": "`main`.default.simple"
+  "table": "`main`.`some-schema`.simple"
 }
 {
   "row": {
@@ -427,7 +427,7 @@
     "int": 6,
     "str": "str 6"
   },
-  "table": "`main`.default.duplicate_keys_standard"
+  "table": "`main`.`some-schema`.duplicate_keys_standard"
 }
 {
   "row": {
@@ -437,7 +437,7 @@
     "int": 7,
     "str": "str 7"
   },
-  "table": "`main`.default.duplicate_keys_standard"
+  "table": "`main`.`some-schema`.duplicate_keys_standard"
 }
 {
   "row": {
@@ -447,7 +447,7 @@
     "int": 8,
     "str": "str 8"
   },
-  "table": "`main`.default.duplicate_keys_standard"
+  "table": "`main`.`some-schema`.duplicate_keys_standard"
 }
 {
   "row": {
@@ -457,7 +457,7 @@
     "int": 9,
     "str": "str 9"
   },
-  "table": "`main`.default.duplicate_keys_standard"
+  "table": "`main`.`some-schema`.duplicate_keys_standard"
 }
 {
   "row": {
@@ -467,7 +467,7 @@
     "int": 10,
     "str": "str 10"
   },
-  "table": "`main`.default.duplicate_keys_standard"
+  "table": "`main`.`some-schema`.duplicate_keys_standard"
 }
 {
   "row": {
@@ -477,7 +477,7 @@
     "int": 6,
     "str": "str 6"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -487,7 +487,7 @@
     "int": 7,
     "str": "str 7"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -497,7 +497,7 @@
     "int": 8,
     "str": "str 8"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -507,7 +507,7 @@
     "int": 9,
     "str": "str 9"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -517,7 +517,7 @@
     "int": 10,
     "str": "str 10"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -527,7 +527,7 @@
     "int": 1,
     "str": "str 1"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -537,7 +537,7 @@
     "int": 2,
     "str": "str 2"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -547,7 +547,7 @@
     "int": 3,
     "str": "str 3"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -557,7 +557,7 @@
     "int": 4,
     "str": "str 4"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -567,7 +567,7 @@
     "int": 5,
     "str": "str 5"
   },
-  "table": "`main`.default.duplicate_keys_delta"
+  "table": "`main`.`some-schema`.duplicate_keys_delta"
 }
 {
   "row": {
@@ -576,7 +576,7 @@
     "int": 6,
     "str": "str 6"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -585,7 +585,7 @@
     "int": 7,
     "str": "str 7"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -594,7 +594,7 @@
     "int": 8,
     "str": "str 8"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -603,7 +603,7 @@
     "int": 9,
     "str": "str 9"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -612,7 +612,7 @@
     "int": 10,
     "str": "str 10"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -621,7 +621,7 @@
     "int": 1,
     "str": "str 1"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -630,7 +630,7 @@
     "int": 2,
     "str": "str 2"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -639,7 +639,7 @@
     "int": 3,
     "str": "str 3"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -648,7 +648,7 @@
     "int": 4,
     "str": "str 4"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -657,7 +657,7 @@
     "int": 5,
     "str": "str 5"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.`some-schema`.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -672,7 +672,7 @@
     "nullable_int": "",
     "str_field": "str1"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -687,7 +687,7 @@
     "nullable_int": 2,
     "str_field": "str2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -702,7 +702,7 @@
     "nullable_int": "",
     "str_field": "str3"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -717,7 +717,7 @@
     "nullable_int": 4,
     "str_field": "str4"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -732,7 +732,7 @@
     "nullable_int": "",
     "str_field": "str5"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -747,7 +747,7 @@
     "nullable_int": 6,
     "str_field": "str6 v2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -762,7 +762,7 @@
     "nullable_int": "",
     "str_field": "str7 v2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -777,7 +777,7 @@
     "nullable_int": 8,
     "str_field": "str8 v2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -792,7 +792,7 @@
     "nullable_int": "",
     "str_field": "str9 v2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -807,7 +807,7 @@
     "nullable_int": 10,
     "str_field": "str10 v2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.`some-schema`.multiple_types"
 }
 {
   "row": {
@@ -821,7 +821,7 @@
     "num_str": 30.1,
     "time": "23:59:38.10Z"
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -835,7 +835,7 @@
     "num_str": 40.1,
     "time": "23:59:38Z"
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -849,7 +849,7 @@
     "num_str": 10.1,
     "time": "00:00:00Z"
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -863,7 +863,7 @@
     "num_str": 20.1,
     "time": "14:20:12.33Z"
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -877,7 +877,7 @@
     "num_str": 50.1,
     "time": "23:59:59Z"
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -891,7 +891,7 @@
     "num_str": "",
     "time": ""
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -905,7 +905,7 @@
     "num_str": "inf",
     "time": ""
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "row": {
@@ -919,11 +919,11 @@
     "num_str": "-inf",
     "time": ""
   },
-  "table": "`main`.default.formatted_strings"
+  "table": "`main`.`some-schema`.formatted_strings"
 }
 {
   "applied": {
-    "actionDescription": "UPDATE `default`.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-databricks/materialize';"
+    "actionDescription": "UPDATE `some-schema`.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-databricks/materialize';"
   }
 }
 {
