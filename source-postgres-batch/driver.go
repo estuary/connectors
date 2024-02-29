@@ -611,7 +611,7 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 
 	for ctx.Err() == nil {
 		if err := c.poll(ctx, binding, queryTemplate); err != nil {
-			return fmt.Errorf("error polling table: %w", err)
+			return fmt.Errorf("error polling binding %q: %w", res.Name, err)
 		}
 	}
 	return ctx.Err()
