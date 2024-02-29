@@ -6,12 +6,14 @@
 from abc import ABC
 from itertools import islice
 from typing import Any, Iterable, Mapping, MutableMapping, Optional, Type, Union
+from functools import cache
 
 import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
 from requests.auth import AuthBase
+from http import HTTPStatus
 
 ASANA_ERRORS_MAPPING = {
     402: "This stream is available to premium organizations and workspaces only",
@@ -32,7 +34,11 @@ class AsanaStream(HttpStream, ABC):
     def AsanaStreamType(self) -> Type:
         return self.__class__
 
-    def __init__(self, authenticator: Union[AuthBase, HttpAuthenticator] = None, test_mode: bool = False):
+    def __init__(
+        self,
+        authenticator: Union[AuthBase, HttpAuthenticator] = None,
+        test_mode: bool = False,
+    ):
         super().__init__(authenticator=authenticator)
         self.test_mode = test_mode
 
@@ -50,13 +56,17 @@ class AsanaStream(HttpStream, ABC):
         if delay_time:
             return int(delay_time)
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+    def next_page_token(
+        self, response: requests.Response
+    ) -> Optional[Mapping[str, Any]]:
         decoded_response = response.json()
         next_page = decoded_response.get("next_page")
         if next_page:
             return {"offset": next_page["offset"]}
 
-    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = {"limit": self.page_size}
         params.update(self.get_opt_fields())
         if next_page_token:
@@ -96,12 +106,16 @@ class AsanaStream(HttpStream, ABC):
 
         return prop
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
         # Asana puts records in a container array "data"
         yield from response_json.get("data", [])
 
-    def read_slices_from_records(self, stream_class: AsanaStreamType, slice_field: str) -> Iterable[Optional[Mapping[str, Any]]]:
+    def read_slices_from_records(
+        self, stream_class: AsanaStreamType, slice_field: str
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
         """
         General function for getting parent stream (which should be passed through `stream_class`) slice.
         Generates dicts with `gid` of parent streams.
@@ -110,8 +124,23 @@ class AsanaStream(HttpStream, ABC):
         stream_slices = stream.stream_slices(sync_mode=SyncMode.full_refresh)
 
         for stream_slice in stream_slices:
-            for record in stream.read_records(sync_mode=SyncMode.full_refresh, stream_slice=stream_slice):
+            for record in stream.read_records(
+                sync_mode=SyncMode.full_refresh, stream_slice=stream_slice
+            ):
                 yield {slice_field: record["gid"]}
+
+    @cache  # Caching this method, so we only make this request once
+    def get_current_user_data(self) -> dict:
+        url = f"{self.url_base}users/me"
+
+        auth_header = self.authenticator.get_auth_header()
+        headers = {"Accept": "application/json", **auth_header}
+
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+
+        return data["data"]
 
 
 class WorkspaceRelatedStream(AsanaStream, ABC):
@@ -123,7 +152,9 @@ class WorkspaceRelatedStream(AsanaStream, ABC):
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
         workspaces_stream = Workspaces(authenticator=self.authenticator)
-        for workspace in workspaces_stream.read_records(sync_mode=SyncMode.full_refresh):
+        for workspace in workspaces_stream.read_records(
+            sync_mode=SyncMode.full_refresh
+        ):
             yield {"workspace_gid": workspace["gid"]}
 
 
@@ -133,7 +164,9 @@ class WorkspaceRequestParamsRelatedStream(WorkspaceRelatedStream, ABC):
     So this is basically the whole point of this class - to pass `workspace` as request argument.
     """
 
-    def request_params(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, stream_slice: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = super().request_params(**kwargs)
         params["workspace"] = stream_slice["workspace_gid"]
         return params
@@ -146,7 +179,9 @@ class ProjectRelatedStream(AsanaStream, ABC):
     """
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=Projects, slice_field="project_gid")
+        yield from self.read_slices_from_records(
+            stream_class=Projects, slice_field="project_gid"
+        )
 
 
 class AttachmentsCompact(AsanaStream):
@@ -155,14 +190,20 @@ class AttachmentsCompact(AsanaStream):
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
         return "attachments"
 
-    def request_params(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, stream_slice: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = super().request_params(**kwargs)
         params["parent"] = stream_slice["parent_gid"]
         return params
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=Projects, slice_field="parent_gid")
-        yield from self.read_slices_from_records(stream_class=Tasks, slice_field="parent_gid")
+        yield from self.read_slices_from_records(
+            stream_class=Projects, slice_field="parent_gid"
+        )
+        yield from self.read_slices_from_records(
+            stream_class=Tasks, slice_field="parent_gid"
+        )
 
 
 class Attachments(AsanaStream):
@@ -171,9 +212,13 @@ class Attachments(AsanaStream):
         return f"attachments/{attachment_gid}"
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=AttachmentsCompact, slice_field="attachment_gid")
+        yield from self.read_slices_from_records(
+            stream_class=AttachmentsCompact, slice_field="attachment_gid"
+        )
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
         section_data = response_json.get("data", {})
         if isinstance(section_data, dict):  # Check if section_data is a dictionary
@@ -247,6 +292,7 @@ class Events(AsanaStream):
         yield from self.read_slices_from_records(stream_class=Tasks, slice_field="resource_gid")
 
 
+
 class OrganizationExports(AsanaStream):
     def __init__(self, organization_export_ids: str, **kwargs):
         super().__init__(**kwargs)
@@ -257,7 +303,12 @@ class OrganizationExports(AsanaStream):
         return f"organization_exports/{organization_export_gid}"
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from [{"organization_export_gid": organization_export_id for organization_export_id in self._organization_export_ids}]
+        yield from [
+            {
+                "organization_export_gid": organization_export_id
+                for organization_export_id in self._organization_export_ids
+            }
+        ]
 
 
 class Projects(WorkspaceRequestParamsRelatedStream):
@@ -271,6 +322,27 @@ class PortfoliosCompact(WorkspaceRequestParamsRelatedStream):
     def path(self, **kwargs) -> str:
         return "portfolios"
 
+    def request_params(
+        self, stream_slice: Optional[dict] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
+        params = super().request_params(stream_slice=stream_slice, **kwargs)
+
+        user_data = self.get_current_user_data()
+        params["owner"] = user_data.get("gid")
+
+        return params
+
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
+        payload = response.json()
+
+        # Handle case of non-paid users
+        if response.status_code == HTTPStatus.PAYMENT_REQUIRED:
+            yield from []
+        else:
+            yield from payload.get("data", [])
+
 
 class Portfolios(AsanaStream):
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
@@ -278,9 +350,16 @@ class Portfolios(AsanaStream):
         return f"portfolios/{portfolio_gid}"
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=PortfoliosCompact, slice_field="portfolio_gid")
+        yield from self.read_slices_from_records(
+            stream_class=PortfoliosCompact, slice_field="portfolio_gid"
+        )
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
+        # Handle case of non-paid users
+        if response.status_code == HTTPStatus.PAYMENT_REQUIRED:
+            return []
         response_json = response.json()
         section_data = response_json.get("data", {})
         if isinstance(section_data, dict):  # Check if section_data is a dictionary
@@ -294,12 +373,27 @@ class PortfoliosMemberships(AsanaStream):
         return "portfolio_memberships"
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=PortfoliosCompact, slice_field="portfolio_gid")
+        yield from self.read_slices_from_records(
+            stream_class=PortfoliosCompact, slice_field="portfolio_gid"
+        )
 
-    def request_params(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, stream_slice: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_slice=stream_slice, **kwargs)
         params["portfolio"] = stream_slice["porfolio_gid"]
         return params
+
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
+        payload = response.json()
+
+        # Handle case of non-paid users
+        if response.status_code == HTTPStatus.PAYMENT_REQUIRED:
+            yield from []
+        else:
+            yield from payload.get("data", [])
 
 
 class SectionsCompact(ProjectRelatedStream):
@@ -316,9 +410,13 @@ class Sections(AsanaStream):
         return f"sections/{section_gid}"
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=SectionsCompact, slice_field="section_gid")
+        yield from self.read_slices_from_records(
+            stream_class=SectionsCompact, slice_field="section_gid"
+        )
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
         section_data = response_json.get("data", {})
         if isinstance(section_data, dict):  # Check if section_data is a dictionary
@@ -337,9 +435,16 @@ class StoriesCompact(AsanaStream):
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
         # This streams causes tests to timeout (> 2hrs), so we limit stream slices to 100 to make tests less noisy
         if self.test_mode:
-            yield from islice(self.read_slices_from_records(stream_class=Tasks, slice_field="task_gid"), 100)
+            yield from islice(
+                self.read_slices_from_records(
+                    stream_class=Tasks, slice_field="task_gid"
+                ),
+                100,
+            )
         else:
-            yield from self.read_slices_from_records(stream_class=Tasks, slice_field="task_gid")
+            yield from self.read_slices_from_records(
+                stream_class=Tasks, slice_field="task_gid"
+            )
 
 
 class Stories(AsanaStream):
@@ -350,11 +455,20 @@ class Stories(AsanaStream):
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
         # This streams causes tests to timeout (> 2hrs), so we limit stream slices to 100 to make tests less noisy
         if self.test_mode:
-            yield from islice(self.read_slices_from_records(stream_class=StoriesCompact, slice_field="story_gid"), 100)
+            yield from islice(
+                self.read_slices_from_records(
+                    stream_class=StoriesCompact, slice_field="story_gid"
+                ),
+                100,
+            )
         else:
-            yield from self.read_slices_from_records(stream_class=StoriesCompact, slice_field="story_gid")
+            yield from self.read_slices_from_records(
+                stream_class=StoriesCompact, slice_field="story_gid"
+            )
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
         section_data = response_json.get("data", {})
         if isinstance(section_data, dict):  # Check if section_data is a dictionary
@@ -374,7 +488,9 @@ class Tasks(ProjectRelatedStream):
     def path(self, **kwargs) -> str:
         return "tasks"
 
-    def request_params(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, stream_slice: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_slice=stream_slice, **kwargs)
         params["project"] = stream_slice["project_gid"]
         return params
@@ -402,7 +518,9 @@ class TeamMemberships(AsanaStream):
         return f"teams/{team_gid}/team_memberships"
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(stream_class=Teams, slice_field="team_gid")
+        yield from self.read_slices_from_records(
+            stream_class=Teams, slice_field="team_gid"
+        )
 
 
 class Users(WorkspaceRequestParamsRelatedStream):
