@@ -91,6 +91,10 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	} else {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
+
+	if _, err := conn.Execute("SELECT true;"); err != nil {
+		return nil, fmt.Errorf("error executing no-op query: %w", err)
+	}
 	return conn, nil
 }
 
