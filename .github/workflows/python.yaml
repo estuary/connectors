@@ -1,0 +1,88 @@
+name: Python Connectors
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "estuary-cdk/**"
+      - "source-asana/**"
+      - "source-google-sheets-native/**"
+      - "source-hubspot-native/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "estuary-cdk/**"
+      - "source-asana/**"
+      - "source-google-sheets-native/**"
+      - "source-hubspot-native/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  py_connector:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        connector:
+          - name: source-asana
+            type: capture
+            version: v1
+          - name: source-hubspot-native
+            type: capture
+            version: v1
+          - name: source-google-sheets-native
+            type: capture
+            version: v1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Common Setup
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          gcp_service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: ${{ matrix.connector.name }} tests
+        run: |
+          cd ${{ matrix.connector.name }}
+          poetry install
+          source $(poetry env info --path)/bin/activate
+          cd ..
+          pytest ${{ matrix.connector.name }}
+
+      - name: Build ${{ matrix.connector.name }} Docker Image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: estuary-cdk/common.Dockerfile
+          load: true
+          build-args: |
+            CONNECTOR_NAME=${{ matrix.connector.name }}
+            CONNECTOR_TYPE=${{ matrix.connector.type }}
+          tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+
+      - name: Deployment
+        uses: ./.github/actions/deploy
+        with:
+          connector: ${{ matrix.connector.name }}
+          pg_database: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
+          pg_host: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
+          pg_password: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
+          pg_user: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          tag_sha: ${{ steps.setup.outputs.tag_sha }}
+          tag_version: ${{ matrix.connector.version }}
+          variants: ${{ matrix.connector.variants }}
