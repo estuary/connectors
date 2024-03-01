@@ -3,6 +3,7 @@ from flow_sdk import shim_airbyte_cdk
 from .source_hubspot import SourceHubspot
 
 scopes = [
+    "oauth",
     "forms",
     "files",
     "tickets",
