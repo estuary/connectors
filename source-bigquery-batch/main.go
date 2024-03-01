@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -66,6 +67,10 @@ func translateBigQueryValue(val any, fieldType bigquery.FieldType) (any, error) 
 	case string:
 		if fieldType == "JSON" && json.Valid([]byte(val)) {
 			return json.RawMessage([]byte(val)), nil
+		}
+	case float64:
+		if math.IsNaN(val) {
+			return "NaN", nil
 		}
 	}
 	return val, nil
