@@ -52,6 +52,7 @@ shim_airbyte_cdk.CaptureShim(
         ),
         "accessTokenResponseMap": {
             "refresh_token": "/refresh_token",
+            "access_token": "/access_token"
         },
     },
     usesSchemaInference=False,
