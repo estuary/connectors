@@ -270,7 +270,7 @@ def discovered(
         if isinstance(resource.model, Resource.FixedSchema):
             schema = resource.model.value
         else:
-            schema = resource.model.model_json_schema()
+            schema = resource.model.model_json_schema(mode='serialization')
 
         if resource.schema_inference:
             schema["x-infer-schema"] = True
