@@ -24,13 +24,6 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
-            },
-            "uuid": {
-              "default": "00000000-0000-0000-0000-000000000000",
-              "description": "UUID of the Document",
-              "format": "uuid",
-              "title": "Uuid",
-              "type": "string"
             }
           },
           "required": [
@@ -50,8 +43,7 @@
           ],
           "default": {
             "op": "u",
-            "row_id": -1,
-            "uuid": "00000000-0000-0000-0000-000000000000"
+            "row_id": -1
           },
           "description": "Document metadata"
         }
@@ -89,13 +81,6 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
-            },
-            "uuid": {
-              "default": "00000000-0000-0000-0000-000000000000",
-              "description": "UUID of the Document",
-              "format": "uuid",
-              "title": "Uuid",
-              "type": "string"
             }
           },
           "required": [
@@ -115,8 +100,7 @@
           ],
           "default": {
             "op": "u",
-            "row_id": -1,
-            "uuid": "00000000-0000-0000-0000-000000000000"
+            "row_id": -1
           },
           "description": "Document metadata"
         }

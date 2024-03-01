@@ -14,7 +14,6 @@ from typing import (
     Literal,
     TypeVar,
 )
-from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
@@ -55,7 +54,6 @@ class BaseDocument(BaseModel):
             default=-1,
             description="Row ID of the Document, counting up from zero, or -1 if not known",
         )
-        uuid: UUID = Field(default=UUID(int=0), description="UUID of the Document")
 
     meta_: Meta = Field(
         default=Meta(op="u"), alias="_meta", description="Document metadata"
