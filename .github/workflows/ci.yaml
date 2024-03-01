@@ -6,16 +6,13 @@ concurrency:
 
 on:
   push:
-    # TODO: Remove jshearer/python_connector_testing before merging
-    branches: [main, jshearer/python_connector_testing]
+    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
   build_base_image:
     runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
     steps:
       - uses: actions/checkout@v2
         with:
@@ -119,9 +116,6 @@ jobs:
             connector_type: capture
             python: true
           - connector: source-shopify
-            connector_type: capture
-            python: true
-          - connector: source-asana
             connector_type: capture
             python: true
           - connector: source-airtable

@@ -1,0 +1,78 @@
+name: Common Deployment Steps
+description: Implements common deployment steps of all connector workflows
+inputs:
+  connector:
+    description: Image name of this connector.
+    required: true
+  pg_database:
+    description: Postgres database to use.
+    required: true
+  pg_host:
+    description: Postgres host to use.
+    required: true
+  pg_password:
+    description: Postgres password to use.
+    required: true
+  pg_user:
+    description: Postgres user to use.
+    required: true
+  tag_sha:
+    description: Short tag of the commit SHA1, such as 'f32dc1a'.
+    required: true
+  tag_version:
+    description: Version tag of the connector, such as `v1`.
+    required: true
+  variants:
+    description: Space-separated variant image names of this connector.
+    default: ''
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Push ${{ inputs.connector }} ${{ inputs.variants }} image(s) with commit SHA tag
+      shell: bash
+      run: |
+        for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
+          echo "Building and pushing ${VARIANT}:${{ inputs.tag }}...";
+          docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local \
+                       --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                       --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
+                       --file connector-variant.Dockerfile .;
+          docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};
+        done
+
+    - name: Push ${{ inputs.connector }} image(s) with 'dev' and '${{ inputs.tag_version }}' tags
+      if: ${{ github.event_name == 'push' }}
+      shell: bash
+      run: |
+        for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
+          docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:dev;
+          docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
+
+          docker image push ghcr.io/estuary/${VARIANT}:dev;
+          docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
+        done
+
+    - name: Install psql
+      if: ${{ github.event_name == 'push' }}
+      shell: bash
+      run: sudo apt install postgresql
+
+    - name: Refresh connector tags for ${{ inputs.connector }}
+      if: ${{ github.event_name == 'push' }}
+      shell: bash
+      env:
+        PGDATABASE: ${{ inputs.pg_database }}
+        PGHOST: ${{ inputs.pg_host }}
+        PGPASSWORD: ${{ inputs.pg_password }}
+        PGUSER: ${{ inputs.pg_user }}
+      run: |
+        for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
+          echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                  WHERE connector_id IN (
+                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${VARIANT}'
+                  ) AND image_tag IN (':${{ inputs.tag_version }}', ':dev');" | psql;
+        done
+
