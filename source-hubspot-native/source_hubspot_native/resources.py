@@ -1,10 +1,11 @@
 from datetime import datetime, UTC, timedelta
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Awaitable, Iterable
 from logging import Logger
 import functools
 
 from estuary_cdk.flow import CaptureBinding
-from estuary_cdk.capture import Task, common
+from estuary_cdk.capture import Task
+from estuary_cdk.capture.common import Resource, LogCursor, PageCursor, open_binding
 from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 
 from .models import (
@@ -35,11 +36,10 @@ from .api import (
 )
 
 
-
 async def all_resources(
-    http: HTTPMixin, config: EndpointConfig, logger: Logger
-) -> list[common.Resource]:
-    http.token_source = TokenSource(spec=OAUTH2_SPEC, credentials=config.credentials)
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[Resource]:
+    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     return [
         crm_object(Company, http, fetch_recent_companies),
         crm_object(Contact, http, fetch_recent_contacts),
@@ -52,7 +52,7 @@ async def all_resources(
 
 def crm_object(
     cls: type[CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
-) -> common.Resource:
+) -> Resource:
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -60,7 +60,7 @@ def crm_object(
         state: ResourceState,
         task: Task,
     ):
-        common.open_binding(
+        open_binding(
             binding,
             binding_index,
             state,
@@ -71,7 +71,7 @@ def crm_object(
 
     started_at = datetime.now(tz=UTC)
 
-    return common.Resource(
+    return Resource(
         name=cls.NAME,
         key=["/id"],
         model=cls,
@@ -85,9 +85,9 @@ def crm_object(
     )
 
 
-def properties(http: HTTPSession) -> common.Resource:
+def properties(http: HTTPSession) -> Resource:
 
-    async def snapshot(logger: Logger) -> AsyncGenerator[Property, None]:
+    async def snapshot(log: Logger) -> AsyncGenerator[Property, None]:
         classes: list[type[BaseCRMObject]] = [
             Company,
             Contact,
@@ -96,7 +96,7 @@ def properties(http: HTTPSession) -> common.Resource:
             Ticket,
         ]
         for cls in classes:
-            properties = await fetch_properties(cls, http)
+            properties = await fetch_properties(log, cls, http)
             for prop in properties.results:
                 yield prop
 
@@ -106,7 +106,7 @@ def properties(http: HTTPSession) -> common.Resource:
         state: ResourceState,
         task: Task,
     ):
-        common.open_binding(
+        open_binding(
             binding,
             binding_index,
             state,
@@ -115,7 +115,7 @@ def properties(http: HTTPSession) -> common.Resource:
             tombstone=Property(_meta=Property.Meta(op="d")),
         )
 
-    return common.Resource(
+    return Resource(
         name=Names.properties,
         key=["/_meta/row_id"],
         model=Property,

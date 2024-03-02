@@ -22,6 +22,7 @@ from .models import (
     ResourceConfig,
 )
 
+
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
     HTTPMixin,
@@ -29,7 +30,7 @@ class Connector(
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
-    async def spec(self, _: request.Spec, logger: Logger) -> ConnectorSpec:
+    async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
             documentationUrl="https://docs.estuary.dev",
@@ -39,25 +40,31 @@ class Connector(
         )
 
     async def discover(
-        self, discover: request.Discover[EndpointConfig], logger: Logger
+        self,
+        log: Logger,
+        discover: request.Discover[EndpointConfig],
     ) -> response.Discovered[ResourceConfig]:
-        resources = await all_resources(self, discover.config, logger)
+        resources = await all_resources(log, self, discover.config)
         return common.discovered(resources)
 
     async def validate(
         self,
+        log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
-        logger: Logger,
     ) -> response.Validated:
-        resources = await all_resources(self, validate.config, logger)
-        resolved = common.resolve_bindings(validate.bindings, resources, resource_term="Sheet")
+        resources = await all_resources(log, self, validate.config)
+        resolved = common.resolve_bindings(
+            validate.bindings, resources, resource_term="Sheet"
+        )
         return common.validated(resolved)
 
     async def open(
         self,
+        log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
-        logger: Logger,
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-        resources = await all_resources(self, open.capture.config, logger)
-        resolved = common.resolve_bindings(open.capture.bindings, resources, resource_term="Sheet")
+        resources = await all_resources(log, self, open.capture.config)
+        resolved = common.resolve_bindings(
+            open.capture.bindings, resources, resource_term="Sheet"
+        )
         return common.open(open, resolved)

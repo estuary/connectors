@@ -27,12 +27,14 @@ from .models import (
 HUB = "https://api.hubapi.com"
 
 
-async def fetch_properties(cls: type[CRMObject], http: HTTPSession) -> Properties:
+async def fetch_properties(
+    log: Logger, cls: type[CRMObject], http: HTTPSession
+) -> Properties:
     if p := getattr(cls, "CACHED_PROPERTIES", None):
         return p
 
     url = f"{HUB}/crm/v3/properties/{cls.NAME}"
-    cls.CACHED_PROPERTIES = Properties.model_validate_json(await http.request(url))
+    cls.CACHED_PROPERTIES = Properties.model_validate_json(await http.request(log, url))
     for p in cls.CACHED_PROPERTIES.results:
         p.hubspotObject = cls.NAME
 
@@ -40,15 +42,17 @@ async def fetch_properties(cls: type[CRMObject], http: HTTPSession) -> Propertie
 
 
 async def fetch_page(
+    # Closed over via functools.partial:
     cls: type[CRMObject],
     http: HTTPSession,
+    # Remainder is common.FetchPageFn:
+    log: Logger,
     page: str | None,
     cutoff: datetime,
-    logger: Logger,
 ) -> tuple[Iterable[CRMObject], str | None]:
 
     url = f"{HUB}/crm/v3/objects/{cls.NAME}"
-    properties = await fetch_properties(cls, http)
+    properties = await fetch_properties(log, cls, http)
     property_names = ",".join(p.name for p in properties.results if not p.calculated)
 
     input = {
@@ -62,7 +66,7 @@ async def fetch_page(
 
     _cls: Any = cls  # Silence mypy false-positive.
     result: PageResult[CRMObject] = PageResult[_cls].model_validate_json(
-        await http.request(url, method="GET", params=input)
+        await http.request(log, url, method="GET", params=input)
     )
 
     return (
@@ -72,13 +76,14 @@ async def fetch_page(
 
 
 async def fetch_batch(
+    log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
     ids: Iterable[str],
 ) -> BatchResult[CRMObject]:
 
     url = f"{HUB}/crm/v3/objects/{cls.NAME}/batch/read"
-    properties = await fetch_properties(cls, http)
+    properties = await fetch_properties(log, cls, http)
     property_names = [p.name for p in properties.results if not p.calculated]
 
     input = {
@@ -89,11 +94,12 @@ async def fetch_batch(
 
     _cls: Any = cls  # Silence mypy false-positive.
     return BatchResult[_cls].model_validate_json(
-        await http.request(url, method="POST", json=input)
+        await http.request(log, url, method="POST", json=input)
     )
 
 
 async def fetch_association(
+    log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
     ids: Iterable[str],
@@ -103,20 +109,24 @@ async def fetch_association(
     input = {"inputs": [{"id": id} for id in ids]}
 
     return BatchResult[Association].model_validate_json(
-        await http.request(url, method="POST", json=input)
+        await http.request(log, url, method="POST", json=input)
     )
 
 
 async def fetch_batch_with_associations(
+    log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
     ids: list[str],
 ) -> BatchResult[CRMObject]:
 
     batch, all_associated = await asyncio.gather(
-        fetch_batch(cls, http, ids),
+        fetch_batch(log, cls, http, ids),
         asyncio.gather(
-            *(fetch_association(cls, http, ids, e) for e in cls.ASSOCIATED_ENTITIES)
+            *(
+                fetch_association(log, cls, http, ids, e)
+                for e in cls.ASSOCIATED_ENTITIES
+            )
         ),
     )
     # Index CRM records so we can attach associations.
@@ -134,7 +144,7 @@ async def fetch_batch_with_associations(
 
 
 FetchRecentFn = Callable[
-    [HTTPSession, datetime, PageCursor],
+    [Logger, HTTPSession, datetime, PageCursor],
     Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
 ]
 """
@@ -149,11 +159,13 @@ that's as-old or older than the datetime cursor.
 
 
 async def fetch_changes(
+    # Closed over via functools.partial:
     cls: type[CRMObject],
     fetch_recent: FetchRecentFn,
     http: HTTPSession,
+    # Remainder is common.FetchChangesFn:
+    log: Logger,
     log_cursor: LogCursor,
-    logger: Logger,
 ) -> AsyncGenerator[CRMObject | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
@@ -163,7 +175,7 @@ async def fetch_changes(
     next_page: PageCursor = None
 
     while True:
-        iter, next_page = await fetch_recent(http, log_cursor, next_page)
+        iter, next_page = await fetch_recent(log, http, log_cursor, next_page)
 
         for ts, id in iter:
             if ts > log_cursor:
@@ -180,7 +192,7 @@ async def fetch_changes(
         batch = list(batch_it)
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-            cls, http, [id for _, id in batch]
+            log, cls, http, [id for _, id in batch]
         )
         for doc in documents.results:
             yield doc
@@ -190,14 +202,14 @@ async def fetch_changes(
 
 
 async def fetch_recent_companies(
-    http: HTTPSession, since: datetime, page: PageCursor
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/companies/v2/companies/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
     result = OldRecentCompanies.model_validate_json(
-        await http.request(url, params=params)
+        await http.request(log, url, params=params)
     )
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
@@ -206,14 +218,14 @@ async def fetch_recent_companies(
 
 
 async def fetch_recent_contacts(
-    http: HTTPSession, since: datetime, page: PageCursor
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/contacts/v1/lists/recently_updated/contacts/recent"
     params = {"count": 100, "timeOffset": page} if page else {"count": 1}
 
     result = OldRecentContacts.model_validate_json(
-        await http.request(url, params=params)
+        await http.request(log, url, params=params)
     )
     return (
         (_ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
@@ -222,13 +234,15 @@ async def fetch_recent_contacts(
 
 
 async def fetch_recent_deals(
-    http: HTTPSession, since: datetime, page: PageCursor
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/deals/v1/deal/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
-    result = OldRecentDeals.model_validate_json(await http.request(url, params=params))
+    result = OldRecentDeals.model_validate_json(
+        await http.request(log, url, params=params)
+    )
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
         for r in result.results
@@ -236,14 +250,14 @@ async def fetch_recent_deals(
 
 
 async def fetch_recent_engagements(
-    http: HTTPSession, since: datetime, page: PageCursor
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/engagements/v1/engagements/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
     result = OldRecentEngagements.model_validate_json(
-        await http.request(url, params=params)
+        await http.request(log, url, params=params)
     )
     return (
         (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
@@ -252,14 +266,14 @@ async def fetch_recent_engagements(
 
 
 async def fetch_recent_tickets(
-    http: HTTPSession, since: datetime, cursor: PageCursor
+    log: Logger, http: HTTPSession, since: datetime, cursor: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/crm-objects/v1/change-log/tickets"
     params = {"timestamp": int(since.timestamp() * 1000) - 1}
 
     result = TypeAdapter(list[OldRecentTicket]).validate_json(
-        await http.request(url, params=params)
+        await http.request(log, url, params=params)
     )
     return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 

@@ -96,15 +96,18 @@ class CaptureShim(BaseCaptureConnector):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
     async def _all_resources(
-        self, config: EndpointConfig, logger: Logger
+        self, log: Logger, config: EndpointConfig
     ) -> list[common.Resource[Document, ResourceConfig, ResourceState]]:
-        catalog = self.delegate.discover(logger, config)
+        logging.getLogger("airbyte").setLevel(log.level)
+        catalog = self.delegate.discover(log, config)
 
         resources: list[common.Resource[Any, ResourceConfig, ResourceState]] = []
 
         for stream in catalog.streams:
 
-            resource_config = ResourceConfig(stream=stream.name, syncMode="full_refresh")
+            resource_config = ResourceConfig(
+                stream=stream.name, syncMode="full_refresh"
+            )
 
             if AirbyteSyncMode.incremental in stream.supported_sync_modes:
                 resource_config.sync_mode = "incremental"
@@ -160,8 +163,9 @@ class CaptureShim(BaseCaptureConnector):
 
         return resources
 
-    async def spec(self, _: request.Spec, logger: Logger) -> ConnectorSpec:
-        spec = self.delegate.spec(logger)
+    async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
+        logging.getLogger("airbyte").setLevel(log.level)
+        spec = self.delegate.spec(log)
 
         return ConnectorSpec(
             configSchema=spec.connectionSpecification,
@@ -172,31 +176,31 @@ class CaptureShim(BaseCaptureConnector):
         )
 
     async def discover(
-        self, discover: request.Discover[EndpointConfig], logger: Logger
+        self, log: Logger, discover: request.Discover[EndpointConfig],
     ) -> response.Discovered:
-        resources = await self._all_resources(discover.config, logger)
+        resources = await self._all_resources(log, discover.config)
         return common.discovered(resources)
 
     async def validate(
-        self, validate: request.Validate[EndpointConfig, ResourceConfig], logger: Logger
+        self, log: Logger, validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
 
-        result = self.delegate.check(logger, validate.config)
+        result = self.delegate.check(log, validate.config)
         if result.status != AirbyteStatus.SUCCEEDED:
             raise ValidationError([f"{result.message}"])
 
-        resources = await self._all_resources(validate.config, logger)
+        resources = await self._all_resources(log, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
 
         return common.validated(resolved)
 
     async def open(
         self,
+        log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
-        logger: Logger,
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
 
-        resources = await self._all_resources(open.capture.config, logger)
+        resources = await self._all_resources(log, open.capture.config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
 
         async def _run(task: Task) -> None:
@@ -253,12 +257,12 @@ class CaptureShim(BaseCaptureConnector):
         ]
 
         for message in self.delegate.read(
-            task.logger, config, airbyte_catalog, airbyte_states
+            task.log, config, airbyte_catalog, airbyte_states
         ):
             if record := message.record:
                 entry = index.get((record.namespace, record.stream), None)
                 if entry is None:
-                    task.logger.warn(
+                    task.log.warn(
                         f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})"
                     )
                     continue
@@ -289,7 +293,7 @@ class CaptureShim(BaseCaptureConnector):
                     None,
                 )
                 if entry is None:
-                    task.logger.warn(
+                    task.log.warn(
                         f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})"
                     )
                     continue
@@ -300,7 +304,7 @@ class CaptureShim(BaseCaptureConnector):
 
             elif trace := message.trace:
                 if error := trace.error:
-                    task.logger.error(
+                    task.log.error(
                         error.message,
                         extra={
                             "internal_message": error.internal_message,
@@ -308,7 +312,7 @@ class CaptureShim(BaseCaptureConnector):
                         },
                     )
                 elif estimate := trace.estimate:
-                    task.logger.info(
+                    task.log.info(
                         "progress estimate",
                         extra={
                             "estimate": {
@@ -321,7 +325,7 @@ class CaptureShim(BaseCaptureConnector):
                         },
                     )
                 elif status := trace.stream_status:
-                    task.logger.info(
+                    task.log.info(
                         "stream status",
                         extra={
                             "status": {
@@ -344,7 +348,7 @@ class CaptureShim(BaseCaptureConnector):
                 else:
                     level = logging.ERROR
 
-                task.logger.log(level, log.message, log.stack_trace)
+                task.log.log(level, log.message, log.stack_trace)
 
             else:
                 raise RuntimeError("unexpected AirbyteMessage", message)
