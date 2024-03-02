@@ -21,7 +21,7 @@ def test_capture(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
 
     for l in lines:
-        typ, rec = l[0], l[1]
+        _collection, record = l[0], l[1]
 
         for m in ["properties", "propertiesWithHistory"]:
             for prop in [
@@ -30,12 +30,8 @@ def test_capture(request, snapshot):
                 "hs_time_in_appointmentscheduled",
                 "hs_time_in_1",
             ]:
-                if rec[m].get(prop):
-                    rec[m][prop] = "redacted"
-
-        # if typ == "acmeCo/property_history":
-        #    rec["timestamp"] = "redacted"
-        #    rec["value"] = "redacted"
+                if record[m].get(prop):
+                    record[m][prop] = "redacted"
 
     assert snapshot("stdout.json") == lines
 

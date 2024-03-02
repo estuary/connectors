@@ -1,43 +1,49 @@
-from pydantic import BaseModel
 from dataclasses import dataclass
-from typing import AsyncGenerator
+from logging import Logger
+from pydantic import BaseModel
+from typing import AsyncGenerator, Any
 import abc
 import aiohttp
 import asyncio
 import base64
-import logging
 import time
 
-from . import Mixin, logger
+from . import Mixin
 from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
 
 
-# HTTPSession is an abstract base class for HTTP clients.
-# Connectors should use this type for typing constraints.
 class HTTPSession(abc.ABC):
-    @abc.abstractmethod
-    def request_stream(
-        self,
-        url: str,
-        method: str = "GET",
-        params=None,
-        json=None,
-        data=None,
-        with_token=True,
-    ) -> AsyncGenerator[bytes, None]: ...
+    """
+    HTTPSession is an abstract base class for an HTTP client implementation.
+    Implementations should manage retries, authorization, and other details.
+    Only "success" responses are returned: failures throw an Exception if
+    they cannot be retried.
+
+    HTTPSession is implemented by HTTPMixin.
+
+    Common parameters of request methods:
+     * `url` to request.
+     * `method` to use (GET, POST, DELETE, etc)
+     * `params` are encoded as URL parameters of the query
+     * `json` is a JSON-encoded request body (if set, `form` cannot be)
+     * `form` is a form URL-encoded request body (if set, `json` cannot be)
+    """
 
     async def request(
         self,
+        log: Logger,
         url: str,
         method: str = "GET",
-        params=None,
-        json=None,
-        data=None,
-        with_token=True,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        form: dict[str, Any] | None = None,
+        _with_token: bool = True,  # Unstable internal API.
     ) -> bytes:
+        """Request a url and return its body as bytes"""
+
         chunks: list[bytes] = []
-        async for chunk in self.request_stream(
-            url, method, params=params, json=json, data=data, with_token=with_token
+        async for chunk in self._request_stream(
+            log, url, method, params, json, form, _with_token
         ):
             chunks.append(chunk)
 
@@ -47,20 +53,22 @@ class HTTPSession(abc.ABC):
             return chunks[0]
         else:
             return b"".join(chunks)
-    
+
     async def request_lines(
         self,
+        log: Logger,
         url: str,
         method: str = "GET",
-        params=None,
-        json=None,
-        data=None,
-        with_token=True,
-        delim=b'\n',
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        form: dict[str, Any] | None = None,
+        delim: bytes = b"\n",
     ) -> AsyncGenerator[bytes, None]:
-        buffer = b''
-        async for chunk in self.request_stream(
-            url, method, params=params, json=json, data=data, with_token=with_token
+        """Request a url and return its response as streaming lines, as they arrive"""
+
+        buffer = b""
+        async for chunk in self._request_stream(
+            log, url, method, params, json, form, True
         ):
             buffer += chunk
             while delim in buffer:
@@ -69,8 +77,23 @@ class HTTPSession(abc.ABC):
 
         if buffer:
             yield buffer
-        
+
         return
+
+    @abc.abstractmethod
+    def _request_stream(
+        self,
+        log: Logger,
+        url: str,
+        method: str,
+        params: dict[str, Any] | None,
+        json: dict[str, Any] | None,
+        form: dict[str, Any] | None,
+        _with_token: bool,
+    ) -> AsyncGenerator[bytes, None]: ...
+        # TODO(johnny): This is an unstable API.
+        # It may need to accept request headers, or surface response headers,
+        # or we may refactor TokenSource, etc.
 
 
 @dataclass
@@ -83,12 +106,12 @@ class TokenSource:
         refresh_token: str = ""
         scope: str = ""
 
-    spec: OAuth2Spec
+    oauth_spec: OAuth2Spec | None
     credentials: BaseOAuth2Credentials | AccessToken | BasicAuth
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
 
-    async def fetch_token(self, session: HTTPSession) -> tuple[str, str]:
+    async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
         if isinstance(self.credentials, AccessToken):
             return ("Bearer", self.credentials.access_token)
         elif isinstance(self.credentials, BasicAuth):
@@ -109,34 +132,55 @@ class TokenSource:
                 return ("Bearer", self._access_token.access_token)
 
         self._fetched_at = int(current_time)
-        self._access_token = await self._fetch_oauth2_token(session, self.credentials)
+        self._access_token = await self._fetch_oauth2_token(
+            log, session, self.credentials
+        )
 
-        logger.debug(
+        log.debug(
             "fetched OAuth2 access token",
             {"at": self._fetched_at, "expires_in": self._access_token.expires_in},
         )
         return ("Bearer", self._access_token.access_token)
 
     async def _fetch_oauth2_token(
-        self, session: HTTPSession, credentials: BaseOAuth2Credentials
+        self, log: Logger, session: HTTPSession, credentials: BaseOAuth2Credentials
     ) -> AccessTokenResponse:
+        assert self.oauth_spec
+ 
         response = await session.request(
-            self.spec.accessTokenUrlTemplate,
+            log,
+            self.oauth_spec.accessTokenUrlTemplate,
             method="POST",
-            data={
+            form={
                 "grant_type": "refresh_token",
                 "client_id": credentials.client_id,
                 "client_secret": credentials.client_secret,
                 "refresh_token": credentials.refresh_token,
             },
-            with_token=False,
+            _with_token=False,
         )
         return self.AccessTokenResponse.model_validate_json(response)
 
 
 class RateLimiter:
-    gain: float = 0.01
+    """
+    RateLimiter maintains a `delay` parameter, which is the number of seconds
+    to wait before issuing an HTTP request. It attempts to achieve a low rate
+    of HTTP 429 (Rate Limit Exceeded) errors (under 5%) while fully utilizing
+    the available rate limit without excessively long delays due to more
+    traditional exponential back-off strategies.
+
+    As requests are made, RateLimiter.update() is called to dynamically adjust
+    the `delay` parameter, decreasing it as successful request occur and
+    increasing it as HTTP 429 (Rate Limit Exceeded) failures are reported.
+
+    It initially uses quadratic decrease of `delay` until a first failure is
+    encountered. Additional failures result in quadratic increase, while
+    successes apply a linear decay.
+    """
+
     delay: float = 1.0
+    gain: float = 0.01
 
     failed: int = 0
     total: int = 0
@@ -148,71 +192,43 @@ class RateLimiter:
         if failed:
             update = max(cur_delay * 4.0, 0.1)
             self.failed += 1
-
-            if self.failed / self.total > 0.05:
-                logger.warning(
-                    "rate limit exceeded",
-                    {
-                        "total": self.total,
-                        "failed": self.failed,
-                        "delay": self.delay,
-                        "update": update,
-                    },
-                )
-
         elif self.failed == 0:
             update = cur_delay / 2.0
-
-            # logger.debug(
-            #    "rate limit fast-start",
-            #    {
-            #        "total": self.total,
-            #        "failed": self.failed,
-            #        "delay": self.delay,
-            #        "update": update,
-            #    },
-            # )
-
         else:
             update = cur_delay * (1 - self.gain)
 
-            # logger.debug(
-            #     "rate limit decay",
-            #    {
-            #        "total": self.total,
-            #        "failed": self.failed,
-            #        "delay": self.delay,
-            #        "update": update,
-            #    },
-            # )
-
         self.delay = (1 - self.gain) * self.delay + self.gain * update
+
+    @property
+    def error_ratio(self) -> float:
+        return self.failed / self.total
 
 
 # HTTPMixin is an opinionated implementation of HTTPSession.
 class HTTPMixin(Mixin, HTTPSession):
 
     inner: aiohttp.ClientSession
-    token_source: TokenSource | None = None
     rate_limiter: RateLimiter
+    token_source: TokenSource | None = None
 
-    async def _mixin_enter(self, logger: logging.Logger):
+    async def _mixin_enter(self, _: Logger):
         self.inner = aiohttp.ClientSession()
         self.rate_limiter = RateLimiter()
         return self
 
-    async def _mixin_exit(self, logger: logging.Logger):
+    async def _mixin_exit(self, _: Logger):
         await self.inner.close()
         return self
 
-    async def request_stream(
+    async def _request_stream(
         self,
+        log: Logger,
         url: str,
-        method: str = "GET",
-        params=None,
-        json=None,
-        data=None,
-        with_token=True,
+        method: str,
+        params: dict[str, Any] | None,
+        json: dict[str, Any] | None,
+        form: dict[str, Any] | None,
+        _with_token: bool,
     ) -> AsyncGenerator[bytes, None]:
         while True:
 
@@ -220,14 +236,14 @@ class HTTPMixin(Mixin, HTTPSession):
             await asyncio.sleep(cur_delay)
 
             headers = {}
-            if with_token and self.token_source is not None:
-                token_type, token = await self.token_source.fetch_token(self)
+            if _with_token and self.token_source is not None:
+                token_type, token = await self.token_source.fetch_token(log, self)
                 headers["Authorization"] = f"{token_type} {token}"
 
             async with self.inner.request(
                 headers=headers,
                 json=json,
-                data=data,
+                data=form,
                 method=method,
                 params=params,
                 url=url,
@@ -236,11 +252,15 @@ class HTTPMixin(Mixin, HTTPSession):
                 self.rate_limiter.update(cur_delay, resp.status == 429)
 
                 if resp.status == 429:
-                    pass
+                    if self.rate_limiter.failed / self.rate_limiter.total > 0.05:
+                        log.warning(
+                            "rate limit errors are elevated",
+                            { "limiter": self.rate_limiter },
+                        )
 
                 elif resp.status >= 500 and resp.status < 600:
                     body = await resp.read()
-                    logger.warning(
+                    log.warning(
                         "server internal error (will retry)",
                         {"body": body.decode("utf-8")},
                     )

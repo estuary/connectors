@@ -56,11 +56,3 @@ runs:
 
     - name: Set up GCloud SDK
       uses: google-github-actions/setup-gcloud@v2
-
-#    - name: Set up Cloud SDK
-#      if: ${{ inputs.gcp_project_id }}
-#      uses: google-github-actions/setup-gcloud@v0
-#      with:
-#        project_id: ${{ inputs.gcp_project_id }}
-#        service_account_key: ${{ inputs.gcp_service_account_key }}
-#        export_default_credentials: true
