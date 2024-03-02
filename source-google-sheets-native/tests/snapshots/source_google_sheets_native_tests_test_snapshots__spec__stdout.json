@@ -93,19 +93,6 @@
           "title": "Name",
           "type": "string"
         },
-        "namespace": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Enclosing schema namespace of this resource",
-          "title": "Namespace"
-        },
         "interval": {
           "default": "PT0S",
           "description": "Interval between updates for this resource",
@@ -134,7 +121,6 @@
       }
     },
     "resourcePathPointers": [
-      "/schema",
       "/name"
     ]
   }

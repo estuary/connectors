@@ -81,20 +81,20 @@ _BaseResourceConfig = TypeVar("_BaseResourceConfig", bound=BaseResourceConfig)
 class ResourceConfig(BaseResourceConfig):
     """ResourceConfig is a common resource configuration shape."""
 
-    PATH_POINTERS: ClassVar[list[str]] = ["/schema", "/name"]
+    PATH_POINTERS: ClassVar[list[str]] = ["/name"]
 
     name: str = Field(description="Name of this resource")
-    namespace: str | None = Field(
-        default=None, description="Enclosing schema namespace of this resource"
-    )
     interval: timedelta = Field(
         default=timedelta(), description="Interval between updates for this resource"
     )
 
-    def path(self) -> list[str]:
-        if self.namespace:
-            return [self.namespace, self.name]
+    # NOTE(johnny): If we need a namespace, introduce an ExtResourceConfig (?)
+    # which adds a `namespace` field like:
+    # namespace: str | None = Field(
+    #    default=None, description="Enclosing schema namespace of this resource"
+    # )
 
+    def path(self) -> list[str]:
         return [self.name]
 
 
