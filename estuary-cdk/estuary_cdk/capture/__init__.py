@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from pydantic import Field
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
+from logging import Logger
 import abc
 import asyncio
-import logging
 import shutil
 import sys
 import tempfile
@@ -57,8 +57,8 @@ class Task:
     Task also facilitates logging and graceful stop of a capture coroutine.
     """
 
-    logger: logging.Logger
-    """Attached Logger of this Task instance, to use for non-protocol logging."""
+    log: Logger
+    """Attached Logger of this Task instance, to use for scoped logging."""
 
     @dataclass
     class Stopping:
@@ -89,7 +89,7 @@ class Task:
 
     def __init__(
         self,
-        logger: logging.Logger,
+        log: Logger,
         name: str,
         output: BinaryIO,
         stopping: Stopping,
@@ -100,7 +100,7 @@ class Task:
         self._name = name
         self._output = output
         self._tg = tg
-        self.logger = logger
+        self.log = log
         self.stopping = stopping
 
     def captured(self, binding: int, document: Any):
@@ -148,13 +148,13 @@ class Task:
         """
 
         child_name = f"{self._name}.{name_suffix}"
-        child_logger = self.logger.getChild(name_suffix)
+        child_log = self.log.getChild(name_suffix)
 
         async def run_task(parent: Task):
             async with asyncio.TaskGroup() as child_tg:
                 try:
                     t = Task(
-                        child_logger,
+                        child_log,
                         child_name,
                         parent._output,
                         parent.stopping,
@@ -162,7 +162,7 @@ class Task:
                     )
                     await child(t)
                 except Exception as exc:
-                    child_logger.error("".join(traceback.format_exception(exc)))
+                    child_log.error("".join(traceback.format_exception(exc)))
 
                     if parent.stopping.first_error is None:
                         parent.stopping.first_error = exc
@@ -192,37 +192,37 @@ class BaseCaptureConnector(
     output: BinaryIO = sys.stdout.buffer
 
     @abc.abstractmethod
-    async def spec(self, _: request.Spec, logger: logging.Logger) -> ConnectorSpec:
+    async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         raise NotImplementedError()
 
     @abc.abstractmethod
     async def discover(
         self,
+        log: Logger,
         discover: request.Discover[EndpointConfig],
-        logger: logging.Logger,
     ) -> response.Discovered[ResourceConfig]:
         raise NotImplementedError()
 
     @abc.abstractmethod
     async def validate(
         self,
+        log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
-        logger: logging.Logger,
     ) -> response.Validated:
         raise NotImplementedError()
 
     async def apply(
         self,
+        log: Logger,
         apply: request.Apply[EndpointConfig, ResourceConfig],
-        logger: logging.Logger,
     ) -> response.Applied:
         return response.Applied(actionDescription="")
 
     @abc.abstractmethod
     async def open(
         self,
+        log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
-        logger: logging.Logger,
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         raise NotImplementedError()
 
@@ -231,26 +231,26 @@ class BaseCaptureConnector(
 
     async def handle(
         self,
+        log: Logger,
         request: Request[EndpointConfig, ResourceConfig, ConnectorState],
-        logger: logging.Logger,
     ) -> None:
 
         if spec := request.spec:
-            response = await self.spec(spec, logger)
+            response = await self.spec(log, spec)
             response.protocol = 3032023
             self._emit(Response(spec=response))
 
         elif discover := request.discover:
-            self._emit(Response(discovered=await self.discover(discover, logger)))
+            self._emit(Response(discovered=await self.discover(log, discover)))
 
         elif validate := request.validate_:
-            self._emit(Response(validated=await self.validate(validate, logger)))
+            self._emit(Response(validated=await self.validate(log, validate)))
 
         elif apply := request.apply:
-            self._emit(Response(applied=await self.apply(apply, logger)))
+            self._emit(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
-            opened, capture = await self.open(open, logger)
+            opened, capture = await self.open(log, open)
             self._emit(Response(opened=opened))
 
             stopping = Task.Stopping(asyncio.Event())
@@ -267,7 +267,7 @@ class BaseCaptureConnector(
             async with asyncio.TaskGroup() as tg:
 
                 task = Task(
-                    logger.getChild("capture"),
+                    log.getChild("capture"),
                     "capture",
                     self.output,
                     stopping,
