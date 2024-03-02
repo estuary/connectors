@@ -11,8 +11,6 @@ import traceback
 from .logger import init_logger
 from .flow import ValidationError
 
-logger = init_logger()
-
 # Request type served by this connector.
 Request = TypeVar("Request", bound=BaseModel)
 
@@ -34,8 +32,8 @@ async def stdin_jsonl(cls: type[Request]) -> AsyncGenerator[Request, None]:
 # they're entered prior to handling any requests, and exited after all requests have
 # been fully processed.
 class Mixin(abc.ABC):
-    async def _mixin_enter(self, logger: Logger): ...
-    async def _mixin_exit(self, logger: Logger): ...
+    async def _mixin_enter(self, log: Logger): ...
+    async def _mixin_exit(self, log: Logger): ...
 
 
 @dataclass
@@ -46,6 +44,7 @@ class Stopped(Exception):
 
     `error`, if set, is a fatal error condition that caused the connector to exit.
     """
+
     error: str | None
 
 
@@ -64,7 +63,7 @@ class BaseConnector(Generic[Request], abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def handle(self, request: Request, logger: Logger) -> None:
+    async def handle(self, log: Logger, request: Request) -> None:
         raise NotImplementedError()
 
     # Serve this connector by invoking `handle()` for all incoming instances of
@@ -75,11 +74,15 @@ class BaseConnector(Generic[Request], abc.ABC):
     # exit code which indicates whether an error occurred.
     async def serve(
         self,
+        log: Logger | None = None,
         requests: Callable[
             [type[Request]], AsyncGenerator[Request, None]
         ] = stdin_jsonl,
-        logger: Logger = logger,
     ):
+        if not log:
+            log = init_logger()
+
+        assert isinstance(log, Logger)  # Narrow type to non-None.
 
         loop = asyncio.get_running_loop()
         this_task = asyncio.current_task(loop)
@@ -100,7 +103,7 @@ class BaseConnector(Generic[Request], abc.ABC):
                     msg, args = type(exc).__name__, exc.args
                     if len(args) != 0:
                         msg = f"{msg}: {args[0]}"
-                    logger.exception(msg, args)
+                    log.exception(msg, args)
 
                 # We manually injected an exception into the coroutine,
                 # so the asyncio event loop will attempt to await it again
@@ -117,35 +120,38 @@ class BaseConnector(Generic[Request], abc.ABC):
         # Call _mixin_enter() on all mixed-in base classes.
         for base in self.__class__.__bases__:
             if enter := getattr(base, "_mixin_enter", None):
-                await enter(self, logger)
+                await enter(self, log)
 
         failed = False
         try:
             async with asyncio.TaskGroup() as group:
                 async for request in requests(self.request_class()):
-                    group.create_task(self.handle(request, logger))
+                    group.create_task(self.handle(log, request))
 
         except ExceptionGroup as exc_group:
             for exc in exc_group.exceptions:
                 if isinstance(exc, ValidationError):
                     if len(exc.errors) == 1:
-                        logger.error(exc.errors[0])
+                        log.error(exc.errors[0])
                     else:
-                        logger.error("Multiple validation errors:\n - " + "\n - ".join(exc.errors))
+                        log.error(
+                            "Multiple validation errors:\n - "
+                            + "\n - ".join(exc.errors)
+                        )
                     failed = True
                 elif isinstance(exc, Stopped):
                     if exc.error:
-                        logger.error(f"{exc.error}")
+                        log.error(f"{exc.error}")
                         failed = True
                 else:
-                    logger.error("".join(traceback.format_exception(exc)))
+                    log.error("".join(traceback.format_exception(exc)))
                     failed = True
 
         finally:
             # Call _mixin_exit() on all mixed-in base classes, in reverse order.
             for base in reversed(self.__class__.__bases__):
                 if exit := getattr(base, "_mixin_exit", None):
-                    await exit(self, logger)
+                    await exit(self, log)
 
             # Restore the original signal handler
             signal.signal(signal.SIGQUIT, original_sigquit)

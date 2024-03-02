@@ -22,12 +22,12 @@ from .api import (
 
 
 async def all_resources(
-    http: HTTPMixin, config: EndpointConfig, logger: Logger
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    http.token_source = TokenSource(spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     spreadsheet_id = get_spreadsheet_id(config.spreadsheet_url)
 
-    spreadsheet = await fetch_spreadsheet(http, spreadsheet_id, logger)
+    spreadsheet = await fetch_spreadsheet(log, http, spreadsheet_id)
     return [sheet(http, spreadsheet_id, s) for s in spreadsheet.sheets]
 
 
@@ -40,8 +40,8 @@ def get_spreadsheet_id(url: str):
 
 def sheet(http: HTTPSession, spreadsheet_id: str, sheet: Sheet):
 
-    async def snapshot(logger: Logger) -> AsyncGenerator[Row, None]:
-        rows = await fetch_rows(http, spreadsheet_id, sheet, logger)
+    async def snapshot(log: Logger) -> AsyncGenerator[Row, None]:
+        rows = await fetch_rows(log, http, spreadsheet_id, sheet)
         for row in rows:
             yield row
 
