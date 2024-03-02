@@ -176,7 +176,7 @@ FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 """
 
 FetchPageFn = Callable[
-    [PageCursor, LogCursor, Logger],
+    [Logger, PageCursor, LogCursor],
     Awaitable[tuple[Iterable[_BaseDocument], PageCursor]],
 ]
 """
@@ -192,7 +192,7 @@ already observed through incremental replication.
 """
 
 FetchChangesFn = Callable[
-    [LogCursor, Logger],
+    [Logger, LogCursor],
     AsyncGenerator[_BaseDocument | LogCursor, None],
 ]
 """
@@ -455,7 +455,7 @@ async def _binding_snapshot_task(
         next_sync = state.updated_at + binding.resourceConfig.interval
         sleep_for = next_sync - datetime.now(tz=UTC)
 
-        task.logger.debug(
+        task.log.debug(
             "awaiting next snapshot",
             {"sleep_for": sleep_for, "next": next_sync},
         )
@@ -466,14 +466,14 @@ async def _binding_snapshot_task(
                     task.stopping.event.wait(), timeout=sleep_for.total_seconds()
                 )
 
-            task.logger.debug(f"periodic snapshot is idle and is yielding to stop")
+            task.log.debug(f"periodic snapshot is idle and is yielding to stop")
             return
         except asyncio.TimeoutError:
             # `sleep_for` elapsed.
             state.updated_at = datetime.now(tz=UTC)
 
         count = 0
-        async for doc in fetch_snapshot(task.logger):
+        async for doc in fetch_snapshot(task.log):
             doc.meta_ = BaseDocument.Meta(
                 op="u" if count < state.last_count else "c", row_id=count
             )
@@ -481,7 +481,7 @@ async def _binding_snapshot_task(
             count += 1
 
         digest = task.pending_digest()
-        task.logger.debug(
+        task.log.debug(
             "polled snapshot",
             {
                 "count": count,
@@ -517,12 +517,12 @@ async def _binding_backfill_task(
     )
 
     if state.next_page:
-        task.logger.info(f"resuming backfill", state)
+        task.log.info(f"resuming backfill", state)
     else:
-        task.logger.info(f"beginning backfill", state)
+        task.log.info(f"beginning backfill", state)
 
     while True:
-        page, next_page = await fetch_page(state.next_page, state.cutoff, task.logger)
+        page, next_page = await fetch_page(task.log, state.next_page, state.cutoff)
         for doc in page:
             task.captured(binding_index, doc)
 
@@ -536,7 +536,7 @@ async def _binding_backfill_task(
         bindingStateV1={binding.stateKey: ResourceState(backfill=None)}
     )
     task.checkpoint(connector_state)
-    task.logger.info(f"completed backfill")
+    task.log.info(f"completed backfill")
 
 
 async def _binding_incremental_task(
@@ -549,14 +549,14 @@ async def _binding_incremental_task(
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc=state)}
     )
-    task.logger.info(f"resuming incremental replication", state)
+    task.log.info(f"resuming incremental replication", state)
 
     while True:
 
         checkpoints = 0
         pending = False
 
-        async for item in fetch_changes(state.cursor, task.logger):
+        async for item in fetch_changes(task.log, state.cursor):
             if isinstance(item, BaseDocument):
                 task.captured(binding_index, item)
                 pending = True
@@ -599,7 +599,7 @@ async def _binding_incremental_task(
                     timeout=binding.resourceConfig.interval.total_seconds(),
                 )
 
-            task.logger.debug(
+            task.log.debug(
                 f"incremental replication is idle and is yielding to stop"
             )
             return
