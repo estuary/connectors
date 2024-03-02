@@ -16,15 +16,20 @@ API = "https://sheets.googleapis.com"
 
 
 async def fetch_spreadsheet(
-    http: HTTPSession, spreadsheet_id: str, logger: Logger
+    log: Logger,
+    http: HTTPSession,
+    spreadsheet_id: str,
 ) -> Spreadsheet:
     url = f"{API}/v4/spreadsheets/{spreadsheet_id}"
 
-    return Spreadsheet.model_validate_json(await http.request(url))
+    return Spreadsheet.model_validate_json(await http.request(log, url))
 
 
 async def fetch_rows(
-    http: HTTPSession, spreadsheet_id: str, sheet: Sheet, logger: Logger
+    log: Logger,
+    http: HTTPSession,
+    spreadsheet_id: str,
+    sheet: Sheet,
 ) -> Iterable[Row]:
 
     url = f"{API}/v4/spreadsheets/{spreadsheet_id}"
@@ -34,7 +39,7 @@ async def fetch_rows(
     }
 
     spreadsheet = Spreadsheet.model_validate_json(
-        await http.request(url, params=params)
+        await http.request(log, url, params=params)
     )
 
     if len(spreadsheet.sheets) == 0:
