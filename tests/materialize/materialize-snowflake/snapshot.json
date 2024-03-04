@@ -305,10 +305,6 @@
           "PipeFiles": [
             {
               "Path": "<uuid>",
-              "Size": 275
-            },
-            {
-              "Path": "<uuid>",
               "Size": 271
             }
           ],
@@ -319,10 +315,6 @@
         },
         "duplicate_keys_delta_exclude_flow_doc": {
           "PipeFiles": [
-            {
-              "Path": "<uuid>",
-              "Size": 140
-            },
             {
               "Path": "<uuid>",
               "Size": 137

@@ -488,13 +488,15 @@ type pipeRecord struct {
 }
 
 // When a file has been successfully loaded, we remove it from the pipe record
-func (pipe *pipeRecord) fileLoaded(file string) {
+func (pipe *pipeRecord) fileLoaded(file string) bool {
 	for i, f := range pipe.files {
 		if f.Path == file {
 			pipe.files = append(pipe.files[:i], pipe.files[i+1:]...)
-			break
+			return true
 		}
 	}
+
+	return false
 }
 
 type copyHistoryRow struct {
@@ -616,23 +618,15 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var maxTries = 10
 	for pipeName, pipe := range pipes {
 		for tries := 0; tries < maxTries; tries++ {
-			log.WithFields(log.Fields{
-				"beginMark": d.pipeMarkers[pipeName],
-				"pipe":      pipeName,
-				"tries":     tries,
-			}).Debug("snowpipe: fetching report on files")
 			// We first try to check the status of pipes using the REST API's insertReport
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is not the most ergonomic and sometimes does not yield
 			// results as expected
-			report, err := d.pipeClient.InsertReport(pipeName, "")
+			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
 			}
-			// FIXME: using beginMark in `InsertReport`, even if we reset the marker
-			// in case of completeResult: false, seems to lead to requests missing from
-			// the report, causing us to loop until maximum retries. When not using the
-			// cursor at all, we are able to find the expected results in the report
+
 			if !report.CompleteResult {
 				tries--
 				d.pipeMarkers[pipeName] = ""
@@ -640,6 +634,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				d.pipeMarkers[pipeName] = report.NextBeginMark
 			}
 
+			// If there are items still in progress, we continue retrying until those items
+			// resolve to another status
 			var hasItemsInProgress = false
 
 			// If the files have already been loaded, when we submit a request to
