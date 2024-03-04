@@ -6,6 +6,7 @@ on:
     paths:
       - "estuary-cdk/**"
       - "source-asana/**"
+      - "source-gladly/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
   pull_request:
@@ -13,6 +14,7 @@ on:
     paths:
       - "estuary-cdk/**"
       - "source-asana/**"
+      - "source-gladly/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
 
@@ -31,6 +33,9 @@ jobs:
             type: capture
             version: v1
           - name: source-hubspot-native
+            type: capture
+            version: v1
+          - name: source-gladly
             type: capture
             version: v1
           - name: source-google-sheets-native
