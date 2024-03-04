@@ -425,8 +425,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Query    string
-	ToDelete []string
+	Query        string
+	TableCleanup string
+	ToDelete     []string
 }
 
 type checkpoint map[string]*checkpointItem
@@ -520,8 +521,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			defer d.mu.Unlock()
 
 			d.cp[bindingCopy.target.StateKey] = &checkpointItem{
-				Query:    query,
-				ToDelete: toDeleteBinding,
+				Query:        query,
+				TableCleanup: bindingCopy.dropStoreSQL,
+				ToDelete:     toDeleteBinding,
 			}
 
 			return nil
@@ -564,6 +566,17 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		if _, err := d.store.conn.ExecContext(ctx, item.Query); err != nil {
+			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+			// it is okay to skip them in this case
+			if d.cpRecovery {
+				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+					continue
+				}
+			}
+			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+		}
+
+		if _, err := d.store.conn.ExecContext(ctx, item.TableCleanup); err != nil {
 			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 			// it is okay to skip them in this case
 			if d.cpRecovery {
