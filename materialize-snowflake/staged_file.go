@@ -114,6 +114,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	f.started = true
 	f.uuid = uuid.NewString()
 	f.dir = filepath.Join(f.tempdir, f.uuid)
+	f.uploaded = nil
 
 	// Create the local working directory for this binding. As a simplification we will always
 	// remove and re-create the directory since it will already exist for transactions beyond the
