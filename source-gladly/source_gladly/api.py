@@ -1,10 +1,9 @@
 from datetime import datetime
 from logging import Logger
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.capture.common import LogCursor
-from pydantic import AwareDatetime
 
 
 from .models import Event
@@ -28,9 +27,8 @@ async def fetch_events(
     max_ts = log_cursor
     async for line in http.request_lines(log, url, params=params):
         event = Event.model_validate_json(line)
-        ts = datetime.fromisoformat(event.timestamp)
-        if ts > max_ts:
-            max_ts = ts
+        if event.timestamp > max_ts:
+            max_ts = event.timestamp
         event.meta_ = Event.Meta(op="c")
         yield event
 
