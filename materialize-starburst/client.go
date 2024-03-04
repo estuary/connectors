@@ -39,7 +39,7 @@ func newClient(_ context.Context, ep *sql.Endpoint) (sql.Client, error) {
 		return nil, err
 	}
 
-	var templates = renderTemplates(starburstDialect)
+	var templates = renderTemplates(starburstTrinoDialect)
 
 	return &client{
 		db:        db,
