@@ -2631,6 +2631,12 @@
                 "string"
               ]
             },
+            "hs_mobile_sdk_push_tokens": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_notes_next_activity_type": {
               "type": [
                 "null",
@@ -13533,6 +13539,12 @@
               ]
             },
             "hs_merged_object_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_mobile_sdk_push_tokens": {
               "type": [
                 "null",
                 "string"
