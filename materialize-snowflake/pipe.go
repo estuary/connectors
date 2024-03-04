@@ -245,8 +245,12 @@ type fileReport struct {
 }
 
 type InsertReportResponse struct {
-	NextBeginMark string       `json:"nextBeginMark"`
-	Files         []fileReport `json:"files"`
+	// completeResult: false means there were events between the supplied beginMark
+	// and the first even that were missed.
+	// see https://docs.snowflake.com/user-guide/data-load-snowpipe-rest-apis
+	CompleteResult bool         `json:"completeResult"`
+	NextBeginMark  string       `json:"nextBeginMark"`
+	Files          []fileReport `json:"files"`
 }
 
 func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertReportResponse, error) {
