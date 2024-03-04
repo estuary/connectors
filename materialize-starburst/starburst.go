@@ -123,11 +123,11 @@ func newStarburstDriver() *sql.Driver {
 
 			var metaBase sql.TablePath
 			var metaSpecs, _ = sql.MetaTables(metaBase)
-			var templates = renderTemplates(starburstDialect)
+			var templates = renderTemplates(starburstTrinoDialect)
 
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             starburstDialect,
+				Dialect:             starburstTrinoDialect,
 				MetaSpecs:           &metaSpecs,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
@@ -161,7 +161,7 @@ func newTransactor(
 	open pm.Request_Open,
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
-	var templates = renderTemplates(starburstDialect)
+	var templates = renderTemplates(starburstTrinoDialect)
 
 	var transactor = &transactor{
 		cfg: cfg,
@@ -216,20 +216,23 @@ func (t *transactor) addBinding(ctx context.Context, materializationSpec *pf.Mat
 	var err error
 	d.target = target
 
-	if d.load.createTempTable, err = sql.RenderTableTemplate(target, templates.createLoadTempTable); err != nil {
+	tempTable, _ := sql.ResolveTable(target.TableShape, starburstHiveDialect)
+	templatesTemp := renderTemplates(starburstHiveDialect)
+
+	if d.load.createTempTable, err = sql.RenderTableTemplate(tempTable, templatesTemp.createLoadTempTable); err != nil {
 		return fmt.Errorf("createLoadTempTable template: %w", err)
 	}
-	if d.load.dropTempTable, err = sql.RenderTableTemplate(target, templates.dropLoadTempTable); err != nil {
+	if d.load.dropTempTable, err = sql.RenderTableTemplate(tempTable, templatesTemp.dropLoadTempTable); err != nil {
 		return fmt.Errorf("dropLoadTempTable template: %w", err)
 	}
 	if d.load.loadQuery, err = sql.RenderTableTemplate(target, templates.loadQuery); err != nil {
 		return fmt.Errorf("loadQuery template: %w", err)
 	}
 
-	if d.store.createTempTable, err = sql.RenderTableTemplate(target, templates.createStoreTempTable); err != nil {
+	if d.store.createTempTable, err = sql.RenderTableTemplate(tempTable, templatesTemp.createStoreTempTable); err != nil {
 		return fmt.Errorf("createStoreTempTable template: %w", err)
 	}
-	if d.store.dropTempTable, err = sql.RenderTableTemplate(target, templates.dropStoreTempTable); err != nil {
+	if d.store.dropTempTable, err = sql.RenderTableTemplate(tempTable, templatesTemp.dropStoreTempTable); err != nil {
 		return fmt.Errorf("dropStoreTempTable template: %w", err)
 	}
 	if d.store.mergeIntoTarget, err = sql.RenderTableTemplate(target, templates.mergeIntoTarget); err != nil {

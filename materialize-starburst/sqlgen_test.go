@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var targetTableDialect = starburstDialect
-var tempTableDialect = starburstDialect
+var targetTableDialect = starburstTrinoDialect
+var tempTableDialect = starburstHiveDialect
 
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
