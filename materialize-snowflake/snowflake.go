@@ -149,6 +149,9 @@ type transactor struct {
 	bindings    []*binding
 	updateDelay time.Duration
 	cp          checkpoint
+
+	// this shard's range spec, used to key pipes so they don't collide
+	_range *pf.RangeSpec
 }
 
 func (t *transactor) AckDelay() time.Duration {
@@ -205,6 +208,7 @@ func newTransactor(
 		db:          db,
 		pipeClient:  pipeClient,
 		pipeMarkers: make(map[string]string),
+		_range:      open.Range,
 	}
 
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -385,13 +389,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// If this is a delta updates binding and we are using JWT auth type, this binding
 			// can use snowpipe
 			if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
-				if pipeName, err := sql.RenderTableTemplate(b.target, d.templates.pipeName); err != nil {
+				if pipeName, err := RenderTableAndShardTemplate(b.target, d._range.KeyBegin, d.templates.pipeName); err != nil {
 					return nil, fmt.Errorf("pipeName template: %w", err)
 				} else {
 					b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
 				}
 
-				if createPipe, err := sql.RenderTableTemplate(b.target, d.templates.createPipe); err != nil {
+				if createPipe, err := RenderTableAndShardTemplate(b.target, d._range.KeyBegin, d.templates.createPipe); err != nil {
 					return nil, fmt.Errorf("createPipe template: %w", err)
 				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
 					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
