@@ -1,0 +1,52 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-gladly:
+    endpoint:
+      local:
+        command:
+          - python
+          # - "-m"
+          # - "debugpy"
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          - "-m"
+          - source_gladly
+        config:
+          organization: some_organization
+          agentEmail: somebody@somedomain.com
+          apiToken: secret_token
+    bindings:
+      - resource:
+          name: AgentAvailabilityEvents
+          interval: PT30S
+        target: acmeCo/AgentAvailabilityEvents
+      - resource:
+          name: AgentStatusEvents
+          interval: PT30S
+        target: acmeCo/AgentStatusEvents
+      - resource:
+          name: ContactEvents
+          interval: PT30S
+        target: acmeCo/ContactEvents
+      - resource:
+          name: ConversationEvents
+          interval: PT30S
+        target: acmeCo/ConversationEvents
+      - resource:
+          name: CustomerEvents
+          interval: PT30S
+        target: acmeCo/CustomerEvents
+      - resource:
+          name: PaymentRequestEvents
+          interval: PT30S
+        target: acmeCo/PaymentRequestEvents
+      - resource:
+          name: TaskEvents
+          interval: PT30S
+        target: acmeCo/TaskEvents
+    interval: 3m
+    shards:
+      logLevel: debug
