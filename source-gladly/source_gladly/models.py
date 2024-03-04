@@ -1,5 +1,5 @@
 from enum import StrEnum
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 from typing import TYPE_CHECKING
 
 from estuary_cdk.capture.common import (
@@ -57,6 +57,6 @@ class Event(BaseDocument, extra="forbid"):
 
     id: str
     type: str
-    timestamp: str
+    timestamp: AwareDatetime
     initiator: Initiator
     content: Content
