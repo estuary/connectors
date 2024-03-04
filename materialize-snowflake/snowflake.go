@@ -497,6 +497,62 @@ func (pipe *pipeRecord) fileLoaded(file string) {
 	}
 }
 
+type copyHistoryRow struct {
+	fileName          string
+	status            string
+	firstErrorMessage string
+}
+
+func (d *transactor) copyHistory(ctx context.Context, tableName string, fileNames []string) ([]copyHistoryRow, error) {
+	query, err := RenderCopyHistoryTemplate(tableName, fileNames, d.templates.copyHistory)
+	if err != nil {
+		return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
+	}
+
+	rows, err := d.store.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("snowpipe: fetching copy history: %w", err)
+	}
+	defer rows.Close()
+
+	var items []copyHistoryRow
+
+	var (
+		fileName                  string
+		status                    string
+		firstErrorMessage         string
+		firstErrorMessageNullable stdsql.NullString
+	)
+
+	for rows.Next() {
+		if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable); err != nil {
+			return nil, fmt.Errorf("scanning copy history row: %w", err)
+		}
+
+		if firstErrorMessageNullable.Valid {
+			firstErrorMessage = firstErrorMessageNullable.String
+		}
+		log.WithFields(log.Fields{
+			"fileName":          fileName,
+			"status":            status,
+			"firstErrorMessage": firstErrorMessage,
+			"tableName":         tableName,
+		}).Info("snowpipe: copy history row")
+
+		items = append(items, copyHistoryRow{
+			fileName:          fileName,
+			status:            status,
+			firstErrorMessage: firstErrorMessage,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("snowpipe: reading copy history: %w", err)
+	}
+
+	return items, nil
+}
+
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	// Run the queries using AsyncMode, which means that `ExecContext` will not block
@@ -557,13 +613,31 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
-	var tries = 0
 	var maxTries = 10
-	for len(pipes) > 0 {
-		for pipeName, pipe := range pipes {
-			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
+	for pipeName, pipe := range pipes {
+		for tries := 0; tries < maxTries; tries++ {
+			log.WithFields(log.Fields{
+				"beginMark": d.pipeMarkers[pipeName],
+				"pipe":      pipeName,
+				"tries":     tries,
+			}).Debug("snowpipe: fetching report on files")
+			// We first try to check the status of pipes using the REST API's insertReport
+			// The REST API does not wake up the warehouse, hence our preference
+			// however this API is not the most ergonomic and sometimes does not yield
+			// results as expected
+			report, err := d.pipeClient.InsertReport(pipeName, "")
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
+			}
+			// FIXME: using beginMark in `InsertReport`, even if we reset the marker
+			// in case of completeResult: false, seems to lead to requests missing from
+			// the report, causing us to loop until maximum retries. When not using the
+			// cursor at all, we are able to find the expected results in the report
+			if !report.CompleteResult {
+				tries--
+				d.pipeMarkers[pipeName] = ""
+			} else {
+				d.pipeMarkers[pipeName] = report.NextBeginMark
 			}
 
 			var hasItemsInProgress = false
@@ -571,92 +645,62 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// If the files have already been loaded, when we submit a request to
 			// load those files again, our request will not show up in reports.
 			// One way to find out whether the files were successfully loaded is to check
-			// the COPY_HISTORY to make sure they are there. If they are not, then something
-			// is wrong.
+			// the COPY_HISTORY to make sure they are there. The COPY_HISTORY is much more
+			// reliable. If they are not there, then something is wrong.
 			if len(report.Files) == 0 {
-				if tries < maxTries {
-					tries = tries + 1
+				// We try `maxTries` times since it may take some time for the REST API
+				// to reflect the new pipe requests
+				if tries < maxTries-1 {
+					time.Sleep(5 * time.Second)
 					continue
 				}
 
-				log.WithField("tries", tries).Info("snowpipe: no files in report, fetching copy history from warehouse")
+				log.WithFields(log.Fields{
+					"tries": tries,
+					"pipe":  pipeName,
+				}).Info("snowpipe: no files in report, fetching copy history from warehouse")
 
 				var fileNames = make([]string, len(pipe.files))
 				for i, f := range pipe.files {
 					fileNames[i] = f.Path
 				}
 
-				query, err := RenderCopyHistoryTemplate(pipe.tableName, fileNames, d.templates.copyHistory)
+				rows, err := d.copyHistory(ctx, pipe.tableName, fileNames)
 				if err != nil {
-					return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
+					return nil, err
 				}
 
-				rows, err := d.store.conn.QueryContext(ctx, query)
-				if err != nil {
-					return nil, fmt.Errorf("snowpipe: fetching copy history: %w", err)
-				}
-				defer rows.Close()
-
-				var (
-					fileName                  string
-					status                    string
-					firstErrorMessageNullable stdsql.NullString
-					firstErrorMessage         string
-				)
-
-				var loadedFiles []string
-				for rows.Next() {
-					if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable); err != nil {
-						return nil, fmt.Errorf("scanning copy history row: %w", err)
-					}
-
-					if firstErrorMessageNullable.Valid {
-						firstErrorMessage = firstErrorMessageNullable.String
-					}
-					log.WithFields(log.Fields{
-						"fileName":          fileName,
-						"status":            status,
-						"firstErrorMessage": firstErrorMessage,
-						"pipeName":          pipeName,
-					}).Info("snowpipe: copy history row")
-
-					if status == "Loaded" {
-						loadedFiles = append(loadedFiles, fileName)
-					} else if status == "Load in progress" {
+				for _, row := range rows {
+					if row.status == "Loaded" {
+						pipe.fileLoaded(row.fileName)
+					} else if row.status == "Load in progress" {
 						hasItemsInProgress = true
 					} else {
-						return nil, fmt.Errorf("unexpected status %q for files in pipe %q: %s", status, pipeName, firstErrorMessage)
+						return nil, fmt.Errorf("unexpected status %q for files in pipe %q: %s", row.status, pipeName, row.firstErrorMessage)
 					}
 				}
 
-				for _, fileName := range loadedFiles {
-					pipe.fileLoaded(fileName)
-				}
-
-				if err := rows.Err(); err != nil {
-					return nil, fmt.Errorf("snowpipe: reading copy history: %w", err)
-				}
-
+				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
+					tries--
+					time.Sleep(2 * time.Second)
 					continue
 				}
 
 				if len(pipe.files) > 0 {
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
-				} else {
-					d.deleteFiles(ctx, []string{pipe.dir})
-					delete(pipes, pipeName)
-					continue
 				}
+
+				// All files have been processed for this pipe, we can skip to the next pipe
+				d.deleteFiles(ctx, []string{pipe.dir})
+				break
 			}
 
 			tries = 0
 
-			var loadedFiles []string
 			for _, reportFile := range report.Files {
 				if reportFile.Status == "LOADED" {
-					d.pipeMarkers[pipeName] = report.NextBeginMark
-					loadedFiles = append(loadedFiles, reportFile.Path)
+					pipe.fileLoaded(reportFile.Path)
 				} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 					return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
 				} else if reportFile.Status == "LOAD_IN_PROGRESS" {
@@ -664,17 +708,15 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				}
 			}
 
-			for _, fileName := range loadedFiles {
-				pipe.fileLoaded(fileName)
-			}
-
 			if len(pipe.files) == 0 {
 				d.deleteFiles(ctx, []string{pipe.dir})
-				delete(pipes, pipeName)
+				break
+			} else if tries < maxTries-1 {
+				time.Sleep(5 * time.Second)
+			} else {
+				return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
 			}
 		}
-
-		time.Sleep(6 * time.Second)
 	}
 
 	log.Info("store: finished committing changes")
