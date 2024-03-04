@@ -131,6 +131,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
@@ -288,6 +289,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
@@ -445,6 +447,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
@@ -602,6 +605,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
@@ -759,6 +763,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
@@ -916,6 +921,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
@@ -1073,6 +1079,7 @@
           "type": "string"
         },
         "timestamp": {
+          "format": "date-time",
           "title": "Timestamp",
           "type": "string"
         },
