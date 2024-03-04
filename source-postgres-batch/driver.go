@@ -182,7 +182,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
-	keys, err := discoverPrimaryKeys(ctx, db)
+	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing primary keys: %w", err)
 	}
@@ -258,8 +258,6 @@ func primaryKeyToCollectionKey(key string) string {
 	return "/" + key
 }
 
-const queryDiscoverTables = `SELECT table_schema, table_name, table_type FROM information_schema.tables;`
-
 type discoveredTable struct {
 	Schema string
 	Name   string
@@ -267,9 +265,18 @@ type discoveredTable struct {
 }
 
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
-	rows, err := db.QueryContext(ctx, queryDiscoverTables)
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, "SELECT table_schema, table_name, table_type FROM information_schema.tables")
+	if len(discoverSchemas) > 0 {
+		fmt.Fprintf(query, " WHERE table_schema = ANY ($1)")
+		args = append(args, discoverSchemas)
+	}
+	fmt.Fprintf(query, ";")
+
+	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
-		return nil, fmt.Errorf("error executing discovery query: %w", err)
+		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
 	defer rows.Close()
 
@@ -278,11 +285,6 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 		var tableSchema, tableName, tableType string
 		if err := rows.Scan(&tableSchema, &tableName, &tableType); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
-		if len(discoverSchemas) > 0 && !slices.Contains(discoverSchemas, tableSchema) {
-			log.WithFields(log.Fields{"schema": tableSchema, "table": tableName}).Debug("ignoring table")
-			continue
 		}
 		tables = append(tables, &discoveredTable{
 			Schema: tableSchema,
@@ -293,28 +295,6 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	return tables, nil
 }
 
-// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
-// overkill but shouldn't hurt, and helps to make absolutely sure that we're
-// matching up the constraint type with the column names/positions correctly.
-const queryDiscoverPrimaryKeys = `
-SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, col.data_type
-  FROM information_schema.key_column_usage kcu
-  JOIN information_schema.table_constraints tcs
-    ON  tcs.constraint_catalog = kcu.constraint_catalog
-    AND tcs.constraint_schema = kcu.constraint_schema
-    AND tcs.constraint_name = kcu.constraint_name
-    AND tcs.table_catalog = kcu.table_catalog
-    AND tcs.table_schema = kcu.table_schema
-    AND tcs.table_name = kcu.table_name
-  JOIN information_schema.columns col
-    ON  col.table_catalog = kcu.table_catalog
-	AND col.table_schema = kcu.table_schema
-	AND col.table_name = kcu.table_name
-	AND col.column_name = kcu.column_name
-  WHERE tcs.constraint_type = 'PRIMARY KEY'
-  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
-`
-
 type discoveredPrimaryKey struct {
 	Schema      string
 	Table       string
@@ -322,10 +302,36 @@ type discoveredPrimaryKey struct {
 	ColumnTypes map[string]*jsonschema.Schema
 }
 
-func discoverPrimaryKeys(ctx context.Context, db *sql.DB) ([]*discoveredPrimaryKey, error) {
-	rows, err := db.QueryContext(ctx, queryDiscoverPrimaryKeys)
+func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
+	var query = new(strings.Builder)
+	var args []any
+	// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
+	// overkill but shouldn't hurt, and helps to make absolutely sure that we're
+	// matching up the constraint type with the column names/positions correctly.
+	fmt.Fprintf(query, "SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, col.data_type")
+	fmt.Fprintf(query, " FROM information_schema.key_column_usage kcu")
+	fmt.Fprintf(query, " JOIN information_schema.table_constraints tcs")
+	fmt.Fprintf(query, "  ON  tcs.constraint_catalog = kcu.constraint_catalog")
+	fmt.Fprintf(query, "  AND tcs.constraint_schema = kcu.constraint_schema")
+	fmt.Fprintf(query, "  AND tcs.constraint_name = kcu.constraint_name")
+	fmt.Fprintf(query, "  AND tcs.table_catalog = kcu.table_catalog")
+	fmt.Fprintf(query, "  AND tcs.table_schema = kcu.table_schema")
+	fmt.Fprintf(query, "  AND tcs.table_name = kcu.table_name")
+	fmt.Fprintf(query, " JOIN information_schema.columns col")
+	fmt.Fprintf(query, "  ON  col.table_catalog = kcu.table_catalog")
+	fmt.Fprintf(query, "  AND col.table_schema = kcu.table_schema")
+	fmt.Fprintf(query, "  AND col.table_name = kcu.table_name")
+	fmt.Fprintf(query, "  AND col.column_name = kcu.column_name")
+	fmt.Fprintf(query, " WHERE tcs.constraint_type = 'PRIMARY KEY'")
+	if len(discoverSchemas) > 0 {
+		fmt.Fprintf(query, "  AND kcu.table_schema = ANY ($1)")
+		args = append(args, discoverSchemas)
+	}
+	fmt.Fprintf(query, " ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;")
+
+	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
-		return nil, fmt.Errorf("error executing discovery query: %w", err)
+		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
 	defer rows.Close()
 

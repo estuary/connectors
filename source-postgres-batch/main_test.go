@@ -63,20 +63,7 @@ func TestBasicCapture(t *testing.T) {
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) {
-		var summary = new(strings.Builder)
-		for idx, binding := range cs.Bindings {
-			fmt.Fprintf(summary, "Binding %d:\n", idx)
-			bs, err := json.MarshalIndent(binding, "  ", "  ")
-			require.NoError(t, err)
-			io.Copy(summary, bytes.NewReader(bs))
-			fmt.Fprintf(summary, "\n")
-		}
-		if len(cs.Bindings) == 0 {
-			fmt.Fprintf(summary, "(no output)")
-		}
-		cupaloy.SnapshotT(t, summary.String())
-	})
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
 
 	t.Run("Capture", func(t *testing.T) {
 		// Spawn a worker thread which will insert 50 rows of data in parallel with the capture.
@@ -113,20 +100,7 @@ func TestBasicDatatypes(t *testing.T) {
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) {
-		var summary = new(strings.Builder)
-		for idx, binding := range cs.Bindings {
-			fmt.Fprintf(summary, "Binding %d:\n", idx)
-			bs, err := json.MarshalIndent(binding, "  ", "  ")
-			require.NoError(t, err)
-			io.Copy(summary, bytes.NewReader(bs))
-			fmt.Fprintf(summary, "\n")
-		}
-		if len(cs.Bindings) == 0 {
-			fmt.Fprintf(summary, "(no output)")
-		}
-		cupaloy.SnapshotT(t, summary.String())
-	})
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
 
 	t.Run("Capture", func(t *testing.T) {
 		executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s(id, a_real, a_bool, a_date, a_ts, a_tstz) VALUES ($1,$2,$3,$4,$5,$6)", tableName),
@@ -137,6 +111,31 @@ func TestBasicDatatypes(t *testing.T) {
 		time.AfterFunc(5*time.Second, cancelCapture)
 		cs.Capture(captureCtx, t, nil)
 		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+func TestSchemaFilter(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "22492"
+	var tableName = fmt.Sprintf("test.schema_filtering_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data TEXT)", tableName))
+
+	// Run discovery with several schema filters and snapshot the results
+	t.Run("Unfiltered", func(t *testing.T) {
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{}
+		snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
+	})
+	t.Run("FilteredOut", func(t *testing.T) {
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", "bar"}
+		snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
+	})
+	t.Run("FilteredIn", func(t *testing.T) {
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", "test"}
+		snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
 	})
 }
 
@@ -221,4 +220,19 @@ func discoverStreams(ctx context.Context, t testing.TB, cs *st.CaptureSpec, matc
 		})
 	}
 	return bindings
+}
+
+func snapshotBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) {
+	var summary = new(strings.Builder)
+	for idx, binding := range bindings {
+		fmt.Fprintf(summary, "Binding %d:\n", idx)
+		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		require.NoError(t, err)
+		io.Copy(summary, bytes.NewReader(bs))
+		fmt.Fprintf(summary, "\n")
+	}
+	if len(bindings) == 0 {
+		fmt.Fprintf(summary, "(no bindings)")
+	}
+	cupaloy.SnapshotT(t, summary.String())
 }
