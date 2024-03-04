@@ -14,7 +14,6 @@ from typing import (
     Literal,
     TypeVar,
 )
-
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
@@ -24,7 +23,9 @@ from ..flow import (
     OAuth2Spec,
     ValidationError,
 )
+from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
+
 
 LogCursor = AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -161,7 +162,7 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 
 
-class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
+class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
     bindingStateV1: dict[str, _BaseResourceState] = {}
@@ -268,7 +269,7 @@ def discovered(
         if isinstance(resource.model, Resource.FixedSchema):
             schema = resource.model.value
         else:
-            schema = resource.model.model_json_schema(mode='serialization')
+            schema = resource.model.model_json_schema(mode="serialization")
 
         if resource.schema_inference:
             schema["x-infer-schema"] = True
@@ -599,9 +600,7 @@ async def _binding_incremental_task(
                     timeout=binding.resourceConfig.interval.total_seconds(),
                 )
 
-            task.log.debug(
-                f"incremental replication is idle and is yielding to stop"
-            )
+            task.log.debug(f"incremental replication is idle and is yielding to stop")
             return
         except asyncio.TimeoutError:
             pass  # `interval` elapsed.
