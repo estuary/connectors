@@ -675,6 +675,13 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			if !catchupStreaming {
 				catchupStreaming = true
 				c.streamsInCatchup.Add(1)
+
+				// Ensure that we call Done if there's an early return
+				defer func() {
+					if catchupStreaming {
+						c.streamsInCatchup.Done()
+					}
+				}()
 			}
 			catchupStarted = time.Now()
 		}
