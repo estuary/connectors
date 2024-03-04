@@ -236,43 +236,42 @@ class CustomFields(WorkspaceRelatedStream):
 class Events(AsanaStream):
     primary_key = "created_at"
     sync_token: Optional[str] = None
+    has_more: bool = False
     raise_on_http_errors = False
 
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
         return "events"
 
-    def read_records(self, *args, **kwargs):
-        # Check if sync token is available
-        if self.sync_token is not None:
-            # Pass the sync token as a request parameter
-            kwargs["next_page_token"] = {"sync": self.sync_token}
-
-        yield from super().read_records(*args, **kwargs)
-
     def parse_response(
         self, response: requests.Response, **kwargs
     ) -> Iterable[Mapping]:
-        response_json: dict = response.json()
-        self.sync_token = response_json.get("sync")
+        payload: dict = response.json()
+        data = payload.get("data", [])
 
         if (  # Check if response is a 412 error
             response.status_code == HTTPStatus.PRECONDITION_FAILED
-            or not self.sync_token
+            and not self.sync_token
         ):
             self.logger.warning(
                 "Sync token expired. Fetch the full dataset for this query now."
             )
-        data = response_json.get("data", [])
 
-        yield from data
+        self.sync_token = payload.get("sync")
+
+        return data
 
     def next_page_token(
         self, response: requests.Response
     ) -> Optional[Mapping[str, Any]]:
-        decoded_response = response.json()
-        last_sync = decoded_response.get("sync")
-        if last_sync:
-            return {"sync": last_sync}
+        payload = response.json()
+
+        has_more = bool(payload.get("has_more"))
+        # self.sync_token = payload.get("sync")
+
+        if not has_more:
+            self.logger.info("Nothing to read.")
+            return None
+        return {"sync": self.sync_token}
 
     def request_params(
         self, stream_slice: Mapping[str, Any] = None, **kwargs
