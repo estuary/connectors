@@ -49,6 +49,7 @@ connectionSpecification:
               type: string
               examples:
                 - "123456789000"
+              secret: true
             client_secret:
               title: Client Secret
               description: >-
