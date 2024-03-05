@@ -242,7 +242,7 @@ class API:
             "type": "object",
             "additionalProperties": True,
             "properties": {
-                "id": {"type": ["null", "string"]},
+                "id": {"type": "string"},
                 "createdAt": {"type": ["null", "string"], "format": "date-time"},
                 "updatedAt": {"type": ["null", "string"], "format": "date-time"},
                 "archived": {"type": ["null", "boolean"]},
