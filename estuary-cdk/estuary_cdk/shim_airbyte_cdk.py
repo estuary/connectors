@@ -119,7 +119,7 @@ class CaptureShim(BaseCaptureConnector):
             if stream.namespace:
                 resource_config.namespace = stream.namespace
             if stream.default_cursor_field:
-                resource_config.cursor_field = [stream.default_cursor_field]
+                resource_config.cursor_field = stream.default_cursor_field
 
             if stream.source_defined_primary_key:
                 # Map array of array of property names into an array of JSON pointers.
