@@ -8,7 +8,7 @@ captures:
         command:
           - python
           - "-m"
-          - source-airtable
+          - source_airtable
         config: config.yaml
     shards:
       logLevel: debug

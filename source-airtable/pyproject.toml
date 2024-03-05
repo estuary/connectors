@@ -1,20 +1,22 @@
 [tool.poetry]
-name = "source-airtable-estuary"
+name = "source_airtable"
 version = "0.1.0"
 description = ""
 authors = ["Joseph Shearer <joseph@estuary.dev>"]
 
 [tool.poetry.dependencies]
-airbyte-cdk = "0.51.14"
-mypy = "^1.5"
-python = ">=3.11,<3.12"
-debugpy = "^1.8.0"
-source_airtable = { path = "source_airtable", develop=true }
-flow-sdk = {path="../python", develop=true}
+airbyte-cdk = "^0.52"
+estuary-cdk = {path="../estuary-cdk", develop = true}
+python = "^3.11"
+types-requests = "^2.31"
 
 [tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
 pytest = "^7.4.3"
-pytest-insta = "^0.2.0"
+pytest-insta = "^0.3.0"
+requests-mock = "^1.11.0"
+pytest-mock = "^3.12.0"
 
 [build-system]
 requires = ["poetry-core"]

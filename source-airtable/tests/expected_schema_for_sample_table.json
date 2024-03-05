@@ -6,14 +6,15 @@
       "type": ["null", "string"]
     },
     "_airtable_id": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "_airtable_table_name": {
       "type": ["null", "string"]
     },
     "assignee_(from_table_6)": {
       "items": {
-        "type": ["null", "number"]
+        "type": ["null", "number", "string"],
+        "format": "number"
       },
       "type": ["null", "array"]
     },
@@ -21,10 +22,12 @@
       "type": ["null", "string"]
     },
     "float": {
-      "type": ["null", "number"]
+      "type": ["null", "number", "string"],
+      "format": "number"
     },
     "formula_1": {
-      "type": ["null", "number"]
+      "type": ["null", "number", "string"],
+      "format": "number"
     },
     "formula_2_(array)": {
       "items": {
@@ -36,7 +39,8 @@
       "type": ["null", "string"]
     },
     "integer": {
-      "type": ["null", "number"]
+      "type": ["null", "number", "string"],
+      "format": "number"
     },
     "name": {
       "type": ["null", "string"]
@@ -51,5 +55,6 @@
       "type": ["null", "array"]
     }
   },
+  "required": ["_airtable_id"],
   "type": "object"
 }
