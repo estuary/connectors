@@ -29,18 +29,25 @@ jobs:
       fail-fast: false
       matrix:
         connector:
+          # Note that every entry here must specify usage_rate. We're unable to
+          # set a default and selectively override it with `0.0`, because GH actions
+          # considers zero values to be "unset" (which is bs and I'm salty about it).
           - name: source-asana
             type: capture
             version: v1
+            usage_rate: 1.0
           - name: source-hubspot-native
             type: capture
             version: v1
+            usage_rate: 1.0
           - name: source-gladly
             type: capture
             version: v1
+            usage_rate: 1.0
           - name: source-google-sheets-native
             type: capture
             version: v1
+            usage_rate: 0.0
 
     steps:
       - uses: actions/checkout@v4
@@ -78,6 +85,7 @@ jobs:
           build-args: |
             CONNECTOR_NAME=${{ matrix.connector.name }}
             CONNECTOR_TYPE=${{ matrix.connector.type }}
+            USAGE_RATE=${{ matrix.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
 
       - name: Deployment
