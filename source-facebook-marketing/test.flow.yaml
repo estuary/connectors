@@ -10,7 +10,7 @@ captures:
         command:
           - python
           - "-m"
-          - source-facebook-marketing
+          - source_facebook_marketing
         config: connector_config.yaml
     bindings:
       - resource:

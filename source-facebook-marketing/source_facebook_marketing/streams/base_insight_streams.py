@@ -96,10 +96,7 @@ class AdsInsights(FBMarketingIncrementalStream):
     @property
     def primary_key(self) -> Optional[Union[str, List[str], List[List[str]]]]:
         """Build complex PK based on slices and breakdowns"""
-        # return ["date_start", "account_id", "ad_id"] + self.breakdowns
-        # We missed these key fields in airbyte-to-flow, so we're intentionally
-        # breaking this logic to retain consistency and avoid re-versioning collections.
-        return ["date_start", "account_id", "ad_id"]
+        return ["date_start", "account_id", "ad_id"] + self.breakdowns
 
     @property
     def insights_lookback_period(self):
@@ -205,7 +202,7 @@ class AdsInsights(FBMarketingIncrementalStream):
             if ts_start in self._completed_slices:
                 continue
             ts_end = ts_start + pendulum.duration(days=self.time_increment - 1)
-            interval = pendulum.Period(ts_start, ts_end)
+            interval = pendulum.Interval(ts_start, ts_end)
             yield InsightAsyncJob(api=self._api.api, edge_object=self._api.account, interval=interval, params=params)
 
     def check_breakdowns(self):

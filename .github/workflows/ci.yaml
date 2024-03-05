@@ -118,9 +118,6 @@ jobs:
           - connector: source-shopify
             connector_type: capture
             python: true
-          - connector: source-facebook-marketing
-            connector_type: capture
-            python: true
           - connector: source-hubspot
             connector_type: capture
             python: true

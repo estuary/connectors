@@ -68,7 +68,7 @@ class Status(str, Enum):
 class AsyncJob(ABC):
     """Abstract AsyncJob base class"""
 
-    def __init__(self, api: FacebookAdsApi, interval: pendulum.Period):
+    def __init__(self, api: FacebookAdsApi, interval: pendulum.Interval):
         """Init generic async job
 
         :param api: FB API instance (to create batch, etc)
@@ -79,7 +79,7 @@ class AsyncJob(ABC):
         self._attempt_number = 0
 
     @property
-    def interval(self) -> pendulum.Period:
+    def interval(self) -> pendulum.Interval:
         """Job identifier, in most cases start of the interval"""
         return self._interval
 

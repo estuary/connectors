@@ -45,7 +45,7 @@ class FBMarketingStream(Stream, ABC):
     def availability_strategy(self) -> Optional["AvailabilityStrategy"]:
         return None
 
-    def __init__(self, source_defined_primary_key: List, api: "API", include_deleted: bool = False, page_size: int = 100, max_batch_size: int = 50,  **kwargs):
+    def __init__(self, api: "API", include_deleted: bool = False, page_size: int = 100, max_batch_size: int = 50, source_defined_primary_key: list | None = None, **kwargs):
         super().__init__(**kwargs)
         self._api = api
         self.page_size = page_size if page_size is not None else 100

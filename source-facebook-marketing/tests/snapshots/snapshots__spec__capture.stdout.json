@@ -90,12 +90,10 @@
                     "account_name",
                     "action_values",
                     "actions",
-                    "ad_bid_value",
                     "ad_click_actions",
                     "ad_id",
                     "ad_impression_actions",
                     "ad_name",
-                    "adset_bid_value",
                     "adset_end",
                     "adset_id",
                     "adset_name",
@@ -142,6 +140,7 @@
                     "cpm",
                     "cpp",
                     "created_time",
+                    "creative_media_type",
                     "ctr",
                     "date_start",
                     "date_stop",
@@ -162,6 +161,7 @@
                     "inline_link_click_ctr",
                     "inline_link_clicks",
                     "inline_post_engagement",
+                    "instagram_upcoming_event_reminders_set",
                     "instant_experience_clicks_to_open",
                     "instant_experience_clicks_to_start",
                     "instant_experience_outbound_clicks",
@@ -185,6 +185,7 @@
                     "spend",
                     "total_postbacks",
                     "total_postbacks_detailed",
+                    "total_postbacks_detailed_v4",
                     "unique_actions",
                     "unique_clicks",
                     "unique_conversions",
@@ -233,14 +234,17 @@
                     "app_id",
                     "body_asset",
                     "call_to_action_asset",
+                    "coarse_conversion_value",
                     "country",
                     "description_asset",
                     "device_platform",
                     "dma",
+                    "fidelity_type",
                     "frequency_value",
                     "gender",
                     "hourly_stats_aggregated_by_advertiser_time_zone",
                     "hourly_stats_aggregated_by_audience_time_zone",
+                    "hsid",
                     "image_asset",
                     "impression_device",
                     "is_conversion_id_modeled",
@@ -248,8 +252,10 @@
                     "mmm",
                     "place_page_id",
                     "platform_position",
+                    "postback_sequence_index",
                     "product_id",
                     "publisher_platform",
+                    "redownload",
                     "region",
                     "skan_campaign_id",
                     "skan_conversion_id",
@@ -392,22 +398,31 @@
       ]
     },
     "resourceConfigSchema": {
+      "title": "ResourceConfig",
+      "description": "ResourceConfig encodes a configured resource stream",
       "type": "object",
       "properties": {
         "stream": {
+          "title": "Stream",
+          "description": "Name of this stream",
           "type": "string"
         },
         "syncMode": {
-          "type": "string",
+          "title": "Sync Mode",
+          "description": "Sync this resource incrementally, or fully refresh it every run",
           "enum": [
-            "incremental",
-            "full_refresh"
-          ]
+            "full_refresh",
+            "incremental"
+          ],
+          "type": "string"
         },
         "namespace": {
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
           "type": "string"
         },
         "cursorField": {
+          "title": "Cursor Field",
           "type": "array",
           "items": {
             "type": "string"
@@ -417,7 +432,8 @@
       "required": [
         "stream",
         "syncMode"
-      ]
+      ],
+      "additionalProperties": false
     },
     "documentationUrl": "https://docs.airbyte.com/integrations/sources/facebook-marketing",
     "oauth2": {
