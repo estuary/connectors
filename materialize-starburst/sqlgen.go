@@ -223,24 +223,24 @@ MERGE INTO {{ $.Identifier }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	WHEN MATCHED THEN
-	UPDATE SET {{ range $ind, $key := $.Values }}
+	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{ end -}}
-	{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ $val.Identifier }} = r.{{ $val.Identifier }}
 	{{- end -}}
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 	{{- end }}
 	WHEN NOT MATCHED THEN
 	INSERT (
-	{{- range $ind, $key := $.Columns }}
+	{{- range $ind, $col := $.Columns }}
 	{{- if $ind }}, {{ end -}}
-	{{$key.Identifier -}}
+	{{$col.Identifier -}}
 	{{- end -}}
 	)
 	VALUES (
-	{{- range $ind, $key := $.Columns }}
+	{{- range $ind, $col := $.Columns }}
 	{{- if $ind }}, {{ end -}}
-	r.{{ $key.Identifier }}
+	r.{{ $col.Identifier }}
 	{{- end -}}
 	)
 {{ end }}
