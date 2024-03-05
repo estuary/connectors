@@ -9,38 +9,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
@@ -142,38 +117,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
@@ -275,38 +225,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
@@ -408,38 +333,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
@@ -541,38 +441,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
@@ -674,38 +549,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
@@ -807,38 +657,13 @@
       "$defs": {
         "Content": {
           "additionalProperties": true,
-          "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            }
-          },
+          "properties": {},
           "title": "Content",
           "type": "object"
         },
         "Initiator": {
           "additionalProperties": false,
           "properties": {
-            "_meta": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/Meta"
-                }
-              ],
-              "default": {
-                "op": "u",
-                "row_id": -1
-              },
-              "description": "Document metadata"
-            },
             "id": {
               "title": "Id",
               "type": "string"
