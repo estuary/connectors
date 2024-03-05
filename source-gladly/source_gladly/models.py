@@ -1,6 +1,4 @@
-from enum import StrEnum
 from pydantic import AwareDatetime, BaseModel, Field
-from typing import TYPE_CHECKING
 
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
@@ -33,7 +31,7 @@ class EndpointConfig(BaseModel):
     apiToken: str = Field(
         description="API Token to use for Authentication",
         title="API Token",
-        secret=True,
+        json_schema_extra={"secret": True},
     )
 
 
@@ -52,8 +50,6 @@ class Event(BaseDocument, extra="forbid"):
     class Content(BaseDocument, extra="allow"):
         class Context(BaseDocument, extra="allow"):
             pass
-
-        context: Context
 
     id: str
     type: str

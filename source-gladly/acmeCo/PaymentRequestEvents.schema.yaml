@@ -10,23 +10,7 @@ $defs:
           op: u
           row_id: -1
         description: Document metadata
-      context:
-        $ref: "#/$defs/Context"
-    required:
-      - context
     title: Content
-    type: object
-  Context:
-    additionalProperties: true
-    properties:
-      _meta:
-        allOf:
-          - $ref: "#/$defs/Meta"
-        default:
-          op: u
-          row_id: -1
-        description: Document metadata
-    title: Context
     type: object
   Initiator:
     additionalProperties: false
@@ -84,6 +68,7 @@ properties:
     title: Type
     type: string
   timestamp:
+    format: date-time
     title: Timestamp
     type: string
   initiator:
