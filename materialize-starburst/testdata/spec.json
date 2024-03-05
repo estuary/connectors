@@ -32,8 +32,13 @@
             "number": {
               "type": "number"
             },
-            "string": {
-              "type": "string"
+            "datetime": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "date": {
+              "type": "string",
+              "format": "date"
             }
           },
           "required": [
@@ -55,6 +60,32 @@
               "types": [
                 "boolean"
               ],
+              "exists": 2
+            }
+          },
+          {
+            "ptr": "/date",
+            "field": "date",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "format" : "date"
+              },
+              "exists": 2
+            }
+          },
+          {
+            "ptr": "/datetime",
+            "field": "datetime",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "format" : "date-time"
+              },
               "exists": 2
             }
           },
@@ -187,7 +218,9 @@
           "boolean",
           "integer",
           "number",
-          "string"
+          "string",
+          "datetime",
+          "date"
         ],
         "document": "flow_document"
       },
