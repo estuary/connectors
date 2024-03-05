@@ -528,7 +528,10 @@
     "recommendedName": "ad_sets",
     "resourceConfig": {
       "stream": "ad_sets",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_time"
+      ]
     },
     "documentSchema": {
       "type": [
@@ -3201,7 +3204,10 @@
     "recommendedName": "ads",
     "resourceConfig": {
       "stream": "ads",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_time"
+      ]
     },
     "documentSchema": {
       "type": [
@@ -12188,7 +12194,10 @@
     "recommendedName": "ads_insights",
     "resourceConfig": {
       "stream": "ads_insights",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -15916,7 +15925,10 @@
     "recommendedName": "ads_insights_age_and_gender",
     "resourceConfig": {
       "stream": "ads_insights_age_and_gender",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -19649,14 +19661,19 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/age",
+      "/gender"
     ]
   },
   {
     "recommendedName": "ads_insights_country",
     "resourceConfig": {
       "stream": "ads_insights_country",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -23383,14 +23400,18 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/country"
     ]
   },
   {
     "recommendedName": "ads_insights_region",
     "resourceConfig": {
       "stream": "ads_insights_region",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -27117,14 +27138,18 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/region"
     ]
   },
   {
     "recommendedName": "ads_insights_dma",
     "resourceConfig": {
       "stream": "ads_insights_dma",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -30851,14 +30876,18 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/dma"
     ]
   },
   {
     "recommendedName": "ads_insights_platform_and_device",
     "resourceConfig": {
       "stream": "ads_insights_platform_and_device",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -34597,14 +34626,20 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/publisher_platform",
+      "/platform_position",
+      "/impression_device"
     ]
   },
   {
     "recommendedName": "ads_insights_action_type",
     "resourceConfig": {
       "stream": "ads_insights_action_type",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -38332,7 +38367,10 @@
     "recommendedName": "campaigns",
     "resourceConfig": {
       "stream": "campaigns",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_time"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -38658,7 +38696,10 @@
     "recommendedName": "images",
     "resourceConfig": {
       "stream": "images",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_time"
+      ]
     },
     "documentSchema": {
       "type": "object",
@@ -38787,7 +38828,10 @@
     "recommendedName": "videos",
     "resourceConfig": {
       "stream": "videos",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_time"
+      ]
     },
     "documentSchema": {
       "type": "object",
@@ -38995,7 +39039,10 @@
     "recommendedName": "activities",
     "resourceConfig": {
       "stream": "activities",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "event_time"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -39096,7 +39143,10 @@
     "recommendedName": "customads_insights_publisher_platform",
     "resourceConfig": {
       "stream": "customads_insights_publisher_platform",
-      "syncMode": "incremental"
+      "syncMode": "incremental",
+      "cursorField": [
+        "date_start"
+      ]
     },
     "documentSchema": {
       "properties": {
@@ -39285,7 +39335,8 @@
     "key": [
       "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/publisher_platform"
     ]
   }
 ]
