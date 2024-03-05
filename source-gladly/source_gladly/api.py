@@ -60,6 +60,15 @@ async def fetch_events(
                 f"not updating cursor since last_ts ({last_ts}) <= log_cursor ({log_cursor})"
             )
             return
+        elif last_ts - log_cursor < timedelta(hours=6):
+            # Only emit an updated checkpoint when there are no documents if the current cursor is
+            # sufficiently old. Emitting a checkpoint with no documents will trigger an immediate
+            # re-invocation of this task, so it shouldn't be done every time.
+            log.debug(
+                f"not updating cursor since updated cursor is less than 6 hours newer than prior cursor (updated cursor: {last_ts} vs prior cursor: {log_cursor})"
+            )
+            return
+
     else:
         # The Events API has millisecond precision for timestamps, so bump up the log cursor one
         # millisecond to not re-fetch the last event seen again on the next round. The assumption
