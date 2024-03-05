@@ -43,13 +43,12 @@ ConnectorState = GenericConnectorState[ResourceState]
 # through schema inference.
 class Event(BaseDocument, extra="forbid"):
 
-    class Initiator(BaseDocument, extra="forbid"):
+    class Initiator(BaseModel, extra="forbid"):
         id: str
         type: str
 
-    class Content(BaseDocument, extra="allow"):
-        class Context(BaseDocument, extra="allow"):
-            pass
+    class Content(BaseModel, extra="allow"):
+        pass
 
     id: str
     type: str
