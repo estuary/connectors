@@ -241,7 +241,6 @@ class API:
             "$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
             "additionalProperties": True,
-            "required": "id",
             "properties": {
                 "id": {"type": "string"},
                 "createdAt": {"type": ["null", "string"], "format": "date-time"},
@@ -249,6 +248,9 @@ class API:
                 "archived": {"type": ["null", "boolean"]},
                 "properties": {"type": ["null", "object"], "properties": properties},
             },
+              "required": [
+                "id"
+                ]
         }
 
         return schema
