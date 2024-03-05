@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "estuary_cdk"
+version = "0.2.0"
+description = "Estuary Connector Development Kit"
+authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
+homepage = "https://github.com/estuary/connectors/tree/main/estuary-cdk"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+aiodns = "^3.1.1"
+aiohttp = "^3.9.3"
+orjson = "^3.9.15"
+pydantic = ">1.10,<3"
+xxhash = "^3.4.1"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+pytest = "^7.4.3"
+pytest-insta = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

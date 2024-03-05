@@ -1,0 +1,1019 @@
+[
+  {
+    "recommendedName": "companies",
+    "resourceConfig": {
+      "name": "companies"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Company",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "contacts",
+    "resourceConfig": {
+      "name": "contacts"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "companies": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Companies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Contact",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "deals",
+    "resourceConfig": {
+      "name": "deals"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "engagements": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Engagements",
+          "type": "array"
+        },
+        "line_items": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Line Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Deal",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "engagements",
+    "resourceConfig": {
+      "name": "engagements"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Engagement",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "tickets",
+    "resourceConfig": {
+      "name": "tickets"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "engagements": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Engagements",
+          "type": "array"
+        },
+        "line_items": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Line Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Ticket",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "properties",
+    "resourceConfig": {
+      "name": "properties",
+      "interval": "P1D"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "calculated": {
+          "default": false,
+          "title": "Calculated",
+          "type": "boolean"
+        },
+        "hubspotObject": {
+          "default": "unknown",
+          "title": "Hubspotobject",
+          "type": "string"
+        }
+      },
+      "title": "Property",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  }
+]

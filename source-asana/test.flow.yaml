@@ -8,7 +8,7 @@ captures:
         command:
           - python
           - "-m"
-          - source-asana
+          - source_asana
         config: connector_config.yaml
     bindings:
       - resource:

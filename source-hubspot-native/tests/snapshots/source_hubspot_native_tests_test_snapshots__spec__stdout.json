@@ -1,0 +1,120 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "title": "Credentials Title"
+            },
+            "access_token": {
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentials_title",
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        },
+        "_OAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "title": "Credentials Title"
+            },
+            "client_id": {
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "title": "Refresh Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentials_title",
+            "client_id",
+            "client_secret",
+            "refresh_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "hubspot"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/_OAuth2Credentials",
+              "Private App Credentials": "#/$defs/AccessToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/_OAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "oauth2": {
+      "provider": "hubspot",
+      "authUrlTemplate": "https://app.hubspot.com/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=crm.lists.read%20crm.objects.companies.read%20crm.objects.contacts.read%20crm.objects.deals.read%20crm.objects.owners.read%20crm.schemas.companies.read%20crm.schemas.contacts.read%20crm.schemas.deals.read%20e-commerce%20files%20files.ui_hidden.read%20forms%20forms-uploaded-files%20sales-email-read%20tickets&optional_scope=automation%20content%20crm.objects.custom.read%20crm.objects.feedback_submissions.read%20crm.objects.goals.read%20crm.schemas.custom.read&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://api.hubapi.com/oauth/v1/token",
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "refresh_token": "/refresh_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

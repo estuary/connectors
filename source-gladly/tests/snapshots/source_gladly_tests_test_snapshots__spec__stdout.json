@@ -1,0 +1,59 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "properties": {
+        "organization": {
+          "description": "Organization to Request Data From",
+          "title": "Organization",
+          "type": "string"
+        },
+        "agentEmail": {
+          "description": "Agent Email Address to use for Authentication",
+          "title": "Agent Email",
+          "type": "string"
+        },
+        "apiToken": {
+          "description": "API Token to use for Authentication",
+          "secret": true,
+          "title": "API Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "organization",
+        "agentEmail",
+        "apiToken"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-gladly",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

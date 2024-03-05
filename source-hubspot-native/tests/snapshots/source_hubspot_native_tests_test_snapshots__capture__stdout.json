@@ -1,0 +1,5574 @@
+[
+  [
+    "acmeCo/companies",
+    {
+      "archived": false,
+      "createdAt": "2024-02-08T02:37:20.547000Z",
+      "id": 19015508755,
+      "properties": {
+        "address": "25 First Street",
+        "address2": "2nd Floor",
+        "annualrevenue": "10000000000",
+        "city": "Cambridge",
+        "country": "United States",
+        "createdate": "2024-02-08T02:37:20.547Z",
+        "description": "HubSpot is a leading CRM platform that provides software and support to help businesses grow better. Our platform includes marketing, sales, service, and website management products that start free and scale to meet our customers\u2019 needs at any stage of...",
+        "domain": "hubspot.com",
+        "facebook_company_page": "https://facebook.com/hubspot",
+        "founded_year": "2006",
+        "hs_all_owner_ids": "722900407",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_lead": "2024-02-08T02:37:20.547Z",
+        "hs_lastmodifieddate": "2024-02-08T02:37:23.482Z",
+        "hs_num_blockers": "0",
+        "hs_num_child_companies": "0",
+        "hs_num_contacts_with_buying_roles": "0",
+        "hs_num_decision_makers": "0",
+        "hs_num_open_deals": "0",
+        "hs_object_id": "19015508755",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_target_account_probability": "0.4076234698295593",
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hubspot_owner_assigneddate": "2024-02-08T02:37:20.547Z",
+        "hubspot_owner_id": "722900407",
+        "industry": "COMPUTER_SOFTWARE",
+        "is_public": "true",
+        "lifecyclestage": "lead",
+        "linkedin_company_page": "https://www.linkedin.com/company/hubspot",
+        "linkedinbio": "HubSpot is a leading CRM platform that provides software and support to help businesses grow better. Our platform includes marketing, sales, service, and website management products that start free and scale to meet our customers\u2019 needs at any stage of...",
+        "name": "HubSpot, Inc.",
+        "num_associated_contacts": "0",
+        "numberofemployees": "10000",
+        "phone": "+1 888-482-7768",
+        "state": "MA",
+        "timezone": "America/New_York",
+        "twitterhandle": "HubSpot",
+        "web_technologies": "unbounce;app_nexus;piwik;salesforce;stripe;cloud_flare;dstillery;twitter_button;hubspot;youtube;vidyard;facebook_connect",
+        "website": "hubspot.com",
+        "zip": "02141"
+      },
+      "propertiesWithHistory": {
+        "address": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "25 First Street"
+          }
+        ],
+        "address2": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "2nd Floor"
+          }
+        ],
+        "annualrevenue": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "10000000000"
+          }
+        ],
+        "city": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "Cambridge"
+          }
+        ],
+        "country": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "United States"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:37:20.547Z"
+          }
+        ],
+        "description": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "HubSpot is a leading CRM platform that provides software and support to help businesses grow better. Our platform includes marketing, sales, service, and website management products that start free and scale to meet our customers\u2019 needs at any stage of..."
+          }
+        ],
+        "domain": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "hubspot.com"
+          }
+        ],
+        "facebook_company_page": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "https://facebook.com/hubspot"
+          }
+        ],
+        "founded_year": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "2006"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "value": "2024-02-08T02:37:20.547Z"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:23.482000Z",
+            "value": "2024-02-08T02:37:23.482Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.947000Z",
+            "value": "2024-02-08T02:37:21.947Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:21.338000Z",
+            "value": "2024-02-08T02:37:21.338Z"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.735000Z",
+            "value": "2024-02-08T02:37:20.735Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "value": "2024-02-08T02:37:20.547Z"
+          }
+        ],
+        "hs_num_blockers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.936000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_child_companies": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.937000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_contacts_with_buying_roles": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.936000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_decision_makers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.936000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_open_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.937000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "19015508755"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "companies-lifecycle-pipeline"
+          }
+        ],
+        "hs_target_account_probability": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:23.482000Z",
+            "value": "0.4076234698295593"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:21.338000Z",
+            "value": "0.49565839767456055"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:37:20.547Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "industry": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "COMPUTER_SOFTWARE"
+          }
+        ],
+        "is_public": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "true"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "lead"
+          }
+        ],
+        "linkedin_company_page": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "https://www.linkedin.com/company/hubspot"
+          }
+        ],
+        "linkedinbio": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "HubSpot is a leading CRM platform that provides software and support to help businesses grow better. Our platform includes marketing, sales, service, and website management products that start free and scale to meet our customers\u2019 needs at any stage of..."
+          }
+        ],
+        "name": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "HubSpot, Inc."
+          }
+        ],
+        "num_associated_contacts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:21.936000Z",
+            "value": "0"
+          }
+        ],
+        "numberofemployees": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "10000"
+          }
+        ],
+        "phone": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "+1 888-482-7768"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "MA"
+          }
+        ],
+        "timezone": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "America/New_York"
+          }
+        ],
+        "twitterhandle": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "HubSpot"
+          }
+        ],
+        "web_technologies": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:20.724000Z",
+            "value": "unbounce;app_nexus;piwik;salesforce;stripe;cloud_flare;dstillery;twitter_button;hubspot;youtube;vidyard;facebook_connect"
+          }
+        ],
+        "website": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "hubspot.com"
+          }
+        ],
+        "zip": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:20.547000Z",
+            "updatedByUserId": 63843671,
+            "value": "02141"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-08T02:37:23.482000Z"
+    }
+  ],
+  [
+    "acmeCo/companies",
+    {
+      "archived": false,
+      "contacts": [
+        151,
+        151
+      ],
+      "createdAt": "2024-02-08T02:37:53.193000Z",
+      "id": 19015508766,
+      "properties": {
+        "address": "588 Broadway",
+        "address2": "502",
+        "annualrevenue": "1000000000",
+        "city": "New York",
+        "country": "United States",
+        "createdate": "2024-02-08T02:37:53.193Z",
+        "description": "LiveRamp Holdings, Inc., formerly known as Acxiom Corporation, is a San Francisco, California-based SaaS company that offers a data connectivity platform whose services include data onboarding, the transfer of offline data online for marketing purposes.",
+        "domain": "arbor.io",
+        "facebook_company_page": "https://facebook.com/liveramp",
+        "first_contact_createdate": "2024-02-08T16:09:32.359Z",
+        "founded_year": "1969",
+        "hs_all_owner_ids": "722900407",
+        "hs_analytics_first_timestamp": "2024-02-08T16:09:32.359Z",
+        "hs_analytics_latest_source": "OFFLINE",
+        "hs_analytics_latest_source_data_1": "CRM_UI",
+        "hs_analytics_latest_source_data_2": "userId:63843671",
+        "hs_analytics_latest_source_timestamp": "2024-02-08T16:09:32.494Z",
+        "hs_analytics_num_page_views": "0",
+        "hs_analytics_num_visits": "0",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "CRM_UI",
+        "hs_analytics_source_data_2": "userId:63843671",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_lead": "2024-02-08T02:37:53.193Z",
+        "hs_lastmodifieddate": "2024-02-22T14:19:02.860Z",
+        "hs_num_blockers": "0",
+        "hs_num_child_companies": "0",
+        "hs_num_contacts_with_buying_roles": "0",
+        "hs_num_decision_makers": "0",
+        "hs_num_open_deals": "0",
+        "hs_object_id": "19015508766",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_parent_company_id": "19021320226",
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_target_account_probability": "0.38625118136405945",
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hubspot_owner_assigneddate": "2024-02-08T02:37:53.193Z",
+        "hubspot_owner_id": "722900407",
+        "industry": "COMPUTER_SOFTWARE",
+        "is_public": "false",
+        "lifecyclestage": "lead",
+        "linkedin_company_page": "https://www.linkedin.com/company/liveramp",
+        "linkedinbio": "LiveRamp Holdings, Inc., formerly known as Acxiom Corporation, is a San Francisco, California-based SaaS company that offers a data connectivity platform whose services include data onboarding, the transfer of offline data online for marketing purposes.",
+        "name": "Arbor",
+        "num_associated_contacts": "1",
+        "num_conversion_events": "0",
+        "numberofemployees": "4001",
+        "phone": "+1 415-243-0776",
+        "state": "NY",
+        "timezone": "America/New_York",
+        "total_money_raised": "9050000",
+        "twitterhandle": "LiveRamp",
+        "web_technologies": "aws_route_53;google_tag_manager",
+        "website": "arbor.io",
+        "zip": "10012"
+      },
+      "propertiesWithHistory": {
+        "address": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "588 Broadway"
+          }
+        ],
+        "address2": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-22T14:19:02.860000Z",
+            "value": "502"
+          }
+        ],
+        "annualrevenue": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "1000000000"
+          }
+        ],
+        "city": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "New York"
+          }
+        ],
+        "country": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "United States"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:37:53.193Z"
+          }
+        ],
+        "description": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "LiveRamp Holdings, Inc., formerly known as Acxiom Corporation, is a San Francisco, California-based SaaS company that offers a data connectivity platform whose services include data onboarding, the transfer of offline data online for marketing purposes."
+          }
+        ],
+        "domain": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "arbor.io"
+          }
+        ],
+        "facebook_company_page": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "https://facebook.com/liveramp"
+          }
+        ],
+        "first_contact_createdate": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.572000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "founded_year": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "1969"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_analytics_first_timestamp": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.572000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hs_analytics_latest_source": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.203000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_latest_source_data_1": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.203000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_analytics_latest_source_data_2": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.203000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_analytics_latest_source_timestamp": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.203000Z",
+            "value": "2024-02-08T16:09:32.494Z"
+          }
+        ],
+        "hs_analytics_num_page_views": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.572000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_visits": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.572000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.205000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.203000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.204000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "value": "2024-02-08T02:37:53.193Z"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-22T14:19:02.860000Z",
+            "value": "2024-02-22T14:19:02.860Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.592000Z",
+            "value": "2024-02-08T22:09:56.592Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T22:08:41.735000Z",
+            "value": "2024-02-08T22:08:41.735Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:54:50.460000Z",
+            "value": "2024-02-08T21:54:50.460Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:10:05.886000Z",
+            "value": "2024-02-08T17:10:05.886Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T16:10:37.339000Z",
+            "value": "2024-02-08T16:10:37.339Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.220000Z",
+            "value": "2024-02-08T16:10:33.220Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:57.329000Z",
+            "value": "2024-02-08T02:37:57.329Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.821000Z",
+            "value": "2024-02-08T02:37:54.821Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:54.020000Z",
+            "value": "2024-02-08T02:37:54.020Z"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.538000Z",
+            "value": "2024-02-08T02:37:53.538Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "value": "2024-02-08T02:37:53.193Z"
+          }
+        ],
+        "hs_num_blockers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.800000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_child_companies": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.802000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_contacts_with_buying_roles": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.778000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_decision_makers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.800000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_open_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.800000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "19015508766"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_parent_company_id": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:10:05.844000Z",
+            "value": "19021320226"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "companies-lifecycle-pipeline"
+          }
+        ],
+        "hs_target_account_probability": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T16:10:37.339000Z",
+            "value": "0.38625118136405945"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:57.329000Z",
+            "value": "0.4076234698295593"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:37:54.020000Z",
+            "value": "0.49565839767456055"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:37:53.193Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "industry": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "COMPUTER_SOFTWARE"
+          }
+        ],
+        "is_public": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-22T14:19:02.860000Z",
+            "value": "false"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "true"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "lead"
+          }
+        ],
+        "linkedin_company_page": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "https://www.linkedin.com/company/liveramp"
+          }
+        ],
+        "linkedinbio": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "LiveRamp Holdings, Inc., formerly known as Acxiom Corporation, is a San Francisco, California-based SaaS company that offers a data connectivity platform whose services include data onboarding, the transfer of offline data online for marketing purposes."
+          }
+        ],
+        "name": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "Arbor"
+          }
+        ],
+        "num_associated_contacts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:33.204000Z",
+            "value": "1"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:54.801000Z",
+            "value": "0"
+          }
+        ],
+        "num_conversion_events": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.572000Z",
+            "value": "0"
+          }
+        ],
+        "numberofemployees": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T22:08:41.735000Z",
+            "updatedByUserId": 63843671,
+            "value": "4001"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:54:50.460000Z",
+            "updatedByUserId": 63843671,
+            "value": "4000"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "5000"
+          }
+        ],
+        "phone": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "+1 415-243-0776"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "NY"
+          }
+        ],
+        "timezone": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "America/New_York"
+          }
+        ],
+        "total_money_raised": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-22T14:19:02.860000Z",
+            "value": "9050000"
+          }
+        ],
+        "twitterhandle": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "LiveRamp"
+          }
+        ],
+        "web_technologies": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-22T14:19:02.860000Z",
+            "value": "aws_route_53;google_tag_manager"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:37:53.530000Z",
+            "value": "aws_route_53;wistia;wordpress;unbounce;facebook_advertiser;salesforce;app_nexus;drift;nginx;sendgrid;mailgun;marketo;google_analytics;google_apps;bug_herd;qualtrics;google_maps;live_chat;hotjar;google_tag_manager;bing_advertiser"
+          }
+        ],
+        "website": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "arbor.io"
+          }
+        ],
+        "zip": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:37:53.193000Z",
+            "updatedByUserId": 63843671,
+            "value": "10012"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-22T14:19:02.860000Z"
+    }
+  ],
+  [
+    "acmeCo/companies",
+    {
+      "archived": false,
+      "contacts": [
+        51,
+        201,
+        51,
+        201
+      ],
+      "createdAt": "2024-02-08T02:36:27.739000Z",
+      "id": 19015593502,
+      "properties": {
+        "address": "244 5th Avenue",
+        "address2": "1277",
+        "annualrevenue": "1000000",
+        "city": "New York",
+        "country": "United States",
+        "createdate": "2024-02-08T02:36:27.739Z",
+        "description": "Estuary is a real-time data operations platform that helps organizations gain real-time access to their data without having to manage infrastructure. They provide fully managed real-time data pipelines, streaming SQL, and turnkey connectivity to clouds...",
+        "domain": "estuary.dev",
+        "first_contact_createdate": "2024-02-08T02:34:10.795Z",
+        "founded_year": "2019",
+        "hs_all_owner_ids": "722900407",
+        "hs_analytics_first_timestamp": "2024-02-08T02:34:10.795Z",
+        "hs_analytics_latest_source": "OFFLINE",
+        "hs_analytics_latest_source_data_1": "CRM_UI",
+        "hs_analytics_latest_source_data_2": "userId:63843671",
+        "hs_analytics_latest_source_timestamp": "2024-02-08T16:11:29.338Z",
+        "hs_analytics_num_page_views": "0",
+        "hs_analytics_num_visits": "0",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "API",
+        "hs_analytics_source_data_2": "sample-contact",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_lead": "2024-02-08T02:36:27.739Z",
+        "hs_lastmodifieddate": "2024-02-29T17:12:01.335Z",
+        "hs_num_blockers": "0",
+        "hs_num_child_companies": "0",
+        "hs_num_contacts_with_buying_roles": "0",
+        "hs_num_decision_makers": "0",
+        "hs_num_open_deals": "0",
+        "hs_object_id": "19015593502",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_target_account_probability": "0.5596858859062195",
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hubspot_owner_assigneddate": "2024-02-08T02:36:27.739Z",
+        "hubspot_owner_id": "722900407",
+        "industry": "COMPUTER_SOFTWARE",
+        "is_public": "false",
+        "lifecyclestage": "lead",
+        "linkedin_company_page": "https://www.linkedin.com/company/estuary-development",
+        "linkedinbio": "Estuary is a real-time data operations platform that helps organizations gain real-time access to their data without having to manage infrastructure. They provide fully managed real-time data pipelines, streaming SQL, and turnkey connectivity to clouds...",
+        "name": "Estuary",
+        "notes_last_updated": "2024-02-15T17:25:49.545Z",
+        "num_associated_contacts": "2",
+        "num_contacted_notes": "0",
+        "num_conversion_events": "0",
+        "num_notes": "1",
+        "numberofemployees": "16",
+        "state": "NY",
+        "timezone": "America/New_York",
+        "twitterhandle": "EstuaryDev",
+        "type": "PARTNER",
+        "web_technologies": "google_tag_manager;google_analytics;google_apps;hubspot",
+        "website": "estuary.dev",
+        "zip": "10001"
+      },
+      "propertiesWithHistory": {
+        "address": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "244 5th Avenue"
+          }
+        ],
+        "address2": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "1277"
+          }
+        ],
+        "annualrevenue": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-29T17:12:01.335000Z",
+            "updatedByUserId": 63843671,
+            "value": "1000000"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "10000000"
+          }
+        ],
+        "city": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "New York"
+          }
+        ],
+        "country": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:36:27.924000Z",
+            "value": "United States"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:36:27.739Z"
+          }
+        ],
+        "description": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "Estuary is a real-time data operations platform that helps organizations gain real-time access to their data without having to manage infrastructure. They provide fully managed real-time data pipelines, streaming SQL, and turnkey connectivity to clouds..."
+          }
+        ],
+        "domain": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "estuary.dev"
+          }
+        ],
+        "first_contact_createdate": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:54.869000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.440000Z",
+            "value": "2024-02-08T16:11:29.216Z"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "founded_year": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:36:27.924000Z",
+            "value": "2019"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_analytics_first_timestamp": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:54.869000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.440000Z",
+            "value": "2024-02-08T16:11:29.216Z"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hs_analytics_latest_source": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.017000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_latest_source_data_1": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_analytics_latest_source_data_2": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_analytics_latest_source_timestamp": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:58.715000Z",
+            "value": "2024-02-08T16:11:29.338Z"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.008000Z",
+            "value": "2024-02-08T16:09:32.494Z"
+          }
+        ],
+        "hs_analytics_num_page_views": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_visits": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.008000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:51.696000Z",
+            "value": "API"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.011000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:51.690000Z",
+            "value": "sample-contact"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.010000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "value": "2024-02-08T02:36:27.739Z"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-29T17:12:01.335000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-29T17:12:01.335Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-28T22:41:14.697000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-28T22:41:14.697Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-27T06:53:41.988000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-27T06:53:41.988Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:26:37.587000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-22T23:26:37.587Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:23:08.594000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-22T23:23:08.594Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-19T23:39:42.776000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-19T23:39:42.776Z"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "2024-02-19T21:39:53.367Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-18T17:52:20.186000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-18T17:52:20.186Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-18T06:08:57.124000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-18T06:08:57.124Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-18T03:29:14.434000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-18T03:29:14.434Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T21:17:08.372000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-17T21:17:08.372Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T20:53:35.872000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-17T20:53:35.872Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T20:47:43.798000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-17T20:47:43.798Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T20:29:18.374000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-17T20:29:18.374Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:02:54.959000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T23:02:54.959Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-16T22:56:59.886000Z",
+            "value": "2024-02-16T22:56:59.886Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T22:53:03.486000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T22:53:03.486Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T22:49:04.665000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T22:49:04.665Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T21:58:32.815000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T21:58:32.815Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T17:37:34.730000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T17:37:34.730Z"
+          }
+        ],
+        "hs_num_blockers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:29.174000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_child_companies": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:29.173000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_contacts_with_buying_roles": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:29.172000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_decision_makers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:29.172000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_open_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:29.174000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "19015593502"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "companies-lifecycle-pipeline"
+          }
+        ],
+        "hs_target_account_probability": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T22:10:53.915000Z",
+            "value": "0.5596858859062195"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T22:09:58.632000Z",
+            "value": "0.38625118136405945"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T16:11:43.820000Z",
+            "value": "0.5596858859062195"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T16:10:22.578000Z",
+            "value": "0.38625118136405945"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:36:31.248000Z",
+            "value": "0.4076234698295593"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:36:28.052000Z",
+            "value": "0.49565839767456055"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:36:27.739Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "industry": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "COMPUTER_SOFTWARE"
+          }
+        ],
+        "is_public": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:36:27.924000Z",
+            "value": "false"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "lead"
+          }
+        ],
+        "linkedin_company_page": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "https://www.linkedin.com/company/estuary-development"
+          }
+        ],
+        "linkedinbio": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "Estuary is a real-time data operations platform that helps organizations gain real-time access to their data without having to manage infrastructure. They provide fully managed real-time data pipelines, streaming SQL, and turnkey connectivity to clouds..."
+          }
+        ],
+        "name": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "Estuary"
+          }
+        ],
+        "notes_last_updated": [
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-16T22:56:59.825000Z",
+            "value": "2024-02-15T17:25:49.545Z"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T18:06:43.556000Z",
+            "value": "2024-02-15T17:44:16.024Z"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T18:06:15.315000Z",
+            "value": "2024-02-15T18:06:08.845Z"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T18:06:02.541000Z",
+            "value": "2024-02-15T17:44:16.024Z"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:54:19.784000Z",
+            "value": "2024-02-15T17:54:14.726Z"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:44:21.881000Z",
+            "value": "2024-02-15T17:44:16.024Z"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:25:56.485000Z",
+            "value": "2024-02-15T17:25:49.545Z"
+          }
+        ],
+        "num_associated_contacts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:51.689000Z",
+            "value": "2"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.439000Z",
+            "value": "1"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:42.224000Z",
+            "value": "2"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.008000Z",
+            "value": "1"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:29.172000Z",
+            "value": "0"
+          }
+        ],
+        "num_contacted_notes": [
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:25:56.485000Z",
+            "value": "0"
+          }
+        ],
+        "num_conversion_events": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.010000Z",
+            "value": "0"
+          }
+        ],
+        "num_notes": [
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-16T22:56:59.825000Z",
+            "value": "1"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T18:06:43.556000Z",
+            "value": "2"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T18:06:15.315000Z",
+            "value": "3"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T18:06:02.541000Z",
+            "value": "2"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:54:19.784000Z",
+            "value": "3"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:44:21.881000Z",
+            "value": "2"
+          },
+          {
+            "sourceId": "rollup",
+            "sourceType": "ENGAGEMENTS",
+            "timestamp": "2024-02-15T17:25:56.485000Z",
+            "value": "1"
+          }
+        ],
+        "numberofemployees": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-28T22:41:14.697000Z",
+            "updatedByUserId": 63843671,
+            "value": "16"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-27T06:53:41.988000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:26:37.587000Z",
+            "updatedByUserId": 63843671,
+            "value": "16"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:23:08.594000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-19T23:39:42.776000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-18T17:52:20.186000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-18T06:08:57.124000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-18T03:29:14.434000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T21:17:08.372000Z",
+            "updatedByUserId": 63843671,
+            "value": "16"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T20:53:35.872000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T20:47:43.798000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-17T20:29:18.374000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:02:54.959000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T22:53:03.486000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T22:49:04.665000Z",
+            "updatedByUserId": 63843671,
+            "value": "13"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T21:58:32.815000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T17:37:34.730000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:24:50.065000Z",
+            "updatedByUserId": 63843671,
+            "value": "14"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:21:40.212000Z",
+            "updatedByUserId": 63843671,
+            "value": "15"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T16:22:08.223000Z",
+            "updatedByUserId": 63843671,
+            "value": "16"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "NY"
+          }
+        ],
+        "timezone": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "America/New_York"
+          }
+        ],
+        "twitterhandle": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "EstuaryDev"
+          }
+        ],
+        "type": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-14T17:27:50.900000Z",
+            "updatedByUserId": 63843671,
+            "value": "PARTNER"
+          }
+        ],
+        "web_technologies": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "google_tag_manager;google_analytics;google_apps;hubspot"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-08T02:36:27.924000Z",
+            "value": "apache;hotjar;wordpress;google_tag_manager;google_analytics;piwik;google_apps;hubspot"
+          }
+        ],
+        "website": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:36:27.739000Z",
+            "updatedByUserId": 63843671,
+            "value": "estuary.dev"
+          }
+        ],
+        "zip": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-02-19T21:39:53.367000Z",
+            "value": "10001"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-29T17:12:01.335000Z"
+    }
+  ],
+  [
+    "acmeCo/companies",
+    {
+      "archived": false,
+      "createdAt": "2024-02-08T17:09:41.623000Z",
+      "id": 19021320226,
+      "properties": {
+        "city": "New York",
+        "createdate": "2024-02-08T17:09:41.623Z",
+        "hs_all_owner_ids": "722900407",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_lead": "2024-02-08T17:09:41.623Z",
+        "hs_lastmodifieddate": "2024-02-08T21:52:54.064Z",
+        "hs_num_blockers": "0",
+        "hs_num_child_companies": "1",
+        "hs_num_contacts_with_buying_roles": "0",
+        "hs_num_decision_makers": "0",
+        "hs_num_open_deals": "0",
+        "hs_object_id": "19021320226",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_target_account_probability": "0.4076234698295593",
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hubspot_owner_assigneddate": "2024-02-08T17:09:41.623Z",
+        "hubspot_owner_id": "722900407",
+        "lifecyclestage": "lead",
+        "name": "LiveRamp",
+        "num_associated_contacts": "0",
+        "state": "NY",
+        "type": "PROSPECT"
+      },
+      "propertiesWithHistory": {
+        "city": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:52:54.064000Z",
+            "updatedByUserId": 63843671,
+            "value": "New York"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T17:09:41.623Z"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "value": "2024-02-08T17:09:41.623Z"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:52:54.064000Z",
+            "value": "2024-02-08T21:52:54.064Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T20:47:47.235000Z",
+            "value": "2024-02-08T20:47:47.235Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:10:04.990000Z",
+            "value": "2024-02-08T17:10:04.990Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T17:09:46.673000Z",
+            "value": "2024-02-08T17:09:46.673Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.918000Z",
+            "value": "2024-02-08T17:09:44.918Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "value": "2024-02-08T17:09:41.623Z"
+          }
+        ],
+        "hs_num_blockers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.908000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_child_companies": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:10:04.974000Z",
+            "value": "1"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.908000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_contacts_with_buying_roles": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.934000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_decision_makers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.908000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_open_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.908000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "19021320226"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "companies-lifecycle-pipeline"
+          }
+        ],
+        "hs_target_account_probability": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T17:09:46.673000Z",
+            "value": "0.4076234698295593"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T17:09:41.623Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "lead"
+          }
+        ],
+        "name": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T17:09:41.623000Z",
+            "updatedByUserId": 63843671,
+            "value": "LiveRamp"
+          }
+        ],
+        "num_associated_contacts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T17:09:44.908000Z",
+            "value": "0"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:52:54.064000Z",
+            "updatedByUserId": 63843671,
+            "value": "NY"
+          }
+        ],
+        "type": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T20:47:47.235000Z",
+            "updatedByUserId": 63843671,
+            "value": "PROSPECT"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-08T21:52:54.064000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "archived": false,
+      "createdAt": "2024-02-08T02:34:10.399000Z",
+      "id": 1,
+      "properties": {
+        "city": "Brisbane",
+        "company": "HubSpot",
+        "createdate": "2024-02-08T02:34:10.399Z",
+        "email": "emailmaria@hubspot.com",
+        "first_deal_created_date": "2024-02-08T02:34:37.277Z",
+        "firstname": "Maria",
+        "hs_analytics_average_page_views": "0",
+        "hs_analytics_first_timestamp": "2024-02-08T02:34:10.388Z",
+        "hs_analytics_num_event_completions": "0",
+        "hs_analytics_num_page_views": "0",
+        "hs_analytics_num_visits": "0",
+        "hs_analytics_revenue": "0.0",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "API",
+        "hs_analytics_source_data_2": "sample-contact",
+        "hs_date_entered_lead": "2024-02-08T02:34:10.388Z",
+        "hs_date_entered_opportunity": "2024-02-08T02:34:38.253Z",
+        "hs_date_exited_lead": "2024-02-08T02:34:38.253Z",
+        "hs_is_unworked": "true",
+        "hs_latest_source": "OFFLINE",
+        "hs_latest_source_data_1": "API",
+        "hs_latest_source_data_2": "sample-contact",
+        "hs_latest_source_timestamp": "2024-02-08T02:34:10.499Z",
+        "hs_lifecyclestage_lead_date": "2024-02-08T02:34:10.388Z",
+        "hs_lifecyclestage_opportunity_date": "2024-02-08T02:34:38.253Z",
+        "hs_marketable_reason_id": "Sample Contact",
+        "hs_marketable_reason_type": "SAMPLE_CONTACT",
+        "hs_marketable_status": "true",
+        "hs_marketable_until_renewal": "true",
+        "hs_object_id": "1",
+        "hs_object_source": "API",
+        "hs_object_source_id": "sample-contact",
+        "hs_object_source_label": "INTERNAL_PROCESSING",
+        "hs_pipeline": "contacts-lifecycle-pipeline",
+        "hs_sequences_actively_enrolled_count": "0",
+        "hs_social_facebook_clicks": "0",
+        "hs_social_google_plus_clicks": "0",
+        "hs_social_linkedin_clicks": "0",
+        "hs_social_num_broadcast_clicks": "0",
+        "hs_social_twitter_clicks": "0",
+        "hs_time_between_contact_creation_and_deal_creation": "26878",
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_opportunity": "redacted",
+        "hs_v2_cumulative_time_in_lead": "27865",
+        "hs_v2_date_entered_lead": "2024-02-08T02:34:10.388Z",
+        "hs_v2_date_entered_opportunity": "2024-02-08T02:34:38.253Z",
+        "hs_v2_date_exited_lead": "2024-02-08T02:34:38.253Z",
+        "hs_v2_latest_time_in_lead": "27865",
+        "jobtitle": "Salesperson",
+        "lastmodifieddate": "2024-02-08T02:34:44.268Z",
+        "lastname": "Johnson (Sample Contact)",
+        "lifecyclestage": "opportunity",
+        "num_associated_deals": "1",
+        "state": "QLD",
+        "website": "http://www.HubSpot.com"
+      },
+      "propertiesWithHistory": {
+        "city": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Brisbane"
+          }
+        ],
+        "company": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "HubSpot"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "2024-02-08T02:34:10.399Z"
+          }
+        ],
+        "email": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "emailmaria@hubspot.com"
+          }
+        ],
+        "first_deal_created_date": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:39.295000Z",
+            "value": "2024-02-08T02:34:37.277Z"
+          }
+        ],
+        "firstname": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Maria"
+          }
+        ],
+        "hs_analytics_average_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_first_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "2024-02-08T02:34:10.388Z"
+          }
+        ],
+        "hs_analytics_num_event_completions": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_visits": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_revenue": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0.0"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "API"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "2024-02-08T02:34:10.388Z"
+          }
+        ],
+        "hs_date_entered_opportunity": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.253000Z",
+            "value": "2024-02-08T02:34:38.253Z"
+          }
+        ],
+        "hs_date_exited_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.253000Z",
+            "value": "2024-02-08T02:34:38.253Z"
+          }
+        ],
+        "hs_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "true"
+          }
+        ],
+        "hs_latest_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_latest_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "API"
+          }
+        ],
+        "hs_latest_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_latest_source_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "2024-02-08T02:34:10.499Z"
+          }
+        ],
+        "hs_lifecyclestage_lead_date": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "2024-02-08T02:34:10.388Z"
+          }
+        ],
+        "hs_lifecyclestage_opportunity_date": [
+          {
+            "sourceId": "deals-lifecycle-sync",
+            "sourceType": "DEALS",
+            "timestamp": "2024-02-08T02:34:38.253000Z",
+            "value": "2024-02-08T02:34:38.253Z"
+          }
+        ],
+        "hs_marketable_reason_id": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.693000Z",
+            "value": "Sample Contact"
+          }
+        ],
+        "hs_marketable_reason_type": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.693000Z",
+            "value": "SAMPLE_CONTACT"
+          }
+        ],
+        "hs_marketable_status": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.693000Z",
+            "value": "true"
+          }
+        ],
+        "hs_marketable_until_renewal": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.693000Z",
+            "value": "true"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "1"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "API"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "INTERNAL_PROCESSING"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "contacts-lifecycle-pipeline"
+          }
+        ],
+        "hs_sequences_actively_enrolled_count": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:11.820000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_facebook_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_google_plus_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_linkedin_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_num_broadcast_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_twitter_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "0"
+          }
+        ],
+        "hs_time_between_contact_creation_and_deal_creation": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:39.306000Z",
+            "value": "26878"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_opportunity": "redacted",
+        "hs_v2_cumulative_time_in_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:44.257000Z",
+            "value": "27865"
+          }
+        ],
+        "hs_v2_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:13.359000Z",
+            "value": "2024-02-08T02:34:10.388Z"
+          }
+        ],
+        "hs_v2_date_entered_opportunity": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:44.304000Z",
+            "value": "2024-02-08T02:34:38.253Z"
+          }
+        ],
+        "hs_v2_date_exited_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:44.258000Z",
+            "value": "2024-02-08T02:34:38.253Z"
+          }
+        ],
+        "hs_v2_latest_time_in_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:44.257000Z",
+            "value": "27865"
+          }
+        ],
+        "jobtitle": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Salesperson"
+          }
+        ],
+        "lastmodifieddate": [
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:44.268000Z",
+            "value": "2024-02-08T02:34:44.268Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:39.306000Z",
+            "value": "2024-02-08T02:34:39.306Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:38.253000Z",
+            "value": "2024-02-08T02:34:38.253Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:15.950000Z",
+            "value": "2024-02-08T02:34:15.950Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:13.375000Z",
+            "value": "2024-02-08T02:34:13.375Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:11.836000Z",
+            "value": "2024-02-08T02:34:11.836Z"
+          },
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.693000Z",
+            "value": "2024-02-08T02:34:10.693Z"
+          },
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.399000Z",
+            "value": "2024-02-08T02:34:10.399Z"
+          }
+        ],
+        "lastname": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Johnson (Sample Contact)"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "deals-lifecycle-sync",
+            "sourceType": "DEALS",
+            "timestamp": "2024-02-08T02:34:38.253000Z",
+            "value": "opportunity"
+          },
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "lead"
+          }
+        ],
+        "num_associated_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:39.295000Z",
+            "value": "1"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "QLD"
+          }
+        ],
+        "website": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "http://www.HubSpot.com"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-08T02:34:44.268000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "archived": false,
+      "companies": [
+        19015593502,
+        19015593502
+      ],
+      "createdAt": "2024-02-08T02:34:10.795000Z",
+      "id": 51,
+      "properties": {
+        "associatedcompanyid": "19015593502",
+        "city": "Cambridge",
+        "company": "HubSpot",
+        "createdate": "2024-02-08T02:34:10.795Z",
+        "email": "bh@hubspot.com",
+        "firstname": "Brian",
+        "hs_all_owner_ids": "722900407",
+        "hs_analytics_average_page_views": "0",
+        "hs_analytics_first_timestamp": "2024-02-08T02:34:10.795Z",
+        "hs_analytics_num_event_completions": "0",
+        "hs_analytics_num_page_views": "0",
+        "hs_analytics_num_visits": "0",
+        "hs_analytics_revenue": "0.0",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "API",
+        "hs_analytics_source_data_2": "sample-contact",
+        "hs_count_is_unworked": "1",
+        "hs_count_is_worked": "0",
+        "hs_date_entered_lead": "2024-02-08T02:34:10.795Z",
+        "hs_is_unworked": "true",
+        "hs_latest_source": "OFFLINE",
+        "hs_latest_source_data_1": "API",
+        "hs_latest_source_data_2": "sample-contact",
+        "hs_latest_source_timestamp": "2024-02-08T02:34:10.891Z",
+        "hs_lifecyclestage_lead_date": "2024-02-08T02:34:10.795Z",
+        "hs_marketable_reason_id": "Sample Contact",
+        "hs_marketable_reason_type": "SAMPLE_CONTACT",
+        "hs_marketable_status": "true",
+        "hs_marketable_until_renewal": "true",
+        "hs_object_id": "51",
+        "hs_object_source": "API",
+        "hs_object_source_id": "sample-contact",
+        "hs_object_source_label": "INTERNAL_PROCESSING",
+        "hs_pipeline": "contacts-lifecycle-pipeline",
+        "hs_sequences_actively_enrolled_count": "0",
+        "hs_social_facebook_clicks": "0",
+        "hs_social_google_plus_clicks": "0",
+        "hs_social_linkedin_clicks": "0",
+        "hs_social_num_broadcast_clicks": "0",
+        "hs_social_twitter_clicks": "0",
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hs_v2_date_entered_lead": "2024-02-08T02:34:10.795Z",
+        "hubspot_owner_assigneddate": "2024-02-15T18:48:26.440Z",
+        "hubspot_owner_id": "722900407",
+        "jobtitle": "CEO",
+        "lastmodifieddate": "2024-02-15T18:48:26.440Z",
+        "lastname": "Halligan (Sample Contact)",
+        "lifecyclestage": "lead",
+        "state": "MA",
+        "twitterhandle": "bhalligan",
+        "twitterprofilephoto": "https://pbs.twimg.com/profile_images/3491742741/212e42c07d3348251da10872e85aa6b0.jpeg",
+        "website": "http://www.HubSpot.com"
+      },
+      "propertiesWithHistory": {
+        "associatedcompanyid": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:54.210000Z",
+            "value": "19015593502"
+          }
+        ],
+        "city": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Cambridge"
+          }
+        ],
+        "company": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "HubSpot"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          }
+        ],
+        "email": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "bh@hubspot.com"
+          }
+        ],
+        "firstname": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Brian"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_analytics_average_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_first_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          }
+        ],
+        "hs_analytics_num_event_completions": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_visits": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_revenue": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0.0"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "API"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_count_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "1"
+          }
+        ],
+        "hs_count_is_worked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          }
+        ],
+        "hs_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "true"
+          }
+        ],
+        "hs_latest_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_latest_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "API"
+          }
+        ],
+        "hs_latest_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_latest_source_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "2024-02-08T02:34:10.891Z"
+          }
+        ],
+        "hs_lifecyclestage_lead_date": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          }
+        ],
+        "hs_marketable_reason_id": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:11.065000Z",
+            "value": "Sample Contact"
+          }
+        ],
+        "hs_marketable_reason_type": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:11.065000Z",
+            "value": "SAMPLE_CONTACT"
+          }
+        ],
+        "hs_marketable_status": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:11.065000Z",
+            "value": "true"
+          }
+        ],
+        "hs_marketable_until_renewal": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:11.065000Z",
+            "value": "true"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "51"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "API"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "INTERNAL_PROCESSING"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "contacts-lifecycle-pipeline"
+          }
+        ],
+        "hs_sequences_actively_enrolled_count": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:12.843000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_facebook_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_google_plus_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_linkedin_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_num_broadcast_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_twitter_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "0"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_v2_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:14.672000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:48:26.440Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "jobtitle": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "CEO"
+          }
+        ],
+        "lastmodifieddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:26.440000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:48:26.440Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:10:54.232000Z",
+            "value": "2024-02-08T22:10:54.232Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:19.025000Z",
+            "value": "2024-02-08T02:34:19.025Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:14.683000Z",
+            "value": "2024-02-08T02:34:14.683Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:12.856000Z",
+            "value": "2024-02-08T02:34:12.856Z"
+          },
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:11.065000Z",
+            "value": "2024-02-08T02:34:11.065Z"
+          },
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "2024-02-08T02:34:10.795Z"
+          }
+        ],
+        "lastname": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "Halligan (Sample Contact)"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:10.795000Z",
+            "value": "lead"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "MA"
+          }
+        ],
+        "twitterhandle": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "bhalligan"
+          }
+        ],
+        "twitterprofilephoto": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "https://pbs.twimg.com/profile_images/3491742741/212e42c07d3348251da10872e85aa6b0.jpeg"
+          }
+        ],
+        "website": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-02-08T02:34:10.388000Z",
+            "value": "http://www.HubSpot.com"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-15T18:48:26.440000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "archived": false,
+      "companies": [
+        19015508766,
+        19015508766
+      ],
+      "createdAt": "2024-02-08T16:09:32.359000Z",
+      "id": 151,
+      "properties": {
+        "associatedcompanyid": "19015508766",
+        "createdate": "2024-02-08T16:09:32.359Z",
+        "email": "dave@estuary.dev",
+        "firstname": "Dave",
+        "hs_all_owner_ids": "722900407",
+        "hs_analytics_average_page_views": "0",
+        "hs_analytics_first_timestamp": "2024-02-08T16:09:32.359Z",
+        "hs_analytics_num_event_completions": "0",
+        "hs_analytics_num_page_views": "0",
+        "hs_analytics_num_visits": "0",
+        "hs_analytics_revenue": "0.0",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "CRM_UI",
+        "hs_analytics_source_data_2": "userId:63843671",
+        "hs_count_is_unworked": "1",
+        "hs_count_is_worked": "0",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_lead": "2024-02-08T16:09:32.359Z",
+        "hs_is_unworked": "true",
+        "hs_latest_source": "OFFLINE",
+        "hs_latest_source_data_1": "CRM_UI",
+        "hs_latest_source_data_2": "userId:63843671",
+        "hs_latest_source_timestamp": "2024-02-08T16:09:32.494Z",
+        "hs_lifecyclestage_lead_date": "2024-02-08T16:09:32.359Z",
+        "hs_object_id": "151",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_pipeline": "contacts-lifecycle-pipeline",
+        "hs_sequences_actively_enrolled_count": "0",
+        "hs_social_facebook_clicks": "0",
+        "hs_social_google_plus_clicks": "0",
+        "hs_social_linkedin_clicks": "0",
+        "hs_social_num_broadcast_clicks": "0",
+        "hs_social_twitter_clicks": "0",
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hs_v2_date_entered_lead": "2024-02-08T16:09:32.359Z",
+        "hubspot_owner_assigneddate": "2024-02-08T16:09:32.359Z",
+        "hubspot_owner_id": "722900407",
+        "jobtitle": "CEO",
+        "lastmodifieddate": "2024-02-08T22:09:56.522Z",
+        "lastname": "Yaffe",
+        "lifecyclestage": "lead",
+        "phone": "+13125555555"
+      },
+      "propertiesWithHistory": {
+        "associatedcompanyid": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.439000Z",
+            "value": "19015508766"
+          },
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.142000Z",
+            "value": "19015593502"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "email": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "dave@estuary.dev"
+          }
+        ],
+        "firstname": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "Dave"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_analytics_average_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_first_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hs_analytics_num_event_completions": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_visits": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_revenue": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0.0"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_count_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "1"
+          }
+        ],
+        "hs_count_is_worked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hs_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "true"
+          }
+        ],
+        "hs_latest_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_latest_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_latest_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_latest_source_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "2024-02-08T16:09:32.494Z"
+          }
+        ],
+        "hs_lifecyclestage_lead_date": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "151"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "contacts-lifecycle-pipeline"
+          }
+        ],
+        "hs_sequences_actively_enrolled_count": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:09:36.537000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_facebook_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_google_plus_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_linkedin_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_num_broadcast_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_twitter_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "0"
+          }
+        ],
+        "hs_time_in_lead": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_v2_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:12:15.492000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "jobtitle": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "CEO"
+          }
+        ],
+        "lastmodifieddate": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T22:09:56.522000Z",
+            "value": "2024-02-08T22:09:56.522Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:54:17.426000Z",
+            "value": "2024-02-08T21:54:17.426Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T16:12:15.532000Z",
+            "value": "2024-02-08T16:12:15.532Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:10:20.177000Z",
+            "value": "2024-02-08T16:10:20.177Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T16:09:52.612000Z",
+            "value": "2024-02-08T16:09:52.612Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:09:36.626000Z",
+            "value": "2024-02-08T16:09:36.626Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "value": "2024-02-08T16:09:32.359Z"
+          }
+        ],
+        "lastname": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "Yaffe"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:09:32.359000Z",
+            "updatedByUserId": 63843671,
+            "value": "lead"
+          }
+        ],
+        "phone": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T21:54:17.404000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13125555555"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-08T22:09:56.522000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "archived": false,
+      "companies": [
+        19015593502,
+        19015593502
+      ],
+      "createdAt": "2024-02-08T16:11:29.216000Z",
+      "id": 201,
+      "properties": {
+        "associatedcompanyid": "19015593502",
+        "createdate": "2024-02-08T16:11:29.216Z",
+        "email": "phil@estuary.dev",
+        "firstname": "Phil",
+        "hs_all_owner_ids": "722900407",
+        "hs_analytics_average_page_views": "0",
+        "hs_analytics_first_timestamp": "2024-02-08T16:11:29.216Z",
+        "hs_analytics_num_event_completions": "0",
+        "hs_analytics_num_page_views": "0",
+        "hs_analytics_num_visits": "0",
+        "hs_analytics_revenue": "0.0",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "CRM_UI",
+        "hs_analytics_source_data_2": "userId:63843671",
+        "hs_count_is_unworked": "1",
+        "hs_count_is_worked": "0",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_opportunity": "2024-02-08T16:11:29.216Z",
+        "hs_is_unworked": "true",
+        "hs_latest_source": "OFFLINE",
+        "hs_latest_source_data_1": "CRM_UI",
+        "hs_latest_source_data_2": "userId:63843671",
+        "hs_latest_source_timestamp": "2024-02-08T16:11:29.338Z",
+        "hs_lifecyclestage_opportunity_date": "2024-02-08T16:11:29.216Z",
+        "hs_object_id": "201",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_pipeline": "contacts-lifecycle-pipeline",
+        "hs_sequences_actively_enrolled_count": "0",
+        "hs_social_facebook_clicks": "0",
+        "hs_social_google_plus_clicks": "0",
+        "hs_social_linkedin_clicks": "0",
+        "hs_social_num_broadcast_clicks": "0",
+        "hs_social_twitter_clicks": "0",
+        "hs_time_in_opportunity": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hs_v2_date_entered_opportunity": "2024-02-08T16:11:29.216Z",
+        "hubspot_owner_assigneddate": "2024-02-08T16:11:29.216Z",
+        "hubspot_owner_id": "722900407",
+        "jobtitle": "SWE",
+        "lastmodifieddate": "2024-02-25T20:43:51.308Z",
+        "lifecyclestage": "opportunity",
+        "phone": "+13165565552"
+      },
+      "propertiesWithHistory": {
+        "associatedcompanyid": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:40.271000Z",
+            "value": "19015593502"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "email": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "phil@estuary.dev"
+          }
+        ],
+        "firstname": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "Phil"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_analytics_average_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_first_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "hs_analytics_num_event_completions": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_page_views": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_num_visits": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_analytics_revenue": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0.0"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_count_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "1"
+          }
+        ],
+        "hs_count_is_worked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_opportunity": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "hs_is_unworked": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "true"
+          }
+        ],
+        "hs_latest_source": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_latest_source_data_1": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_latest_source_data_2": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_latest_source_timestamp": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "2024-02-08T16:11:29.338Z"
+          }
+        ],
+        "hs_lifecyclestage_opportunity_date": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "201"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "contacts-lifecycle-pipeline"
+          }
+        ],
+        "hs_sequences_actively_enrolled_count": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:35.294000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_facebook_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_google_plus_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_linkedin_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_num_broadcast_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_social_twitter_clicks": [
+          {
+            "sourceId": "WebAnalyticsPropertyCalculation",
+            "sourceType": "ANALYTICS",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "0"
+          }
+        ],
+        "hs_time_in_opportunity": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_v2_date_entered_opportunity": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:13:37.729000Z",
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "jobtitle": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "SWE"
+          }
+        ],
+        "lastmodifieddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-25T20:43:51.308000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-25T20:43:51.308Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T21:18:43.915000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-23T21:18:43.915Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T21:18:23.203000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-23T21:18:23.203Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T20:03:39.843000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-23T20:03:39.843Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T07:49:42.666000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-23T07:49:42.666Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T00:57:11.352000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-23T00:57:11.352Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:45:35.227000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-22T23:45:35.227Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:28:08.073000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-22T23:28:08.073Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:44.711000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:48:44.711Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:24:22.905000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:24:22.905Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:22:27.142000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:22:27.142Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T16:13:37.738000Z",
+            "value": "2024-02-08T16:13:37.738Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T16:11:46.436000Z",
+            "value": "2024-02-08T16:11:46.436Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:40.303000Z",
+            "value": "2024-02-08T16:11:40.303Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T16:11:35.308000Z",
+            "value": "2024-02-08T16:11:35.308Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "value": "2024-02-08T16:11:29.216Z"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T16:11:29.216000Z",
+            "updatedByUserId": 63843671,
+            "value": "opportunity"
+          }
+        ],
+        "phone": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-25T20:43:51.308000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165565552"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T21:18:43.915000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165565551"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T21:18:23.203000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555551"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T20:03:39.843000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555552"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T07:49:42.666000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555553"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-23T00:57:11.352000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555552"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:45:35.227000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555551"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-22T23:28:08.073000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555550"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:48:44.711000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555557"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:24:22.905000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555556"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:22:27.142000Z",
+            "updatedByUserId": 63843671,
+            "value": "+13165555555"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-25T20:43:51.308000Z"
+    }
+  ],
+  [
+    "acmeCo/deals",
+    {
+      "archived": false,
+      "contacts": [
+        1
+      ],
+      "createdAt": "2024-02-08T02:34:37.277000Z",
+      "id": 17423218541,
+      "properties": {
+        "amount": "1000.0",
+        "closedate": "2024-01-03T09:37:11.118Z",
+        "createdate": "2024-02-08T02:34:37.277Z",
+        "days_to_close": "0",
+        "dealname": "HubSpot - New Deal (Sample Deal)",
+        "dealstage": "appointmentscheduled",
+        "hs_analytics_latest_source_contact": "OFFLINE",
+        "hs_analytics_latest_source_data_1_contact": "API",
+        "hs_analytics_latest_source_data_2_contact": "sample-contact",
+        "hs_analytics_latest_source_timestamp_contact": "2024-02-08T02:34:10.499Z",
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "API",
+        "hs_analytics_source_data_2": "sample-contact",
+        "hs_closed_amount": "0",
+        "hs_closed_amount_in_home_currency": "0",
+        "hs_created_by_user_id": "63843671",
+        "hs_createdate": "2024-02-08T02:34:37.283Z",
+        "hs_date_entered_appointmentscheduled": "2024-02-08T02:34:37.283Z",
+        "hs_deal_stage_probability": "0.200000000000000011102230246251565404236316680908203125",
+        "hs_deal_stage_probability_shadow": "0.200000000000000011102230246251565404236316680908203125",
+        "hs_is_closed_won": "false",
+        "hs_is_deal_split": "false",
+        "hs_lastmodifieddate": "2024-02-08T02:34:41.578Z",
+        "hs_num_target_accounts": "0",
+        "hs_object_id": "17423218541",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_projected_amount": "200.0000000000000111022302462515654042363166809082031250000",
+        "hs_projected_amount_in_home_currency": "200.0000000000000111022302462515654042363166809082031250000",
+        "hs_time_in_appointmentscheduled": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_v2_date_entered_appointmentscheduled": "2024-02-08T02:34:37.283Z",
+        "pipeline": "default"
+      },
+      "propertiesWithHistory": {
+        "amount": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "1000.0"
+          }
+        ],
+        "closedate": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-01-03T09:37:11.118Z"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:34:37.277Z"
+          }
+        ],
+        "days_to_close": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "dealname": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "HubSpot - New Deal (Sample Deal)"
+          }
+        ],
+        "dealstage": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "appointmentscheduled"
+          }
+        ],
+        "hs_analytics_latest_source_contact": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.748000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_latest_source_data_1_contact": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.748000Z",
+            "value": "API"
+          }
+        ],
+        "hs_analytics_latest_source_data_2_contact": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.748000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_analytics_latest_source_timestamp_contact": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.748000Z",
+            "value": "2024-02-08T02:34:10.499Z"
+          }
+        ],
+        "hs_analytics_source": [
+          {
+            "sourceId": "deal sync triggered by vid=1",
+            "sourceType": "DEALS",
+            "timestamp": "2024-02-08T02:34:38.283000Z",
+            "value": "OFFLINE"
+          }
+        ],
+        "hs_analytics_source_data_1": [
+          {
+            "sourceId": "deal sync triggered by vid=1",
+            "sourceType": "DEALS",
+            "timestamp": "2024-02-08T02:34:38.283000Z",
+            "value": "API"
+          }
+        ],
+        "hs_analytics_source_data_2": [
+          {
+            "sourceId": "deal sync triggered by vid=1",
+            "sourceType": "DEALS",
+            "timestamp": "2024-02-08T02:34:38.283000Z",
+            "value": "sample-contact"
+          }
+        ],
+        "hs_closed_amount": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_closed_amount_in_home_currency": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_createdate": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-08T02:34:37.283Z"
+          }
+        ],
+        "hs_date_entered_appointmentscheduled": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "value": "2024-02-08T02:34:37.283Z"
+          }
+        ],
+        "hs_deal_stage_probability": [
+          {
+            "sourceId": "DealStageProbabilityHandler",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.268000Z",
+            "value": "0.200000000000000011102230246251565404236316680908203125"
+          }
+        ],
+        "hs_deal_stage_probability_shadow": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "0.200000000000000011102230246251565404236316680908203125"
+          }
+        ],
+        "hs_is_closed_won": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "false"
+          }
+        ],
+        "hs_is_deal_split": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "false"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:41.578000Z",
+            "value": "2024-02-08T02:34:41.578Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.770000Z",
+            "value": "2024-02-08T02:34:38.770Z"
+          },
+          {
+            "sourceType": "API",
+            "timestamp": "2024-02-08T02:34:38.295000Z",
+            "value": "2024-02-08T02:34:38.295Z"
+          },
+          {
+            "sourceId": "DealStageProbabilityHandler",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.268000Z",
+            "value": "2024-02-08T02:34:38.268Z"
+          },
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "value": "2024-02-08T02:34:37.283Z"
+          }
+        ],
+        "hs_num_target_accounts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.748000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "17423218541"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_projected_amount": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.268000Z",
+            "value": "200.0000000000000111022302462515654042363166809082031250000"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_projected_amount_in_home_currency": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:38.268000Z",
+            "value": "200.0000000000000111022302462515654042363166809082031250000"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_time_in_appointmentscheduled": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_v2_date_entered_appointmentscheduled": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:41.569000Z",
+            "value": "2024-02-08T02:34:37.283Z"
+          }
+        ],
+        "pipeline": [
+          {
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "default"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-08T02:34:41.578000Z"
+    }
+  ],
+  [
+    "acmeCo/engagements",
+    {
+      "archived": false,
+      "createdAt": "2024-02-15T17:25:55.752000Z",
+      "id": 47494434080,
+      "properties": {
+        "hs_all_owner_ids": "722900407",
+        "hs_body_preview": "This is an example note!",
+        "hs_body_preview_html": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note!</p> \n </div>\n </body>\n</html>",
+        "hs_body_preview_is_truncated": "false",
+        "hs_created_by": "63843671",
+        "hs_created_by_user_id": "63843671",
+        "hs_createdate": "2024-02-15T17:25:55.752Z",
+        "hs_engagement_source": "CRM_UI",
+        "hs_engagement_type": "NOTE",
+        "hs_lastmodifieddate": "2024-02-16T23:30:26.472Z",
+        "hs_modified_by": "63843671",
+        "hs_note_body": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note!</p></div>",
+        "hs_object_id": "47494434080",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_timestamp": "2024-02-15T17:25:49.545Z",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hubspot_owner_assigneddate": "2024-02-15T17:25:55.752Z",
+        "hubspot_owner_id": "722900407"
+      },
+      "propertiesWithHistory": {
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_body_preview": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:30:26.472000Z",
+            "updatedByUserId": 63843671,
+            "value": "This is an example note!"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:25:57.680000Z",
+            "updatedByUserId": 63843671,
+            "value": "This is an example note! I've updated it."
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:22:42.344000Z",
+            "updatedByUserId": 63843671,
+            "value": "This is an example note! I've updated it. And again."
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:22:14.952000Z",
+            "updatedByUserId": 63843671,
+            "value": "This is an example note! I've updated it."
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:43:44.008000Z",
+            "updatedByUserId": 63843671,
+            "value": "This is an example note!"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "This is an example note."
+          }
+        ],
+        "hs_body_preview_html": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:30:26.472000Z",
+            "updatedByUserId": 63843671,
+            "value": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note!</p> \n </div>\n </body>\n</html>"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:25:57.680000Z",
+            "updatedByUserId": 63843671,
+            "value": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note! I've updated it.</p> \n </div>\n </body>\n</html>"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:22:42.344000Z",
+            "updatedByUserId": 63843671,
+            "value": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note! I've updated it. And again.</p> \n </div>\n </body>\n</html>"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-16T23:22:14.952000Z",
+            "updatedByUserId": 63843671,
+            "value": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note! I've updated it.</p> \n </div>\n </body>\n</html>"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:43:44.008000Z",
+            "updatedByUserId": 63843671,
+            "value": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note!</p> \n </div>\n </body>\n</html>"
+          },
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "<html>\n <head></head>\n <body>\n <div style=\"\" dir=\"auto\" data-top-level=\"true\"> \n <p style=\"margin:0;\">This is an example note.</p> \n </div>\n </body>\n</html>"
+          }
+        ],
+        "hs_body_preview_is_truncated": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "false"
+          }
+        ],
+        "hs_created_by": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:25:55.752Z"
+          }
+        ],
+        "hs_engagement_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_engagement_type": [
+          {
+            "sourceType": "UNKNOWN",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "value": "NOTE"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:30:26.472000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T23:30:26.472Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:25:57.680000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T23:25:57.680Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:22:42.344000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T23:22:42.344Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:22:14.952000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-16T23:22:14.952Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:43:44.008000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:43:44.008Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:25:55.752Z"
+          }
+        ],
+        "hs_modified_by": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_note_body": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:30:26.472000Z",
+            "updatedByUserId": 63843671,
+            "value": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note!</p></div>"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:25:57.680000Z",
+            "updatedByUserId": 63843671,
+            "value": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note! I've updated it.</p></div>"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:22:42.344000Z",
+            "updatedByUserId": 63843671,
+            "value": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note! I've updated it. And again.</p></div>"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-16T23:22:14.952000Z",
+            "updatedByUserId": 63843671,
+            "value": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note! I've updated it.</p></div>"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:43:44.008000Z",
+            "updatedByUserId": 63843671,
+            "value": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note!</p></div>"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "<div style=\"\" dir=\"auto\" data-top-level=\"true\"><p style=\"margin:0;\">This is an example note.</p></div>"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "47494434080"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_timestamp": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:25:49.545Z"
+          }
+        ],
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T17:25:55.752Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T17:25:55.752000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-16T23:30:26.472000Z"
+    }
+  ],
+  [
+    "acmeCo/tickets",
+    {
+      "archived": false,
+      "contacts": [
+        151
+      ],
+      "createdAt": "2024-02-15T18:46:27.456000Z",
+      "id": 2371913597,
+      "properties": {
+        "content": "Description of this ticket.",
+        "createdate": "2024-02-15T18:46:27.456Z",
+        "hs_all_owner_ids": "722900407",
+        "hs_created_by_user_id": "63843671",
+        "hs_date_entered_1": "2024-02-15T18:46:27.456Z",
+        "hs_helpdesk_sort_timestamp": "2024-02-15T18:46:27.456Z",
+        "hs_is_visible_in_help_desk": "true",
+        "hs_last_message_from_visitor": "false",
+        "hs_lastmodifieddate": "2024-02-15T18:47:39.436Z",
+        "hs_num_associated_conversations": "0",
+        "hs_num_times_contacted": "0",
+        "hs_object_id": "2371913597",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:63843671",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "63843671",
+        "hs_pipeline": "0",
+        "hs_pipeline_stage": "1",
+        "hs_time_in_1": "redacted",
+        "hs_updated_by_user_id": "63843671",
+        "hs_user_ids_of_all_owners": "63843671",
+        "hubspot_owner_assigneddate": "2024-02-15T18:46:27.456Z",
+        "hubspot_owner_id": "722900407",
+        "subject": "Example Ticket"
+      },
+      "propertiesWithHistory": {
+        "content": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:47:39.436000Z",
+            "updatedByUserId": 63843671,
+            "value": "Description of this ticket."
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:46:27.456Z"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_date_entered_1": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "value": "2024-02-15T18:46:27.456Z"
+          }
+        ],
+        "hs_helpdesk_sort_timestamp": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:46:27.456Z"
+          }
+        ],
+        "hs_is_visible_in_help_desk": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:29.884000Z",
+            "value": "true"
+          }
+        ],
+        "hs_last_message_from_visitor": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "false"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:47:39.436000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:47:39.436Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:32.246000Z",
+            "value": "2024-02-15T18:46:32.246Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:29.884000Z",
+            "value": "2024-02-15T18:46:29.884Z"
+          },
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:46:27.456Z"
+          }
+        ],
+        "hs_num_associated_conversations": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:29.812000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_times_contacted": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-15T18:46:29.814000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "2371913597"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "userId:63843671"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "0"
+          }
+        ],
+        "hs_pipeline_stage": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "1"
+          }
+        ],
+        "hs_time_in_1": "redacted",
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "63843671"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "2024-02-15T18:46:27.456Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "722900407"
+          }
+        ],
+        "subject": [
+          {
+            "sourceId": "userId:63843671",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-02-15T18:46:27.456000Z",
+            "updatedByUserId": 63843671,
+            "value": "Example Ticket"
+          }
+        ]
+      },
+      "updatedAt": "2024-02-15T18:47:39.436000Z"
+    }
+  ]
+]

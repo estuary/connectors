@@ -1,0 +1,10 @@
+---
+collections:
+  acmeCo/OtherThings:
+    schema: OtherThings.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/VariousTypes:
+    schema: VariousTypes.schema.yaml
+    key:
+      - /_meta/row_id

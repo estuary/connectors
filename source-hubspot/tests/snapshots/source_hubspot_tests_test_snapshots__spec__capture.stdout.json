@@ -6,6 +6,9 @@
       "properties": {
         "credentials": {
           "description": "Choose how to authenticate to HubSpot.",
+          "discriminator": {
+            "propertyName": "credentials_title"
+          },
           "oneOf": [
             {
               "properties": {
@@ -14,6 +17,7 @@
                   "examples": [
                     "123456789000"
                   ],
+                  "secret": true,
                   "title": "Client ID",
                   "type": "string"
                 },

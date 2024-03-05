@@ -1,0 +1,30 @@
+---
+collections:
+  acmeCo/AgentAvailabilityEvents:
+    schema: AgentAvailabilityEvents.schema.yaml
+    key:
+      - /id
+  acmeCo/AgentStatusEvents:
+    schema: AgentStatusEvents.schema.yaml
+    key:
+      - /id
+  acmeCo/ContactEvents:
+    schema: ContactEvents.schema.yaml
+    key:
+      - /id
+  acmeCo/ConversationEvents:
+    schema: ConversationEvents.schema.yaml
+    key:
+      - /id
+  acmeCo/CustomerEvents:
+    schema: CustomerEvents.schema.yaml
+    key:
+      - /id
+  acmeCo/PaymentRequestEvents:
+    schema: PaymentRequestEvents.schema.yaml
+    key:
+      - /id
+  acmeCo/TaskEvents:
+    schema: TaskEvents.schema.yaml
+    key:
+      - /id

@@ -1,0 +1,86 @@
+---
+$defs:
+  Content:
+    additionalProperties: true
+    properties:
+      _meta:
+        allOf:
+          - $ref: "#/$defs/Meta"
+        default:
+          op: u
+          row_id: -1
+        description: Document metadata
+    title: Content
+    type: object
+  Initiator:
+    additionalProperties: false
+    properties:
+      _meta:
+        allOf:
+          - $ref: "#/$defs/Meta"
+        default:
+          op: u
+          row_id: -1
+        description: Document metadata
+      id:
+        title: Id
+        type: string
+      type:
+        title: Type
+        type: string
+    required:
+      - id
+      - type
+    title: Initiator
+    type: object
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  type:
+    title: Type
+    type: string
+  timestamp:
+    format: date-time
+    title: Timestamp
+    type: string
+  initiator:
+    $ref: "#/$defs/Initiator"
+  content:
+    $ref: "#/$defs/Content"
+required:
+  - id
+  - type
+  - timestamp
+  - initiator
+  - content
+title: Event
+type: object
+x-infer-schema: true

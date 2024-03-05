@@ -1,0 +1,29 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-google-sheets:
+    endpoint:
+      local:
+        command:
+          - python
+          # - "-m"
+          # - "debugpy"
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          - "-m"
+          - source_google_sheets_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: VariousTypes
+          interval: PT5S
+        target: acmeCo/VariousTypes
+      - resource:
+          name: OtherThings
+          interval: PT5S
+        target: acmeCo/OtherThings
+    interval: 3m
+    shards:
+      logLevel: debug

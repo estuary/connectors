@@ -1,0 +1,127 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "title": "Credentials Title"
+            },
+            "access_token": {
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentials_title",
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        },
+        "_OAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "title": "Credentials Title"
+            },
+            "client_id": {
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "title": "Refresh Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentials_title",
+            "client_id",
+            "client_secret",
+            "refresh_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "google"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/_OAuth2Credentials",
+              "Private App Credentials": "#/$defs/AccessToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/_OAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "spreadsheet_url": {
+          "description": "URL of the Google Spreadsheet",
+          "pattern": "^https://docs.google.com/spreadsheets/",
+          "title": "Spreadsheet Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials",
+        "spreadsheet_url"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "oauth2": {
+      "provider": "google",
+      "authUrlTemplate": "https://accounts.google.com/o/oauth2/auth?access_type=offline&prompt=consent&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&scope=https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://oauth2.googleapis.com/token",
+      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
+      "accessTokenHeaders": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "refresh_token": "/refresh_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

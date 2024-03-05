@@ -21,6 +21,8 @@ connectionSpecification:
     credentials:
       title: Authentication
       description: Choose how to authenticate to HubSpot.
+      discriminator:
+        propertyName: credentials_title
       type: object
       oneOf:
         - type: object
@@ -47,6 +49,7 @@ connectionSpecification:
               type: string
               examples:
                 - "123456789000"
+              secret: true
             client_secret:
               title: Client Secret
               description: >-
