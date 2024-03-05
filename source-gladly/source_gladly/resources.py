@@ -5,7 +5,6 @@ from logging import Logger
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import common, Task
 from estuary_cdk.http import HTTPMixin, TokenSource, BasicAuth
-from estuary_cdk.capture.common import LogCursor
 
 from .models import (
     EndpointConfig,
@@ -50,8 +49,12 @@ async def all_resources(
             ),
         )
 
-    # The Gladly Events API allows looking back within the last 24 hours only.
-    started_at = datetime.now(tz=UTC) - timedelta(days=1)
+    # The Gladly Events API allows looking back within the last 24 hours only and does not support
+    # backfilling. The offset of 23 hours means we won't try to immediately request data outside of
+    # the allowable 24 hour window while still making a reasonable effort to grab as much historical
+    # data as possible. This also means that the connector will have 1 hour to advance the cursor
+    # after its initial invocation, which generally shouldn't be a problem.
+    started_at = datetime.now(tz=UTC) - timedelta(hours=23)
 
     return [
         common.Resource(
