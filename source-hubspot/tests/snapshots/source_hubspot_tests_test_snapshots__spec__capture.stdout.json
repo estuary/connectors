@@ -17,6 +17,7 @@
                   "examples": [
                     "123456789000"
                   ],
+                  "secret": true,
                   "title": "Client ID",
                   "type": "string"
                 },
