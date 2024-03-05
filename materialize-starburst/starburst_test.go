@@ -83,12 +83,12 @@ func TestValidateAndApply(t *testing.T) {
 		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
 
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s", targetTableDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
 				"delete from %s where materialization = %s",
-				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
+				targetTableDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				targetTableDialect.Literal(materialization.String()),
 			))
 		},
 	)
