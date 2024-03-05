@@ -45,7 +45,7 @@ def job_fixture(api, account):
         "time_increment": 1,
         "action_attribution_windows": [],
     }
-    interval = pendulum.Period(pendulum.Date(2019, 1, 1), pendulum.Date(2019, 1, 1))
+    interval = pendulum.Interval(pendulum.Date(2019, 1, 1), pendulum.Date(2019, 1, 1))
 
     return InsightAsyncJob(edge_object=account, api=api, interval=interval, params=params)
 
@@ -57,7 +57,7 @@ def grouped_jobs_fixture(mocker):
 
 @pytest.fixture(name="parent_job")
 def parent_job_fixture(api, grouped_jobs):
-    interval = pendulum.Period(pendulum.Date(2019, 1, 1), pendulum.Date(2019, 1, 1))
+    interval = pendulum.Interval(pendulum.Date(2019, 1, 1), pendulum.Date(2019, 1, 1))
     return ParentAsyncJob(api=api, jobs=grouped_jobs, interval=interval)
 
 
@@ -277,7 +277,7 @@ class TestInsightAsyncJob:
         assert failed_job.failed, "should return True if the job previously failed"
 
     def test_str(self, api, account):
-        interval = pendulum.Period(pendulum.Date(2010, 1, 1), pendulum.Date(2011, 1, 1))
+        interval = pendulum.Interval(pendulum.Date(2010, 1, 1), pendulum.Date(2011, 1, 1))
         job = InsightAsyncJob(
             edge_object=account,
             api=api,
@@ -285,7 +285,7 @@ class TestInsightAsyncJob:
             interval=interval,
         )
 
-        assert str(job) == f"InsightAsyncJob(id=<None>, {account}, time_range=<Period [2010-01-01 -> 2011-01-01]>, breakdowns=[10, 20])"
+        assert str(job) == f"InsightAsyncJob(id=<None>, {account}, time_range=<Interval [2010-01-01 -> 2011-01-01]>, breakdowns=[10, 20])"
 
     def test_get_result(self, job, adreport, api):
         job.start()
@@ -332,7 +332,7 @@ class TestInsightAsyncJob:
         today = pendulum.today().date()
         start, end = today - pendulum.duration(days=365 * 3 + 20), today - pendulum.duration(days=365 * 3 + 10)
         params = {"time_increment": 1, "breakdowns": []}
-        job = InsightAsyncJob(api=api, edge_object=edge_class(1), interval=pendulum.Period(start, end), params=params)
+        job = InsightAsyncJob(api=api, edge_object=edge_class(1), interval=pendulum.Interval(start, end), params=params)
         mocker.patch.object(edge_class, "get_insights", return_value=[{id_field: 1}, {id_field: 2}, {id_field: 3}])
 
         small_jobs = job.split_job()
@@ -353,7 +353,7 @@ class TestInsightAsyncJob:
 
     def test_split_job_smallest(self, mocker, api):
         """Test that split will correctly downsize edge_object"""
-        interval = pendulum.Period(pendulum.Date(2010, 1, 1), pendulum.Date(2010, 1, 10))
+        interval = pendulum.Interval(pendulum.Date(2010, 1, 1), pendulum.Date(2010, 1, 10))
         params = {"time_increment": 1, "breakdowns": []}
         job = InsightAsyncJob(api=api, edge_object=Ad(1), interval=interval, params=params)
 
