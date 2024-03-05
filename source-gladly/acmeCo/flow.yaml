@@ -28,7 +28,3 @@ collections:
     schema: TaskEvents.schema.yaml
     key:
       - /id
-  acmeCo/events:
-    schema: events.schema.yaml
-    key:
-      - /id
