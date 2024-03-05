@@ -239,7 +239,7 @@ class API:
 
         schema = {
             "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": ["null", "object"],
+            "type": "object",
             "additionalProperties": True,
             "properties": {
                 "id": {"type": ["null", "string"]},
