@@ -8,7 +8,7 @@ def test_discover(request, snapshot):
             "raw",
             "discover",
             "--source",
-            request.config.rootdir + "/source-facebook-marketing/test.flow.yaml",
+            request.fspath.dirname + "/../test.flow.yaml",
             "-o",
             "json",
             "--emit-raw"
@@ -28,7 +28,7 @@ def test_spec(request, snapshot):
             "raw",
             "spec",
             "--source",
-            request.config.rootdir + "/source-facebook-marketing/test.flow.yaml"
+            request.fspath.dirname + "/../test.flow.yaml",
         ],
         stdout=subprocess.PIPE,
         text=True,

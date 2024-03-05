@@ -18,7 +18,11 @@ from .utils import command_check
 def config_fixture():
     config = {
         "account_id": "123",
-        "access_token": "TOKEN",
+        "credentials": {
+            "access_token": "TOKEN",
+            "client_id": "an-id",
+            "client_secret": "a-secret"
+        },
         "start_date": "2019-10-10T00:00:00Z",
         "end_date": "2020-10-10T00:00:00Z",
     }
