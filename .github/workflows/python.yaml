@@ -7,6 +7,7 @@ on:
       - "estuary-cdk/**"
       - "source-asana/**"
       - "source-gladly/**"
+      - "source-google-ads/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "estuary-cdk/**"
       - "source-asana/**"
       - "source-gladly/**"
+      - "source-google-ads/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
 
@@ -43,6 +45,10 @@ jobs:
           - name: source-gladly
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-google-ads
+            type: capture
+            version: v2
             usage_rate: "1.0"
           - name: source-google-sheets-native
             type: capture
