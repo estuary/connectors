@@ -23,6 +23,25 @@ CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 COMMENT 'Generated for materialization test/sqlite of collection key/value'
 --- End "a-schema".target_table createTargetTable ---
 
+--- Begin "a-schema".target_table loadQuery ---
+SELECT 0, flow_document
+	FROM "a-schema".target_table AS l
+    JOIN "a-schema".target_table_load_temp AS r
+	ON l.key1 = r.key1 AND l.key2 = r.key2
+
+--- End "a-schema".target_table loadQuery ---
+
+--- Begin "a-schema".target_table mergeIntoTarget ---
+MERGE INTO "a-schema".target_table AS l
+	USING "a-schema".target_table_store_temp AS r
+	ON l.key1 = r.key1 AND l.key2 = r.key2
+	WHEN MATCHED THEN
+	UPDATE SET boolean = r.boolean, integer = r.integer, number = r.number, string = r.string, flow_document = r.flow_document
+	WHEN NOT MATCHED THEN
+	INSERT (key1, key2, boolean, integer, number, string, flow_document)
+	VALUES (r.key1, r.key2, r.boolean, r.integer, r.number, r.string, r.flow_document)
+--- End "a-schema".target_table mergeIntoTarget ---
+
 --- Begin "a-schema".target_table createLoadTempTable ---
 CREATE TABLE "a-schema".target_table_load_temp (
 	key1 BIGINT,
@@ -38,14 +57,6 @@ WITH (
 --- Begin "a-schema".target_table dropLoadTempTable ---
 DROP TABLE IF EXISTS "a-schema".target_table_load_temp
 --- End "a-schema".target_table dropLoadTempTable ---
-
---- Begin "a-schema".target_table loadQuery ---
-SELECT 0, flow_document
-	FROM "a-schema".target_table AS l
-    JOIN "a-schema".target_table_load_temp AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
-
---- End "a-schema".target_table loadQuery ---
 
 --- Begin "a-schema".target_table createStoreTempTable ---
 CREATE TABLE "a-schema".target_table_store_temp (
@@ -67,17 +78,6 @@ WITH (
 --- Begin "a-schema".target_table dropStoreTempTable ---
 DROP TABLE IF EXISTS "a-schema".target_table_store_temp
 --- End "a-schema".target_table dropStoreTempTable ---
-
---- Begin "a-schema".target_table mergeIntoTarget ---
-MERGE INTO "a-schema".target_table AS l
-	USING "a-schema".target_table_store_temp AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
-	WHEN MATCHED THEN
-	UPDATE SET boolean = r.boolean, integer = r.integer, number = r.number, string = r.string, flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
-	INSERT (key1, key2, boolean, integer, number, string, flow_document)
-	VALUES (r.key1, r.key2, r.boolean, r.integer, r.number, r.string, r.flow_document)
---- End "a-schema".target_table mergeIntoTarget ---
 
 --- Begin alter table add columns ---
 ALTER TABLE "a-schema".target_table ADD COLUMN first_new_column STRING
