@@ -9,6 +9,8 @@ collections:
         integer: { type: integer }
         number: { type: number }
         string: { type: string }
+        datetime: { type: "string", format: "date-time" }
+        date: { type: "string", format: "date" }
       required: [key1, key2]
     key: [/key1, /key2]
 
