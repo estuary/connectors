@@ -6,7 +6,8 @@
       "_airtable_id": "recEi9L0zVx5T1TXa",
       "_airtable_table_name": "Pizzas",
       "_meta": {
-        "row_id": 1
+        "op": "u",
+        "row_id": 0
       },
       "cost": 200,
       "name": "Pepperoni",
@@ -21,7 +22,8 @@
       "_airtable_id": "recwIuv53qfJI2o7E",
       "_airtable_table_name": "Pizzas",
       "_meta": {
-        "row_id": 2
+        "op": "u",
+        "row_id": 1
       },
       "cost": 100,
       "name": "Pineapple",
@@ -36,7 +38,8 @@
       "_airtable_id": "recyiWwcNMoh2SDvd",
       "_airtable_table_name": "Pizzas",
       "_meta": {
-        "row_id": 3
+        "op": "u",
+        "row_id": 2
       },
       "cost": 300,
       "name": "Cheese",

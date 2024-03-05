@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "estuary-cdk/**"
+      - "source-airtable/**"
       - "source-asana/**"
       - "source-gladly/**"
       - "source-google-ads/**"
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - "estuary-cdk/**"
+      - "source-airtable/**"
       - "source-asana/**"
       - "source-gladly/**"
       - "source-google-ads/**"
@@ -34,6 +36,10 @@ jobs:
           # Note that every entry here must specify usage_rate. We're unable to
           # set a default and selectively override it with `0.0`, because GH actions
           # considers zero values to be "unset" (which is bs and I'm salty about it).
+          - name: source-airtable
+            type: capture
+            version: v1
+            usage_rate: "1.0"
           - name: source-asana
             type: capture
             version: v1
