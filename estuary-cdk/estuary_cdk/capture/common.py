@@ -211,7 +211,7 @@ contract to allow an explicit "roll back" sentinel.
 
 FetchChangesFn yields until no further checkpoints are readily available,
 and then returns. If no checkpoints are available at all,
-it returns yields nothing and returns.
+it yields nothing and returns.
 
 Implementations may block for brief periods to await checkpoints, such as while
 awaiting a server response, but MUST NOT block forever as it prevents the
