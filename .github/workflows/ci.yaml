@@ -121,9 +121,6 @@ jobs:
           - connector: source-airtable
             connector_type: capture
             python: true
-          - connector: source-google-ads
-            connector_type: capture
-            python: true
           - connector: source-facebook-marketing
             connector_type: capture
             python: true
