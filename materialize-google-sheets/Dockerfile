@@ -33,5 +33,6 @@ COPY --from=builder /builder/connector ./materialize-google-sheets
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
+LABEL dev.estuary.usage-rate=0
 
 ENTRYPOINT ["/connector/materialize-google-sheets"]
