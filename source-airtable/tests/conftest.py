@@ -109,10 +109,11 @@ def expected_json_schema():
         "additionalProperties": True,
         "properties": {
             "_airtable_created_time": {"type": ["null", "string"]},
-            "_airtable_id": {"type": ["null", "string"]},
+            "_airtable_id": {"type": "string"},
             "_airtable_table_name": {"type": ["null", "string"]},
             "test": {"type": ["null", "string"]},
         },
+        "required": ["_airtable_id"],
         "type": "object",
     }
 
