@@ -36,6 +36,7 @@ COPY --from=builder /builder/connector ./source-hello-world
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
+LABEL dev.estuary.usage-rate=0
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
