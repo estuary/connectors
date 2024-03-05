@@ -12,6 +12,7 @@ on:
       - "source-google-ads/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
+      - "source-hubspot/**"
   pull_request:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - "source-google-ads/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
+      - "source-hubspot/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -50,10 +52,6 @@ jobs:
             type: capture
             version: v4
             usage_rate: "1.0"
-          - name: source-hubspot-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
           - name: source-gladly
             type: capture
             version: v1
@@ -66,6 +64,14 @@ jobs:
             type: capture
             version: v1
             usage_rate: "0.0"
+          - name: source-hubspot-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-hubspot
+            type: capture
+            version: v5
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4
