@@ -117,31 +117,33 @@
     },
     "protocol": 3032023,
     "resourceConfigSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "description": "ResourceConfig encodes a configured resource stream",
       "properties": {
         "cursorField": {
           "items": {
             "type": "string"
           },
-          "type": [
-            "array",
-            "null"
-          ]
+          "title": "Cursor Field",
+          "type": "array"
         },
         "namespace": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Enclosing schema namespace of this resource",
+          "title": "Namespace",
+          "type": "string"
         },
         "stream": {
+          "description": "Name of this stream",
+          "title": "Stream",
           "type": "string"
         },
         "syncMode": {
+          "description": "Sync this resource incrementally, or fully refresh it every run",
           "enum": [
-            "incremental",
-            "full_refresh"
+            "full_refresh",
+            "incremental"
           ],
+          "title": "Sync Mode",
           "type": "string"
         }
       },
@@ -149,7 +151,7 @@
         "stream",
         "syncMode"
       ],
-      "title": "ResourceSpec",
+      "title": "ResourceConfig",
       "type": "object"
     },
     "resourcePathPointers": [
