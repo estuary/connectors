@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/databricks/databricks-sdk-go/service/files"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 const fileSizeLimit = 128 * 1024 * 1024
@@ -65,7 +65,7 @@ func (f *fileBuffer) Close() error {
 // - flush: Sends the current & final local file to the worker for staging and waits for the worker
 // to complete before returning.
 type stagedFile struct {
-	fields     []string
+	fields []string
 
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
@@ -98,9 +98,9 @@ func newStagedFile(filesAPI *files.FilesAPI, root string, fields []string) *stag
 	var tempdir = os.TempDir()
 
 	return &stagedFile{
-		fields: fields,
-		dir:  filepath.Join(tempdir, uuid),
-		root: root,
+		fields:   fields,
+		dir:      filepath.Join(tempdir, uuid),
+		root:     root,
 		filesAPI: filesAPI,
 	}
 }
@@ -159,23 +159,16 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) flush() ([]string, []string, error) {
+func (f *stagedFile) flush() ([]string, error) {
 	if err := f.putFile(); err != nil {
-		return nil, nil, fmt.Errorf("flush putFile: %w", err)
+		return nil, fmt.Errorf("flush putFile: %w", err)
 	}
 
 	close(f.putFiles)
 	f.started = false
 
-	var toDelete = make([]string, len(f.uploaded))
-	var toCopy = make([]string, len(f.uploaded))
-	for i, u := range f.uploaded {
-		toCopy[i] = u
-		toDelete[i] = f.remoteFilePath(u)
-	}
-
 	// Wait for all outstanding PUT requests to complete.
-	return toCopy, toDelete, f.group.Wait()
+	return f.uploaded, f.group.Wait()
 }
 
 func (f *stagedFile) remoteFilePath(file string) string {
