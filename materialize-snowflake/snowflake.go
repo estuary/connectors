@@ -601,8 +601,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
-	//var hasPipes = len(pipes) > 0
-
 	for stateKey, r := range results {
 		var item = d.cp[stateKey]
 		if _, err := r.RowsAffected(); err != nil {
@@ -734,10 +732,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
-
-	/*if hasPipes {
-		return nil, fmt.Errorf("artificial error")
-	}*/
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
