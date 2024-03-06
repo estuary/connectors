@@ -163,7 +163,7 @@ type templates struct {
 	updateLoad        *template.Template
 	updateReplace     *template.Template
 	updateTruncate    *template.Template
-	storeLoad         *template.Template
+	insertLoad        *template.Template
 	loadQuery         *template.Template
 	loadLoad          *template.Template
 	installFence      *template.Template
@@ -244,7 +244,7 @@ TRUNCATE {{ template "temp_load_name" . }};
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load_{{ $.Binding }}' INTO TABLE {{ template "temp_load_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -278,8 +278,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 -- Template to load data into target table
 
-{{ define "storeLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_store_{{ $.Binding }}' INTO TABLE {{ $.Identifier }}
+{{ define "insertLoad" }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -311,7 +311,7 @@ CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 {{ end }}
 
 {{ define "updateLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_update_{{ $.Binding }}' INTO TABLE {{ template "temp_update_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -406,7 +406,7 @@ UPDATE {{ Identifier $.TablePath }}
 		updateLoad:        tplAll.Lookup("updateLoad"),
 		updateReplace:     tplAll.Lookup("updateReplace"),
 		updateTruncate:    tplAll.Lookup("truncateUpdateTable"),
-		storeLoad:         tplAll.Lookup("storeLoad"),
+		insertLoad:        tplAll.Lookup("insertLoad"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		loadLoad:          tplAll.Lookup("loadLoad"),
 		installFence:      tplAll.Lookup("installFence"),
