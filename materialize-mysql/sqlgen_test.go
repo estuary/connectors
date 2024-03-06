@@ -48,7 +48,7 @@ func TestSQLGeneration(t *testing.T) {
 		templates.tempTruncate,
 		templates.loadLoad,
 		templates.loadQuery,
-		templates.storeLoad,
+		templates.insertLoad,
 		templates.updateLoad,
 		templates.updateReplace,
 		templates.updateTruncate,
