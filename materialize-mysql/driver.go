@@ -604,7 +604,7 @@ func setupBatch(readerSuffix string) batchMeta {
 	}
 }
 
-func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch batchMeta) error {
+func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch *batchMeta) error {
 	batch.w.Flush()
 
 	if err := batch.w.Error(); err != nil {
@@ -618,7 +618,7 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch batchMe
 	return nil
 }
 
-func drainUpdateBatch(ctx context.Context, txn *stdsql.Tx, b *binding, batch batchMeta) error {
+func drainUpdateBatch(ctx context.Context, txn *stdsql.Tx, b *binding, batch *batchMeta) error {
 	if err := drainBatch(ctx, txn, b.updateLoadSQL, batch); err != nil {
 		return fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
 	}
@@ -656,7 +656,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Drain the prior batch as naturally-ordered key groupings are cycled through.
 			lastBatch := batches[lastBinding]
 			if lastBatch.buff.Len() > 0 {
-				if err := drainBatch(ctx, txn, d.bindings[lastBinding].loadLoadSQL, lastBatch); err != nil {
+				if err := drainBatch(ctx, txn, d.bindings[lastBinding].loadLoadSQL, &lastBatch); err != nil {
 					return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 				}
 			}
@@ -698,7 +698,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 
 			if batches[it.Binding].buff.Len() > batchSizeThreshold {
-				if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding]); err != nil {
+				batch := batches[it.Binding]
+				if err := drainBatch(ctx, txn, b.loadLoadSQL, &batch); err != nil {
 					return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 				}
 			}
@@ -710,8 +711,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 		var b = d.bindings[bindingIndex]
-
-		if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding]); err != nil {
+		batch := batches[it.Binding]
+		if err := drainBatch(ctx, txn, b.loadLoadSQL, &batch); err != nil {
 			return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 		}
 	}
@@ -788,14 +789,15 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			var insert = inserts[lastBinding]
 			var b = d.bindings[lastBinding]
 			if insert.buff.Len() > 0 {
-				if err := drainBatch(ctx, txn, b.storeLoadSQL, insert); err != nil {
+				if err := drainBatch(ctx, txn, b.storeLoadSQL, &insert); err != nil {
 					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
 				}
 			}
 
 			var update = updates[lastBinding]
 			if update.buff.Len() > 0 {
-				if err := drainUpdateBatch(ctx, txn, b, updates[lastBinding]); err != nil {
+				batch := updates[lastBinding]
+				if err := drainUpdateBatch(ctx, txn, b, &batch); err != nil {
 					return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
 				}
 			}
@@ -843,7 +845,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			if updates[it.Binding].buff.Len() > batchSizeThreshold {
-				if err := drainUpdateBatch(ctx, txn, b, updates[it.Binding]); err != nil {
+				batch := updates[it.Binding]
+				if err := drainUpdateBatch(ctx, txn, b, &batch); err != nil {
 					return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
 				}
 			}
@@ -853,7 +856,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			if inserts[it.Binding].buff.Len() > batchSizeThreshold {
-				if err := drainBatch(ctx, txn, b.storeLoadSQL, inserts[it.Binding]); err != nil {
+				batch := inserts[it.Binding]
+				if err := drainBatch(ctx, txn, b.storeLoadSQL, &batch); err != nil {
 					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
 				}
 			}
@@ -866,7 +870,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		var b = d.bindings[bindingIndex]
-		if err := drainBatch(ctx, txn, b.storeLoadSQL, insert); err != nil {
+		if err := drainBatch(ctx, txn, b.storeLoadSQL, &insert); err != nil {
 			return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
 		}
 	}
@@ -877,7 +881,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		var b = d.bindings[bindingIndex]
-		if err := drainUpdateBatch(ctx, txn, b, update); err != nil {
+		if err := drainUpdateBatch(ctx, txn, b, &update); err != nil {
 			return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
 		}
 	}
