@@ -21,7 +21,7 @@ import (
 type Resource struct {
 	Mode BackfillMode `json:"mode,omitempty" jsonschema:"title=Backfill Mode,description=How the preexisting contents of the table should be backfilled. This should generally not be changed.,default=,enum=,enum=Normal,enum=Precise,enum=Only Changes,enum=Without Primary Key"`
 
-	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides."`
+	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides.,readOnly=true"`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured.,readOnly=true"`
 
 	// PrimaryKey allows the user to override the "scan key" columns which will be used
