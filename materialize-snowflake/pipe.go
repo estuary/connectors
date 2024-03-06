@@ -40,6 +40,8 @@ func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
 	return fmt.Sprintf("SHA256:%s", base64.StdEncoding.EncodeToString(hash[:])), nil
 }
 
+// See https://docs.snowflake.com/en/developer-guide/sql-api/authenticating#using-key-pair-authentication
+// for details on how the JWT token is constructed
 func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (string, time.Time, error) {
 	fingerprint, err := publicKeyFingerprint(key.Public().(*rsa.PublicKey))
 	if err != nil {
@@ -48,12 +50,11 @@ func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (str
 
 	var qualifiedUser = fmt.Sprintf("%s.%s", strings.ToUpper(accountName), strings.ToUpper(user))
 
+	// JWT tokens for Snowflake can live up to an hour
 	var expiry = time.Now().Add(59 * time.Minute)
 
 	var claims = &jwt.RegisteredClaims{
-		IssuedAt: jwt.NewNumericDate(time.Now()),
-		// TODO: automatically refresh the JWT token
-		// JWT tokens for Snowflake can live up to an hour
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(expiry),
 		Issuer:    fmt.Sprintf("%s.%s", qualifiedUser, fingerprint),
 		Subject:   qualifiedUser,
