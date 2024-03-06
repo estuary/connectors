@@ -5,6 +5,7 @@ set -o pipefail
 set -o nounset
 
 function dropTable() {
+	echo "dropping $1"
 	echo "y" | dbsqlcli -e "DROP TABLE IF EXISTS $1";
 }
 
