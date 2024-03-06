@@ -120,7 +120,8 @@
       "namespace": {
         "type": "string",
         "title": "Schema",
-        "description": "The schema (namespace) in which the table resides."
+        "description": "The schema (namespace) in which the table resides.",
+        "readOnly": true
       },
       "stream": {
         "type": "string",
