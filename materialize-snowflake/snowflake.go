@@ -746,16 +746,6 @@ func (d *transactor) hasStateKey(stateKey string) bool {
 	return false
 }
 
-func (d *transactor) bindingByStateKey(stateKey string) *binding {
-	for _, b := range d.bindings {
-		if b.target.StateKey == stateKey {
-			return b
-		}
-	}
-
-	return nil
-}
-
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	for _, f := range files {
 		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
