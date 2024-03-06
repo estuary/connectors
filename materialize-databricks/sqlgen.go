@@ -146,52 +146,6 @@ func stringCompatible(p pf.Projection) bool {
 // TODO: use create table USING location instead of copying data into temporary table
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
-{{ define "temp_name_load" -}}
-`+"`"+`flow_temp_load_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}`+"`"+`
-{{- end }}
-
-{{ define "temp_name_store" -}}
-`+"`"+`flow_temp_store_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}`+"`"+`
-{{- end }}
-
--- Idempotent creation of the load table for staging load keys.
-{{ define "createLoadTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "temp_name_load" . }} (
-{{- range $ind, $key := $.Table.Keys }}
-	{{- if $ind }},{{ end }}
-	{{ $key.Identifier }} {{ $key.DDL }}
-{{- end }}
-);
-{{ end }}
-
--- Templated truncation of the temporary load table:
-{{ define "truncateLoadTable" }}
-TRUNCATE TABLE {{ template "temp_name_load" . }};
-{{ end }}
-
-{{ define "dropLoadTable" }}
-DROP TABLE IF EXISTS {{ template "temp_name_load" . }}
-{{ end }}
-
--- Idempotent creation of the store table for staging new records.
-{{ define "createStoreTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }} (
-{{- range $ind, $key := $.Table.Columns }}
-	{{- if $ind }},{{ end }}
-	{{ $key.Identifier }} {{ $key.DDL }}
-{{- end }}
-);
-{{ end }}
-
--- Templated truncation of the temporary store table:
-{{ define "truncateStoreTable" }}
-TRUNCATE TABLE {{ template "temp_name_store" . }};
-{{ end }}
-
-{{ define "dropStoreTable" }}
-DROP TABLE IF EXISTS {{ template "temp_name_store" . }}
-{{ end }}
-
 -- Templated creation of a materialized table definition and comments:
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
@@ -222,7 +176,19 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{ if $.Table.Document -}}
 SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
-	JOIN {{ template "temp_name_load" . }} AS r
+	JOIN (
+		{{- range $fi, $file := $.Files }}
+		{{ if $fi }} UNION {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ $key.Identifier }}
+			{{- end }}
+			FROM json.`+"`{{ $file }}`"+`
+		)
+		{{- end }}
+	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
 	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
@@ -261,42 +227,7 @@ SELECT -1, ""
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
-  FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
-	COPY_OPTIONS ( 'mergeSchema' = 'true' )
-  ;
-{{ end }}
-
--- Copy into temporary store table
-{{ define "copyIntoStore" }}
-	COPY INTO {{ template "temp_name_store" . }} FROM (
-    SELECT
-		_metadata.file_name as _metadata_file_name,
-		{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}{{ template "cast" $key.DDL -}}
-		{{- end }}
-    FROM {{ Literal $.StagingPath }}
-	)
-  FILEFORMAT = JSON
-  FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
-	COPY_OPTIONS ( 'mergeSchema' = 'true' )
-  ;
-{{ end }}
-
--- Copy into temporary load table
-{{ define "copyIntoLoad" }}
-	COPY INTO {{ template "temp_name_load" . }} FROM (
-    SELECT
-      {{ range $ind, $key := $.Table.Keys }}
-        {{- if $ind }}, {{ end -}}
-        {{$key.Identifier -}}{{ template "cast" $key.DDL -}}
-      {{- end }}
-    FROM {{ Literal $.StagingPath }}
-  )
-  FILEFORMAT = JSON
-  FILES = (%s)
+  FILES = ('{{ Join $.Files "','" }}')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
@@ -304,12 +235,23 @@ SELECT -1, ""
 
 {{ define "mergeInto" }}
 	MERGE INTO {{ $.Table.Identifier }} AS l
-	USING {{ template "temp_name_store" . }} AS r
+	USING (
+		{{- range $fi, $file := $.Files }}
+		{{ if $fi }} UNION {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{$key.Identifier -}}
+			{{- end }}
+			FROM json.`+"`{{ $file }}`"+`
+		)
+		{{- end }}
+	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 		{{- if $ind }} AND {{ end -}}
 		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
 	{{- end }}
-	AND r._metadata_file_name IN (%s)
 	{{- if $.Table.Document }}
 	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }} <=> NULL THEN
 		DELETE
@@ -339,28 +281,20 @@ SELECT -1, ""
   `)
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateStoreTable  = tplAll.Lookup("createStoreTable")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplTruncateLoad      = tplAll.Lookup("truncateLoadTable")
-	tplTruncateStore     = tplAll.Lookup("truncateStoreTable")
-	tplDropLoad          = tplAll.Lookup("dropLoadTable")
-	tplDropStore         = tplAll.Lookup("dropStoreTable")
 	tplCopyIntoDirect    = tplAll.Lookup("copyIntoDirect")
-	tplCopyIntoLoad      = tplAll.Lookup("copyIntoLoad")
-	tplCopyIntoStore     = tplAll.Lookup("copyIntoStore")
 	tplMergeInto         = tplAll.Lookup("mergeInto")
 )
 
-type Template struct {
+type tableWithFiles struct {
+	Files       []string
 	StagingPath string
-	ShardRange  string
 	Table       *sql.Table
 }
 
-func RenderTable(table sql.Table, stagingPath string, shardRange string, tpl *template.Template) (string, error) {
+func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &Template{Table: &table, StagingPath: stagingPath, ShardRange: shardRange}); err != nil {
+	if err := tpl.Execute(&w, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath}); err != nil {
 		return "", err
 	}
 	return w.String(), nil
