@@ -125,7 +125,8 @@
       "stream": {
         "type": "string",
         "title": "Table Name",
-        "description": "The name of the table to be captured."
+        "description": "The name of the table to be captured.",
+        "readOnly": true
       }
     },
     "type": "object",
