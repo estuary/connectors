@@ -91,9 +91,10 @@ class HTTPSession(abc.ABC):
         form: dict[str, Any] | None,
         _with_token: bool,
     ) -> AsyncGenerator[bytes, None]: ...
-        # TODO(johnny): This is an unstable API.
-        # It may need to accept request headers, or surface response headers,
-        # or we may refactor TokenSource, etc.
+
+    # TODO(johnny): This is an unstable API.
+    # It may need to accept request headers, or surface response headers,
+    # or we may refactor TokenSource, etc.
 
 
 @dataclass
@@ -146,7 +147,7 @@ class TokenSource:
         self, log: Logger, session: HTTPSession, credentials: BaseOAuth2Credentials
     ) -> AccessTokenResponse:
         assert self.oauth_spec
- 
+
         response = await session.request(
             log,
             self.oauth_spec.accessTokenUrlTemplate,
@@ -255,7 +256,11 @@ class HTTPMixin(Mixin, HTTPSession):
                     if self.rate_limiter.failed / self.rate_limiter.total > 0.05:
                         log.warning(
                             "rate limit errors are elevated",
-                            { "limiter": self.rate_limiter },
+                            {
+                                "delay": self.rate_limiter.delay,
+                                "failed": self.rate_limiter.failed,
+                                "total": self.rate_limiter.total,
+                            },
                         )
 
                 elif resp.status >= 500 and resp.status < 600:
