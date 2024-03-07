@@ -155,7 +155,9 @@
         "description": "Alternative schema for this table (optional)"
       },
       "delta_updates": {
-        "type": "boolean"
+        "type": "boolean",
+        "title": "Delta Updates",
+        "description": "Use Private Key authentication to enable Snowpipe for Delta Update bindings"
       }
     },
     "type": "object",
