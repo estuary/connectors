@@ -40,21 +40,13 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
 		for _, tpl := range []*template.Template{
-			tplCreateLoadTable,
-			tplCreateStoreTable,
 			tplLoadQuery,
-			tplTruncateLoad,
-			tplTruncateStore,
-			tplDropLoad,
-			tplDropStore,
 			tplMergeInto,
 			tplCopyIntoDirect,
-			tplCopyIntoStore,
-			tplCopyIntoLoad,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			var tplData = Template{Table: &tbl, StagingPath: "test-staging-path", ShardRange: "shard-range"}
+			var tplData = tableWithFiles{Table: &tbl, StagingPath: "test-staging-path", Files: []string{"file1", "file2"}}
 			snap.WriteString("--- Begin " + testcase + " ---")
 			require.NoError(t, tpl.Execute(&snap, &tplData))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
@@ -89,7 +81,7 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	var tplData = Template{Table: &tableNoValues, StagingPath: "test-staging-path", ShardRange: "shard-range"}
+	var tplData = tableWithFiles{Table: &tableNoValues, StagingPath: "test-staging-path", Files: []string{"file2", "file3"}}
 	require.NoError(t, tplMergeInto.Execute(&snap, &tplData))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 

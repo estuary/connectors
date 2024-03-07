@@ -24,7 +24,6 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
-	"golang.org/x/sync/errgroup"
 
 	_ "github.com/databricks/databricks-sql-go"
 )
@@ -290,48 +289,30 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Copy the staged files in parallel
-	// TODO: we may want to limit the concurrency here, but we don't yet know a good
-	// value for tuning this
-	group, groupCtx := errgroup.WithContext(ctx)
 	var queries []string
 	var toDelete []string
-	// mutex to ensure safety of updating queries
-	m := sync.Mutex{}
 	for idx, b := range d.bindings {
 		if !b.loadFile.started {
 			continue
 		}
 
-		// This is due to a bug in Golang, see https://go.dev/blog/loopvar-preview
-		var bindingCopy = b
-		var idxCopy = idx
-		group.Go(func() error {
-			toLoad, err := bindingCopy.loadFile.flush()
-			if err != nil {
-				return fmt.Errorf("flushing load file for binding[%d]: %w", idxCopy, err)
-			}
-			var fullPaths = pathsWithRoot(bindingCopy.rootStagingPath, toLoad)
+		toLoad, err := b.loadFile.flush()
+		if err != nil {
+			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
+		}
+		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-			if loadQuery, err := RenderTableWithFiles(bindingCopy.target, fullPaths, bindingCopy.rootStagingPath, tplLoadQuery); err != nil {
-				return fmt.Errorf("loadQuery template: %w", err)
-			} else {
-				m.Lock()
-				queries = append(queries, loadQuery)
-				toDelete = append(toDelete, fullPaths...)
-				m.Unlock()
-			}
-
-			return nil
-		})
+		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplLoadQuery); err != nil {
+			return fmt.Errorf("loadQuery template: %w", err)
+		} else {
+			queries = append(queries, loadQuery)
+			toDelete = append(toDelete, fullPaths...)
+		}
 	}
-	defer d.deleteFiles(groupCtx, toDelete)
+	defer d.deleteFiles(ctx, toDelete)
 
 	if it.Err() != nil {
 		return it.Err()
-	}
-
-	if err := group.Wait(); err != nil {
-		return err
 	}
 
 	log.Info("load: finished upload and copying of files")
@@ -421,53 +402,37 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// connector idempotently applies a commit. These are keyed on the binding stateKey so that in
 	// case of a recovery being necessary we don't run queries belonging to bindings that have been
 	// removed.
-
-	// we run these processes in parallel
-	group, _ := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
 			continue
 		}
 
-		var bindingCopy = b
-		var idxCopy = idx
-		group.Go(func() error {
-			toCopy, err := bindingCopy.storeFile.flush()
-			if err != nil {
-				return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
+		toCopy, err := b.storeFile.flush()
+		if err != nil {
+			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+		}
+		var fullPaths = pathsWithRoot(b.rootStagingPath, toCopy)
+
+		var query string
+		// In case of delta updates or if there are no existing keys being stored
+		// we directly copy from staged files into the target table. Note that this is retriable
+		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
+		// not be loaded again
+		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
+		if b.target.DeltaUpdates || !b.needsMerge {
+			if query, err = RenderTableWithFiles(b.target, toCopy, b.rootStagingPath, tplCopyIntoDirect); err != nil {
+				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			}
-			var fullPaths = pathsWithRoot(bindingCopy.rootStagingPath, toCopy)
-
-			var query string
-			// In case of delta updates or if there are no existing keys being stored
-			// we directly copy from staged files into the target table. Note that this is retriable
-			// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
-			// not be loaded again
-			// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-			if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
-				if query, err = RenderTableWithFiles(bindingCopy.target, toCopy, bindingCopy.rootStagingPath, tplCopyIntoDirect); err != nil {
-					return fmt.Errorf("copyIntoDirect template: %w", err)
-				}
-			} else {
-				if query, err = RenderTableWithFiles(bindingCopy.target, fullPaths, bindingCopy.rootStagingPath, tplMergeInto); err != nil {
-					return fmt.Errorf("mergeInto template: %w", err)
-				}
+		} else {
+			if query, err = RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplMergeInto); err != nil {
+				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}
+		}
 
-			d.mu.Lock()
-			defer d.mu.Unlock()
-
-			d.cp[bindingCopy.target.StateKey] = &checkpointItem{
-				Query:    query,
-				ToDelete: fullPaths,
-			}
-
-			return nil
-		})
-	}
-
-	if err := group.Wait(); err != nil {
-		return nil, err
+		d.cp[b.target.StateKey] = &checkpointItem{
+			Query:    query,
+			ToDelete: fullPaths,
+		}
 	}
 
 	log.Info("store: finished file upload and copies")
