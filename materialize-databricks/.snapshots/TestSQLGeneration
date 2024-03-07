@@ -1,50 +1,36 @@
---- Begin `a-schema`.target_table createLoadTable ---
-CREATE TABLE IF NOT EXISTS `flow_temp_load_table_shard-range_0_target_table` (
-	key1 BIGINT NOT NULL,
-	key2 BOOLEAN NOT NULL
-);
---- End `a-schema`.target_table createLoadTable ---
-
---- Begin `a-schema`.target_table createStoreTable ---
-CREATE TABLE IF NOT EXISTS `flow_temp_store_table_shard-range_0_target_table` (
-	key1 BIGINT NOT NULL,
-	key2 BOOLEAN NOT NULL,
-	boolean BOOLEAN,
-	integer BIGINT,
-	number DOUBLE,
-	string STRING,
-	flow_document STRING NOT NULL
-);
---- End `a-schema`.target_table createStoreTable ---
-
 --- Begin `a-schema`.target_table loadQuery ---
 SELECT 0, `a-schema`.target_table.flow_document
 	FROM `a-schema`.target_table
-	JOIN `flow_temp_load_table_shard-range_0_target_table` AS r
+	JOIN (
+		(
+			SELECT
+			key1, key2
+			FROM json.`file1`
+		)
+		 UNION (
+			SELECT
+			key1, key2
+			FROM json.`file2`
+		)
+	) AS r
 	ON `a-schema`.target_table.key1 = r.key1 AND `a-schema`.target_table.key2 = r.key2
 --- End `a-schema`.target_table loadQuery ---
 
---- Begin `a-schema`.target_table truncateLoadTable ---
-TRUNCATE TABLE `flow_temp_load_table_shard-range_0_target_table`;
---- End `a-schema`.target_table truncateLoadTable ---
-
---- Begin `a-schema`.target_table truncateStoreTable ---
-TRUNCATE TABLE `flow_temp_store_table_shard-range_0_target_table`;
---- End `a-schema`.target_table truncateStoreTable ---
-
---- Begin `a-schema`.target_table dropLoadTable ---
-DROP TABLE IF EXISTS `flow_temp_load_table_shard-range_0_target_table`
---- End `a-schema`.target_table dropLoadTable ---
-
---- Begin `a-schema`.target_table dropStoreTable ---
-DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_0_target_table`
---- End `a-schema`.target_table dropStoreTable ---
-
 --- Begin `a-schema`.target_table mergeInto ---
 	MERGE INTO `a-schema`.target_table AS l
-	USING `flow_temp_store_table_shard-range_0_target_table` AS r
+	USING (
+		(
+			SELECT
+			key1, key2, boolean, integer, number, string, flow_document
+			FROM json.`file1`
+		)
+		 UNION (
+			SELECT
+			key1, key2, boolean, integer, number, string, flow_document
+			FROM json.`file2`
+		)
+	) AS r
 	ON l.key1 = r.key1::BIGINT AND l.key2 = r.key2::BOOLEAN
-	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
@@ -61,38 +47,11 @@ DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_0_target_table`
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = (%s)
+  FILES = ('file1','file2')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 --- End `a-schema`.target_table copyIntoDirect ---
-
---- Begin `a-schema`.target_table copyIntoStore ---
-	COPY INTO `flow_temp_store_table_shard-range_0_target_table` FROM (
-    SELECT
-		_metadata.file_name as _metadata_file_name,
-		key1::BIGINT, key2::BOOLEAN, boolean::BOOLEAN, integer::BIGINT, number::DOUBLE, string::STRING, flow_document::STRING
-    FROM 'test-staging-path'
-	)
-  FILEFORMAT = JSON
-  FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
-	COPY_OPTIONS ( 'mergeSchema' = 'true' )
-  ;
---- End `a-schema`.target_table copyIntoStore ---
-
---- Begin `a-schema`.target_table copyIntoLoad ---
-	COPY INTO `flow_temp_load_table_shard-range_0_target_table` FROM (
-    SELECT
-      key1::BIGINT, key2::BOOLEAN
-    FROM 'test-staging-path'
-  )
-  FILEFORMAT = JSON
-  FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
-	COPY_OPTIONS ( 'mergeSchema' = 'true' )
-  ;
---- End `a-schema`.target_table copyIntoLoad ---
 
 --- Begin `a-schema`.target_table createTargetTable ---
 CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
@@ -106,44 +65,25 @@ CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
 ) COMMENT 'Generated for materialization test/sqlite of collection key/value';
 --- End `a-schema`.target_table createTargetTable ---
 
---- Begin `default`.`Delta_Updates` createLoadTable ---
-CREATE TABLE IF NOT EXISTS `flow_temp_load_table_shard-range_1_Delta_Updates` (
-	`theKey` STRING NOT NULL
-);
---- End `default`.`Delta_Updates` createLoadTable ---
-
---- Begin `default`.`Delta_Updates` createStoreTable ---
-CREATE TABLE IF NOT EXISTS `flow_temp_store_table_shard-range_1_Delta_Updates` (
-	`theKey` STRING NOT NULL,
-	`aValue` BIGINT
-);
---- End `default`.`Delta_Updates` createStoreTable ---
-
 --- Begin `default`.`Delta_Updates` loadQuery ---
 SELECT -1, ""
 --- End `default`.`Delta_Updates` loadQuery ---
 
---- Begin `default`.`Delta_Updates` truncateLoadTable ---
-TRUNCATE TABLE `flow_temp_load_table_shard-range_1_Delta_Updates`;
---- End `default`.`Delta_Updates` truncateLoadTable ---
-
---- Begin `default`.`Delta_Updates` truncateStoreTable ---
-TRUNCATE TABLE `flow_temp_store_table_shard-range_1_Delta_Updates`;
---- End `default`.`Delta_Updates` truncateStoreTable ---
-
---- Begin `default`.`Delta_Updates` dropLoadTable ---
-DROP TABLE IF EXISTS `flow_temp_load_table_shard-range_1_Delta_Updates`
---- End `default`.`Delta_Updates` dropLoadTable ---
-
---- Begin `default`.`Delta_Updates` dropStoreTable ---
-DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta_Updates`
---- End `default`.`Delta_Updates` dropStoreTable ---
-
 --- Begin `default`.`Delta_Updates` mergeInto ---
 	MERGE INTO `default`.`Delta_Updates` AS l
-	USING `flow_temp_store_table_shard-range_1_Delta_Updates` AS r
+	USING (
+		(
+			SELECT
+			`theKey`, `aValue`
+			FROM json.`file1`
+		)
+		 UNION (
+			SELECT
+			`theKey`, `aValue`
+			FROM json.`file2`
+		)
+	) AS r
 	ON l.`theKey` = r.`theKey`::STRING
-	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED THEN
 		UPDATE SET l.`aValue` = r.`aValue`::BIGINT
 	WHEN NOT MATCHED THEN
@@ -158,38 +98,11 @@ DROP TABLE IF EXISTS `flow_temp_store_table_shard-range_1_Delta_Updates`
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = (%s)
+  FILES = ('file1','file2')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 --- End `default`.`Delta_Updates` copyIntoDirect ---
-
---- Begin `default`.`Delta_Updates` copyIntoStore ---
-	COPY INTO `flow_temp_store_table_shard-range_1_Delta_Updates` FROM (
-    SELECT
-		_metadata.file_name as _metadata_file_name,
-		`theKey`::STRING, `aValue`::BIGINT
-    FROM 'test-staging-path'
-	)
-  FILEFORMAT = JSON
-  FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
-	COPY_OPTIONS ( 'mergeSchema' = 'true' )
-  ;
---- End `default`.`Delta_Updates` copyIntoStore ---
-
---- Begin `default`.`Delta_Updates` copyIntoLoad ---
-	COPY INTO `flow_temp_load_table_shard-range_1_Delta_Updates` FROM (
-    SELECT
-      `theKey`::STRING
-    FROM 'test-staging-path'
-  )
-  FILEFORMAT = JSON
-  FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
-	COPY_OPTIONS ( 'mergeSchema' = 'true' )
-  ;
---- End `default`.`Delta_Updates` copyIntoLoad ---
 
 --- Begin `default`.`Delta_Updates` createTargetTable ---
 CREATE TABLE IF NOT EXISTS `default`.`Delta_Updates` (
@@ -207,9 +120,19 @@ ALTER TABLE `a-schema`.target_table ADD COLUMN
 
 --- Begin target_table_no_values_materialized mergeInto ---
 	MERGE INTO ``.target_table_no_values_materialized AS l
-	USING `flow_temp_store_table_shard-range_2_target_table_no_values_materialized` AS r
+	USING (
+		(
+			SELECT
+			key1, key2, flow_document
+			FROM json.`file2`
+		)
+		 UNION (
+			SELECT
+			key1, key2, flow_document
+			FROM json.`file3`
+		)
+	) AS r
 	ON l.key1 = r.key1::BIGINT AND l.key2 = r.key2::BOOLEAN
-	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
