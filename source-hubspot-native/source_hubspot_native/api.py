@@ -49,7 +49,7 @@ async def fetch_page(
     log: Logger,
     page: str | None,
     cutoff: datetime,
-) -> tuple[Iterable[CRMObject], str | None]:
+) -> AsyncGenerator[CRMObject | str, None]:
 
     url = f"{HUB}/crm/v3/objects/{cls.NAME}"
     properties = await fetch_properties(log, cls, http)
@@ -69,10 +69,12 @@ async def fetch_page(
         await http.request(log, url, method="GET", params=input)
     )
 
-    return (
-        (doc for doc in result.results if doc.updatedAt < cutoff),
-        result.paging.next.after if result.paging else None,
-    )
+    for doc in result.results:
+        if doc.updatedAt < cutoff:
+            yield doc
+
+    if result.paging:
+        yield result.paging.next.after
 
 
 async def fetch_batch(
