@@ -201,7 +201,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}).Debug("pipe client")
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
+		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf.String())
 	}
 
 	var response InsertFilesResponse
@@ -210,7 +210,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}
 
 	if response.Status != "SUCCESS" {
-		return nil, fmt.Errorf("response status %q, %s", response.Status, respBuf)
+		return nil, fmt.Errorf("response status %q, %s", response.Status, respBuf.String())
 	}
 
 	return &response, nil
