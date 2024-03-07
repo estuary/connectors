@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FAlterTable_AddColumnSetEnum_enum_76927424":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","enumCol"],"types":{"data":"text","enumCol":{"enum":["'someValue'","'anotherValue'"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FAlterTable_AddColumnSetEnum_enum_76927424":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","enumCol"],"types":{"data":"text","enumCol":{"enum":["","'someValue'","'anotherValue'"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
