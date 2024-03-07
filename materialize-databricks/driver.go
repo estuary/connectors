@@ -319,30 +319,32 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	log.Info("load: starting join query")
 
-	// Issue a union join of the target tables and their (now staged) load keys,
-	// and send results to the |loaded| callback.
-	var unionQuery = strings.Join(queries, "\nUNION ALL\n") + ";"
-	rows, err := d.load.conn.QueryContext(ctx, unionQuery)
-	if err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
-	}
-	defer rows.Close()
+	if len(queries) > 0 {
+		// Issue a union join of the target tables and their (now staged) load keys,
+		// and send results to the |loaded| callback.
+		var unionQuery = strings.Join(queries, "\nUNION ALL\n")
+		rows, err := d.load.conn.QueryContext(ctx, unionQuery)
+		if err != nil {
+			return fmt.Errorf("querying Load documents: %w", err)
+		}
+		defer rows.Close()
 
-	for rows.Next() {
-		var binding int
-		var document string
+		for rows.Next() {
+			var binding int
+			var document string
 
-		if err = rows.Scan(&binding, &document); err != nil {
-			return fmt.Errorf("scanning Load document: %w", err)
-		} else if binding > -1 {
-			if err = loaded(binding, json.RawMessage([]byte(document))); err != nil {
-				return err
+			if err = rows.Scan(&binding, &document); err != nil {
+				return fmt.Errorf("scanning Load document: %w", err)
+			} else if binding > -1 {
+				if err = loaded(binding, json.RawMessage([]byte(document))); err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("querying Loads: %w", err)
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("querying Loads: %w", err)
+		}
 	}
 	log.Info("load: finished join query")
 
