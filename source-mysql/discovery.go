@@ -381,7 +381,9 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 
 func parseDataType(typeName, fullColumnType string) any {
 	if typeName == "enum" {
-		return &mysqlColumnType{Type: "enum", EnumValues: append(parseEnumValues(fullColumnType), "")}
+		// Illegal values are represented internally by MySQL as the integer 0. Adding
+		// this to the list as the zero-th element allows everything else to flow naturally.
+		return &mysqlColumnType{Type: "enum", EnumValues: append([]string{""}, parseEnumValues(fullColumnType)...)}
 	} else if typeName == "set" {
 		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
 	}
@@ -402,14 +404,8 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 	switch t.Type {
 	case "enum":
 		if index, ok := val.(int64); ok {
-			if 1 <= index && index <= int64(len(t.EnumValues)) {
-				return t.EnumValues[index-1], nil
-			} else if index == 0 {
-				// Illegal values are represented internally by MySQL as the integer 0.
-				// Backfill queries return this as the empty string, which is our chosen
-				// representation as well, but we have to handle the conversion of replicated
-				// values since they're just provided as the raw integer.
-				return "", nil
+			if 0 <= index && int(index) < len(t.EnumValues) {
+				return t.EnumValues[index], nil
 			}
 		} else if bs, ok := val.([]byte); ok {
 			return string(bs), nil
@@ -439,18 +435,10 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 	switch t.Type {
 	case "enum":
 		if bs, ok := val.([]byte); ok {
-			if len(bs) == 0 {
-				// MySQL represents illegal enum values as the empty string or the integer
-				// zero in different contexts. We include the empty string in the EnumValues
-				// list for other reasons, so here we have to explicitly hard-code that the
-				// empty string will be translated back into the integer zero as a row key.
-				return 0, nil
-			} else if idx := slices.Index(t.EnumValues, string(bs)); idx >= 0 {
-				// Since zero is reserved, the first enum value corresponds to integer 1
-				return idx + 1, nil
-			} else {
-				return val, fmt.Errorf("internal error: failed to translate enum value %q back to integer index", string(bs))
+			if idx := slices.Index(t.EnumValues, string(bs)); idx >= 0 {
+				return idx, nil
 			}
+			return val, fmt.Errorf("internal error: failed to translate enum value %q to integer index", string(bs))
 		}
 		return val, nil
 	}
