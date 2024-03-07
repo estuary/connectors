@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"testing"
 
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/estuary/flow/go/protocols/flow"
@@ -157,4 +158,25 @@ func TestDatetimeNormalization(t *testing.T) {
 		})
 		tests.VerifiedCapture(ctx, t, cs)
 	})
+}
+
+func TestEnumPrimaryKey(t *testing.T) {
+	// Create a table whose primary key includes an enum value (whose cases are specified
+	// in non-alphabetical order).
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "18676708"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(category ENUM('A', 'C', 'B', 'D') , id INTEGER, data TEXT, PRIMARY KEY (category, id))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 3
+
+	// Insert various test values and then capture them
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{"A", 1, "A1"}, {"A", 2, "A2"}, {"A", 3, "A3"}, {"A", 4, "A4"},
+		{"B", 1, "B1"}, {"B", 2, "B2"}, {"B", 3, "B3"}, {"B", 4, "B4"},
+		{"C", 1, "C1"}, {"C", 2, "C2"}, {"C", 3, "C3"}, {"C", 4, "C4"},
+		{"D", 1, "D1"}, {"D", 2, "D2"}, {"D", 3, "D3"}, {"D", 4, "D4"},
+		{"E", 1, "E1"}, {"E", 2, "E2"}, {"E", 3, "E3"}, {"E", 4, "E4"},
+	})
+	tests.VerifiedCapture(ctx, t, cs)
 }
