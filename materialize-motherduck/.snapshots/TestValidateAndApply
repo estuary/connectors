@@ -113,7 +113,7 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUuidField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUuidField' is already being materialized as endpoint type 'UUID' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
@@ -151,7 +151,7 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"stringUriField","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"stringUriReferenceField","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"stringUriTemplateField","Nullable":"NO","Type":"VARCHAR"}
-{"Name":"stringUuidField","Nullable":"NO","Type":"UUID"}
+{"Name":"stringUuidField","Nullable":"NO","Type":"VARCHAR"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
@@ -189,7 +189,7 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"stringUriField","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"stringUriReferenceField","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"stringUriTemplateField","Nullable":"YES","Type":"VARCHAR"}
-{"Name":"stringUuidField","Nullable":"YES","Type":"UUID"}
+{"Name":"stringUuidField","Nullable":"YES","Type":"VARCHAR"}
 
 Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
