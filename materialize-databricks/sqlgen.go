@@ -178,7 +178,7 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION {{ end -}}
+		{{ if $fi }} UNION ALL {{ end -}}
 		(
 			SELECT
 			{{ range $ind, $key := $.Table.Keys }}
@@ -237,7 +237,7 @@ SELECT -1, ""
 	MERGE INTO {{ $.Table.Identifier }} AS l
 	USING (
 		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION {{ end -}}
+		{{ if $fi }} UNION ALL {{ end -}}
 		(
 			SELECT
 			{{ range $ind, $key := $.Table.Columns }}
