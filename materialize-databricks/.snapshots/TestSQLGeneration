@@ -7,7 +7,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 			key1, key2
 			FROM json.`file1`
 		)
-		 UNION (
+		 UNION ALL (
 			SELECT
 			key1, key2
 			FROM json.`file2`
@@ -24,7 +24,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 			key1, key2, boolean, integer, number, string, flow_document
 			FROM json.`file1`
 		)
-		 UNION (
+		 UNION ALL (
 			SELECT
 			key1, key2, boolean, integer, number, string, flow_document
 			FROM json.`file2`
@@ -77,7 +77,7 @@ SELECT -1, ""
 			`theKey`, `aValue`
 			FROM json.`file1`
 		)
-		 UNION (
+		 UNION ALL (
 			SELECT
 			`theKey`, `aValue`
 			FROM json.`file2`
@@ -126,7 +126,7 @@ ALTER TABLE `a-schema`.target_table ADD COLUMN
 			key1, key2, flow_document
 			FROM json.`file2`
 		)
-		 UNION (
+		 UNION ALL (
 			SELECT
 			key1, key2, flow_document
 			FROM json.`file3`
