@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
@@ -431,6 +433,28 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 		return val, nil
 	}
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
+}
+
+func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
+	switch t.Type {
+	case "enum":
+		if bs, ok := val.([]byte); ok {
+			if len(bs) == 0 {
+				// MySQL represents illegal enum values as the empty string or the integer
+				// zero in different contexts. We include the empty string in the EnumValues
+				// list for other reasons, so here we have to explicitly hard-code that the
+				// empty string will be translated back into the integer zero as a row key.
+				return 0, nil
+			} else if idx := slices.Index(t.EnumValues, string(bs)); idx >= 0 {
+				// Since zero is reserved, the first enum value corresponds to integer 1
+				return idx + 1, nil
+			} else {
+				return val, fmt.Errorf("internal error: failed to translate enum value %q back to integer index", string(bs))
+			}
+		}
+		return val, nil
+	}
+	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
 }
 
 // enumValuesRegexp matches a MySQL-format single-quoted string followed by
