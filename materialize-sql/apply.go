@@ -10,7 +10,7 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // TableCreate is a new table that needs to be created.
@@ -115,11 +115,19 @@ func (a *sqlApplier) CreateResource(ctx context.Context, spec *pf.Materializatio
 	}
 
 	return createStatement, func(ctx context.Context) error {
-		return a.client.CreateTable(ctx, TableCreate{
+		if err := a.client.CreateTable(ctx, TableCreate{
 			Table:              table,
 			TableCreateSql:     createStatement,
 			ResourceConfigJson: spec.Bindings[bindingIndex].ResourceConfigJson,
-		})
+		}); err != nil {
+			log.WithFields(log.Fields{
+				"table":          table.Identifier,
+				"tableCreateSql": createStatement,
+			}).Error("table creation failed")
+			return fmt.Errorf("failed to create table %q: %w", table.Identifier, err)
+		}
+
+		return nil
 	}, nil
 }
 
@@ -251,7 +259,7 @@ func loadSpec(ctx context.Context, client Client, endpoint *Endpoint, materializ
 	if err == sql.ErrNoRows {
 		return nil, "", nil
 	} else if err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"table": endpoint.MetaSpecs.Path,
 			"err":   err,
 		}).Info("failed to query materialization spec (the table may not be initialized?)")
