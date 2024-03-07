@@ -32,7 +32,11 @@ var duckDialect = func() sql.Dialect {
 				"date-time": sql.NewStaticMapper("TIMESTAMP WITH TIME ZONE"),
 				"duration":  sql.NewStaticMapper("INTERVAL"),
 				"time":      sql.NewStaticMapper("TIME"),
-				"uuid":      sql.NewStaticMapper("UUID"),
+				// UUIDs are currently broken in the DuckDB version used by MotherDuck, see
+				// https://github.com/duckdb/duckdb/issues/9193. To support UUIDs in the future,
+				// we'll need to re-backfill tables that have UUIDs as strings, or allow string
+				// columns to validate as uuid columns.
+				// "uuid":      sql.NewStaticMapper("UUID"),
 			},
 		},
 	}
