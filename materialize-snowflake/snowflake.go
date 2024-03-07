@@ -613,6 +613,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
+
+	// If we see no results from the REST API for `maxTries` iterations, then we
+	// fallback to asking the `COPY_HISTORY` table.
 	var maxTries = 10
 	for pipeName, pipe := range pipes {
 		for tries := 0; tries < maxTries; tries++ {
@@ -625,6 +628,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
 			}
 
+			// completeResult=false means the latest report we received has a cursor
+			// which is ahead, and some results have not been seen by us and will not be
+			// seen with the given cursor. So we reset the cursor in this case and try again.
 			if !report.CompleteResult {
 				tries--
 				d.pipeMarkers[pipeName] = ""
@@ -632,12 +638,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				d.pipeMarkers[pipeName] = report.NextBeginMark
 			}
 
-			// If there are items still in progress, we continue retrying until those items
-			// resolve to another status
-			var hasItemsInProgress = false
-
 			// If the files have already been loaded, when we submit a request to
 			// load those files again, our request will not show up in reports.
+			// Moreover, insertReport only retains events for 10 minutes.
 			// One way to find out whether the files were successfully loaded is to check
 			// the COPY_HISTORY to make sure they are there. The COPY_HISTORY is much more
 			// reliable. If they are not there, then something is wrong.
@@ -663,6 +666,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				if err != nil {
 					return nil, err
 				}
+
+				// If there are items still in progress, we continue retrying until those items
+				// resolve to another status
+				var hasItemsInProgress = false
 
 				for _, row := range rows {
 					if row.status == "Loaded" {
@@ -690,6 +697,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				break
 			}
 
+			// So long as we are able to get some results from the REST API, we do not
+			// want to ask COPY_HISTORY. So we reset the counter if we see some results from the REST API
 			tries = 0
 
 			for _, reportFile := range report.Files {
@@ -705,10 +714,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			if len(pipe.files) == 0 {
 				d.deleteFiles(ctx, []string{pipe.dir})
 				break
-			} else if tries < maxTries-1 {
-				time.Sleep(5 * time.Second)
 			} else {
-				return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}
