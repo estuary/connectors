@@ -174,22 +174,36 @@ _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
 FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument, None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
+
+Snapshot resources are typically "small" -- they fit easily on disk -- and are
+gathered in a single shot. Its content is digested to determine if its
+changed since the last snapshot. If it hasn't, the snapshot is discarded and
+not emitted by the connector.
 """
 
 FetchPageFn = Callable[
     [Logger, PageCursor, LogCursor],
-    Awaitable[tuple[Iterable[_BaseDocument], PageCursor]],
+    AsyncGenerator[_BaseDocument | PageCursor, None],
 ]
 """
-FetchPageFn is a function which fetches a page of documents.
-It takes a PageCursor for the next page and an upper-bound "cutoff" LogCursor.
-It returns documents and an updated PageCursor, where None indicates
-no further pages remain.
+FetchPageFn fetches available checkpoints since the provided last PageCursor.
+It will typically fetch just one page, though it may fetch multiple pages.
 
-The "cutoff" LogCursor represents the log position at which incremental
-replication started, and should be used to filter returned documents
-which were modified at-or-after the cutoff, as such documents are
+The argument PageCursor is None if a new iteration is being started.
+Otherwise it is the last PageCursor yielded by FetchPageFn.
+
+The argument LogCursor is the "cutoff" log position at which incremental
+replication started, and should be used to suppress documents which were
+modified at-or-after the cutoff, as such documents are
 already observed through incremental replication.
+
+Checkpoints consist of a yielded sequence of documents followed by a
+non-None PageCursor, which checkpoints those preceding documents,
+or by simply returning if the iteration is complete.
+
+It's an error if FetchPageFn yields a PageCursor of None.
+Instead, mark the end of the sequence by yielding documents and then
+returning without yielding a final PageCursor.
 """
 
 FetchChangesFn = Callable[
@@ -521,7 +535,7 @@ async def _binding_backfill_task(
         bindingStateV1={binding.stateKey: ResourceState(backfill=state)}
     )
 
-    if state.next_page:
+    if state.next_page is not None:
         task.log.info(f"resuming backfill", state)
     else:
         task.log.info(f"beginning backfill", state)
@@ -530,14 +544,23 @@ async def _binding_backfill_task(
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
-        page, next_page = await fetch_page(task.log, state.next_page, state.cutoff)
-        for doc in page:
-            task.captured(binding_index, doc)
+        # Track if fetch_page returns without having yielded a PageCursor.
+        done = True 
 
-        if next_page is not None:
-            state.next_page = next_page
-            task.checkpoint(connector_state)
-        else:
+        async for item in fetch_page(task.log, state.next_page, state.cutoff):
+            if isinstance(item, BaseDocument):
+                task.captured(binding_index, item)
+                done = True
+            elif item is None:
+                raise RuntimeError(
+                    f"Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
+                )
+            else:
+                state.next_page = item
+                task.checkpoint(connector_state)
+                done = False
+
+        if done:
             break
 
     connector_state = ConnectorState(
