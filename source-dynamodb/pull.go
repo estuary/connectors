@@ -32,7 +32,7 @@ const (
 	backfillDuration = 1 * time.Hour
 
 	// Number of concurrent workers to use when backfilling a table.
-	backfillConcurrency = 3
+	backfillConcurrency = 5
 
 	// Number of stream workers which may concurrently send requests for stream data.
 	streamConcurrency = 5
