@@ -1,0 +1,205 @@
+---
+properties:
+  application_fee_percent:
+    type:
+      - "null"
+      - number
+  cancel_at_period_end:
+    type:
+      - "null"
+      - boolean
+  canceled_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  current_period_end:
+    format: date-time
+    type:
+      - "null"
+      - string
+  current_period_start:
+    type:
+      - "null"
+      - integer
+  customer:
+    type:
+      - "null"
+      - string
+  discount:
+    properties: {}
+    type:
+      - "null"
+      - object
+  ended_at:
+    type:
+      - "null"
+      - number
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  plan:
+    properties:
+      active:
+        type:
+          - "null"
+          - boolean
+      aggregate_usage:
+        type:
+          - "null"
+          - string
+      amount:
+        type:
+          - "null"
+          - integer
+      billing_scheme:
+        type:
+          - "null"
+          - string
+      created:
+        type:
+          - "null"
+          - integer
+      currency:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - string
+      interval:
+        type:
+          - "null"
+          - string
+      interval_count:
+        type:
+          - "null"
+          - integer
+      livemode:
+        type:
+          - "null"
+          - boolean
+      metadata:
+        properties: {}
+        type:
+          - "null"
+          - object
+      name:
+        type:
+          - "null"
+          - string
+      nickname:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      product:
+        type:
+          - "null"
+          - string
+      statement_description:
+        type:
+          - "null"
+          - string
+      statement_descriptor:
+        type:
+          - "null"
+          - string
+      tiers:
+        items:
+          properties:
+            flat_amount:
+              type:
+                - "null"
+                - integer
+            unit_amount:
+              type:
+                - "null"
+                - integer
+            up_to:
+              type:
+                - "null"
+                - integer
+          type:
+            - "null"
+            - string
+            - object
+        type:
+          - "null"
+          - array
+      tiers_mode:
+        type:
+          - "null"
+          - string
+      transform_usage:
+        type:
+          - "null"
+          - string
+      trial_period_days:
+        type:
+          - "null"
+          - integer
+      updated:
+        type:
+          - "null"
+          - number
+      usage_type:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+      - string
+  quantity:
+    type:
+      - "null"
+      - integer
+  start:
+    type:
+      - "null"
+      - integer
+  status:
+    type:
+      - "null"
+      - string
+  subscription:
+    type:
+      - "null"
+      - string
+  tax_percent:
+    type:
+      - "null"
+      - number
+  trial_end:
+    type:
+      - "null"
+      - number
+  trial_start:
+    type:
+      - "null"
+      - integer
+required:
+  - id
+type:
+  - object

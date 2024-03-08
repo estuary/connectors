@@ -1,0 +1,110 @@
+---
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  attributes:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  caption:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  deactivate_on:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  description:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  images:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  package_dimensions:
+    properties:
+      height:
+        type:
+          - "null"
+          - number
+      length:
+        type:
+          - "null"
+          - number
+      weight:
+        type:
+          - "null"
+          - number
+      width:
+        type:
+          - "null"
+          - number
+    type:
+      - "null"
+      - object
+  shippable:
+    type:
+      - "null"
+      - boolean
+  statement_descriptor:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+  unit_label:
+    type:
+      - "null"
+      - string
+  updated:
+    type:
+      - "null"
+      - integer
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,167 @@
+---
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  amount_reversed:
+    type:
+      - "null"
+      - integer
+  arrival_date:
+    type:
+      - "null"
+      - integer
+  automatic:
+    type:
+      - "null"
+      - boolean
+  balance_transaction:
+    type:
+      - "null"
+      - string
+  bank_account:
+    properties:
+      account_holder_name:
+        type:
+          - "null"
+          - string
+      account_holder_type:
+        type:
+          - "null"
+          - string
+      bank_name:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      currency:
+        type:
+          - "null"
+          - string
+      fingerprint:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - string
+      last4:
+        type:
+          - "null"
+          - string
+      metadata:
+        properties: {}
+        type:
+          - "null"
+          - object
+      name:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      routing_number:
+        type:
+          - "null"
+          - string
+      status:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  date:
+    type:
+      - "null"
+      - integer
+  description:
+    type:
+      - "null"
+      - string
+  destination:
+    type:
+      - "null"
+      - string
+  failure_balance_transaction:
+    type:
+      - "null"
+      - string
+  failure_code:
+    type:
+      - "null"
+      - string
+  failure_message:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  method:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  recipient:
+    type:
+      - "null"
+      - string
+  source_transaction:
+    type:
+      - "null"
+      - string
+  source_type:
+    type:
+      - "null"
+      - string
+  statement_description:
+    type:
+      - "null"
+      - string
+  statement_descriptor:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - "null"
+      - string
+  transfer_group:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

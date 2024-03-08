@@ -1,0 +1,448 @@
+---
+$schema: "http://json-schema.org/draft-04/schema#"
+properties:
+  after_expiration:
+    properties:
+      recovery:
+        properties:
+          allow_promotion_codes:
+            type:
+              - "null"
+              - boolean
+          enabled:
+            type:
+              - "null"
+              - boolean
+          expires_at:
+            type:
+              - "null"
+              - integer
+          url:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  allow_promotion_codes:
+    type:
+      - "null"
+      - boolean
+  amount_subtotal:
+    type:
+      - "null"
+      - integer
+  amount_total:
+    type:
+      - "null"
+      - integer
+  automatic_tax:
+    properties:
+      enabled:
+        type:
+          - "null"
+          - boolean
+      status:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  billing_address_collection:
+    type:
+      - "null"
+      - string
+  cancel_url:
+    type:
+      - "null"
+      - string
+  client_reference_id:
+    type:
+      - "null"
+      - string
+  consent:
+    properties:
+      promotions:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  consent_collection:
+    properties:
+      promotions:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  currency:
+    type:
+      - "null"
+      - string
+  customer:
+    type:
+      - "null"
+      - string
+  customer_details:
+    properties:
+      email:
+        type:
+          - "null"
+          - string
+      phone:
+        type:
+          - "null"
+          - string
+      tax_exempt:
+        type:
+          - "null"
+          - string
+      tax_ids:
+        items:
+          properties:
+            type:
+              type:
+                - "null"
+                - string
+            value:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  customer_email:
+    type:
+      - "null"
+      - string
+  expires_at:
+    type:
+      - "null"
+      - integer
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  locale:
+    type:
+      - "null"
+      - string
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  mode:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  payment_intent:
+    type:
+      - "null"
+      - string
+  payment_method_options:
+    properties:
+      acss_debit:
+        properties:
+          currency:
+            type:
+              - "null"
+              - string
+          mandate_options:
+            properties:
+              custom_mandate_url:
+                type:
+                  - "null"
+                  - string
+              default_for:
+                items:
+                  type:
+                    - "null"
+                    - string
+                type:
+                  - "null"
+                  - array
+              interval_description:
+                type:
+                  - "null"
+                  - string
+              payment_schedule:
+                type:
+                  - "null"
+                  - string
+              transaction_type:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          verification_method:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      boleto:
+        properties:
+          expires_after_days:
+            type:
+              - "null"
+              - integer
+        type:
+          - "null"
+          - object
+      oxxo:
+        properties:
+          expires_after_days:
+            type:
+              - "null"
+              - integer
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  payment_method_types:
+    items:
+      type:
+        - string
+        - "null"
+    type: array
+  payment_status:
+    type:
+      - "null"
+      - string
+  phone_number_collection:
+    properties:
+      enabled:
+        type:
+          - "null"
+          - boolean
+    type:
+      - "null"
+      - object
+  recovered_from:
+    type:
+      - "null"
+      - string
+  setup_intent:
+    type:
+      - "null"
+      - string
+  shipping:
+    properties:
+      address:
+        properties:
+          city:
+            type:
+              - "null"
+              - string
+          country:
+            type:
+              - "null"
+              - string
+          line1:
+            type:
+              - "null"
+              - string
+          line2:
+            type:
+              - "null"
+              - string
+          postal_code:
+            type:
+              - "null"
+              - string
+          state:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      name:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  shipping_address_collection:
+    properties:
+      allowed_countries:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  submit_type:
+    type:
+      - "null"
+      - string
+  subscription:
+    type:
+      - "null"
+      - string
+  success_url:
+    type:
+      - "null"
+      - string
+  tax_id_collection:
+    properties:
+      enabled:
+        type:
+          - "null"
+          - boolean
+    type:
+      - "null"
+      - object
+  total_details:
+    properties:
+      amount_discount:
+        type:
+          - "null"
+          - integer
+      amount_shipping:
+        type:
+          - "null"
+          - integer
+      amount_tax:
+        type:
+          - "null"
+          - integer
+      breakdown:
+        properties:
+          discounts:
+            items:
+              properties:
+                amount:
+                  type:
+                    - "null"
+                    - integer
+                discount:
+                  properties: {}
+                  type:
+                    - "null"
+                    - object
+              type:
+                - "null"
+                - object
+            type:
+              - "null"
+              - array
+          taxes:
+            items:
+              properties:
+                amount:
+                  type:
+                    - "null"
+                    - integer
+                rate:
+                  properties:
+                    active:
+                      type:
+                        - "null"
+                        - boolean
+                    country:
+                      type:
+                        - "null"
+                        - string
+                    created:
+                      type:
+                        - "null"
+                        - integer
+                    description:
+                      type:
+                        - "null"
+                        - string
+                    display_name:
+                      type:
+                        - "null"
+                        - string
+                    id:
+                      type:
+                        - "null"
+                        - string
+                    inclusive:
+                      type:
+                        - "null"
+                        - boolean
+                    jurisdiction:
+                      type:
+                        - "null"
+                        - string
+                    livemode:
+                      type:
+                        - "null"
+                        - boolean
+                    metadata:
+                      properties: {}
+                      type:
+                        - "null"
+                        - object
+                    object:
+                      type:
+                        - "null"
+                        - string
+                    percentage:
+                      type:
+                        - "null"
+                        - number
+                    state:
+                      type:
+                        - "null"
+                        - string
+                    tax_type:
+                      type:
+                        - "null"
+                        - string
+                  type:
+                    - "null"
+                    - object
+              type:
+                - "null"
+                - object
+            type:
+              - "null"
+              - array
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

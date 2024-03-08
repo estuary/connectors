@@ -1,0 +1,60 @@
+---
+$schema: "http://json-schema.org/draft-04/schema#"
+properties:
+  account:
+    type:
+      - string
+      - "null"
+  account_holder_name:
+    type:
+      - string
+      - "null"
+  account_holder_type:
+    type:
+      - string
+      - "null"
+  account_type:
+    type:
+      - string
+      - "null"
+  bank_name:
+    type:
+      - string
+      - "null"
+  country:
+    type:
+      - string
+      - "null"
+  currency:
+    type:
+      - string
+      - "null"
+  fingerprint:
+    type:
+      - string
+      - "null"
+  id:
+    type: string
+  last4:
+    type:
+      - string
+      - "null"
+  metadata:
+    type:
+      - object
+      - "null"
+  object:
+    type:
+      - string
+      - "null"
+  routing_number:
+    type:
+      - string
+      - "null"
+  status:
+    type:
+      - string
+      - "null"
+required:
+  - id
+type: object

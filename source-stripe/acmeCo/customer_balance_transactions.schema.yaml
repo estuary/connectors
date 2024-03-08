@@ -1,0 +1,58 @@
+---
+$schema: "http://json-schema.org/draft-04/schema#"
+properties:
+  amount:
+    type:
+      - "null"
+      - number
+  created:
+    type:
+      - "null"
+      - integer
+  credit_note:
+    type:
+      - "null"
+      - string
+  currency:
+    type:
+      - "null"
+      - string
+  customer:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  ending_balance:
+    type:
+      - "null"
+      - number
+  id:
+    type: string
+  invoice:
+    type:
+      - "null"
+      - string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    additionalProperties: true
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

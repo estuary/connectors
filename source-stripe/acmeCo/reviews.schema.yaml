@@ -1,0 +1,100 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  billing_zip:
+    type:
+      - "null"
+      - string
+  charge:
+    type:
+      - "null"
+      - string
+  closed_reason:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  id:
+    type: string
+  ip_address:
+    type:
+      - "null"
+      - string
+  ip_address_location:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      region:
+        type:
+          - "null"
+          - number
+    type:
+      - "null"
+      - object
+  livemode:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  open:
+    type:
+      - "null"
+      - boolean
+  opened_reason:
+    type:
+      - "null"
+      - string
+  payment_intent:
+    type:
+      - "null"
+      - string
+  reason:
+    type:
+      - "null"
+      - string
+  session:
+    properties:
+      browser:
+        type:
+          - "null"
+          - string
+      device:
+        type:
+          - "null"
+          - string
+      platform:
+        type:
+          - "null"
+          - string
+      version:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+required:
+  - id
+type:
+  - object

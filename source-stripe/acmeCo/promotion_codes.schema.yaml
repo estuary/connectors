@@ -1,0 +1,142 @@
+---
+$schema: "http://json-schema.org/draft-04/schema#"
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  code:
+    type:
+      - "null"
+      - string
+  coupon:
+    properties:
+      amount_off:
+        type:
+          - "null"
+          - integer
+      applies_to:
+        properties:
+          products:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+        type:
+          - "null"
+          - object
+      created:
+        type:
+          - "null"
+          - integer
+      currency:
+        type:
+          - "null"
+          - string
+      duration:
+        type:
+          - "null"
+          - string
+      duration_in_months:
+        type:
+          - "null"
+          - integer
+      id:
+        type:
+          - "null"
+          - string
+      livemode:
+        type:
+          - "null"
+          - boolean
+      max_redemptions:
+        type:
+          - "null"
+          - integer
+      metadata:
+        properties: {}
+        type:
+          - "null"
+          - object
+      name:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      percent_off:
+        type:
+          - "null"
+          - number
+      redeem_by:
+        type:
+          - "null"
+          - integer
+      times_redeemed:
+        type:
+          - "null"
+          - integer
+      valid:
+        type:
+          - "null"
+          - boolean
+    type:
+      - "null"
+      - object
+  created:
+    type:
+      - "null"
+      - integer
+  customer:
+    type:
+      - "null"
+      - string
+  expires_at:
+    type:
+      - "null"
+      - integer
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  max_redemptions:
+    type:
+      - "null"
+      - integer
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  restrictions:
+    properties:
+      first_time_transaction:
+        type:
+          - "null"
+          - boolean
+      minimum_amount:
+        type:
+          - "null"
+          - integer
+      minimum_amount_currency:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+required:
+  - id
+type:
+  - object

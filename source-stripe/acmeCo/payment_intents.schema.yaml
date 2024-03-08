@@ -1,0 +1,1053 @@
+---
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  amount_capturable:
+    type:
+      - "null"
+      - integer
+  amount_received:
+    type:
+      - "null"
+      - integer
+  application:
+    type:
+      - "null"
+      - string
+  application_fee_amount:
+    type:
+      - "null"
+      - integer
+  canceled_at:
+    type:
+      - "null"
+      - integer
+  cancellation_reason:
+    type:
+      - "null"
+      - string
+  capture_method:
+    type:
+      - "null"
+      - string
+  charges:
+    properties:
+      data:
+        type:
+          - "null"
+          - array
+      has_more:
+        type:
+          - "null"
+          - boolean
+      object:
+        type:
+          - "null"
+          - string
+      total_count:
+        type:
+          - "null"
+          - integer
+      url:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  client_secret:
+    type:
+      - "null"
+      - string
+  confirmation_method:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  customer:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  invoice:
+    type:
+      - "null"
+      - string
+  last_payment_error:
+    properties:
+      charge:
+        type:
+          - "null"
+          - string
+      code:
+        type:
+          - "null"
+          - string
+      decline_code:
+        type:
+          - "null"
+          - string
+      doc_url:
+        type:
+          - "null"
+          - string
+      message:
+        type:
+          - "null"
+          - string
+      param:
+        type:
+          - "null"
+          - string
+      payment_method:
+        properties:
+          acss_debit:
+            properties:
+              bank_name:
+                type:
+                  - "null"
+                  - string
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              institution_number:
+                type:
+                  - "null"
+                  - string
+              last4:
+                type:
+                  - "null"
+                  - string
+              transit_number:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          afterpay_clearpay:
+            type:
+              - "null"
+              - string
+          alipay:
+            type:
+              - "null"
+              - string
+          au_becs_debit:
+            properties:
+              bsb_number:
+                type:
+                  - "null"
+                  - string
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              last4:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          bacs_debit:
+            properties:
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              last4:
+                type:
+                  - "null"
+                  - string
+              sort_code:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          bancontact:
+            type:
+              - "null"
+              - string
+          billing_details:
+            properties:
+              address:
+                properties:
+                  city:
+                    type:
+                      - "null"
+                      - string
+                  country:
+                    type:
+                      - "null"
+                      - string
+                  line1:
+                    type:
+                      - "null"
+                      - string
+                  line2:
+                    type:
+                      - "null"
+                      - string
+                  postal_code:
+                    type:
+                      - "null"
+                      - string
+                  state:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+              email:
+                type:
+                  - "null"
+                  - string
+              name:
+                type:
+                  - "null"
+                  - string
+              phone:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          boleto:
+            properties:
+              tax_id:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          card:
+            properties:
+              brand:
+                type:
+                  - "null"
+                  - string
+              checks:
+                properties:
+                  address_line1_check:
+                    type:
+                      - "null"
+                      - string
+                  address_postal_code_check:
+                    type:
+                      - "null"
+                      - string
+                  cvc_check:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+              country:
+                type:
+                  - "null"
+                  - string
+              exp_month:
+                type:
+                  - "null"
+                  - integer
+              exp_year:
+                type:
+                  - "null"
+                  - integer
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              funding:
+                type:
+                  - "null"
+                  - string
+              generated_from:
+                properties:
+                  charge:
+                    type:
+                      - "null"
+                      - string
+                  payment_method_details:
+                    properties:
+                      card_present:
+                        properties:
+                          brand:
+                            type:
+                              - "null"
+                              - string
+                          cardholder_name:
+                            type:
+                              - "null"
+                              - string
+                          country:
+                            type:
+                              - "null"
+                              - string
+                          emv_auth_data:
+                            type:
+                              - "null"
+                              - string
+                          exp_month:
+                            type:
+                              - "null"
+                              - integer
+                          exp_year:
+                            type:
+                              - "null"
+                              - integer
+                          fingerprint:
+                            type:
+                              - "null"
+                              - string
+                          funding:
+                            type:
+                              - "null"
+                              - string
+                          generated_card:
+                            type:
+                              - "null"
+                              - string
+                          lsat4:
+                            type:
+                              - "null"
+                              - string
+                          network:
+                            type:
+                              - "null"
+                              - string
+                          read_method:
+                            type:
+                              - "null"
+                              - string
+                          receipt:
+                            properties:
+                              account_type:
+                                type:
+                                  - "null"
+                                  - string
+                              application_cryptogram:
+                                type:
+                                  - "null"
+                                  - string
+                              application_preferred_name:
+                                type:
+                                  - "null"
+                                  - string
+                              authorization_code:
+                                type:
+                                  - "null"
+                                  - string
+                              authorization_response_code:
+                                type:
+                                  - "null"
+                                  - string
+                              cardholder_verification_method:
+                                type:
+                                  - "null"
+                                  - string
+                              dedicated_file_name:
+                                type:
+                                  - "null"
+                                  - string
+                              terminal_verification_results:
+                                type:
+                                  - "null"
+                                  - string
+                              transaction_status_information:
+                                type:
+                                  - "null"
+                                  - string
+                            type:
+                              - "null"
+                              - object
+                          type:
+                            type:
+                              - "null"
+                              - string
+                        type:
+                          - "null"
+                          - object
+                      type:
+                        type:
+                          - "null"
+                          - string
+                    type:
+                      - "null"
+                      - object
+                  setup_attempt:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+              last4:
+                type:
+                  - "null"
+                  - string
+              networks:
+                properties:
+                  available:
+                    items:
+                      type:
+                        - "null"
+                        - string
+                    type:
+                      - "null"
+                      - array
+                  preferred:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+              three_d_secure_usage:
+                properties:
+                  supported:
+                    type:
+                      - "null"
+                      - boolean
+                type:
+                  - "null"
+                  - object
+              wallet:
+                properties:
+                  amex_express_checkout:
+                    type:
+                      - "null"
+                      - string
+                  apple_pay:
+                    type:
+                      - "null"
+                      - string
+                  dynamic_last4:
+                    type:
+                      - "null"
+                      - string
+                  google_pay:
+                    type:
+                      - "null"
+                      - string
+                  masterpass:
+                    properties:
+                      billing_address:
+                        properties:
+                          city:
+                            type:
+                              - "null"
+                              - string
+                          country:
+                            type:
+                              - "null"
+                              - string
+                          line1:
+                            type:
+                              - "null"
+                              - string
+                          line2:
+                            type:
+                              - "null"
+                              - string
+                          postal_code:
+                            type:
+                              - "null"
+                              - string
+                          state:
+                            type:
+                              - "null"
+                              - string
+                        type:
+                          - "null"
+                          - object
+                      email:
+                        type:
+                          - "null"
+                          - string
+                      name:
+                        type:
+                          - "null"
+                          - string
+                      shipping_address:
+                        properties:
+                          city:
+                            type:
+                              - "null"
+                              - string
+                          country:
+                            type:
+                              - "null"
+                              - string
+                          line1:
+                            type:
+                              - "null"
+                              - string
+                          line2:
+                            type:
+                              - "null"
+                              - string
+                          postal_code:
+                            type:
+                              - "null"
+                              - string
+                          state:
+                            type:
+                              - "null"
+                              - string
+                        type:
+                          - "null"
+                          - object
+                    type:
+                      - "null"
+                      - object
+                  samsung_pay:
+                    type:
+                      - "null"
+                      - string
+                  type:
+                    type:
+                      - "null"
+                      - string
+                  visa_checkout:
+                    properties:
+                      billing_address:
+                        properties:
+                          city:
+                            type:
+                              - "null"
+                              - string
+                          country:
+                            type:
+                              - "null"
+                              - string
+                          line1:
+                            type:
+                              - "null"
+                              - string
+                          line2:
+                            type:
+                              - "null"
+                              - string
+                          postal_code:
+                            type:
+                              - "null"
+                              - string
+                          state:
+                            type:
+                              - "null"
+                              - string
+                        type:
+                          - "null"
+                          - object
+                      email:
+                        type:
+                          - "null"
+                          - string
+                      name:
+                        type:
+                          - "null"
+                          - string
+                      shipping_address:
+                        properties:
+                          city:
+                            type:
+                              - "null"
+                              - string
+                          country:
+                            type:
+                              - "null"
+                              - string
+                          line1:
+                            type:
+                              - "null"
+                              - string
+                          line2:
+                            type:
+                              - "null"
+                              - string
+                          postal_code:
+                            type:
+                              - "null"
+                              - string
+                          state:
+                            type:
+                              - "null"
+                              - string
+                        type:
+                          - "null"
+                          - object
+                    type:
+                      - "null"
+                      - object
+                type:
+                  - "null"
+                  - object
+            type:
+              - "null"
+              - object
+          card_present:
+            properties: {}
+            type:
+              - "null"
+              - object
+          created:
+            type:
+              - "null"
+              - integer
+          customer:
+            type:
+              - "null"
+              - string
+          eps:
+            properties:
+              bank:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          fpx:
+            properties:
+              bank:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          giropay:
+            properties: {}
+            type:
+              - "null"
+              - object
+          grabpay:
+            properties: {}
+            type:
+              - "null"
+              - object
+          id:
+            type:
+              - "null"
+              - string
+          ideal:
+            properties:
+              bank:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          interac_present:
+            properties: {}
+            type:
+              - "null"
+              - object
+          livemode:
+            type:
+              - "null"
+              - boolean
+          metadata:
+            properties: {}
+            type:
+              - "null"
+              - object
+          object:
+            type:
+              - "null"
+              - string
+          oxxo:
+            properties: {}
+            type:
+              - "null"
+              - object
+          p24:
+            properties:
+              bank:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          sepa_debit:
+            properties:
+              bank_code:
+                type:
+                  - "null"
+                  - string
+              branch_code:
+                type:
+                  - "null"
+                  - string
+              country:
+                type:
+                  - "null"
+                  - string
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              generated_from:
+                properties:
+                  charge:
+                    type:
+                      - "null"
+                      - string
+                  setup_attempt:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+              last4:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          sofort:
+            properties:
+              country:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          type:
+            type:
+              - "null"
+              - string
+          wechat_pay:
+            properties: {}
+            type:
+              - "null"
+              - object
+        type:
+          - "null"
+          - object
+      payment_method_type:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  next_action:
+    properties:
+      alipay_handle_redirect:
+        properties:
+          native_data:
+            type:
+              - "null"
+              - string
+          native_url:
+            type:
+              - "null"
+              - string
+          return_url:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      boleto_display_details:
+        properties:
+          expires_at:
+            type:
+              - "null"
+              - integer
+          hosted_voucher_url:
+            type:
+              - "null"
+              - string
+          number:
+            type:
+              - "null"
+              - string
+          pdf:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      oxxo_display_details:
+        properties:
+          expires_after:
+            type:
+              - "null"
+              - integer
+          hosted_voucher_url:
+            type:
+              - "null"
+              - string
+          number:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      redirect_to_url:
+        properties:
+          return_url:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      type:
+        type:
+          - "null"
+          - string
+      use_stripe_sdk:
+        properties: {}
+        type:
+          - "null"
+          - object
+      verify_with_microdeposits:
+        properties:
+          arrival_date:
+            type:
+              - "null"
+              - integer
+          hosted_verification_url:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      wechat_pay_display_qr_code:
+        properties:
+          data:
+            type:
+              - "null"
+              - string
+          image_data_url:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      wechat_pay_redirect_to_android_app:
+        properties:
+          app_id:
+            type:
+              - "null"
+              - string
+          nonce_str:
+            type:
+              - "null"
+              - string
+          package:
+            type:
+              - "null"
+              - string
+          partner_id:
+            type:
+              - "null"
+              - string
+          prepay_id:
+            type:
+              - "null"
+              - string
+          sign:
+            type:
+              - "null"
+              - string
+          timestamp:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      wechat_pay_redirect_to_ios_app:
+        properties:
+          native_url:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  on_behalf_of:
+    type:
+      - "null"
+      - string
+  payment_method:
+    type:
+      - "null"
+      - string
+  payment_method_options:
+    properties: {}
+    type:
+      - "null"
+      - object
+  payment_method_types:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  receipt_email:
+    type:
+      - "null"
+      - string
+  review:
+    type:
+      - "null"
+      - string
+  setup_future_usage:
+    type:
+      - "null"
+      - string
+  shipping:
+    properties:
+      address:
+        properties:
+          city:
+            type:
+              - "null"
+              - string
+          country:
+            type:
+              - "null"
+              - string
+          line1:
+            type:
+              - "null"
+              - string
+          line2:
+            type:
+              - "null"
+              - string
+          postal_code:
+            type:
+              - "null"
+              - string
+          state:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      carrier:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      phone:
+        type:
+          - "null"
+          - string
+      tracking_number:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  source:
+    type:
+      - "null"
+      - string
+  statement_description:
+    type:
+      - "null"
+      - string
+  statement_descriptor_suffix:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - "null"
+      - string
+  transfer_data:
+    properties:
+      amount:
+        type:
+          - "null"
+          - integer
+      destination:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  transfer_group:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

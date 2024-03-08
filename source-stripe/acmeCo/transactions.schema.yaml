@@ -1,0 +1,197 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  amount_details:
+    properties:
+      atm_fee:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  authorization:
+    type:
+      - "null"
+      - string
+  balance_transaction:
+    type:
+      - "null"
+      - string
+  card:
+    type:
+      - "null"
+      - string
+  cardholder:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  dispute:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  merchant_amount:
+    type:
+      - "null"
+      - integer
+  merchant_currency:
+    type:
+      - "null"
+      - string
+  merchant_data:
+    properties:
+      category:
+        type:
+          - "null"
+          - string
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      network_id:
+        type:
+          - "null"
+          - string
+      postal_code:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  metadata:
+    additionalProperties: true
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  purchase_details:
+    properties:
+      flight:
+        properties:
+          departure_at:
+            type:
+              - "null"
+              - integer
+          passenger_name:
+            type:
+              - "null"
+              - string
+          refundable:
+            type:
+              - "null"
+              - boolean
+          segments:
+            items:
+              properties:
+                arrival_airport_code:
+                  type:
+                    - "null"
+                    - string
+                carrier:
+                  type:
+                    - "null"
+                    - string
+                departure_airport_code:
+                  type:
+                    - "null"
+                    - string
+                flight_number:
+                  type:
+                    - "null"
+                    - string
+                service_class:
+                  type:
+                    - "null"
+                    - string
+                stopover_allowed:
+                  type:
+                    - "null"
+                    - boolean
+              type:
+                - "null"
+                - object
+            type:
+              - "null"
+              - array
+          travel_agency:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      fuel:
+        properties:
+          unit:
+            type:
+              - "null"
+              - string
+          unit_cost_decimal:
+            type:
+              - "null"
+              - string
+          volume_decimal:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - string
+      lodging:
+        type:
+          - "null"
+          - object
+      receipt:
+        type:
+          - "null"
+          - array
+      reference:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

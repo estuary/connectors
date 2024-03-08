@@ -1,0 +1,335 @@
+---
+properties:
+  amount_due:
+    type:
+      - "null"
+      - integer
+  amount_paid:
+    type:
+      - "null"
+      - integer
+  amount_remaining:
+    type:
+      - "null"
+      - integer
+  application_fee:
+    type:
+      - "null"
+      - integer
+  attempt_count:
+    type:
+      - "null"
+      - integer
+  attempted:
+    type:
+      - "null"
+      - boolean
+  auto_advance:
+    type:
+      - "null"
+      - boolean
+  billing:
+    type:
+      - "null"
+      - string
+  billing_reason:
+    type:
+      - "null"
+      - string
+  charge:
+    type:
+      - "null"
+      - string
+  closed:
+    type:
+      - "null"
+      - boolean
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  customer:
+    type:
+      - "null"
+      - string
+  customer_tax_ids:
+    items:
+      additionalProperties: true
+      properties:
+        type:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  description:
+    type:
+      - "null"
+      - string
+  discount:
+    properties:
+      checkout_session:
+        type:
+          - "null"
+          - string
+      coupon:
+        properties:
+          amount_off:
+            type:
+              - "null"
+              - integer
+          created:
+            type:
+              - "null"
+              - integer
+          currency:
+            type:
+              - "null"
+              - string
+          duration:
+            type:
+              - "null"
+              - string
+          duration_in_months:
+            type:
+              - "null"
+              - integer
+          id:
+            type:
+              - "null"
+              - string
+          livemode:
+            type:
+              - "null"
+              - boolean
+          max_redemptions:
+            type:
+              - "null"
+              - integer
+          metadata:
+            properties: {}
+            type:
+              - "null"
+              - object
+          name:
+            type:
+              - "null"
+              - string
+          object:
+            type:
+              - "null"
+              - string
+          percent_off:
+            type:
+              - "null"
+              - number
+          redeem_by:
+            type:
+              - "null"
+              - integer
+          times_redeemed:
+            type:
+              - "null"
+              - integer
+          valid:
+            type:
+              - "null"
+              - boolean
+        type:
+          - "null"
+          - object
+      customer:
+        type:
+          - "null"
+          - string
+      end:
+        type:
+          - "null"
+          - integer
+      id:
+        type:
+          - "null"
+          - string
+      invoice:
+        type:
+          - "null"
+          - string
+      invoice_item:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      promotion_code:
+        type:
+          - "null"
+          - string
+      start:
+        type:
+          - "null"
+          - integer
+      subscription:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  discounts:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  due_date:
+    type:
+      - "null"
+      - number
+  ending_balance:
+    type:
+      - "null"
+      - integer
+  forgiven:
+    type:
+      - "null"
+      - boolean
+  hosted_invoice_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  invoice_pdf:
+    type:
+      - "null"
+      - string
+  lines:
+    items:
+      type:
+        - "null"
+        - string
+    properties: {}
+    type:
+      - "null"
+      - array
+      - object
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  next_payment_attempt:
+    type:
+      - "null"
+      - number
+  number:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  paid:
+    type:
+      - "null"
+      - boolean
+  payment:
+    type:
+      - "null"
+      - string
+  period_end:
+    type:
+      - "null"
+      - number
+  period_start:
+    type:
+      - "null"
+      - number
+  receipt_number:
+    type:
+      - "null"
+      - string
+  starting_balance:
+    type:
+      - "null"
+      - integer
+  statement_description:
+    type:
+      - "null"
+      - string
+  statement_descriptor:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - "null"
+      - string
+  status_transitions:
+    properties:
+      finalized_at:
+        type:
+          - "null"
+          - integer
+      marked_uncollectible_at:
+        type:
+          - "null"
+          - integer
+      paid_at:
+        type:
+          - "null"
+          - integer
+      voided_at:
+        type:
+          - "null"
+          - integer
+    type: object
+  subscription:
+    type:
+      - "null"
+      - string
+  subtotal:
+    type:
+      - "null"
+      - integer
+  tax:
+    type:
+      - "null"
+      - integer
+  tax_percent:
+    type:
+      - "null"
+      - number
+  total:
+    type:
+      - "null"
+      - integer
+  webhooks_delivered_at:
+    type:
+      - "null"
+      - number
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,1195 @@
+---
+properties:
+  account_balance:
+    type:
+      - "null"
+      - integer
+  address:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      line1:
+        type:
+          - "null"
+          - string
+      line2:
+        type:
+          - "null"
+          - string
+      postal_code:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  balance:
+    type:
+      - "null"
+      - integer
+  cards:
+    items:
+      properties:
+        address_city:
+          type:
+            - "null"
+            - string
+        address_country:
+          type:
+            - "null"
+            - string
+        address_line1:
+          type:
+            - "null"
+            - string
+        address_line1_check:
+          type:
+            - "null"
+            - string
+        address_line2:
+          type:
+            - "null"
+            - string
+        address_state:
+          type:
+            - "null"
+            - string
+        address_zip:
+          type:
+            - "null"
+            - string
+        address_zip_check:
+          type:
+            - "null"
+            - string
+        brand:
+          type:
+            - "null"
+            - string
+        country:
+          type:
+            - "null"
+            - string
+        customer:
+          type:
+            - "null"
+            - string
+        cvc_check:
+          type:
+            - "null"
+            - string
+        dynamic_last4:
+          type:
+            - "null"
+            - string
+        exp_month:
+          type:
+            - "null"
+            - integer
+        exp_year:
+          type:
+            - "null"
+            - integer
+        fingerprint:
+          type:
+            - "null"
+            - string
+        funding:
+          type:
+            - "null"
+            - string
+        id:
+          type:
+            - "null"
+            - string
+        last4:
+          type:
+            - "null"
+            - string
+        metadata:
+          properties: {}
+          type:
+            - "null"
+            - object
+        name:
+          type:
+            - "null"
+            - string
+        object:
+          type:
+            - "null"
+            - string
+        tokenization_method:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  default_card:
+    type:
+      - "null"
+      - string
+  default_source:
+    type:
+      - "null"
+      - string
+  delinquent:
+    type:
+      - "null"
+      - boolean
+  description:
+    type:
+      - "null"
+      - string
+  discount:
+    properties:
+      coupon:
+        properties:
+          amount_off:
+            type:
+              - "null"
+              - integer
+          created:
+            type:
+              - "null"
+              - integer
+          currency:
+            type:
+              - "null"
+              - string
+          duration:
+            type:
+              - "null"
+              - string
+          duration_in_months:
+            type:
+              - "null"
+              - integer
+          id:
+            type:
+              - "null"
+              - string
+          livemode:
+            type:
+              - "null"
+              - boolean
+          max_redemptions:
+            type:
+              - "null"
+              - integer
+          metadata:
+            properties: {}
+            type:
+              - "null"
+              - object
+          name:
+            type:
+              - "null"
+              - string
+          object:
+            type:
+              - "null"
+              - string
+          percent_off:
+            type:
+              - "null"
+              - number
+          percent_off_precise:
+            type:
+              - "null"
+              - number
+          redeem_by:
+            type:
+              - "null"
+              - integer
+          times_redeemed:
+            type:
+              - "null"
+              - integer
+          valid:
+            type:
+              - "null"
+              - boolean
+        type:
+          - "null"
+          - object
+      customer:
+        type:
+          - "null"
+          - string
+      end:
+        type:
+          - "null"
+          - integer
+      object:
+        type:
+          - "null"
+          - string
+      start:
+        type:
+          - "null"
+          - integer
+      subscription:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  email:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  invoice_prefix:
+    type:
+      - "null"
+      - string
+  invoice_settings:
+    properties:
+      custom_fields:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      default_payment_method:
+        type:
+          - "null"
+          - string
+      footer:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  next_invoice_sequence:
+    type:
+      - "null"
+      - integer
+  object:
+    type:
+      - "null"
+      - string
+  phone:
+    type:
+      - "null"
+      - string
+  preferred_locales:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  shipping:
+    properties:
+      address:
+        properties:
+          city:
+            type:
+              - "null"
+              - string
+          country:
+            type:
+              - "null"
+              - string
+          line1:
+            type:
+              - "null"
+              - string
+          line2:
+            type:
+              - "null"
+              - string
+          postal_code:
+            type:
+              - "null"
+              - string
+          state:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      name:
+        type:
+          - "null"
+          - string
+      phone:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  sources:
+    anyOf:
+      - items:
+          properties:
+            ach_credit_transfer:
+              properties:
+                account_number:
+                  type:
+                    - "null"
+                    - string
+                bank_name:
+                  type:
+                    - "null"
+                    - string
+                fingerprint:
+                  type:
+                    - "null"
+                    - string
+                refund_account_holder_name:
+                  type:
+                    - "null"
+                    - string
+                refund_account_holder_type:
+                  type:
+                    - "null"
+                    - string
+                refund_account_number:
+                  type:
+                    - "null"
+                    - string
+                refund_routing_number:
+                  type:
+                    - "null"
+                    - string
+                routing_number:
+                  type:
+                    - "null"
+                    - string
+                swift_code:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+            address_city:
+              type:
+                - "null"
+                - string
+            address_country:
+              type:
+                - "null"
+                - string
+            address_line1:
+              type:
+                - "null"
+                - string
+            address_line1_check:
+              type:
+                - "null"
+                - string
+            address_line2:
+              type:
+                - "null"
+                - string
+            address_state:
+              type:
+                - "null"
+                - string
+            address_zip:
+              type:
+                - "null"
+                - string
+            address_zip_check:
+              type:
+                - "null"
+                - string
+            alipay:
+              properties: {}
+              type:
+                - "null"
+                - object
+            amount:
+              type:
+                - "null"
+                - integer
+            bancontact:
+              properties: {}
+              type:
+                - "null"
+                - object
+            brand:
+              type:
+                - "null"
+                - string
+            card:
+              properties:
+                address_line1_check:
+                  type:
+                    - "null"
+                    - string
+                address_zip_check:
+                  type:
+                    - "null"
+                    - string
+                brand:
+                  type:
+                    - "null"
+                    - string
+                country:
+                  type:
+                    - "null"
+                    - string
+                cvc_check:
+                  type:
+                    - "null"
+                    - string
+                dynamic_last4:
+                  type:
+                    - "null"
+                    - string
+                exp_month:
+                  type:
+                    - "null"
+                    - integer
+                exp_year:
+                  type:
+                    - "null"
+                    - integer
+                fingerprint:
+                  type:
+                    - "null"
+                    - string
+                funding:
+                  type:
+                    - "null"
+                    - string
+                last4:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+                three_d_secure:
+                  type:
+                    - "null"
+                    - string
+                tokenization_method:
+                  type:
+                    - "null"
+                    - string
+                type:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+            client_secret:
+              type:
+                - "null"
+                - string
+            country:
+              type:
+                - "null"
+                - string
+            created:
+              type:
+                - "null"
+                - integer
+            currency:
+              type:
+                - "null"
+                - string
+            customer:
+              type:
+                - "null"
+                - string
+            cvc_check:
+              type:
+                - "null"
+                - string
+            dynamic_last4:
+              type:
+                - "null"
+                - string
+            eps:
+              properties: {}
+              type:
+                - "null"
+                - object
+            exp_month:
+              type:
+                - "null"
+                - integer
+            exp_year:
+              type:
+                - "null"
+                - integer
+            fingerprint:
+              type:
+                - "null"
+                - string
+            flow:
+              type:
+                - "null"
+                - string
+            funding:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+            ideal:
+              properties: {}
+              type:
+                - "null"
+                - object
+            last4:
+              type:
+                - "null"
+                - string
+            livemode:
+              type:
+                - "null"
+                - boolean
+            metadata:
+              properties: {}
+              type:
+                - "null"
+                - object
+            multibanco:
+              properties: {}
+              type:
+                - "null"
+                - object
+            name:
+              type:
+                - "null"
+                - string
+            object:
+              type:
+                - "null"
+                - string
+            owner:
+              properties:
+                address:
+                  properties:
+                    city:
+                      type:
+                        - "null"
+                        - string
+                    country:
+                      type:
+                        - "null"
+                        - string
+                    line1:
+                      type:
+                        - "null"
+                        - string
+                    line2:
+                      type:
+                        - "null"
+                        - string
+                    postal_code:
+                      type:
+                        - "null"
+                        - string
+                    state:
+                      type:
+                        - "null"
+                        - string
+                  type:
+                    - "null"
+                    - object
+                email:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+                phone:
+                  type:
+                    - "null"
+                    - string
+                verified_address:
+                  type:
+                    - "null"
+                    - string
+                verified_email:
+                  type:
+                    - "null"
+                    - string
+                verified_name:
+                  type:
+                    - "null"
+                    - string
+                verified_phone:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+            receiver:
+              properties:
+                address:
+                  type:
+                    - "null"
+                    - string
+                amount_charged:
+                  type:
+                    - "null"
+                    - integer
+                amount_received:
+                  type:
+                    - "null"
+                    - integer
+                amount_returned:
+                  type:
+                    - "null"
+                    - integer
+                refund_attributes_method:
+                  type:
+                    - "null"
+                    - string
+                refund_attributes_status:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+            redirect:
+              properties:
+                failure_reason:
+                  type:
+                    - "null"
+                    - string
+                return_url:
+                  type:
+                    - "null"
+                    - string
+                status:
+                  type:
+                    - "null"
+                    - string
+                url:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+            statement_descriptor:
+              type:
+                - "null"
+                - string
+            status:
+              type:
+                - "null"
+                - string
+            tokenization_method:
+              type:
+                - "null"
+                - string
+            type:
+              type:
+                - "null"
+                - string
+            usage:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+      - properties:
+          ach_credit_transfer:
+            properties:
+              account_number:
+                type:
+                  - "null"
+                  - string
+              bank_name:
+                type:
+                  - "null"
+                  - string
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              refund_account_holder_name:
+                type:
+                  - "null"
+                  - string
+              refund_account_holder_type:
+                type:
+                  - "null"
+                  - string
+              refund_account_number:
+                type:
+                  - "null"
+                  - string
+              refund_routing_number:
+                type:
+                  - "null"
+                  - string
+              routing_number:
+                type:
+                  - "null"
+                  - string
+              swift_code:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          address_city:
+            type:
+              - "null"
+              - string
+          address_country:
+            type:
+              - "null"
+              - string
+          address_line1:
+            type:
+              - "null"
+              - string
+          address_line1_check:
+            type:
+              - "null"
+              - string
+          address_line2:
+            type:
+              - "null"
+              - string
+          address_state:
+            type:
+              - "null"
+              - string
+          address_zip:
+            type:
+              - "null"
+              - string
+          address_zip_check:
+            type:
+              - "null"
+              - string
+          alipay:
+            properties: {}
+            type:
+              - "null"
+              - object
+          amount:
+            type:
+              - "null"
+              - integer
+          bancontact:
+            properties: {}
+            type:
+              - "null"
+              - object
+          brand:
+            type:
+              - "null"
+              - string
+          card:
+            properties:
+              address_line1_check:
+                type:
+                  - "null"
+                  - string
+              address_zip_check:
+                type:
+                  - "null"
+                  - string
+              brand:
+                type:
+                  - "null"
+                  - string
+              country:
+                type:
+                  - "null"
+                  - string
+              cvc_check:
+                type:
+                  - "null"
+                  - string
+              dynamic_last4:
+                type:
+                  - "null"
+                  - string
+              exp_month:
+                type:
+                  - "null"
+                  - integer
+              exp_year:
+                type:
+                  - "null"
+                  - integer
+              fingerprint:
+                type:
+                  - "null"
+                  - string
+              funding:
+                type:
+                  - "null"
+                  - string
+              last4:
+                type:
+                  - "null"
+                  - string
+              name:
+                type:
+                  - "null"
+                  - string
+              three_d_secure:
+                type:
+                  - "null"
+                  - string
+              tokenization_method:
+                type:
+                  - "null"
+                  - string
+              type:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          client_secret:
+            type:
+              - "null"
+              - string
+          country:
+            type:
+              - "null"
+              - string
+          created:
+            type:
+              - "null"
+              - integer
+          currency:
+            type:
+              - "null"
+              - string
+          customer:
+            type:
+              - "null"
+              - string
+          cvc_check:
+            type:
+              - "null"
+              - string
+          dynamic_last4:
+            type:
+              - "null"
+              - string
+          eps:
+            properties: {}
+            type:
+              - "null"
+              - object
+          exp_month:
+            type:
+              - "null"
+              - integer
+          exp_year:
+            type:
+              - "null"
+              - integer
+          fingerprint:
+            type:
+              - "null"
+              - string
+          flow:
+            type:
+              - "null"
+              - string
+          funding:
+            type:
+              - "null"
+              - string
+          id:
+            type:
+              - "null"
+              - string
+          ideal:
+            properties: {}
+            type:
+              - "null"
+              - object
+          last4:
+            type:
+              - "null"
+              - string
+          livemode:
+            type:
+              - "null"
+              - boolean
+          metadata:
+            properties: {}
+            type:
+              - "null"
+              - object
+          multibanco:
+            properties: {}
+            type:
+              - "null"
+              - object
+          name:
+            type:
+              - "null"
+              - string
+          object:
+            type:
+              - "null"
+              - string
+          owner:
+            properties:
+              address:
+                properties:
+                  city:
+                    type:
+                      - "null"
+                      - string
+                  country:
+                    type:
+                      - "null"
+                      - string
+                  line1:
+                    type:
+                      - "null"
+                      - string
+                  line2:
+                    type:
+                      - "null"
+                      - string
+                  postal_code:
+                    type:
+                      - "null"
+                      - string
+                  state:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+              email:
+                type:
+                  - "null"
+                  - string
+              name:
+                type:
+                  - "null"
+                  - string
+              phone:
+                type:
+                  - "null"
+                  - string
+              verified_address:
+                type:
+                  - "null"
+                  - string
+              verified_email:
+                type:
+                  - "null"
+                  - string
+              verified_name:
+                type:
+                  - "null"
+                  - string
+              verified_phone:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          receiver:
+            properties:
+              address:
+                type:
+                  - "null"
+                  - string
+              amount_charged:
+                type:
+                  - "null"
+                  - integer
+              amount_received:
+                type:
+                  - "null"
+                  - integer
+              amount_returned:
+                type:
+                  - "null"
+                  - integer
+              refund_attributes_method:
+                type:
+                  - "null"
+                  - string
+              refund_attributes_status:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          redirect:
+            properties:
+              failure_reason:
+                type:
+                  - "null"
+                  - string
+              return_url:
+                type:
+                  - "null"
+                  - string
+              status:
+                type:
+                  - "null"
+                  - string
+              url:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          statement_descriptor:
+            type:
+              - "null"
+              - string
+          status:
+            type:
+              - "null"
+              - string
+          tokenization_method:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          usage:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+  subscriptions:
+    properties:
+      data:
+        type:
+          - "null"
+          - array
+      has_more:
+        type:
+          - "null"
+          - boolean
+      object:
+        type:
+          - "null"
+          - string
+      total_count:
+        type:
+          - "null"
+          - number
+      url:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  tax_exempt:
+    type:
+      - "null"
+      - string
+  tax_info:
+    properties:
+      tax_id:
+        type:
+          - string
+          - "null"
+      type:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  tax_info_verification:
+    properties:
+      status:
+        type:
+          - string
+          - "null"
+      verified_name:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+required:
+  - id
+type:
+  - object

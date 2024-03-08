@@ -1,0 +1,340 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  application:
+    type:
+      - "null"
+      - string
+  canceled_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  completed_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  created:
+    type:
+      - "null"
+      - integer
+  current_phase:
+    additionalProperties: true
+    properties:
+      end_date:
+        type:
+          - "null"
+          - integer
+      start_date:
+        type:
+          - "null"
+          - integer
+    type:
+      - object
+      - "null"
+  customer:
+    type:
+      - "null"
+      - string
+  default_settings:
+    properties:
+      application_fee_percent:
+        type:
+          - "null"
+          - string
+      automatic_tax:
+        properties:
+          enabled:
+            type:
+              - "null"
+              - boolean
+        type:
+          - "null"
+          - object
+      billing_cycle_anchor:
+        type:
+          - "null"
+          - string
+      billing_thresholds:
+        type:
+          - "null"
+          - string
+      collection_method:
+        type:
+          - "null"
+          - string
+      default_payment_method:
+        type:
+          - "null"
+          - string
+      description:
+        type:
+          - "null"
+          - string
+      invoice_settings:
+        type:
+          - string
+          - "null"
+          - object
+      on_behalf_of:
+        type:
+          - "null"
+          - string
+      transfer_data:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  end_behavior:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  phases:
+    items:
+      additionalProperties: true
+      properties:
+        add_invoice_items:
+          items:
+            additionalProperties: true
+            properties:
+              price:
+                type:
+                  - "null"
+                  - string
+              quantity:
+                type:
+                  - integer
+                  - "null"
+              tax_rates:
+                items:
+                  additionalProperties: true
+                  properties:
+                    active:
+                      type:
+                        - "null"
+                        - boolean
+                    country:
+                      type:
+                        - "null"
+                        - string
+                    created:
+                      format: date-time
+                      type:
+                        - "null"
+                        - string
+                    display_name:
+                      type:
+                        - "null"
+                        - string
+                    id:
+                      type:
+                        - "null"
+                        - string
+                    inclusive:
+                      type:
+                        - "null"
+                        - boolean
+                    jurisdiction:
+                      type:
+                        - "null"
+                        - string
+                    livemode:
+                      type:
+                        - "null"
+                        - boolean
+                    metadata:
+                      additionalProperties: true
+                      type:
+                        - "null"
+                        - object
+                    object:
+                      type:
+                        - "null"
+                        - string
+                    percentage:
+                      type:
+                        - "null"
+                        - number
+                    state:
+                      type:
+                        - "null"
+                        - string
+                    tax_type:
+                      type:
+                        - "null"
+                        - string
+                  type:
+                    - "null"
+                    - object
+                type:
+                  - "null"
+                  - array
+            type:
+              - "null"
+              - object
+          type:
+            - "null"
+            - array
+        application_fee_percent:
+          type:
+            - "null"
+            - string
+        billing_cycle_anchor:
+          type:
+            - "null"
+            - string
+        billing_thresholds:
+          type:
+            - "null"
+            - string
+        collection_method:
+          type:
+            - "null"
+            - string
+        coupon:
+          type:
+            - "null"
+            - string
+        currency:
+          type:
+            - "null"
+            - string
+        default_payment_method:
+          type:
+            - "null"
+            - string
+        default_tax_rates:
+          items:
+            additionalProperties: true
+            type:
+              - "null"
+              - object
+          type:
+            - "null"
+            - array
+        description:
+          type:
+            - "null"
+            - string
+        end_date:
+          format: date-time
+          type:
+            - string
+            - "null"
+        invoice_settings:
+          type:
+            - string
+            - "null"
+            - object
+        items:
+          items:
+            additionalProperties: true
+            properties:
+              billing_thresholds:
+                type:
+                  - "null"
+                  - string
+              metadata:
+                additionalProperties: true
+                type:
+                  - "null"
+                  - object
+              price:
+                type:
+                  - "null"
+                  - string
+              quantity:
+                type:
+                  - integer
+                  - "null"
+              tax_rates:
+                items:
+                  additionalProperties: true
+                  type:
+                    - "null"
+                    - object
+                type:
+                  - "null"
+                  - array
+            type:
+              - "null"
+              - object
+          type:
+            - "null"
+            - array
+        metadata:
+          additionalProperties: true
+          type:
+            - "null"
+            - object
+        on_behalf_of:
+          type:
+            - "null"
+            - string
+        proration_behavior:
+          type:
+            - "null"
+            - string
+        start_date:
+          format: date-time
+          type:
+            - string
+            - "null"
+        transfer_data:
+          type:
+            - "null"
+            - string
+        trial_end:
+          format: date-time
+          type:
+            - string
+            - "null"
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  released_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  released_subscription:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - "null"
+      - string
+  subscription:
+    type:
+      - "null"
+      - string
+  test_clock:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

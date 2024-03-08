@@ -1,0 +1,860 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  amount_details:
+    properties:
+      atm_fee:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  approved:
+    type:
+      - "null"
+      - boolean
+  authorization_method:
+    type:
+      - "null"
+      - string
+  balance_transactions:
+    items:
+      properties:
+        amount:
+          type:
+            - "null"
+            - integer
+        available_on:
+          type:
+            - "null"
+            - integer
+        created:
+          type:
+            - "null"
+            - integer
+        currency:
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
+        exchange_rate:
+          type:
+            - "null"
+            - number
+        fee:
+          type:
+            - "null"
+            - integer
+        fee_details:
+          items:
+            properties:
+              amount:
+                type:
+                  - "null"
+                  - integer
+              application:
+                type:
+                  - "null"
+                  - string
+              currency:
+                type:
+                  - "null"
+                  - string
+              description:
+                type:
+                  - "null"
+                  - string
+              type:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          type:
+            - "null"
+            - array
+        id:
+          type:
+            - "null"
+            - string
+        net:
+          type:
+            - "null"
+            - integer
+        object:
+          type:
+            - "null"
+            - string
+        source:
+          type:
+            - "null"
+            - string
+        sourced_transfers:
+          items: {}
+          type:
+            - "null"
+            - array
+        status:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  card:
+    properties:
+      brand:
+        type:
+          - "null"
+          - string
+      cancellation_reason:
+        type:
+          - "null"
+          - string
+      cardholder:
+        properties:
+          billing:
+            properties:
+              address:
+                properties:
+                  city:
+                    type:
+                      - "null"
+                      - string
+                  country:
+                    type:
+                      - "null"
+                      - string
+                  line1:
+                    type:
+                      - "null"
+                      - string
+                  line2:
+                    type:
+                      - "null"
+                      - string
+                  postal_code:
+                    type:
+                      - "null"
+                      - string
+                  state:
+                    type:
+                      - "null"
+                      - string
+                type:
+                  - "null"
+                  - object
+            type:
+              - "null"
+              - object
+          company:
+            properties:
+              tax_id_provided:
+                type: boolean
+            type:
+              - "null"
+              - object
+          created:
+            type:
+              - "null"
+              - integer
+          email:
+            type:
+              - "null"
+              - string
+          id:
+            type:
+              - "null"
+              - string
+          individual:
+            properties:
+              dob:
+                properties:
+                  day:
+                    type:
+                      - "null"
+                      - integer
+                  month:
+                    type:
+                      - "null"
+                      - integer
+                  year:
+                    type:
+                      - "null"
+                      - integer
+                type:
+                  - "null"
+                  - object
+              first_name:
+                type:
+                  - "null"
+                  - string
+              last_name:
+                type:
+                  - "null"
+                  - string
+              verification:
+                properties:
+                  document:
+                    properties:
+                      back:
+                        type:
+                          - "null"
+                          - string
+                      front:
+                        type:
+                          - "null"
+                          - string
+                    type:
+                      - "null"
+                      - object
+                type:
+                  - "null"
+                  - object
+            type:
+              - "null"
+              - object
+          livemode:
+            type:
+              - "null"
+              - boolean
+          metadata:
+            type:
+              - "null"
+              - object
+          name:
+            type:
+              - "null"
+              - string
+          object:
+            type:
+              - "null"
+              - string
+          phone_number:
+            type:
+              - "null"
+              - string
+          requirements:
+            properties:
+              disabled_reason:
+                type:
+                  - "null"
+                  - string
+              past_due:
+                items:
+                  type:
+                    - "null"
+                    - string
+                type:
+                  - "null"
+                  - array
+            type:
+              - "null"
+              - object
+          spending_controls:
+            properties:
+              allowed_categories:
+                items:
+                  type:
+                    - "null"
+                    - string
+                type:
+                  - "null"
+                  - array
+              blocked_categories:
+                items:
+                  type:
+                    - "null"
+                    - string
+                type:
+                  - "null"
+                  - array
+              spending_limits:
+                items:
+                  type:
+                    - "null"
+                    - object
+                type:
+                  - "null"
+                  - array
+              spending_limits_currency:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          status:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      created:
+        type:
+          - "null"
+          - integer
+      currency:
+        type:
+          - "null"
+          - string
+      cvc:
+        type:
+          - "null"
+          - string
+      exp_month:
+        type:
+          - "null"
+          - integer
+      exp_year:
+        type:
+          - "null"
+          - integer
+      id:
+        type:
+          - "null"
+          - string
+      last4:
+        type:
+          - "null"
+          - string
+      livemode:
+        type:
+          - "null"
+          - boolean
+      metadata:
+        additionalProperties: true
+        type:
+          - "null"
+          - object
+      number:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      replaced_by:
+        additionalProperties: true
+        type:
+          - "null"
+          - object
+      replacement_for:
+        additionalProperties: true
+        type:
+          - "null"
+          - object
+      replacement_reason:
+        type:
+          - "null"
+          - string
+      shipping:
+        additionalProperties: true
+        properties:
+          address:
+            properties:
+              city:
+                type:
+                  - "null"
+                  - string
+              country:
+                type:
+                  - "null"
+                  - string
+              line1:
+                type:
+                  - "null"
+                  - string
+              line2:
+                type:
+                  - "null"
+                  - string
+              postal_code:
+                type:
+                  - "null"
+                  - string
+              state:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+          carrier:
+            type:
+              - "null"
+              - string
+          eta:
+            type:
+              - "null"
+              - integer
+          name:
+            type:
+              - "null"
+              - string
+          service:
+            type:
+              - "null"
+              - string
+          status:
+            type:
+              - "null"
+              - string
+          tracking_number:
+            type:
+              - "null"
+              - string
+          tracking_url:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      spending_controls:
+        properties:
+          allowed_categories:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          blocked_categories:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          spending_limits:
+            items:
+              type:
+                - "null"
+                - object
+            type:
+              - "null"
+              - array
+          spending_limits_currency:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      status:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  cardholder:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  merchant_amount:
+    type:
+      - "null"
+      - integer
+  merchant_currency:
+    type:
+      - "null"
+      - string
+  merchant_data:
+    properties:
+      category:
+        type:
+          - "null"
+          - string
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      network_id:
+        type:
+          - "null"
+          - string
+      postal_code:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  metadata:
+    additionalProperties: true
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  pending_request:
+    properties:
+      amount:
+        type:
+          - "null"
+          - integer
+      amount_details:
+        properties:
+          atm_fee:
+            type:
+              - "null"
+              - integer
+        type:
+          - "null"
+          - object
+      currency:
+        type:
+          - "null"
+          - string
+      is_amount_controllable:
+        type:
+          - "null"
+          - boolean
+      merchant_amount:
+        type:
+          - "null"
+          - integer
+      merchant_currency:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  request_history:
+    items:
+      properties:
+        amount:
+          type:
+            - "null"
+            - integer
+        amount_details:
+          properties:
+            atm_fee:
+              type:
+                - "null"
+                - integer
+          type:
+            - "null"
+            - object
+        approved:
+          type:
+            - "null"
+            - boolean
+        created:
+          type:
+            - "null"
+            - integer
+        currency:
+          type:
+            - "null"
+            - string
+        merchant_amount:
+          type:
+            - "null"
+            - integer
+        merchant_currency:
+          type:
+            - "null"
+            - string
+        reason:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  status:
+    type:
+      - "null"
+      - string
+  transactions:
+    items:
+      properties:
+        amount:
+          type:
+            - "null"
+            - integer
+        amount_details:
+          properties:
+            atm_fee:
+              type:
+                - "null"
+                - integer
+          type:
+            - "null"
+            - object
+        authorization:
+          type:
+            - "null"
+            - string
+        balance_transaction:
+          type:
+            - "null"
+            - string
+        card:
+          type:
+            - "null"
+            - string
+        cardholder:
+          type:
+            - "null"
+            - string
+        created:
+          type:
+            - "null"
+            - integer
+        currency:
+          type:
+            - "null"
+            - string
+        dispute:
+          type:
+            - "null"
+            - string
+        id:
+          type:
+            - "null"
+            - string
+        livemode:
+          type:
+            - "null"
+            - boolean
+        merchant_amount:
+          type:
+            - "null"
+            - integer
+        merchant_currency:
+          type:
+            - "null"
+            - string
+        merchant_data:
+          properties:
+            category:
+              type:
+                - "null"
+                - string
+            city:
+              type:
+                - "null"
+                - string
+            country:
+              type:
+                - "null"
+                - string
+            name:
+              type:
+                - "null"
+                - string
+            network_id:
+              type:
+                - "null"
+                - string
+            postal_code:
+              type:
+                - "null"
+                - string
+            state:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        metadata:
+          additionalProperties: true
+          type:
+            - "null"
+            - object
+        object:
+          type:
+            - "null"
+            - string
+        purchase_details:
+          properties:
+            flight:
+              properties:
+                departure_at:
+                  type:
+                    - "null"
+                    - integer
+                passenger_name:
+                  type:
+                    - "null"
+                    - string
+                refundable:
+                  type:
+                    - "null"
+                    - boolean
+                segments:
+                  items:
+                    properties:
+                      arrival_airport_code:
+                        type:
+                          - "null"
+                          - string
+                      carrier:
+                        type:
+                          - "null"
+                          - string
+                      departure_airport_code:
+                        type:
+                          - "null"
+                          - string
+                      flight_number:
+                        type:
+                          - "null"
+                          - string
+                      service_class:
+                        type:
+                          - "null"
+                          - string
+                      stopover_allowed:
+                        type:
+                          - "null"
+                          - boolean
+                    type:
+                      - "null"
+                      - object
+                  type:
+                    - "null"
+                    - array
+                travel_agency:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+            fuel:
+              properties:
+                unit:
+                  type:
+                    - "null"
+                    - string
+                unit_cost_decimal:
+                  type:
+                    - "null"
+                    - string
+                volume_decimal:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - string
+            lodging:
+              type:
+                - "null"
+                - object
+            receipt:
+              type:
+                - "null"
+                - array
+            reference:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  verification_data:
+    properties:
+      address_line1_check:
+        type:
+          - "null"
+          - string
+      address_postal_code_check:
+        type:
+          - "null"
+          - string
+      cvc_check:
+        type:
+          - "null"
+          - string
+      expiry_check:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  wallet:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

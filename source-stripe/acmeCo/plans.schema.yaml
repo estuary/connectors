@@ -1,0 +1,119 @@
+---
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  aggregate_usage:
+    type:
+      - "null"
+      - string
+  amount:
+    type:
+      - "null"
+      - integer
+  billing_scheme:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  interval:
+    type:
+      - "null"
+      - string
+  interval_count:
+    type:
+      - "null"
+      - integer
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  nickname:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  product:
+    type:
+      - "null"
+      - string
+  statement_description:
+    type:
+      - "null"
+      - string
+  statement_descriptor:
+    type:
+      - "null"
+      - string
+  tiers:
+    items:
+      properties:
+        flat_amount:
+          type:
+            - "null"
+            - integer
+        flat_amount_decimal:
+          type:
+            - "null"
+            - string
+        unit_amount:
+          type:
+            - "null"
+            - integer
+        unit_amount_decimal:
+          type:
+            - "null"
+            - string
+        up_to:
+          type:
+            - "null"
+            - integer
+      type:
+        - "null"
+        - string
+        - object
+    type:
+      - "null"
+      - array
+  tiers_mode:
+    type:
+      - "null"
+      - string
+  transform_usage:
+    type:
+      - "null"
+      - string
+  trial_period_days:
+    type:
+      - "null"
+      - integer
+  usage_type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

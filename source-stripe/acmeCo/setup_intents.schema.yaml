@@ -1,0 +1,93 @@
+---
+properties:
+  application:
+    type:
+      - "null"
+      - string
+  cancellation_reason:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - integer
+  customer:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  flow_directions:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  id:
+    type: string
+  last_setup_error:
+    type:
+      - "null"
+      - string
+  latest_attempt:
+    type:
+      - "null"
+      - string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  mandate:
+    type:
+      - "null"
+      - string
+  metadata:
+    type:
+      - "null"
+      - object
+  next_action:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - string
+  on_behalf_of:
+    type:
+      - "null"
+      - string
+  payment_method:
+    type:
+      - "null"
+      - string
+  payment_method_options:
+    additionalProperties: true
+    type:
+      - "null"
+      - object
+  payment_method_types:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  single_use_mandate:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - string
+  usage:
+    type:
+      - string
+required:
+  - id
+type:
+  - object

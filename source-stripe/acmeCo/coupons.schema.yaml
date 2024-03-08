@@ -1,0 +1,69 @@
+---
+properties:
+  amount_off:
+    type:
+      - "null"
+      - integer
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  duration:
+    type:
+      - "null"
+      - string
+  duration_in_months:
+    type:
+      - "null"
+      - integer
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  max_redemptions:
+    type:
+      - "null"
+      - integer
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  percent_off:
+    type:
+      - "null"
+      - number
+  percent_off_precise:
+    type:
+      - "null"
+      - number
+  redeem_by:
+    type:
+      - "null"
+      - string
+  times_redeemed:
+    type:
+      - "null"
+      - integer
+  valid:
+    type:
+      - "null"
+      - boolean
+required:
+  - id
+type:
+  - object

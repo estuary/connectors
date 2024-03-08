@@ -1,0 +1,53 @@
+---
+properties:
+  api_version:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  data:
+    properties: {}
+    type:
+      - "null"
+      - object
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  object:
+    type:
+      - "null"
+      - string
+  pending_webhooks:
+    type:
+      - "null"
+      - integer
+  request:
+    oneOf:
+      - type:
+          - "null"
+          - string
+      - properties:
+          id:
+            type:
+              - "null"
+              - string
+          idempotency_key:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

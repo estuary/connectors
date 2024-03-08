@@ -1,0 +1,118 @@
+---
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  amount_reversed:
+    type:
+      - "null"
+      - integer
+  arrival_date:
+    type:
+      - "null"
+      - integer
+  automatic:
+    type:
+      - "null"
+      - boolean
+  balance_transaction:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  date:
+    type:
+      - "null"
+      - integer
+  description:
+    type:
+      - "null"
+      - string
+  destination:
+    type:
+      - "null"
+      - string
+  failure_balance_transaction:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  recipient:
+    type:
+      - "null"
+      - string
+  reversals:
+    properties:
+      data:
+        type:
+          - "null"
+          - array
+      has_more:
+        type:
+          - "null"
+          - boolean
+      object:
+        type:
+          - "null"
+          - string
+      total_count:
+        type:
+          - "null"
+          - number
+      url:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  reversed:
+    type:
+      - "null"
+      - boolean
+  source_transaction:
+    type:
+      - "null"
+      - string
+  source_type:
+    type:
+      - "null"
+      - string
+  statement_description:
+    type:
+      - "null"
+      - string
+  statement_descriptor:
+    type:
+      - "null"
+      - string
+  transfer_group:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,90 @@
+---
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  available_on:
+    type:
+      - "null"
+      - integer
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  exchange_rate:
+    type:
+      - "null"
+      - number
+  fee:
+    type:
+      - "null"
+      - integer
+  fee_details:
+    items:
+      properties:
+        amount:
+          type:
+            - "null"
+            - integer
+        application:
+          type:
+            - "null"
+            - string
+        currency:
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  id:
+    type: string
+  net:
+    type:
+      - "null"
+      - integer
+  object:
+    type:
+      - "null"
+      - string
+  source:
+    type:
+      - "null"
+      - string
+  sourced_transfers:
+    items: {}
+    type:
+      - "null"
+      - array
+  status:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,75 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  amount:
+    type:
+      - "null"
+      - integer
+  balance_transaction:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - integer
+  currency:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  destination_balance:
+    type:
+      - "null"
+      - string
+  expected_availability_date:
+    type:
+      - "null"
+      - integer
+  failure_code:
+    type:
+      - "null"
+      - string
+  failure_message:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  source:
+    properties: {}
+    type:
+      - "null"
+      - object
+  statement_descriptor:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - "null"
+      - string
+  transfer_group:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

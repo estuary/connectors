@@ -1,0 +1,325 @@
+---
+properties:
+  application_fee_percent:
+    type:
+      - "null"
+      - number
+  billing:
+    type:
+      - "null"
+      - string
+  billing_cycle_anchor:
+    type:
+      - "null"
+      - number
+  cancel_at:
+    type:
+      - "null"
+      - number
+  cancel_at_period_end:
+    type:
+      - "null"
+      - boolean
+  canceled_at:
+    type:
+      - "null"
+      - number
+  created:
+    type:
+      - "null"
+      - integer
+  current_period_end:
+    type:
+      - "null"
+      - number
+  current_period_start:
+    type:
+      - "null"
+      - integer
+  customer:
+    type:
+      - "null"
+      - string
+  days_until_due:
+    type:
+      - "null"
+      - integer
+  discount:
+    properties:
+      coupon:
+        properties:
+          amount_off:
+            type:
+              - "null"
+              - number
+          created:
+            type:
+              - "null"
+              - integer
+          currency:
+            type:
+              - "null"
+              - string
+          duration:
+            type:
+              - "null"
+              - string
+          duration_in_months:
+            type:
+              - "null"
+              - number
+          id:
+            type:
+              - "null"
+              - string
+          livemode:
+            type:
+              - "null"
+              - boolean
+          max_redemptions:
+            type:
+              - "null"
+              - number
+          metadata:
+            properties: {}
+            type:
+              - "null"
+              - object
+          name:
+            type:
+              - "null"
+              - string
+          object:
+            type:
+              - "null"
+              - string
+          percent_off:
+            type:
+              - "null"
+              - number
+          percent_off_precise:
+            type:
+              - "null"
+              - number
+          redeem_by:
+            type:
+              - "null"
+              - string
+          times_redeemed:
+            type:
+              - "null"
+              - number
+          valid:
+            type:
+              - "null"
+              - boolean
+        type:
+          - "null"
+          - object
+      customer:
+        type:
+          - "null"
+          - string
+      end:
+        type:
+          - "null"
+          - integer
+      object:
+        type:
+          - "null"
+          - string
+      start:
+        type:
+          - "null"
+          - integer
+      subscription:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  ended_at:
+    type:
+      - "null"
+      - number
+  id:
+    type: string
+  items:
+    properties:
+      data:
+        type:
+          - "null"
+          - array
+      has_more:
+        type:
+          - "null"
+          - boolean
+      object:
+        type:
+          - "null"
+          - string
+      total_count:
+        type:
+          - "null"
+          - number
+      url:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    properties: {}
+    type:
+      - "null"
+      - object
+  object:
+    type:
+      - "null"
+      - string
+  plan:
+    properties:
+      active:
+        type:
+          - "null"
+          - boolean
+      aggregate_usage:
+        type:
+          - "null"
+          - string
+      amount:
+        type:
+          - "null"
+          - integer
+      billing_scheme:
+        type:
+          - "null"
+          - string
+      created:
+        type:
+          - "null"
+          - integer
+      currency:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - string
+      interval:
+        type:
+          - "null"
+          - string
+      interval_count:
+        type:
+          - "null"
+          - integer
+      livemode:
+        type:
+          - "null"
+          - boolean
+      metadata:
+        properties: {}
+        type:
+          - "null"
+          - object
+      name:
+        type:
+          - "null"
+          - string
+      nickname:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      product:
+        type:
+          - "null"
+          - string
+      statement_description:
+        type:
+          - "null"
+          - string
+      statement_descriptor:
+        type:
+          - "null"
+          - string
+      tiers:
+        items:
+          properties:
+            flat_amount:
+              type:
+                - "null"
+                - integer
+            unit_amount:
+              type:
+                - "null"
+                - integer
+            up_to:
+              type:
+                - "null"
+                - integer
+          type:
+            - "null"
+            - integer
+            - object
+        type:
+          - "null"
+          - array
+      tiers_mode:
+        type:
+          - "null"
+          - string
+      transform_usage:
+        type:
+          - "null"
+          - string
+      trial_period_days:
+        type:
+          - "null"
+          - integer
+      usage_type:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  quantity:
+    type:
+      - "null"
+      - integer
+  start_date:
+    type:
+      - "null"
+      - integer
+  status:
+    type:
+      - "null"
+      - string
+  tax_percent:
+    type:
+      - "null"
+      - number
+  trial_end:
+    type:
+      - "null"
+      - number
+  trial_start:
+    type:
+      - "null"
+      - integer
+required:
+  - id
+type:
+  - object

@@ -1,0 +1,183 @@
+---
+properties:
+  billing:
+    properties:
+      address:
+        properties:
+          city:
+            type:
+              - "null"
+              - string
+          country:
+            type:
+              - "null"
+              - string
+          line1:
+            type:
+              - "null"
+              - string
+          line2:
+            type:
+              - "null"
+              - string
+          postal_code:
+            type:
+              - "null"
+              - string
+          state:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  company:
+    properties:
+      tax_id_provided:
+        type: boolean
+    type:
+      - "null"
+      - object
+  created:
+    type:
+      - "null"
+      - integer
+  email:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  individual:
+    properties:
+      dob:
+        properties:
+          day:
+            type:
+              - "null"
+              - integer
+          month:
+            type:
+              - "null"
+              - integer
+          year:
+            type:
+              - "null"
+              - integer
+        type:
+          - "null"
+          - object
+      first_name:
+        type:
+          - "null"
+          - string
+      last_name:
+        type:
+          - "null"
+          - string
+      verification:
+        properties:
+          document:
+            properties:
+              back:
+                type:
+                  - "null"
+                  - string
+              front:
+                type:
+                  - "null"
+                  - string
+            type:
+              - "null"
+              - object
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  livemode:
+    type:
+      - "null"
+      - boolean
+  metadata:
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  phone_number:
+    type:
+      - "null"
+      - string
+  requirements:
+    properties:
+      disabled_reason:
+        type:
+          - "null"
+          - string
+      past_due:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  spending_controls:
+    properties:
+      allowed_categories:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      blocked_categories:
+        items:
+          type:
+            - "null"
+            - string
+        type:
+          - "null"
+          - array
+      spending_limits:
+        items:
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+      spending_limits_currency:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  status:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

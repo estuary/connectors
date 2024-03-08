@@ -1,0 +1,382 @@
+---
+$schema: "http://json-schema.org/draft-04/schema#"
+properties:
+  amount_subtotal:
+    type:
+      - "null"
+      - integer
+  amount_total:
+    type:
+      - "null"
+      - integer
+  checkout_session_expires_at:
+    type:
+      - "null"
+      - integer
+  checkout_session_id:
+    type:
+      - "null"
+      - string
+  currency:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  discounts:
+    items:
+      properties:
+        amount:
+          type:
+            - "null"
+            - integer
+        discount:
+          properties:
+            checkout_session:
+              type:
+                - "null"
+                - string
+            coupon:
+              properties:
+                amount_off:
+                  type:
+                    - "null"
+                    - integer
+                applies_to:
+                  properties:
+                    products:
+                      items:
+                        type:
+                          - "null"
+                          - string
+                      type:
+                        - "null"
+                        - array
+                  type:
+                    - "null"
+                    - object
+                created:
+                  type:
+                    - "null"
+                    - integer
+                currency:
+                  type:
+                    - "null"
+                    - string
+                duration:
+                  type:
+                    - "null"
+                    - string
+                duration_in_months:
+                  type:
+                    - "null"
+                    - integer
+                id:
+                  type:
+                    - "null"
+                    - string
+                livemode:
+                  type:
+                    - "null"
+                    - boolean
+                max_redemptions:
+                  type:
+                    - "null"
+                    - integer
+                metadata:
+                  properties: {}
+                  type:
+                    - "null"
+                    - object
+                name:
+                  type:
+                    - "null"
+                    - string
+                object:
+                  type:
+                    - "null"
+                    - string
+                percent_off:
+                  type:
+                    - "null"
+                    - number
+                redeem_by:
+                  type:
+                    - "null"
+                    - integer
+                times_redeemed:
+                  type:
+                    - "null"
+                    - integer
+                valid:
+                  type:
+                    - "null"
+                    - boolean
+              type:
+                - "null"
+                - object
+            customer:
+              type:
+                - "null"
+                - string
+            end:
+              type:
+                - "null"
+                - integer
+            id:
+              type:
+                - "null"
+                - string
+            invoice:
+              type:
+                - "null"
+                - string
+            invoice_item:
+              type:
+                - "null"
+                - string
+            object:
+              type:
+                - "null"
+                - string
+            promotion_code:
+              type:
+                - "null"
+                - string
+            start:
+              type:
+                - "null"
+                - integer
+            subscription:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  id:
+    type: string
+  object:
+    type:
+      - "null"
+      - string
+  price:
+    properties:
+      active:
+        type:
+          - "null"
+          - boolean
+      billing_scheme:
+        type:
+          - "null"
+          - string
+      created:
+        type:
+          - "null"
+          - integer
+      currency:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - string
+      livemode:
+        type:
+          - "null"
+          - boolean
+      lookup_key:
+        type:
+          - "null"
+          - string
+      metadata:
+        properties: {}
+        type:
+          - "null"
+          - object
+      nickname:
+        type:
+          - "null"
+          - string
+      object:
+        type:
+          - "null"
+          - string
+      product:
+        type:
+          - "null"
+          - string
+      recurring:
+        properties:
+          aggregate_usage:
+            type:
+              - "null"
+              - string
+          interval:
+            type:
+              - "null"
+              - string
+          interval_count:
+            type:
+              - "null"
+              - integer
+          usage_type:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      tax_behavior:
+        type:
+          - "null"
+          - string
+      tiers:
+        properties:
+          flat_amount:
+            type:
+              - "null"
+              - integer
+          flat_amount_decimal:
+            type:
+              - "null"
+              - string
+          unit_amount:
+            type:
+              - "null"
+              - integer
+          unit_amount_decimal:
+            type:
+              - "null"
+              - string
+          up_to:
+            type:
+              - "null"
+              - integer
+        type:
+          - "null"
+          - object
+      tiers_mode:
+        type:
+          - "null"
+          - string
+      transform_quantity:
+        properties:
+          divide_by:
+            type:
+              - "null"
+              - integer
+          round:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+      type:
+        type:
+          - "null"
+          - string
+      unit_amount:
+        type:
+          - "null"
+          - integer
+      unit_amount_decimal:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  quantity:
+    type:
+      - "null"
+      - integer
+  taxes:
+    items:
+      properties:
+        amount:
+          type:
+            - "null"
+            - integer
+        rate:
+          properties:
+            active:
+              type:
+                - "null"
+                - boolean
+            country:
+              type:
+                - "null"
+                - string
+            created:
+              type:
+                - "null"
+                - integer
+            description:
+              type:
+                - "null"
+                - string
+            display_name:
+              type:
+                - "null"
+                - string
+            id:
+              type:
+                - "null"
+                - string
+            inclusive:
+              type:
+                - "null"
+                - boolean
+            jurisdiction:
+              type:
+                - "null"
+                - string
+            livemode:
+              type:
+                - "null"
+                - boolean
+            metadata:
+              properties: {}
+              type:
+                - "null"
+                - object
+            object:
+              type:
+                - "null"
+                - string
+            percentage:
+              type:
+                - "null"
+                - number
+            state:
+              type:
+                - "null"
+                - string
+            tax_type:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+required:
+  - id
+type:
+  - object
