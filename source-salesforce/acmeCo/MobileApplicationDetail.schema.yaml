@@ -1,0 +1,102 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AppInstallUrl:
+    type:
+      - string
+      - "null"
+  ApplicationBinary:
+    type:
+      - string
+      - "null"
+  ApplicationBinaryFileName:
+    type:
+      - string
+      - "null"
+  ApplicationBundleIdentifier:
+    type:
+      - string
+      - "null"
+  ApplicationFileLength:
+    type:
+      - integer
+      - "null"
+  ApplicationIcon:
+    type:
+      - string
+      - "null"
+  ApplicationIconFileName:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  DevicePlatform:
+    type:
+      - string
+      - "null"
+  DeviceType:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsEnterpriseApp:
+    type:
+      - boolean
+      - "null"
+  Language:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  MinimumOsVersion:
+    type:
+      - string
+      - "null"
+  NamespacePrefix:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Version:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

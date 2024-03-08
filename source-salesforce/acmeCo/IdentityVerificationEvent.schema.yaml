@@ -1,0 +1,109 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Activity:
+    type:
+      - string
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CountryIso:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventGroup:
+    type:
+      - string
+      - "null"
+  EventIdentifier:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  Latitude:
+    type:
+      - number
+      - "null"
+  LoginHistoryId:
+    type:
+      - string
+      - "null"
+  LoginKey:
+    type:
+      - string
+      - "null"
+  Longitude:
+    type:
+      - number
+      - "null"
+  Policy:
+    type:
+      - string
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  Remarks:
+    type:
+      - string
+      - "null"
+  ResourceId:
+    type:
+      - string
+      - "null"
+  SessionKey:
+    type:
+      - string
+      - "null"
+  SessionLevel:
+    type:
+      - string
+      - "null"
+  SourceIp:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  Subdivision:
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+  Username:
+    type:
+      - string
+      - "null"
+  VerificationMethod:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

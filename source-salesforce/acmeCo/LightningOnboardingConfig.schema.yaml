@@ -1,0 +1,74 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CollaborationGroupId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CustomQuestion:
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  FeedbackFormDaysFrequency:
+    type:
+      - integer
+      - "null"
+  Id:
+    type: string
+  IsCustom:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  Language:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  PromptDelayTime:
+    type:
+      - integer
+      - "null"
+  SendFeedbackToSalesforce:
+    type:
+      - boolean
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

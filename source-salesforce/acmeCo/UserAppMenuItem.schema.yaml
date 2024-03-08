@@ -1,0 +1,71 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AppMenuItemId:
+    type:
+      - string
+      - "null"
+  ApplicationId:
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  IconUrl:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InfoUrl:
+    type:
+      - string
+      - "null"
+  IsUsingAdminAuthorization:
+    type:
+      - boolean
+      - "null"
+  IsVisible:
+    type:
+      - boolean
+      - "null"
+  Label:
+    type:
+      - string
+      - "null"
+  LogoUrl:
+    type:
+      - string
+      - "null"
+  MobileStartUrl:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  SortOrder:
+    type:
+      - integer
+      - "null"
+  StartUrl:
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  UserSortOrder:
+    type:
+      - integer
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

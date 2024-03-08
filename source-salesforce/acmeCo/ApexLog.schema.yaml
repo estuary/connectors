@@ -1,0 +1,62 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Application:
+    type:
+      - string
+      - "null"
+  DurationMilliseconds:
+    type:
+      - integer
+      - "null"
+  Id:
+    type: string
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Location:
+    type:
+      - string
+      - "null"
+  LogLength:
+    type:
+      - integer
+      - "null"
+  LogUserId:
+    type:
+      - string
+      - "null"
+  Operation:
+    type:
+      - string
+      - "null"
+  Request:
+    type:
+      - string
+      - "null"
+  RequestIdentifier:
+    type:
+      - string
+      - "null"
+  StartTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

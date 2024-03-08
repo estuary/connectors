@@ -1,0 +1,97 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ListPrice:
+    type:
+      - number
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OpportunityId:
+    type:
+      - string
+      - "null"
+  PricebookEntryId:
+    type:
+      - string
+      - "null"
+  Product2Id:
+    type:
+      - string
+      - "null"
+  ProductCode:
+    type:
+      - string
+      - "null"
+  Quantity:
+    type:
+      - number
+      - "null"
+  ServiceDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  SortOrder:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TotalPrice:
+    type:
+      - number
+      - "null"
+  UnitPrice:
+    type:
+      - number
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

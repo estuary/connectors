@@ -1,0 +1,137 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CompanyName:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LegalEntityAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  LegalEntityCity:
+    type:
+      - string
+      - "null"
+  LegalEntityCountry:
+    type:
+      - string
+      - "null"
+  LegalEntityGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  LegalEntityLatitude:
+    type:
+      - number
+      - "null"
+  LegalEntityLongitude:
+    type:
+      - number
+      - "null"
+  LegalEntityPostalCode:
+    type:
+      - string
+      - "null"
+  LegalEntityState:
+    type:
+      - string
+      - "null"
+  LegalEntityStreet:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

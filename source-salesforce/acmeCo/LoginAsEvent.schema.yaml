@@ -1,0 +1,89 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Application:
+    type:
+      - string
+      - "null"
+  Browser:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DelegatedOrganizationId:
+    type:
+      - string
+      - "null"
+  DelegatedUsername:
+    type:
+      - string
+      - "null"
+  EventDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventIdentifier:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  LoginAsCategory:
+    type:
+      - string
+      - "null"
+  LoginHistoryId:
+    type:
+      - string
+      - "null"
+  LoginKey:
+    type:
+      - string
+      - "null"
+  LoginType:
+    type:
+      - string
+      - "null"
+  Platform:
+    type:
+      - string
+      - "null"
+  SessionKey:
+    type:
+      - string
+      - "null"
+  SessionLevel:
+    type:
+      - string
+      - "null"
+  SourceIp:
+    type:
+      - string
+      - "null"
+  TargetUrl:
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+  UserType:
+    type:
+      - string
+      - "null"
+  Username:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

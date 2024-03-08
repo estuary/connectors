@@ -1,0 +1,156 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CartId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DeliverToAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  DeliverToCity:
+    type:
+      - string
+      - "null"
+  DeliverToCountry:
+    type:
+      - string
+      - "null"
+  DeliverToGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  DeliverToLatitude:
+    type:
+      - number
+      - "null"
+  DeliverToLongitude:
+    type:
+      - number
+      - "null"
+  DeliverToName:
+    type:
+      - string
+      - "null"
+  DeliverToPostalCode:
+    type:
+      - string
+      - "null"
+  DeliverToState:
+    type:
+      - string
+      - "null"
+  DeliverToStreet:
+    type:
+      - string
+      - "null"
+  DesiredDeliveryDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GrandTotalAmount:
+    type:
+      - number
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  ShippingInstructions:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TotalAmount:
+    type:
+      - number
+      - "null"
+  TotalChargeAmount:
+    type:
+      - number
+      - "null"
+  TotalChargeTaxAmount:
+    type:
+      - number
+      - "null"
+  TotalProductAmount:
+    type:
+      - number
+      - "null"
+  TotalProductTaxAmount:
+    type:
+      - number
+      - "null"
+  TotalTaxAmount:
+    type:
+      - number
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,143 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ActionDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ActualTaxChange:
+    type:
+      - number
+      - "null"
+  AdjustmentAmountChange:
+    type:
+      - number
+      - "null"
+  Amount:
+    type:
+      - number
+      - "null"
+  AssetActionNumber:
+    type:
+      - string
+      - "null"
+  AssetId:
+    type:
+      - string
+      - "null"
+  Category:
+    type:
+      - string
+      - "null"
+  CategoryEnum:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EstimatedTaxChange:
+    type:
+      - number
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MrrChange:
+    type:
+      - number
+      - "null"
+  ProductAmountChange:
+    type:
+      - number
+      - "null"
+  QuantityChange:
+    type:
+      - number
+      - "null"
+  SubtotalChange:
+    type:
+      - number
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TotalAmount:
+    type:
+      - number
+      - "null"
+  TotalCancellationsAmount:
+    type:
+      - number
+      - "null"
+  TotalCrossSellsAmount:
+    type:
+      - number
+      - "null"
+  TotalDownsellsAmount:
+    type:
+      - number
+      - "null"
+  TotalInitialSaleAmount:
+    type:
+      - number
+      - "null"
+  TotalMrr:
+    type:
+      - number
+      - "null"
+  TotalOtherAmount:
+    type:
+      - number
+      - "null"
+  TotalQuantity:
+    type:
+      - number
+      - "null"
+  TotalRenewalsAmount:
+    type:
+      - number
+      - "null"
+  TotalTermsAndConditionsAmount:
+    type:
+      - number
+      - "null"
+  TotalTransfersAmount:
+    type:
+      - number
+      - "null"
+  TotalUpsellsAmount:
+    type:
+      - number
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

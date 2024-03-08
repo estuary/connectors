@@ -4,9 +4,8 @@ connectionSpecification:
   title: Salesforce Source Spec
   type: object
   required:
-    - client_id
-    - client_secret
-    - refresh_token
+    - credentials
+    - start_date
   additionalProperties: true
   properties:
     is_sandbox:

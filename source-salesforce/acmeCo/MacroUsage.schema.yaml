@@ -1,0 +1,95 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AppContext:
+    type:
+      - string
+      - "null"
+  ConditionCount:
+    type:
+      - integer
+      - "null"
+  ContextRecord:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DurationInMs:
+    type:
+      - integer
+      - "null"
+  ExecutedInstructionCount:
+    type:
+      - integer
+      - "null"
+  ExecutionEndTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ExecutionState:
+    type:
+      - string
+      - "null"
+  FailureReason:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InstructionCount:
+    type:
+      - integer
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsFromBulk:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MacroId:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

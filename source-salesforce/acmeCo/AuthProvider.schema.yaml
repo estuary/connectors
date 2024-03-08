@@ -1,0 +1,120 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AppleTeam:
+    type:
+      - string
+      - "null"
+  AuthorizeUrl:
+    type:
+      - string
+      - "null"
+  ConsumerKey:
+    type:
+      - string
+      - "null"
+  ConsumerSecret:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CustomMetadataTypeRecord:
+    type:
+      - string
+      - "null"
+  DefaultScopes:
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  EcKey:
+    type:
+      - string
+      - "null"
+  ErrorUrl:
+    type:
+      - string
+      - "null"
+  ExecutionUserId:
+    type:
+      - string
+      - "null"
+  FriendlyName:
+    type:
+      - string
+      - "null"
+  IconUrl:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IdTokenIssuer:
+    type:
+      - string
+      - "null"
+  LinkKickoffUrl:
+    type:
+      - string
+      - "null"
+  LogoutUrl:
+    type:
+      - string
+      - "null"
+  OauthKickoffUrl:
+    type:
+      - string
+      - "null"
+  OptionsIncludeOrgIdInId:
+    type:
+      - boolean
+      - "null"
+  OptionsSendAccessTokenInHeader:
+    type:
+      - boolean
+      - "null"
+  OptionsSendClientCredentialsInHeader:
+    type:
+      - boolean
+      - "null"
+  OptionsSendSecretInApis:
+    type:
+      - boolean
+      - "null"
+  PluginId:
+    type:
+      - string
+      - "null"
+  ProviderType:
+    type:
+      - string
+      - "null"
+  RegistrationHandlerId:
+    type:
+      - string
+      - "null"
+  SsoKickoffUrl:
+    type:
+      - string
+      - "null"
+  TokenUrl:
+    type:
+      - string
+      - "null"
+  UserInfoUrl:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,112 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  BlockTimeAfterAppointment:
+    type:
+      - integer
+      - "null"
+  BlockTimeAfterUnit:
+    type:
+      - string
+      - "null"
+  BlockTimeBeforeAppointment:
+    type:
+      - integer
+      - "null"
+  BlockTimeBeforeUnit:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DefaultAppointmentType:
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  DurationInMinutes:
+    type:
+      - number
+      - "null"
+  DurationType:
+    type:
+      - string
+      - "null"
+  EstimatedDuration:
+    type:
+      - number
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OperatingHoursId:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TimeFrameEndUnit:
+    type:
+      - string
+      - "null"
+  TimeFrameStartUnit:
+    type:
+      - string
+      - "null"
+  TimeframeEnd:
+    type:
+      - integer
+      - "null"
+  TimeframeStart:
+    type:
+      - integer
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

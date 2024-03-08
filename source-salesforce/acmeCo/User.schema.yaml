@@ -1,0 +1,729 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AboutMe:
+    type:
+      - string
+      - "null"
+  AccountId:
+    type:
+      - string
+      - "null"
+  Address:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  Alias:
+    type:
+      - string
+      - "null"
+  BadgeText:
+    type:
+      - string
+      - "null"
+  BannerPhotoUrl:
+    type:
+      - string
+      - "null"
+  CallCenterId:
+    type:
+      - string
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  CommunityNickname:
+    type:
+      - string
+      - "null"
+  CompanyName:
+    type:
+      - string
+      - "null"
+  ContactId:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DefaultGroupNotificationFrequency:
+    type:
+      - string
+      - "null"
+  DelegatedApproverId:
+    type:
+      - string
+      - "null"
+  Department:
+    type:
+      - string
+      - "null"
+  DigestFrequency:
+    type:
+      - string
+      - "null"
+  Division:
+    type:
+      - string
+      - "null"
+  Email:
+    type:
+      - string
+      - "null"
+  EmailEncodingKey:
+    type:
+      - string
+      - "null"
+  EmailPreferencesAutoBcc:
+    type:
+      - boolean
+      - "null"
+  EmailPreferencesAutoBccStayInTouch:
+    type:
+      - boolean
+      - "null"
+  EmailPreferencesStayInTouchReminder:
+    type:
+      - boolean
+      - "null"
+  EmployeeNumber:
+    type:
+      - string
+      - "null"
+  Extension:
+    type:
+      - string
+      - "null"
+  Fax:
+    type:
+      - string
+      - "null"
+  FederationIdentifier:
+    type:
+      - string
+      - "null"
+  FirstName:
+    type:
+      - string
+      - "null"
+  ForecastEnabled:
+    type:
+      - boolean
+      - "null"
+  FullPhotoUrl:
+    type:
+      - string
+      - "null"
+  GeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IndividualId:
+    type:
+      - string
+      - "null"
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  IsExtIndicatorVisible:
+    type:
+      - boolean
+      - "null"
+  IsProfilePhotoActive:
+    type:
+      - boolean
+      - "null"
+  JigsawImportLimitOverride:
+    type:
+      - integer
+      - "null"
+  LanguageLocaleKey:
+    type:
+      - string
+      - "null"
+  LastLoginDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastName:
+    type:
+      - string
+      - "null"
+  LastPasswordChangeDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Latitude:
+    type:
+      - number
+      - "null"
+  LocaleSidKey:
+    type:
+      - string
+      - "null"
+  Longitude:
+    type:
+      - number
+      - "null"
+  ManagerId:
+    type:
+      - string
+      - "null"
+  MediumBannerPhotoUrl:
+    type:
+      - string
+      - "null"
+  MediumPhotoUrl:
+    type:
+      - string
+      - "null"
+  MobilePhone:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NumberOfFailedLogins:
+    type:
+      - integer
+      - "null"
+  OfflinePdaTrialExpirationDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  OfflineTrialExpirationDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  OutOfOfficeMessage:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  ProfileId:
+    type:
+      - string
+      - "null"
+  ReceivesAdminInfoEmails:
+    type:
+      - boolean
+      - "null"
+  ReceivesInfoEmails:
+    type:
+      - boolean
+      - "null"
+  SenderEmail:
+    type:
+      - string
+      - "null"
+  SenderName:
+    type:
+      - string
+      - "null"
+  Signature:
+    type:
+      - string
+      - "null"
+  SmallBannerPhotoUrl:
+    type:
+      - string
+      - "null"
+  SmallPhotoUrl:
+    type:
+      - string
+      - "null"
+  State:
+    type:
+      - string
+      - "null"
+  StayInTouchNote:
+    type:
+      - string
+      - "null"
+  StayInTouchSignature:
+    type:
+      - string
+      - "null"
+  StayInTouchSubject:
+    type:
+      - string
+      - "null"
+  Street:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TimeZoneSidKey:
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+  UserPermissionsCallCenterAutoLogin:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsInteractionUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsJigsawProspectingUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsKnowledgeUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsMarketingUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsOfflineUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsSFContentUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsSiteforceContributorUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsSiteforcePublisherUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsSupportUser:
+    type:
+      - boolean
+      - "null"
+  UserPermissionsWorkDotComUserFeature:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesActivityRemindersPopup:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesApexPagesDeveloperMode:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesCacheDiagnostics:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesContentEmailAsAndWhen:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesContentNoEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesCreateLEXAppsWTShown:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisCommentAfterLikeEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisMentionsCommentEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisProfPostCommentEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableAllFeedsEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableBookmarkEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableChangeCommentEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableEndorsementEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableFileShareNotificationsForApi:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableFollowersEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableLaterCommentEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableLikeEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableMentionsPostEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableMessageEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableProfilePostEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesDisableSharePostEmail:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesEnableAutoSubForFeeds:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesEventRemindersCheckboxDefault:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesExcludeMailAppAttachments:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesFavoritesShowTopFavorites:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesFavoritesWTShown:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesGlobalNavBarWTShown:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesGlobalNavGridMenuWTShown:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHasCelebrationBadge:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideBiggerPhotoCallout:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideCSNDesktopTask:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideCSNGetChatterMobileTask:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideChatterOnboardingSplash:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideEndUserOnboardingAssistantModal:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideLegacyRetirementModal:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideLightningMigrationModal:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideS1BrowserUI:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideSecondChatterOnboardingSplash:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesHideSfxWelcomeMat:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesJigsawListUser:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesLightningExperiencePreferred:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesNativeEmailClient:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesNewLightningReportRunPageEnabled:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesPathAssistantCollapsed:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesPreviewCustomTheme:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesPreviewLightning:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesReceiveNoNotificationsAsApprover:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesReceiveNotificationsAsDelegatedApprover:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesRecordHomeReservedWTShown:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesRecordHomeSectionCollapseWTShown:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesReminderSoundOff:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesSRHOverrideActivities:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowCityToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowCityToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowCountryToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowCountryToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowEmailToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowEmailToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowFaxToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowFaxToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowManagerToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowManagerToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowMobilePhoneToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowMobilePhoneToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowPostalCodeToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowPostalCodeToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowProfilePicToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowStateToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowStateToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowStreetAddressToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowStreetAddressToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowTitleToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowTitleToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowWorkPhoneToExternalUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesShowWorkPhoneToGuestUsers:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesSortFeedByComment:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesSuppressEventSFXReminders:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesSuppressTaskSFXReminders:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesTaskRemindersCheckboxDefault:
+    type:
+      - boolean
+      - "null"
+  UserPreferencesUserDebugModePref:
+    type:
+      - boolean
+      - "null"
+  UserRoleId:
+    type:
+      - string
+      - "null"
+  UserType:
+    type:
+      - string
+      - "null"
+  Username:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

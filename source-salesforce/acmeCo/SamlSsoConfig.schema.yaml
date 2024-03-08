@@ -1,0 +1,130 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AttributeFormat:
+    type:
+      - string
+      - "null"
+  AttributeName:
+    type:
+      - string
+      - "null"
+  Audience:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  ErrorUrl:
+    type:
+      - string
+      - "null"
+  ExecutionUserId:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IdentityLocation:
+    type:
+      - string
+      - "null"
+  IdentityMapping:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  Issuer:
+    type:
+      - string
+      - "null"
+  Language:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LoginUrl:
+    type:
+      - string
+      - "null"
+  LogoutUrl:
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  NamespacePrefix:
+    type:
+      - string
+      - "null"
+  OptionsSpInitBinding:
+    type:
+      - boolean
+      - "null"
+  OptionsUseConfigRequestMethod:
+    type:
+      - boolean
+      - "null"
+  OptionsUserProvisioning:
+    type:
+      - boolean
+      - "null"
+  RequestSignatureMethod:
+    type:
+      - string
+      - "null"
+  SamlJitHandlerId:
+    type:
+      - string
+      - "null"
+  SingleLogoutBinding:
+    type:
+      - string
+      - "null"
+  SingleLogoutUrl:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ValidationCert:
+    type:
+      - string
+      - "null"
+  Version:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,21 @@
+credentials:
+    auth_type: Client
+    client_id_sops: ENC[AES256_GCM,data:w+QlOJj6HMkY8LXI+rhkU+WGzrC/pz70nnZMpqrYbLcLBBnd4MAvPOJrY9GCa1CazfzavL6ATXZtMO2et7IT8PH5i4OkhHmXrcRpYvoQFYqVPOsXMw==,iv:lto0AF8YNlhb9FIntaqVRcyxaEZSxhefzCcDx/2yQFw=,tag:BAIe1Yezo1mnaxz/uPfbaQ==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:MTa+Cv+YH7v8gy/LTsviFW9oocCDWp86g7aB5OVnO6OJLPChbNAuC7qtAzNKiZu2DVKof9tmrjqQcWxhdVEMJA==,iv:oZg6cFFx9Oq3AZCGsGRtusXEZKyMVMKbG6SCANxjwWg=,tag:iyHdLX2mUFKQfo3oJRCneg==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:ao4MuPvTWERkVyPieScomGZnryhEedaVizY1tOIGIXDewe9DD4dvXbBS3s+uMMG1j8mH2QWM5s7ta3LqChAZ+Tq3+o8KktMZ6D/PR7CjNfumrUrXeVgZ,iv:dHVIGWMkalxkcjCCvzeS/wPsJ5SVgfUNoRIKYoq2eTk=,tag:lWOpuMjSZVHn4nFb/UnpjQ==,type:str]
+is_sandbox: false
+start_date: "2020-01-01"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-03-08T05:31:16Z"
+          enc: CiQAdmEdwvWWci8hmYfDEI3t5/hMDMNae/7Pq6THGr3n3y+b8CwSSQCVvC1zN8IPDTYZdbVo11k7xVAeJSNRRAIOPpU+ARe73YpQtoMP92xJs0VasYa6gxjB53wWKIHiGxYJr5rYtJfvE6evYRQFkDY=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-03-08T05:31:17Z"
+    mac: ENC[AES256_GCM,data:f22SroKVPhI6p/24lSCMTSuIjR6orf2jcrGKf1A29MvGpwR9804EaRwnZ6wArq5aqMoeEF4BvZrcbJewqrjNT1qRRPvXb+7e7t/VIPi+8/qH1ID++oLxo/eEvdGMLhtxQSr7x41erqql0izeUyaEU6KgzEo5b0HKM/3FMOQi/z8=,iv:4cjKBY41vOI1ve0ppjbWDp7UWVsnZakEYhDzWTuajLc=,tag:aKpMwjdOnzJ00DNEChRrlw==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1

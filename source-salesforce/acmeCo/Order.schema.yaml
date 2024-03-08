@@ -1,0 +1,296 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  ActivatedById:
+    type:
+      - string
+      - "null"
+  ActivatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  BillToContactId:
+    type:
+      - string
+      - "null"
+  BillingAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  BillingCity:
+    type:
+      - string
+      - "null"
+  BillingCountry:
+    type:
+      - string
+      - "null"
+  BillingGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  BillingLatitude:
+    type:
+      - number
+      - "null"
+  BillingLongitude:
+    type:
+      - number
+      - "null"
+  BillingPostalCode:
+    type:
+      - string
+      - "null"
+  BillingState:
+    type:
+      - string
+      - "null"
+  BillingStreet:
+    type:
+      - string
+      - "null"
+  CompanyAuthorizedById:
+    type:
+      - string
+      - "null"
+  CompanyAuthorizedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ContractId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CustomerAuthorizedById:
+    type:
+      - string
+      - "null"
+  CustomerAuthorizedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  EffectiveDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsReductionOrder:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OrderNumber:
+    type:
+      - string
+      - "null"
+  OrderReferenceNumber:
+    type:
+      - string
+      - "null"
+  OriginalOrderId:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  PoDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  PoNumber:
+    type:
+      - string
+      - "null"
+  Pricebook2Id:
+    type:
+      - string
+      - "null"
+  ShipToContactId:
+    type:
+      - string
+      - "null"
+  ShippingAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  ShippingCity:
+    type:
+      - string
+      - "null"
+  ShippingCountry:
+    type:
+      - string
+      - "null"
+  ShippingGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  ShippingLatitude:
+    type:
+      - number
+      - "null"
+  ShippingLongitude:
+    type:
+      - number
+      - "null"
+  ShippingPostalCode:
+    type:
+      - string
+      - "null"
+  ShippingState:
+    type:
+      - string
+      - "null"
+  ShippingStreet:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  StatusCode:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TotalAmount:
+    type:
+      - number
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

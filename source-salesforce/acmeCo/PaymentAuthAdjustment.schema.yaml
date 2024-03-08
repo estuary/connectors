@@ -1,0 +1,131 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  Amount:
+    type:
+      - number
+      - "null"
+  Comments:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Date:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EffectiveDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Email:
+    type:
+      - string
+      - "null"
+  GatewayDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GatewayRefDetails:
+    type:
+      - string
+      - "null"
+  GatewayRefNumber:
+    type:
+      - string
+      - "null"
+  GatewayResultCode:
+    type:
+      - string
+      - "null"
+  GatewayResultCodeDescription:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IpAddress:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MacAddress:
+    type:
+      - string
+      - "null"
+  PaymentAuthAdjustmentNumber:
+    type:
+      - string
+      - "null"
+  PaymentAuthorizationId:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  ProcessingMode:
+    type:
+      - string
+      - "null"
+  SfResultCode:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

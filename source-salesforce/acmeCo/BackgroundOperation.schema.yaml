@@ -1,0 +1,123 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Error:
+    type:
+      - string
+      - "null"
+  ExecutionGroup:
+    type:
+      - string
+      - "null"
+  ExpiresAt:
+    format: date-time
+    type:
+      - string
+      - "null"
+  FinishedAt:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GroupLeaderId:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NumFollowers:
+    type:
+      - integer
+      - "null"
+  ParentKey:
+    type:
+      - string
+      - "null"
+  ProcessAfter:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RetryBackoff:
+    type:
+      - integer
+      - "null"
+  RetryCount:
+    type:
+      - integer
+      - "null"
+  RetryLimit:
+    type:
+      - integer
+      - "null"
+  SequenceGroup:
+    type:
+      - string
+      - "null"
+  SequenceNumber:
+    type:
+      - integer
+      - "null"
+  StartedAt:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SubmittedAt:
+    format: date-time
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Timeout:
+    type:
+      - integer
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  WorkerUri:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

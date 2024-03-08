@@ -1,0 +1,74 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CurrentElement:
+    type:
+      - string
+      - "null"
+  FlowVersionViewId:
+    type:
+      - string
+      - "null"
+  Guid:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InterviewLabel:
+    type:
+      - string
+      - "null"
+  InterviewStatus:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  PauseLabel:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  WasPausedFromScreen:
+    type:
+      - boolean
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,232 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  BillingAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  BillingCity:
+    type:
+      - string
+      - "null"
+  BillingCountry:
+    type:
+      - string
+      - "null"
+  BillingGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  BillingLatitude:
+    type:
+      - number
+      - "null"
+  BillingLongitude:
+    type:
+      - number
+      - "null"
+  BillingPostalCode:
+    type:
+      - string
+      - "null"
+  BillingState:
+    type:
+      - string
+      - "null"
+  BillingStreet:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GrandTotalAmount:
+    type:
+      - number
+      - "null"
+  GuestEmailAddress:
+    type:
+      - string
+      - "null"
+  GuestFirstName:
+    type:
+      - string
+      - "null"
+  GuestLastName:
+    type:
+      - string
+      - "null"
+  GuestPhoneNumber:
+    type:
+      - string
+      - "null"
+  GuestSecondName:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsRepricingNeeded:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastRepricingDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  PaymentGroupId:
+    type:
+      - string
+      - "null"
+  PaymentMethodId:
+    type:
+      - string
+      - "null"
+  PoNumber:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TotalAdjustmentAmount:
+    type:
+      - number
+      - "null"
+  TotalAmount:
+    type:
+      - number
+      - "null"
+  TotalAmountAfterAllAdjustments:
+    type:
+      - number
+      - "null"
+  TotalChargeAmount:
+    type:
+      - number
+      - "null"
+  TotalChargeTaxAmount:
+    type:
+      - number
+      - "null"
+  TotalLineItemsWithErrors:
+    type:
+      - integer
+      - "null"
+  TotalListAmount:
+    type:
+      - number
+      - "null"
+  TotalProductAmount:
+    type:
+      - number
+      - "null"
+  TotalProductCount:
+    type:
+      - number
+      - "null"
+  TotalProductTaxAmount:
+    type:
+      - number
+      - "null"
+  TotalPromoAdjustmentAmount:
+    type:
+      - number
+      - "null"
+  TotalPromoAdjustmentTaxAmount:
+    type:
+      - number
+      - "null"
+  TotalTaxAmount:
+    type:
+      - number
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  UniqueProductCount:
+    type:
+      - integer
+      - "null"
+  WebStoreId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,115 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  BestCommentId:
+    type:
+      - string
+      - "null"
+  Body:
+    type:
+      - string
+      - "null"
+  CommentCount:
+    type:
+      - integer
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  HasContent:
+    type:
+      - boolean
+      - "null"
+  HasFeedEntity:
+    type:
+      - boolean
+      - "null"
+  HasLink:
+    type:
+      - boolean
+      - "null"
+  HasVerifiedComment:
+    type:
+      - boolean
+      - "null"
+  Id:
+    type: string
+  InsertedById:
+    type:
+      - string
+      - "null"
+  IsClosed:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsRichText:
+    type:
+      - boolean
+      - "null"
+  LastEditById:
+    type:
+      - string
+      - "null"
+  LastEditDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LikeCount:
+    type:
+      - integer
+      - "null"
+  LinkUrl:
+    type:
+      - string
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  RelatedRecordId:
+    type:
+      - string
+      - "null"
+  Revision:
+    type:
+      - integer
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

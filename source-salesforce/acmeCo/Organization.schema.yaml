@@ -1,0 +1,264 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Address:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  ComplianceBccEmail:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DefaultAccountAccess:
+    type:
+      - string
+      - "null"
+  DefaultCalendarAccess:
+    type:
+      - string
+      - "null"
+  DefaultCampaignAccess:
+    type:
+      - string
+      - "null"
+  DefaultCaseAccess:
+    type:
+      - string
+      - "null"
+  DefaultContactAccess:
+    type:
+      - string
+      - "null"
+  DefaultLeadAccess:
+    type:
+      - string
+      - "null"
+  DefaultLocaleSidKey:
+    type:
+      - string
+      - "null"
+  DefaultOpportunityAccess:
+    type:
+      - string
+      - "null"
+  DefaultPricebookAccess:
+    type:
+      - string
+      - "null"
+  Division:
+    type:
+      - string
+      - "null"
+  Fax:
+    type:
+      - string
+      - "null"
+  FiscalYearStartMonth:
+    type:
+      - integer
+      - "null"
+  GeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InstanceName:
+    type:
+      - string
+      - "null"
+  IsReadOnly:
+    type:
+      - boolean
+      - "null"
+  IsSandbox:
+    type:
+      - boolean
+      - "null"
+  LanguageLocaleKey:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Latitude:
+    type:
+      - number
+      - "null"
+  Longitude:
+    type:
+      - number
+      - "null"
+  MonthlyPageViewsEntitlement:
+    type:
+      - integer
+      - "null"
+  MonthlyPageViewsUsed:
+    type:
+      - integer
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NamespacePrefix:
+    type:
+      - string
+      - "null"
+  NumKnowledgeService:
+    type:
+      - integer
+      - "null"
+  OrganizationType:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  PreferencesAutoSelectIndividualOnMerge:
+    type:
+      - boolean
+      - "null"
+  PreferencesConsentManagementEnabled:
+    type:
+      - boolean
+      - "null"
+  PreferencesEmailSenderIdCompliance:
+    type:
+      - boolean
+      - "null"
+  PreferencesLightningLoginEnabled:
+    type:
+      - boolean
+      - "null"
+  PreferencesOnlyLLPermUserAllowed:
+    type:
+      - boolean
+      - "null"
+  PreferencesRequireOpportunityProducts:
+    type:
+      - boolean
+      - "null"
+  PreferencesTransactionSecurityPolicy:
+    type:
+      - boolean
+      - "null"
+  PrimaryContact:
+    type:
+      - string
+      - "null"
+  ReceivesAdminInfoEmails:
+    type:
+      - boolean
+      - "null"
+  ReceivesInfoEmails:
+    type:
+      - boolean
+      - "null"
+  SignupCountryIsoCode:
+    type:
+      - string
+      - "null"
+  State:
+    type:
+      - string
+      - "null"
+  Street:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TimeZoneSidKey:
+    type:
+      - string
+      - "null"
+  TrialExpirationDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  UiSkin:
+    type:
+      - string
+      - "null"
+  UsesStartDateAsFiscalYearName:
+    type:
+      - boolean
+      - "null"
+  WebToCaseDefaultOrigin:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

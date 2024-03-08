@@ -1,0 +1,77 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Alias:
+    type:
+      - string
+      - "null"
+  Email:
+    type:
+      - string
+      - "null"
+  FirstName:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  Language:
+    type:
+      - string
+      - "null"
+  LastName:
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NameOrAlias:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  ProfileId:
+    type:
+      - string
+      - "null"
+  RecordTypeId:
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  UserRoleId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

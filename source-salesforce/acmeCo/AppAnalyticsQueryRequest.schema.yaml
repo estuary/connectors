@@ -1,0 +1,113 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AvailableSince:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DataType:
+    type:
+      - string
+      - "null"
+  DownloadExpirationTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DownloadSize:
+    type:
+      - number
+      - "null"
+  DownloadUrl:
+    type:
+      - string
+      - "null"
+  EndTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ErrorMessage:
+    type:
+      - string
+      - "null"
+  FileCompression:
+    type:
+      - string
+      - "null"
+  FileType:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OrganizationIds:
+    type:
+      - string
+      - "null"
+  PackageIds:
+    type:
+      - string
+      - "null"
+  QuerySubmittedTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RequestState:
+    type:
+      - string
+      - "null"
+  StartTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

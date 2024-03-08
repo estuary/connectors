@@ -1,0 +1,40 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CommentCount:
+    type:
+      - integer
+      - "null"
+  CommentReceivedCount:
+    type:
+      - integer
+      - "null"
+  Id:
+    type: string
+  InfluenceRawRank:
+    type:
+      - integer
+      - "null"
+  LikeReceivedCount:
+    type:
+      - integer
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  PostCount:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

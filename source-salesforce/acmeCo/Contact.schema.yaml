@@ -1,0 +1,327 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  AssistantName:
+    type:
+      - string
+      - "null"
+  AssistantPhone:
+    type:
+      - string
+      - "null"
+  Birthdate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CleanStatus:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Department:
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Email:
+    type:
+      - string
+      - "null"
+  EmailBouncedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EmailBouncedReason:
+    type:
+      - string
+      - "null"
+  Fax:
+    type:
+      - string
+      - "null"
+  FirstName:
+    type:
+      - string
+      - "null"
+  HomePhone:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IndividualId:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsEmailBounced:
+    type:
+      - boolean
+      - "null"
+  Jigsaw:
+    type:
+      - string
+      - "null"
+  JigsawContactId:
+    type:
+      - string
+      - "null"
+  Languages__c:
+    type:
+      - string
+      - "null"
+  LastActivityDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastCURequestDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastCUUpdateDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastName:
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LeadSource:
+    type:
+      - string
+      - "null"
+  Level__c:
+    type:
+      - string
+      - "null"
+  MailingAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  MailingCity:
+    type:
+      - string
+      - "null"
+  MailingCountry:
+    type:
+      - string
+      - "null"
+  MailingGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  MailingLatitude:
+    type:
+      - number
+      - "null"
+  MailingLongitude:
+    type:
+      - number
+      - "null"
+  MailingPostalCode:
+    type:
+      - string
+      - "null"
+  MailingState:
+    type:
+      - string
+      - "null"
+  MailingStreet:
+    type:
+      - string
+      - "null"
+  MasterRecordId:
+    type:
+      - string
+      - "null"
+  MobilePhone:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OtherAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  OtherCity:
+    type:
+      - string
+      - "null"
+  OtherCountry:
+    type:
+      - string
+      - "null"
+  OtherGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  OtherLatitude:
+    type:
+      - number
+      - "null"
+  OtherLongitude:
+    type:
+      - number
+      - "null"
+  OtherPhone:
+    type:
+      - string
+      - "null"
+  OtherPostalCode:
+    type:
+      - string
+      - "null"
+  OtherState:
+    type:
+      - string
+      - "null"
+  OtherStreet:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  PhotoUrl:
+    type:
+      - string
+      - "null"
+  ReportsToId:
+    type:
+      - string
+      - "null"
+  Salutation:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

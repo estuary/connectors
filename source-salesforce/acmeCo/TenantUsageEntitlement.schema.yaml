@@ -1,0 +1,89 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AmountUsed:
+    type:
+      - number
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CurrentAmountAllowed:
+    type:
+      - number
+      - "null"
+  EndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Frequency:
+    type:
+      - string
+      - "null"
+  HasRollover:
+    type:
+      - boolean
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsPersistentResource:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  OverageGrace:
+    type:
+      - number
+      - "null"
+  ResourceGroupKey:
+    type:
+      - string
+      - "null"
+  Setting:
+    type:
+      - string
+      - "null"
+  StartDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  UsageDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

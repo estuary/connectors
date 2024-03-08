@@ -1,0 +1,67 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Amount:
+    type:
+      - number
+      - "null"
+  CloseDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ExpectedRevenue:
+    type:
+      - number
+      - "null"
+  ForecastCategory:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  OpportunityId:
+    type:
+      - string
+      - "null"
+  PrevAmount:
+    type:
+      - number
+      - "null"
+  PrevCloseDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Probability:
+    type:
+      - number
+      - "null"
+  StageName:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

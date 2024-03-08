@@ -1,0 +1,149 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  BirthDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CanStorePiiElsewhere:
+    type:
+      - boolean
+      - "null"
+  ChildrenCount:
+    type:
+      - integer
+      - "null"
+  ConsumerCreditScore:
+    type:
+      - integer
+      - "null"
+  ConsumerCreditScoreProviderName:
+    type:
+      - string
+      - "null"
+  ConvictionsCount:
+    type:
+      - integer
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DeathDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  FirstName:
+    type:
+      - string
+      - "null"
+  HasOptedOutGeoTracking:
+    type:
+      - boolean
+      - "null"
+  HasOptedOutProcessing:
+    type:
+      - boolean
+      - "null"
+  HasOptedOutProfiling:
+    type:
+      - boolean
+      - "null"
+  HasOptedOutSolicit:
+    type:
+      - boolean
+      - "null"
+  HasOptedOutTracking:
+    type:
+      - boolean
+      - "null"
+  Id:
+    type: string
+  IndividualsAge:
+    type:
+      - string
+      - "null"
+  InfluencerRating:
+    type:
+      - integer
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsHomeOwner:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastName:
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterRecordId:
+    type:
+      - string
+      - "null"
+  MilitaryService:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  Occupation:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  Salutation:
+    type:
+      - string
+      - "null"
+  SendIndividualData:
+    type:
+      - boolean
+      - "null"
+  ShouldForget:
+    type:
+      - boolean
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Website:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

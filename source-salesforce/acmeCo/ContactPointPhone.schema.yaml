@@ -1,0 +1,134 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ActiveFromDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ActiveToDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  AreaCode:
+    type:
+      - string
+      - "null"
+  BestTimeToContactEndTime:
+    type:
+      - string
+      - "null"
+  BestTimeToContactStartTime:
+    type:
+      - string
+      - "null"
+  BestTimeToContactTimezone:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ExtensionNumber:
+    type:
+      - string
+      - "null"
+  FormattedInternationalPhoneNumber:
+    type:
+      - string
+      - "null"
+  FormattedNationalPhoneNumber:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsBusinessPhone:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsFaxCapable:
+    type:
+      - boolean
+      - "null"
+  IsPersonalPhone:
+    type:
+      - boolean
+      - "null"
+  IsPrimary:
+    type:
+      - boolean
+      - "null"
+  IsSmsCapable:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  PhoneType:
+    type:
+      - string
+      - "null"
+  PreferenceRank:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TelephoneNumber:
+    type:
+      - string
+      - "null"
+  UsageType:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

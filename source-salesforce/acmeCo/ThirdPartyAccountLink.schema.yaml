@@ -1,0 +1,43 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Handle:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsNotSsoUsable:
+    type:
+      - boolean
+      - "null"
+  Provider:
+    type:
+      - string
+      - "null"
+  RemoteIdentifier:
+    type:
+      - string
+      - "null"
+  SsoProviderId:
+    type:
+      - string
+      - "null"
+  SsoProviderName:
+    type:
+      - string
+      - "null"
+  ThirdPartyAccountLinkKey:
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

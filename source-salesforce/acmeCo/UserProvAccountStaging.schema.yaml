@@ -1,0 +1,78 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ConnectedAppId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ExternalEmail:
+    type:
+      - string
+      - "null"
+  ExternalFirstName:
+    type:
+      - string
+      - "null"
+  ExternalLastName:
+    type:
+      - string
+      - "null"
+  ExternalUserId:
+    type:
+      - string
+      - "null"
+  ExternalUsername:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LinkState:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  SalesforceUserId:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

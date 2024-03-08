@@ -6,8 +6,11 @@ authors = ["Luishfs <luish1980@hotmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-airbyte-cdk = ">=0.2,<1.0"
+python = ">=3.11,<3.12"
+flow-sdk = {path="../python", develop=true}
+airbyte-cdk = "0.51.14"
+backoff = "^1.11"
+pendulum = "^3.0.0"
 pandas = "^2.2.1"
 vcrpy = "4.1.1"
 

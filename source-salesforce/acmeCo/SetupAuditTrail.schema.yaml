@@ -1,0 +1,48 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Action:
+    type:
+      - string
+      - "null"
+  CreatedByContext:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedByIssuer:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DelegateUser:
+    type:
+      - string
+      - "null"
+  Display:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  ResponsibleNamespacePrefix:
+    type:
+      - string
+      - "null"
+  Section:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

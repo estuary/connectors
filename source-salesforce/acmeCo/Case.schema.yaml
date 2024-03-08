@@ -1,0 +1,173 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  AssetId:
+    type:
+      - string
+      - "null"
+  CaseNumber:
+    type:
+      - string
+      - "null"
+  ClosedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Comments:
+    type:
+      - string
+      - "null"
+  ContactEmail:
+    type:
+      - string
+      - "null"
+  ContactFax:
+    type:
+      - string
+      - "null"
+  ContactId:
+    type:
+      - string
+      - "null"
+  ContactMobile:
+    type:
+      - string
+      - "null"
+  ContactPhone:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  EngineeringReqNumber__c:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsClosed:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsEscalated:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterRecordId:
+    type:
+      - string
+      - "null"
+  Origin:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  PotentialLiability__c:
+    type:
+      - string
+      - "null"
+  Priority:
+    type:
+      - string
+      - "null"
+  Product__c:
+    type:
+      - string
+      - "null"
+  Reason:
+    type:
+      - string
+      - "null"
+  SLAViolation__c:
+    type:
+      - string
+      - "null"
+  SourceId:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  Subject:
+    type:
+      - string
+      - "null"
+  SuppliedCompany:
+    type:
+      - string
+      - "null"
+  SuppliedEmail:
+    type:
+      - string
+      - "null"
+  SuppliedName:
+    type:
+      - string
+      - "null"
+  SuppliedPhone:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

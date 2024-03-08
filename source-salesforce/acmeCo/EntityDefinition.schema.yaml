@@ -1,0 +1,220 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  DefaultCompactLayoutId:
+    type:
+      - string
+      - "null"
+  DefaultImplementation:
+    type:
+      - string
+      - "null"
+  DeploymentStatus:
+    type:
+      - string
+      - "null"
+  DetailUrl:
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  DurableId:
+    type:
+      - string
+      - "null"
+  EditDefinitionUrl:
+    type:
+      - string
+      - "null"
+  EditUrl:
+    type:
+      - string
+      - "null"
+  ExtendedBy:
+    type:
+      - string
+      - "null"
+  ExtendsInterfaces:
+    type:
+      - string
+      - "null"
+  ExternalSharingModel:
+    type:
+      - string
+      - "null"
+  HasSubtypes:
+    type:
+      - boolean
+      - "null"
+  HelpSettingPageName:
+    type:
+      - string
+      - "null"
+  HelpSettingPageUrl:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  ImplementedBy:
+    type:
+      - string
+      - "null"
+  ImplementsInterfaces:
+    type:
+      - string
+      - "null"
+  InternalSharingModel:
+    type:
+      - string
+      - "null"
+  IsApexTriggerable:
+    type:
+      - boolean
+      - "null"
+  IsAutoActivityCaptureEnabled:
+    type:
+      - boolean
+      - "null"
+  IsCompactLayoutable:
+    type:
+      - boolean
+      - "null"
+  IsCustomSetting:
+    type:
+      - boolean
+      - "null"
+  IsCustomizable:
+    type:
+      - boolean
+      - "null"
+  IsDeprecatedAndHidden:
+    type:
+      - boolean
+      - "null"
+  IsEverCreatable:
+    type:
+      - boolean
+      - "null"
+  IsEverDeletable:
+    type:
+      - boolean
+      - "null"
+  IsEverUpdatable:
+    type:
+      - boolean
+      - "null"
+  IsFeedEnabled:
+    type:
+      - boolean
+      - "null"
+  IsIdEnabled:
+    type:
+      - boolean
+      - "null"
+  IsInterface:
+    type:
+      - boolean
+      - "null"
+  IsLayoutable:
+    type:
+      - boolean
+      - "null"
+  IsMruEnabled:
+    type:
+      - boolean
+      - "null"
+  IsProcessEnabled:
+    type:
+      - boolean
+      - "null"
+  IsQueryable:
+    type:
+      - boolean
+      - "null"
+  IsReplicateable:
+    type:
+      - boolean
+      - "null"
+  IsRetrieveable:
+    type:
+      - boolean
+      - "null"
+  IsSearchLayoutable:
+    type:
+      - boolean
+      - "null"
+  IsSearchable:
+    type:
+      - boolean
+      - "null"
+  IsSubtype:
+    type:
+      - boolean
+      - "null"
+  IsTriggerable:
+    type:
+      - boolean
+      - "null"
+  IsWorkflowEnabled:
+    type:
+      - boolean
+      - "null"
+  KeyPrefix:
+    type:
+      - string
+      - "null"
+  Label:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  NamespacePrefix:
+    type:
+      - string
+      - "null"
+  NewUrl:
+    type:
+      - string
+      - "null"
+  PluralLabel:
+    type:
+      - string
+      - "null"
+  PublisherId:
+    type:
+      - string
+      - "null"
+  QualifiedApiName:
+    type:
+      - string
+      - "null"
+  RecordTypesSupported:
+    type:
+      - string
+      - "null"
+  RunningUserEntityAccessId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

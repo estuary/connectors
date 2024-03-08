@@ -1,0 +1,8237 @@
+---
+collections:
+  acmeCo/AIApplication:
+    schema: AIApplication.schema.yaml
+    key:
+      - /Id
+  acmeCo/AIApplicationConfig:
+    schema: AIApplicationConfig.schema.yaml
+    key:
+      - /Id
+  acmeCo/AIInsightAction:
+    schema: AIInsightAction.schema.yaml
+    key:
+      - /Id
+  acmeCo/AIInsightFeedback:
+    schema: AIInsightFeedback.schema.yaml
+    key:
+      - /Id
+  acmeCo/AIInsightReason:
+    schema: AIInsightReason.schema.yaml
+    key:
+      - /Id
+  acmeCo/AIInsightValue:
+    schema: AIInsightValue.schema.yaml
+    key:
+      - /Id
+  acmeCo/AIRecordInsight:
+    schema: AIRecordInsight.schema.yaml
+    key:
+      - /Id
+  acmeCo/AcceptedEventRelation:
+    schema: AcceptedEventRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/Account:
+    schema: Account.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountCleanInfo:
+    schema: AccountCleanInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountContactRole:
+    schema: AccountContactRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountFeed:
+    schema: AccountFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountHistory:
+    schema: AccountHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountPartner:
+    schema: AccountPartner.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountShare:
+    schema: AccountShare.schema.yaml
+    key:
+      - /Id
+  acmeCo/ActionLinkGroupTemplate:
+    schema: ActionLinkGroupTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/ActionLinkTemplate:
+    schema: ActionLinkTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/ActiveFeatureLicenseMetric:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ActiveUserCount:
+          type:
+            - integer
+            - "null"
+        AssignedUserCount:
+          type:
+            - integer
+            - "null"
+        FeatureType:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        TotalLicenseCount:
+          type:
+            - integer
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ActivePermSetLicenseMetric:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ActiveUserCount:
+          type:
+            - integer
+            - "null"
+        AssignedUserCount:
+          type:
+            - integer
+            - "null"
+        Id:
+          type: string
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        PermissionSetLicenseId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ActiveProfileMetric:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ActiveUserCount:
+          type:
+            - integer
+            - "null"
+        AssignedUserCount:
+          type:
+            - integer
+            - "null"
+        Id:
+          type: string
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ProfileId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserLicenseId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ActiveScratchOrg:
+    schema: ActiveScratchOrg.schema.yaml
+    key:
+      - /Id
+  acmeCo/ActiveScratchOrgFeed:
+    schema: ActiveScratchOrgFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ActiveScratchOrgHistory:
+    schema: ActiveScratchOrgHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ActiveScratchOrgShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AdditionalNumber:
+    schema: AdditionalNumber.schema.yaml
+    key:
+      - /Id
+  acmeCo/Address:
+    schema: Address.schema.yaml
+    key:
+      - /Id
+  acmeCo/AlternativePaymentMethod:
+    schema: AlternativePaymentMethod.schema.yaml
+    key:
+      - /Id
+  acmeCo/AlternativePaymentMethodShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ApexClass:
+    schema: ApexClass.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexComponent:
+    schema: ApexComponent.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexEmailNotification:
+    schema: ApexEmailNotification.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexLog:
+    schema: ApexLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexPage:
+    schema: ApexPage.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexPageInfo:
+    schema: ApexPageInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexTestQueueItem:
+    schema: ApexTestQueueItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexTestResult:
+    schema: ApexTestResult.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexTestResultLimits:
+    schema: ApexTestResultLimits.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexTestRunResult:
+    schema: ApexTestRunResult.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexTestSuite:
+    schema: ApexTestSuite.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApexTrigger:
+    schema: ApexTrigger.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApiAnomalyEventStore:
+    schema: ApiAnomalyEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApiAnomalyEventStoreFeed:
+    schema: ApiAnomalyEventStoreFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ApiEvent:
+    schema: ApiEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppAnalyticsQueryRequest:
+    schema: AppAnalyticsQueryRequest.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppDefinition:
+    schema: AppDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppMenuItem:
+    schema: AppMenuItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppUsageAssignment:
+    schema: AppUsageAssignment.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentAssignmentPolicy:
+    schema: AppointmentAssignmentPolicy.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentScheduleAggr:
+    schema: AppointmentScheduleAggr.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentScheduleLog:
+    schema: AppointmentScheduleLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentSchedulingPolicy:
+    schema: AppointmentSchedulingPolicy.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentTopicTimeSlot:
+    schema: AppointmentTopicTimeSlot.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentTopicTimeSlotFeed:
+    schema: AppointmentTopicTimeSlotFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/AppointmentTopicTimeSlotHistory:
+    schema: AppointmentTopicTimeSlotHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/Asset:
+    schema: Asset.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetAction:
+    schema: AssetAction.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetActionSource:
+    schema: AssetActionSource.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetFeed:
+    schema: AssetFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AssetId:
+          type:
+            - string
+            - "null"
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AssetRelationship:
+    schema: AssetRelationship.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetRelationshipFeed:
+    schema: AssetRelationshipFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetRelationshipHistory:
+    schema: AssetRelationshipHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssetShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AssetAccessLevel:
+          type:
+            - string
+            - "null"
+        AssetId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AssetStatePeriod:
+    schema: AssetStatePeriod.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssignedResource:
+    schema: AssignedResource.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssignedResourceFeed:
+    schema: AssignedResourceFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssignmentRule:
+    schema: AssignmentRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssociatedLocation:
+    schema: AssociatedLocation.schema.yaml
+    key:
+      - /Id
+  acmeCo/AssociatedLocationHistory:
+    schema: AssociatedLocationHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/AsyncApexJob:
+    schema: AsyncApexJob.schema.yaml
+    key:
+      - /Id
+  acmeCo/AsyncOperationLog:
+    schema: AsyncOperationLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/Attachment:
+    schema: Attachment.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuraDefinition:
+    schema: AuraDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuraDefinitionBundle:
+    schema: AuraDefinitionBundle.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuraDefinitionBundleInfo:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ApiVersion:
+          type:
+            - number
+            - "null"
+        AuraDefinitionBundleId:
+          type:
+            - string
+            - "null"
+        DeveloperName:
+          type:
+            - string
+            - "null"
+        DurableId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        NamespacePrefix:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AuraDefinitionInfo:
+    schema: AuraDefinitionInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthConfig:
+    schema: AuthConfig.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthConfigProviders:
+    schema: AuthConfigProviders.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthProvider:
+    schema: AuthProvider.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthSession:
+    schema: AuthSession.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationForm:
+    schema: AuthorizationForm.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormConsent:
+    schema: AuthorizationFormConsent.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormConsentHistory:
+    schema: AuthorizationFormConsentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormConsentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AuthorizationFormDataUse:
+    schema: AuthorizationFormDataUse.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormDataUseHistory:
+    schema: AuthorizationFormDataUseHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormDataUseShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AuthorizationFormHistory:
+    schema: AuthorizationFormHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/AuthorizationFormText:
+    schema: AuthorizationFormText.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormTextFeed:
+    schema: AuthorizationFormTextFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/AuthorizationFormTextHistory:
+    schema: AuthorizationFormTextHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/BackgroundOperation:
+    schema: BackgroundOperation.schema.yaml
+    key:
+      - /Id
+  acmeCo/BrandTemplate:
+    schema: BrandTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/BrandingSet:
+    schema: BrandingSet.schema.yaml
+    key:
+      - /Id
+  acmeCo/BrandingSetProperty:
+    schema: BrandingSetProperty.schema.yaml
+    key:
+      - /Id
+  acmeCo/BriefcaseAssignment:
+    schema: BriefcaseAssignment.schema.yaml
+    key:
+      - /Id
+  acmeCo/BriefcaseDefinition:
+    schema: BriefcaseDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/BriefcaseRule:
+    schema: BriefcaseRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/BriefcaseRuleFilter:
+    schema: BriefcaseRuleFilter.schema.yaml
+    key:
+      - /Id
+  acmeCo/BulkApiResultEventStore:
+    schema: BulkApiResultEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/BusinessHours:
+    schema: BusinessHours.schema.yaml
+    key:
+      - /Id
+  acmeCo/BusinessProcess:
+    schema: BusinessProcess.schema.yaml
+    key:
+      - /Id
+  acmeCo/BuyerGroup:
+    schema: BuyerGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/BuyerGroupFeed:
+    schema: BuyerGroupFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/BuyerGroupHistory:
+    schema: BuyerGroupHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/BuyerGroupShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Calendar:
+    schema: Calendar.schema.yaml
+    key:
+      - /Id
+  acmeCo/CalendarView:
+    schema: CalendarView.schema.yaml
+    key:
+      - /Id
+  acmeCo/CalendarViewShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CallCenter:
+    schema: CallCenter.schema.yaml
+    key:
+      - /Id
+  acmeCo/CallCenterRoutingMap:
+    schema: CallCenterRoutingMap.schema.yaml
+    key:
+      - /Id
+  acmeCo/CallCoachingMediaProvider:
+    schema: CallCoachingMediaProvider.schema.yaml
+    key:
+      - /Id
+  acmeCo/Campaign:
+    schema: Campaign.schema.yaml
+    key:
+      - /Id
+  acmeCo/CampaignFeed:
+    schema: CampaignFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CampaignHistory:
+    schema: CampaignHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CampaignMember:
+    schema: CampaignMember.schema.yaml
+    key:
+      - /Id
+  acmeCo/CampaignMemberStatus:
+    schema: CampaignMemberStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/CampaignShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CampaignAccessLevel:
+          type:
+            - string
+            - "null"
+        CampaignId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CardPaymentMethod:
+    schema: CardPaymentMethod.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartCheckoutSession:
+    schema: CartCheckoutSession.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartDeliveryGroup:
+    schema: CartDeliveryGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartDeliveryGroupMethod:
+    schema: CartDeliveryGroupMethod.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartItem:
+    schema: CartItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartItemPriceAdjustment:
+    schema: CartItemPriceAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartRelatedItem:
+    schema: CartRelatedItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartTax:
+    schema: CartTax.schema.yaml
+    key:
+      - /Id
+  acmeCo/CartValidationOutput:
+    schema: CartValidationOutput.schema.yaml
+    key:
+      - /Id
+  acmeCo/Case:
+    schema: Case.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseComment:
+    schema: CaseComment.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseContactRole:
+    schema: CaseContactRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseFeed:
+    schema: CaseFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CaseId:
+          type:
+            - string
+            - "null"
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CaseMilestone:
+    schema: CaseMilestone.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CaseAccessLevel:
+          type:
+            - string
+            - "null"
+        CaseId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CaseSolution:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CaseId:
+          type:
+            - string
+            - "null"
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        SolutionId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CaseStatus:
+    schema: CaseStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseTeamMember:
+    schema: CaseTeamMember.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseTeamRole:
+    schema: CaseTeamRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseTeamTemplate:
+    schema: CaseTeamTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseTeamTemplateMember:
+    schema: CaseTeamTemplateMember.schema.yaml
+    key:
+      - /Id
+  acmeCo/CaseTeamTemplateRecord:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        ParentId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        TeamTemplateId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CategoryData:
+    schema: CategoryData.schema.yaml
+    key:
+      - /Id
+  acmeCo/CategoryNode:
+    schema: CategoryNode.schema.yaml
+    key:
+      - /Id
+  acmeCo/ChatterActivity:
+    schema: ChatterActivity.schema.yaml
+    key:
+      - /Id
+  acmeCo/ChatterExtension:
+    schema: ChatterExtension.schema.yaml
+    key:
+      - /Id
+  acmeCo/ChatterExtensionConfig:
+    schema: ChatterExtensionConfig.schema.yaml
+    key:
+      - /Id
+  acmeCo/ClientBrowser:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        FullUserAgent:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        LastUpdate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ProxyInfo:
+          type:
+            - string
+            - "null"
+        UsersId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CollaborationGroup:
+    schema: CollaborationGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/CollaborationGroupFeed:
+    schema: CollaborationGroupFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CollaborationGroupMember:
+    schema: CollaborationGroupMember.schema.yaml
+    key:
+      - /Id
+  acmeCo/CollaborationGroupMemberRequest:
+    schema: CollaborationGroupMemberRequest.schema.yaml
+    key:
+      - /Id
+  acmeCo/CollaborationInvitation:
+    schema: CollaborationInvitation.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscription:
+    schema: CommSubscription.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionChannelType:
+    schema: CommSubscriptionChannelType.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionChannelTypeFeed:
+    schema: CommSubscriptionChannelTypeFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionChannelTypeHistory:
+    schema: CommSubscriptionChannelTypeHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionChannelTypeShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CommSubscriptionConsent:
+    schema: CommSubscriptionConsent.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionConsentFeed:
+    schema: CommSubscriptionConsentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionConsentHistory:
+    schema: CommSubscriptionConsentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionConsentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CommSubscriptionFeed:
+    schema: CommSubscriptionFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionHistory:
+    schema: CommSubscriptionHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CommSubscriptionTiming:
+    schema: CommSubscriptionTiming.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionTimingFeed:
+    schema: CommSubscriptionTimingFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommSubscriptionTimingHistory:
+    schema: CommSubscriptionTimingHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/Community:
+    schema: Community.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConferenceNumber:
+    schema: ConferenceNumber.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConnectedApplication:
+    schema: ConnectedApplication.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConsumptionRate:
+    schema: ConsumptionRate.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConsumptionRateHistory:
+    schema: ConsumptionRateHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConsumptionSchedule:
+    schema: ConsumptionSchedule.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConsumptionScheduleFeed:
+    schema: ConsumptionScheduleFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConsumptionScheduleHistory:
+    schema: ConsumptionScheduleHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConsumptionScheduleShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Contact:
+    schema: Contact.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactCleanInfo:
+    schema: ContactCleanInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactFeed:
+    schema: ContactFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactHistory:
+    schema: ContactHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointAddress:
+    schema: ContactPointAddress.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointAddressHistory:
+    schema: ContactPointAddressHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointAddressShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContactPointConsent:
+    schema: ContactPointConsent.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointConsentHistory:
+    schema: ContactPointConsentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointConsentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContactPointEmail:
+    schema: ContactPointEmail.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointEmailHistory:
+    schema: ContactPointEmailHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointEmailShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContactPointPhone:
+    schema: ContactPointPhone.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointPhoneHistory:
+    schema: ContactPointPhoneHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointPhoneShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContactPointTypeConsent:
+    schema: ContactPointTypeConsent.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointTypeConsentHistory:
+    schema: ContactPointTypeConsentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactPointTypeConsentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContactRequest:
+    schema: ContactRequest.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactRequestShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContactShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContactAccessLevel:
+          type:
+            - string
+            - "null"
+        ContactId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentAsset:
+    schema: ContentAsset.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentDistribution:
+    schema: ContentDistribution.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentDistributionView:
+    schema: ContentDistributionView.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentDocument:
+    schema: ContentDocument.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentDocumentFeed:
+    schema: ContentDocumentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentDocumentHistory:
+    schema: ContentDocumentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentDocumentSubscription:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentDocumentId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsCommentSub:
+          type:
+            - boolean
+            - "null"
+        IsDocumentSub:
+          type:
+            - boolean
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentFolder:
+    schema: ContentFolder.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentFolderLink:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentFolderId:
+          type:
+            - string
+            - "null"
+        EnableFolderStatus:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        ParentEntityId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentNotification:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        EntityIdentifierId:
+          type:
+            - string
+            - "null"
+        EntityType:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Nature:
+          type:
+            - string
+            - "null"
+        Subject:
+          type:
+            - string
+            - "null"
+        Text:
+          type:
+            - string
+            - "null"
+        UsersId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentTagSubscription:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentUserSubscription:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        SubscribedToUserId:
+          type:
+            - string
+            - "null"
+        SubscriberUserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentVersion:
+    schema: ContentVersion.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentVersionComment:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentDocumentId:
+          type:
+            - string
+            - "null"
+        ContentVersionId:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        UserComment:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentVersionHistory:
+    schema: ContentVersionHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentVersionRating:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentVersionId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Rating:
+          type:
+            - integer
+            - "null"
+        UserComment:
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentWorkspace:
+    schema: ContentWorkspace.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentWorkspaceDoc:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentDocumentId:
+          type:
+            - string
+            - "null"
+        ContentWorkspaceId:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        IsOwner:
+          type:
+            - boolean
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentWorkspaceMember:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentWorkspaceId:
+          type:
+            - string
+            - "null"
+        ContentWorkspacePermissionId:
+          type:
+            - string
+            - "null"
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        MemberId:
+          type:
+            - string
+            - "null"
+        MemberType:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ContentWorkspacePermission:
+    schema: ContentWorkspacePermission.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContentWorkspaceSubscription:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ContentWorkspaceId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Contract:
+    schema: Contract.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContractContactRole:
+    schema: ContractContactRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContractFeed:
+    schema: ContractFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContractHistory:
+    schema: ContractHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContractLineItem:
+    schema: ContractLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContractLineItemHistory:
+    schema: ContractLineItemHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContractStatus:
+    schema: ContractStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/Conversation:
+    schema: Conversation.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConversationEntry:
+    schema: ConversationEntry.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConversationParticipant:
+    schema: ConversationParticipant.schema.yaml
+    key:
+      - /Id
+  acmeCo/ConversationVendorInfo:
+    schema: ConversationVendorInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/CorsWhitelistEntry:
+    schema: CorsWhitelistEntry.schema.yaml
+    key:
+      - /Id
+  acmeCo/Coupon:
+    schema: Coupon.schema.yaml
+    key:
+      - /Id
+  acmeCo/CouponHistory:
+    schema: CouponHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CouponShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CredentialStuffingEventStore:
+    schema: CredentialStuffingEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/CredentialStuffingEventStoreFeed:
+    schema: CredentialStuffingEventStoreFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemo:
+    schema: CreditMemo.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoFeed:
+    schema: CreditMemoFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoHistory:
+    schema: CreditMemoHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoInvApplication:
+    schema: CreditMemoInvApplication.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoInvApplicationFeed:
+    schema: CreditMemoInvApplicationFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoInvApplicationHistory:
+    schema: CreditMemoInvApplicationHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoLine:
+    schema: CreditMemoLine.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoLineFeed:
+    schema: CreditMemoLineFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoLineHistory:
+    schema: CreditMemoLineHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditMemoShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CronJobDetail:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        JobType:
+          type:
+            - string
+            - "null"
+        Name:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CronTrigger:
+    schema: CronTrigger.schema.yaml
+    key:
+      - /Id
+  acmeCo/CspTrustedSite:
+    schema: CspTrustedSite.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomBrand:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/CustomBrandAsset:
+    schema: CustomBrandAsset.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomHelpMenuItem:
+    schema: CustomHelpMenuItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomHelpMenuSection:
+    schema: CustomHelpMenuSection.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomHttpHeader:
+    schema: CustomHttpHeader.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomNotificationType:
+    schema: CustomNotificationType.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomObjectUserLicenseMetrics:
+    schema: CustomObjectUserLicenseMetrics.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomPermission:
+    schema: CustomPermission.schema.yaml
+    key:
+      - /Id
+  acmeCo/CustomPermissionDependency:
+    schema: CustomPermissionDependency.schema.yaml
+    key:
+      - /Id
+  acmeCo/DandBCompany:
+    schema: DandBCompany.schema.yaml
+    key:
+      - /Id
+  acmeCo/Dashboard:
+    schema: Dashboard.schema.yaml
+    key:
+      - /Id
+  acmeCo/DashboardComponent:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CustomReportId:
+          type:
+            - string
+            - "null"
+        DashboardId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Name:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/DashboardComponentFeed:
+    schema: DashboardComponentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/DashboardFeed:
+    schema: DashboardFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataAssessmentFieldMetric:
+    schema: DataAssessmentFieldMetric.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataAssessmentMetric:
+    schema: DataAssessmentMetric.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataAssessmentValueMetric:
+    schema: DataAssessmentValueMetric.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataUseLegalBasis:
+    schema: DataUseLegalBasis.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataUseLegalBasisHistory:
+    schema: DataUseLegalBasisHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataUseLegalBasisShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/DataUsePurpose:
+    schema: DataUsePurpose.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataUsePurposeHistory:
+    schema: DataUsePurposeHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/DataUsePurposeShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/DatacloudCompany:
+    schema: DatacloudCompany.schema.yaml
+    key:
+      - /Id
+  acmeCo/DatacloudContact:
+    schema: DatacloudContact.schema.yaml
+    key:
+      - /Id
+  acmeCo/DatacloudOwnedEntity:
+    schema: DatacloudOwnedEntity.schema.yaml
+    key:
+      - /Id
+  acmeCo/DatacloudPurchaseUsage:
+    schema: DatacloudPurchaseUsage.schema.yaml
+    key:
+      - /Id
+  acmeCo/DeclinedEventRelation:
+    schema: DeclinedEventRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/DeleteEvent:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        DeletedById:
+          type:
+            - string
+            - "null"
+        DeletedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Record:
+          type:
+            - string
+            - "null"
+        RecordName:
+          type:
+            - string
+            - "null"
+        SobjectName:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Describe:
+    schema: Describe.schema.yaml
+    key:
+      - /name
+  acmeCo/DigitalWallet:
+    schema: DigitalWallet.schema.yaml
+    key:
+      - /Id
+  acmeCo/Document:
+    schema: Document.schema.yaml
+    key:
+      - /Id
+  acmeCo/DocumentAttachmentMap:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DocumentId:
+          type:
+            - string
+            - "null"
+        DocumentSequence:
+          type:
+            - integer
+            - "null"
+        Id:
+          type: string
+        ParentId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Domain:
+    schema: Domain.schema.yaml
+    key:
+      - /Id
+  acmeCo/DomainSite:
+    schema: DomainSite.schema.yaml
+    key:
+      - /Id
+  acmeCo/DuplicateRecordItem:
+    schema: DuplicateRecordItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/DuplicateRecordSet:
+    schema: DuplicateRecordSet.schema.yaml
+    key:
+      - /Id
+  acmeCo/DuplicateRule:
+    schema: DuplicateRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailCapture:
+    schema: EmailCapture.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailDomainFilter:
+    schema: EmailDomainFilter.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailDomainKey:
+    schema: EmailDomainKey.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailMessage:
+    schema: EmailMessage.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailMessageRelation:
+    schema: EmailMessageRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailRelay:
+    schema: EmailRelay.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailServicesAddress:
+    schema: EmailServicesAddress.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailServicesFunction:
+    schema: EmailServicesFunction.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmailTemplate:
+    schema: EmailTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmbeddedServiceDetail:
+    schema: EmbeddedServiceDetail.schema.yaml
+    key:
+      - /Id
+  acmeCo/EmbeddedServiceLabel:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CustomLabelName:
+          type:
+            - string
+            - "null"
+        DurableId:
+          type:
+            - string
+            - "null"
+        EmbeddedServiceConfigDeveloperName:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        LabelKey:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/EngagementChannelType:
+    schema: EngagementChannelType.schema.yaml
+    key:
+      - /Id
+  acmeCo/EngagementChannelTypeFeed:
+    schema: EngagementChannelTypeFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/EngagementChannelTypeHistory:
+    schema: EngagementChannelTypeHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/EngagementChannelTypeShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/EnhancedLetterhead:
+    schema: EnhancedLetterhead.schema.yaml
+    key:
+      - /Id
+  acmeCo/EnhancedLetterheadFeed:
+    schema: EnhancedLetterheadFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/Entitlement:
+    schema: Entitlement.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntitlementContact:
+    schema: EntitlementContact.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntitlementFeed:
+    schema: EntitlementFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntitlementHistory:
+    schema: EntitlementHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntitlementTemplate:
+    schema: EntitlementTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntityDefinition:
+    schema: EntityDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntityMilestone:
+    schema: EntityMilestone.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntityMilestoneFeed:
+    schema: EntityMilestoneFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntityMilestoneHistory:
+    schema: EntityMilestoneHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/EntitySubscription:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        SubscriberId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Event:
+    schema: Event.schema.yaml
+    key:
+      - /Id
+  acmeCo/EventBusSubscriber:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ExternalId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        LastError:
+          type:
+            - string
+            - "null"
+        Name:
+          type:
+            - string
+            - "null"
+        Position:
+          type:
+            - integer
+            - "null"
+        Retries:
+          type:
+            - integer
+            - "null"
+        Status:
+          type:
+            - string
+            - "null"
+        Tip:
+          type:
+            - integer
+            - "null"
+        Topic:
+          type:
+            - string
+            - "null"
+        Type:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/EventFeed:
+    schema: EventFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/EventLogFile:
+    schema: EventLogFile.schema.yaml
+    key:
+      - /Id
+  acmeCo/EventRelation:
+    schema: EventRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExpressionFilter:
+    schema: ExpressionFilter.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExpressionFilterCriteria:
+    schema: ExpressionFilterCriteria.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExternalDataSource:
+    schema: ExternalDataSource.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExternalDataUserAuth:
+    schema: ExternalDataUserAuth.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExternalEvent:
+    schema: ExternalEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExternalEventMapping:
+    schema: ExternalEventMapping.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExternalEventMappingShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FeedAttachment:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        FeedEntityId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        RecordId:
+          type:
+            - string
+            - "null"
+        Title:
+          type:
+            - string
+            - "null"
+        Type:
+          type:
+            - string
+            - "null"
+        Value:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FeedComment:
+    schema: FeedComment.schema.yaml
+    key:
+      - /Id
+  acmeCo/FeedItem:
+    schema: FeedItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/FeedPollChoice:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ChoiceBody:
+          type:
+            - string
+            - "null"
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        FeedItemId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        Position:
+          type:
+            - integer
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FeedPollVote:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ChoiceId:
+          type:
+            - string
+            - "null"
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        FeedItemId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FeedRevision:
+    schema: FeedRevision.schema.yaml
+    key:
+      - /Id
+  acmeCo/FieldPermissions:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        ParentId:
+          type:
+            - string
+            - "null"
+        PermissionsEdit:
+          type:
+            - boolean
+            - "null"
+        PermissionsRead:
+          type:
+            - boolean
+            - "null"
+        SobjectType:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FieldSecurityClassification:
+    schema: FieldSecurityClassification.schema.yaml
+    key:
+      - /Id
+  acmeCo/FileSearchActivity:
+    schema: FileSearchActivity.schema.yaml
+    key:
+      - /Id
+  acmeCo/FinanceBalanceSnapshot:
+    schema: FinanceBalanceSnapshot.schema.yaml
+    key:
+      - /Id
+  acmeCo/FinanceBalanceSnapshotShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FinanceTransaction:
+    schema: FinanceTransaction.schema.yaml
+    key:
+      - /Id
+  acmeCo/FinanceTransactionShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FiscalYearSettings:
+    schema: FiscalYearSettings.schema.yaml
+    key:
+      - /Id
+  acmeCo/FlowDefinitionView:
+    schema: FlowDefinitionView.schema.yaml
+    key:
+      - /Id
+  acmeCo/FlowInterview:
+    schema: FlowInterview.schema.yaml
+    key:
+      - /Id
+  acmeCo/FlowInterviewLog:
+    schema: FlowInterviewLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/FlowInterviewLogEntry:
+    schema: FlowInterviewLogEntry.schema.yaml
+    key:
+      - /Id
+  acmeCo/FlowInterviewLogShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FlowInterviewShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FlowRecordRelation:
+    schema: FlowRecordRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/FlowStageRelation:
+    schema: FlowStageRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/Folder:
+    schema: Folder.schema.yaml
+    key:
+      - /Id
+  acmeCo/FormulaFunction:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CategoryId:
+          type:
+            - string
+            - "null"
+        Description:
+          type:
+            - string
+            - "null"
+        DurableId:
+          type:
+            - string
+            - "null"
+        ExampleString:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Label:
+          type:
+            - string
+            - "null"
+        Name:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FormulaFunctionAllowedType:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        DurableId:
+          type:
+            - string
+            - "null"
+        FunctionId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Type:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FormulaFunctionCategory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        DurableId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Label:
+          type:
+            - string
+            - "null"
+        Name:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/FulfillmentOrder:
+    schema: FulfillmentOrder.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderFeed:
+    schema: FulfillmentOrderFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderItemAdjustment:
+    schema: FulfillmentOrderItemAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderItemAdjustmentFeed:
+    schema: FulfillmentOrderItemAdjustmentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderItemTax:
+    schema: FulfillmentOrderItemTax.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderItemTaxFeed:
+    schema: FulfillmentOrderItemTaxFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderLineItem:
+    schema: FulfillmentOrderLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderLineItemFeed:
+    schema: FulfillmentOrderLineItemFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/FulfillmentOrderShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/GrantedByLicense:
+    schema: GrantedByLicense.schema.yaml
+    key:
+      - /Id
+  acmeCo/Group:
+    schema: Group.schema.yaml
+    key:
+      - /Id
+  acmeCo/GroupMember:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        GroupId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/GtwyProvPaymentMethodType:
+    schema: GtwyProvPaymentMethodType.schema.yaml
+    key:
+      - /Id
+  acmeCo/Holiday:
+    schema: Holiday.schema.yaml
+    key:
+      - /Id
+  acmeCo/IPAddressRange:
+    schema: IPAddressRange.schema.yaml
+    key:
+      - /Id
+  acmeCo/Idea:
+    schema: Idea.schema.yaml
+    key:
+      - /Id
+  acmeCo/IdentityProviderEventStore:
+    schema: IdentityProviderEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/IdentityVerificationEvent:
+    schema: IdentityVerificationEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/IdpEventLog:
+    schema: IdpEventLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/IframeWhiteListUrl:
+    schema: IframeWhiteListUrl.schema.yaml
+    key:
+      - /Id
+  acmeCo/Image:
+    schema: Image.schema.yaml
+    key:
+      - /Id
+  acmeCo/ImageFeed:
+    schema: ImageFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ImageHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        ImageId:
+          type:
+            - string
+            - "null"
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ImageShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Individual:
+    schema: Individual.schema.yaml
+    key:
+      - /Id
+  acmeCo/IndividualHistory:
+    schema: IndividualHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/IndividualShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        IndividualAccessLevel:
+          type:
+            - string
+            - "null"
+        IndividualId:
+          type:
+            - string
+            - "null"
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/InstalledMobileApp:
+    schema: InstalledMobileApp.schema.yaml
+    key:
+      - /Id
+  acmeCo/Invoice:
+    schema: Invoice.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceFeed:
+    schema: InvoiceFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceHistory:
+    schema: InvoiceHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceLine:
+    schema: InvoiceLine.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceLineFeed:
+    schema: InvoiceLineFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceLineHistory:
+    schema: InvoiceLineHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/KnowledgeableUser:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        RawRank:
+          type:
+            - integer
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        TopicId:
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Lead:
+    schema: Lead.schema.yaml
+    key:
+      - /Id
+  acmeCo/LeadCleanInfo:
+    schema: LeadCleanInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/LeadFeed:
+    schema: LeadFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/LeadHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LeadId:
+          type:
+            - string
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LeadShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        LeadAccessLevel:
+          type:
+            - string
+            - "null"
+        LeadId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LeadStatus:
+    schema: LeadStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/LegalEntity:
+    schema: LegalEntity.schema.yaml
+    key:
+      - /Id
+  acmeCo/LegalEntityFeed:
+    schema: LegalEntityFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/LegalEntityHistory:
+    schema: LegalEntityHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/LegalEntityShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LightningExitByPageMetrics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        PageName:
+          type:
+            - string
+            - "null"
+        RecordCount:
+          type:
+            - integer
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LightningExperienceTheme:
+    schema: LightningExperienceTheme.schema.yaml
+    key:
+      - /Id
+  acmeCo/LightningOnboardingConfig:
+    schema: LightningOnboardingConfig.schema.yaml
+    key:
+      - /Id
+  acmeCo/LightningToggleMetrics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Action:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RecordCount:
+          type:
+            - integer
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LightningUriEvent:
+    schema: LightningUriEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/LightningUsageByAppTypeMetrics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AppExperience:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LightningUsageByBrowserMetrics:
+    schema: LightningUsageByBrowserMetrics.schema.yaml
+    key:
+      - /Id
+  acmeCo/LightningUsageByFlexiPageMetrics:
+    schema: LightningUsageByFlexiPageMetrics.schema.yaml
+    key:
+      - /Id
+  acmeCo/LightningUsageByPageMetrics:
+    schema: LightningUsageByPageMetrics.schema.yaml
+    key:
+      - /Id
+  acmeCo/ListEmail:
+    schema: ListEmail.schema.yaml
+    key:
+      - /Id
+  acmeCo/ListEmailIndividualRecipient:
+    schema: ListEmailIndividualRecipient.schema.yaml
+    key:
+      - /Id
+  acmeCo/ListEmailRecipientSource:
+    schema: ListEmailRecipientSource.schema.yaml
+    key:
+      - /Id
+  acmeCo/ListEmailShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ListView:
+    schema: ListView.schema.yaml
+    key:
+      - /Id
+  acmeCo/ListViewChart:
+    schema: ListViewChart.schema.yaml
+    key:
+      - /Id
+  acmeCo/ListViewEvent:
+    schema: ListViewEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/LiveChatSensitiveDataRule:
+    schema: LiveChatSensitiveDataRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/Location:
+    schema: Location.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationFeed:
+    schema: LocationFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationGroup:
+    schema: LocationGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationGroupAssignment:
+    schema: LocationGroupAssignment.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationGroupFeed:
+    schema: LocationGroupFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationGroupHistory:
+    schema: LocationGroupHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationGroupShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LocationHistory:
+    schema: LocationHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/LocationShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LoginAsEvent:
+    schema: LoginAsEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/LoginEvent:
+    schema: LoginEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/LoginGeo:
+    schema: LoginGeo.schema.yaml
+    key:
+      - /Id
+  acmeCo/LoginHistory:
+    schema: LoginHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/LoginIp:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ChallengeMethod:
+          type:
+            - string
+            - "null"
+        ChallengeSentDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsAuthenticated:
+          type:
+            - boolean
+            - "null"
+        SourceIp:
+          type:
+            - string
+            - "null"
+        UsersId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/LogoutEvent:
+    schema: LogoutEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/MLPredictionDefinition:
+    schema: MLPredictionDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/Macro:
+    schema: Macro.schema.yaml
+    key:
+      - /Id
+  acmeCo/MacroHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        MacroId:
+          type:
+            - string
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/MacroInstruction:
+    schema: MacroInstruction.schema.yaml
+    key:
+      - /Id
+  acmeCo/MacroShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/MacroUsage:
+    schema: MacroUsage.schema.yaml
+    key:
+      - /Id
+  acmeCo/MacroUsageShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/MailmergeTemplate:
+    schema: MailmergeTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/MatchingInformation:
+    schema: MatchingInformation.schema.yaml
+    key:
+      - /Id
+  acmeCo/MatchingRule:
+    schema: MatchingRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/MatchingRuleItem:
+    schema: MatchingRuleItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingChannel:
+    schema: MessagingChannel.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingChannelSkill:
+    schema: MessagingChannelSkill.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingConfiguration:
+    schema: MessagingConfiguration.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingDeliveryError:
+    schema: MessagingDeliveryError.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingEndUser:
+    schema: MessagingEndUser.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingEndUserHistory:
+    schema: MessagingEndUserHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingEndUserShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/MessagingLink:
+    schema: MessagingLink.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingSession:
+    schema: MessagingSession.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingSessionFeed:
+    schema: MessagingSessionFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingSessionHistory:
+    schema: MessagingSessionHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingSessionShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/MessagingTemplate:
+    schema: MessagingTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/MilestoneType:
+    schema: MilestoneType.schema.yaml
+    key:
+      - /Id
+  acmeCo/MobileApplicationDetail:
+    schema: MobileApplicationDetail.schema.yaml
+    key:
+      - /Id
+  acmeCo/MsgChannelLanguageKeyword:
+    schema: MsgChannelLanguageKeyword.schema.yaml
+    key:
+      - /Id
+  acmeCo/MutingPermissionSet:
+    schema: MutingPermissionSet.schema.yaml
+    key:
+      - /Id
+  acmeCo/MyDomainDiscoverableLogin:
+    schema: MyDomainDiscoverableLogin.schema.yaml
+    key:
+      - /Id
+  acmeCo/NamedCredential:
+    schema: NamedCredential.schema.yaml
+    key:
+      - /Id
+  acmeCo/NamespaceRegistry:
+    schema: NamespaceRegistry.schema.yaml
+    key:
+      - /Id
+  acmeCo/NamespaceRegistryFeed:
+    schema: NamespaceRegistryFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/NamespaceRegistryHistory:
+    schema: NamespaceRegistryHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/Note:
+    schema: Note.schema.yaml
+    key:
+      - /Id
+  acmeCo/OauthCustomScope:
+    schema: OauthCustomScope.schema.yaml
+    key:
+      - /Id
+  acmeCo/OauthCustomScopeApp:
+    schema: OauthCustomScopeApp.schema.yaml
+    key:
+      - /Id
+  acmeCo/OauthToken:
+    schema: OauthToken.schema.yaml
+    key:
+      - /Id
+  acmeCo/ObjectPermissions:
+    schema: ObjectPermissions.schema.yaml
+    key:
+      - /Id
+  acmeCo/OnboardingMetrics:
+    schema: OnboardingMetrics.schema.yaml
+    key:
+      - /Id
+  acmeCo/OperatingHours:
+    schema: OperatingHours.schema.yaml
+    key:
+      - /Id
+  acmeCo/OperatingHoursFeed:
+    schema: OperatingHoursFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/OperatingHoursHoliday:
+    schema: OperatingHoursHoliday.schema.yaml
+    key:
+      - /Id
+  acmeCo/OperatingHoursHolidayFeed:
+    schema: OperatingHoursHolidayFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/OperatingHoursShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Opportunity:
+    schema: Opportunity.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityCompetitor:
+    schema: OpportunityCompetitor.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityContactRole:
+    schema: OpportunityContactRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityFeed:
+    schema: OpportunityFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityFieldHistory:
+    schema: OpportunityFieldHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityHistory:
+    schema: OpportunityHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityLineItem:
+    schema: OpportunityLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityPartner:
+    schema: OpportunityPartner.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        OpportunityAccessLevel:
+          type:
+            - string
+            - "null"
+        OpportunityId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/OpportunityStage:
+    schema: OpportunityStage.schema.yaml
+    key:
+      - /Id
+  acmeCo/Order:
+    schema: Order.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrderFeed:
+    schema: OrderFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrderHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+        OrderId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/OrderItem:
+    schema: OrderItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrderItemFeed:
+    schema: OrderItemFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrderItemHistory:
+    schema: OrderItemHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrderShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        OrderAccessLevel:
+          type:
+            - string
+            - "null"
+        OrderId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/OrderStatus:
+    schema: OrderStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrgDeleteRequest:
+    schema: OrgDeleteRequest.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrgDeleteRequestShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/OrgMetric:
+    schema: OrgMetric.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrgMetricScanResult:
+    schema: OrgMetricScanResult.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrgMetricScanSummary:
+    schema: OrgMetricScanSummary.schema.yaml
+    key:
+      - /Id
+  acmeCo/OrgWideEmailAddress:
+    schema: OrgWideEmailAddress.schema.yaml
+    key:
+      - /Id
+  acmeCo/Organization:
+    schema: Organization.schema.yaml
+    key:
+      - /Id
+  acmeCo/PackageLicense:
+    schema: PackageLicense.schema.yaml
+    key:
+      - /Id
+  acmeCo/Partner:
+    schema: Partner.schema.yaml
+    key:
+      - /Id
+  acmeCo/PartnerRole:
+    schema: PartnerRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/PartyConsent:
+    schema: PartyConsent.schema.yaml
+    key:
+      - /Id
+  acmeCo/PartyConsentFeed:
+    schema: PartyConsentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/PartyConsentHistory:
+    schema: PartyConsentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PartyConsentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Payment:
+    schema: Payment.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentAuthAdjustment:
+    schema: PaymentAuthAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentAuthorization:
+    schema: PaymentAuthorization.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentGateway:
+    schema: PaymentGateway.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentGatewayLog:
+    schema: PaymentGatewayLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentGatewayProvider:
+    schema: PaymentGatewayProvider.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentGroup:
+    schema: PaymentGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentLineInvoice:
+    schema: PaymentLineInvoice.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentMethod:
+    schema: PaymentMethod.schema.yaml
+    key:
+      - /Id
+  acmeCo/Period:
+    schema: Period.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSet:
+    schema: PermissionSet.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSetAssignment:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AssigneeId:
+          type:
+            - string
+            - "null"
+        ExpirationDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsActive:
+          type:
+            - boolean
+            - "null"
+        PermissionSetGroupId:
+          type:
+            - string
+            - "null"
+        PermissionSetId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PermissionSetEventStore:
+    schema: PermissionSetEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSetGroup:
+    schema: PermissionSetGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSetGroupComponent:
+    schema: PermissionSetGroupComponent.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSetLicense:
+    schema: PermissionSetLicense.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSetLicenseAssign:
+    schema: PermissionSetLicenseAssign.schema.yaml
+    key:
+      - /Id
+  acmeCo/PermissionSetTabSetting:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        Name:
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Visibility:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PlatformCachePartition:
+    schema: PlatformCachePartition.schema.yaml
+    key:
+      - /Id
+  acmeCo/PlatformCachePartitionType:
+    schema: PlatformCachePartitionType.schema.yaml
+    key:
+      - /Id
+  acmeCo/PlatformEventUsageMetric:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        EndDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ExternalId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Name:
+          type:
+            - string
+            - "null"
+        StartDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Value:
+          type:
+            - number
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Pricebook2:
+    schema: Pricebook2.schema.yaml
+    key:
+      - /Id
+  acmeCo/Pricebook2History:
+    schema: Pricebook2History.schema.yaml
+    key:
+      - /Id
+  acmeCo/PricebookEntry:
+    schema: PricebookEntry.schema.yaml
+    key:
+      - /Id
+  acmeCo/PricebookEntryHistory:
+    schema: PricebookEntryHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessDefinition:
+    schema: ProcessDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessException:
+    schema: ProcessException.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessExceptionShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ProcessInstance:
+    schema: ProcessInstance.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessInstanceNode:
+    schema: ProcessInstanceNode.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessInstanceStep:
+    schema: ProcessInstanceStep.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessInstanceWorkitem:
+    schema: ProcessInstanceWorkitem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessNode:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Description:
+          type:
+            - string
+            - "null"
+        DeveloperName:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Name:
+          type:
+            - string
+            - "null"
+        ProcessDefinitionId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Product2:
+    schema: Product2.schema.yaml
+    key:
+      - /Id
+  acmeCo/Product2Feed:
+    schema: Product2Feed.schema.yaml
+    key:
+      - /Id
+  acmeCo/Product2History:
+    schema: Product2History.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductAttribute:
+    schema: ProductAttribute.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductAttributeSet:
+    schema: ProductAttributeSet.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductAttributeSetItem:
+    schema: ProductAttributeSetItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductAttributeSetProduct:
+    schema: ProductAttributeSetProduct.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCatalog:
+    schema: ProductCatalog.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCatalogFeed:
+    schema: ProductCatalogFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCatalogHistory:
+    schema: ProductCatalogHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCatalogShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ProductCategory:
+    schema: ProductCategory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCategoryFeed:
+    schema: ProductCategoryFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCategoryHistory:
+    schema: ProductCategoryHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCategoryProduct:
+    schema: ProductCategoryProduct.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductCategoryProductHistory:
+    schema: ProductCategoryProductHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductConsumptionSchedule:
+    schema: ProductConsumptionSchedule.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductEntitlementTemplate:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        EntitlementTemplateId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        Product2Id:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Profile:
+    schema: Profile.schema.yaml
+    key:
+      - /Id
+  acmeCo/Promotion:
+    schema: Promotion.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionFeed:
+    schema: PromotionFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionHistory:
+    schema: PromotionHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionMarketSegment:
+    schema: PromotionMarketSegment.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionMarketSegmentFeed:
+    schema: PromotionMarketSegmentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionMarketSegmentHistory:
+    schema: PromotionMarketSegmentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionQualifier:
+    schema: PromotionQualifier.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionQualifierHistory:
+    schema: PromotionQualifierHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegment:
+    schema: PromotionSegment.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegmentBuyerGroup:
+    schema: PromotionSegmentBuyerGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegmentBuyerGroupHistory:
+    schema: PromotionSegmentBuyerGroupHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegmentHistory:
+    schema: PromotionSegmentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegmentSalesStore:
+    schema: PromotionSegmentSalesStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegmentSalesStoreHistory:
+    schema: PromotionSegmentSalesStoreHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionSegmentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PromotionShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PromotionTarget:
+    schema: PromotionTarget.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromotionTargetHistory:
+    schema: PromotionTargetHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/Prompt:
+    schema: Prompt.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromptAction:
+    schema: PromptAction.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromptActionShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PromptError:
+    schema: PromptError.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromptErrorShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PromptVersion:
+    schema: PromptVersion.schema.yaml
+    key:
+      - /Id
+  acmeCo/Publisher:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        DurableId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsSalesforce:
+          type:
+            - boolean
+            - "null"
+        MajorVersion:
+          type:
+            - integer
+            - "null"
+        MinorVersion:
+          type:
+            - integer
+            - "null"
+        Name:
+          type:
+            - string
+            - "null"
+        NamespacePrefix:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/PushTopic:
+    schema: PushTopic.schema.yaml
+    key:
+      - /Id
+  acmeCo/QueueSobject:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        QueueId:
+          type:
+            - string
+            - "null"
+        SobjectType:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/QuickText:
+    schema: QuickText.schema.yaml
+    key:
+      - /Id
+  acmeCo/QuickTextHistory:
+    schema: QuickTextHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/QuickTextShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/QuickTextUsage:
+    schema: QuickTextUsage.schema.yaml
+    key:
+      - /Id
+  acmeCo/QuickTextUsageShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/RecentlyViewed:
+    schema: RecentlyViewed.schema.yaml
+    key:
+      - /Id
+  acmeCo/Recommendation:
+    schema: Recommendation.schema.yaml
+    key:
+      - /Id
+  acmeCo/RecommendationResponse:
+    schema: RecommendationResponse.schema.yaml
+    key:
+      - /Id
+  acmeCo/RecordAction:
+    schema: RecordAction.schema.yaml
+    key:
+      - /Id
+  acmeCo/RecordActionHistory:
+    schema: RecordActionHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/RecordType:
+    schema: RecordType.schema.yaml
+    key:
+      - /Id
+  acmeCo/RedirectWhitelistUrl:
+    schema: RedirectWhitelistUrl.schema.yaml
+    key:
+      - /Id
+  acmeCo/Refund:
+    schema: Refund.schema.yaml
+    key:
+      - /Id
+  acmeCo/RefundLinePayment:
+    schema: RefundLinePayment.schema.yaml
+    key:
+      - /Id
+  acmeCo/Report:
+    schema: Report.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReportAnomalyEventStore:
+    schema: ReportAnomalyEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReportAnomalyEventStoreFeed:
+    schema: ReportAnomalyEventStoreFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReportEvent:
+    schema: ReportEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReportFeed:
+    schema: ReportFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ResourceAbsence:
+    schema: ResourceAbsence.schema.yaml
+    key:
+      - /Id
+  acmeCo/ResourceAbsenceFeed:
+    schema: ResourceAbsenceFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ResourceAbsenceHistory:
+    schema: ResourceAbsenceHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ResourcePreference:
+    schema: ResourcePreference.schema.yaml
+    key:
+      - /Id
+  acmeCo/ResourcePreferenceFeed:
+    schema: ResourcePreferenceFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ResourcePreferenceHistory:
+    schema: ResourcePreferenceHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrder:
+    schema: ReturnOrder.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderFeed:
+    schema: ReturnOrderFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderHistory:
+    schema: ReturnOrderHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderItemAdjustment:
+    schema: ReturnOrderItemAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderItemTax:
+    schema: ReturnOrderItemTax.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderLineItem:
+    schema: ReturnOrderLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderLineItemFeed:
+    schema: ReturnOrderLineItemFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderLineItemHistory:
+    schema: ReturnOrderLineItemHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ReturnOrderShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/SPSamlAttributes:
+    schema: SPSamlAttributes.schema.yaml
+    key:
+      - /Id
+  acmeCo/SalesStore:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Description:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        ImplementorType:
+          type:
+            - string
+            - "null"
+        LocationId:
+          type:
+            - string
+            - "null"
+        Name:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/SamlSsoConfig:
+    schema: SamlSsoConfig.schema.yaml
+    key:
+      - /Id
+  acmeCo/Scontrol:
+    schema: Scontrol.schema.yaml
+    key:
+      - /Id
+  acmeCo/ScratchOrgInfo:
+    schema: ScratchOrgInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/ScratchOrgInfoFeed:
+    schema: ScratchOrgInfoFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ScratchOrgInfoHistory:
+    schema: ScratchOrgInfoHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ScratchOrgInfoShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/SearchPromotionRule:
+    schema: SearchPromotionRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/SecurityCustomBaseline:
+    schema: SecurityCustomBaseline.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceAppointment:
+    schema: ServiceAppointment.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceAppointmentFeed:
+    schema: ServiceAppointmentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceAppointmentHistory:
+    schema: ServiceAppointmentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceAppointmentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ServiceAppointmentStatus:
+    schema: ServiceAppointmentStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceContract:
+    schema: ServiceContract.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceContractFeed:
+    schema: ServiceContractFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceContractHistory:
+    schema: ServiceContractHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceContractShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ServiceResource:
+    schema: ServiceResource.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceResourceFeed:
+    schema: ServiceResourceFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceResourceHistory:
+    schema: ServiceResourceHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceResourceShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ServiceResourceSkill:
+    schema: ServiceResourceSkill.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceResourceSkillFeed:
+    schema: ServiceResourceSkillFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceResourceSkillHistory:
+    schema: ServiceResourceSkillHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceSetupProvisioning:
+    schema: ServiceSetupProvisioning.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritory:
+    schema: ServiceTerritory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryFeed:
+    schema: ServiceTerritoryFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryHistory:
+    schema: ServiceTerritoryHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryMember:
+    schema: ServiceTerritoryMember.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryMemberFeed:
+    schema: ServiceTerritoryMemberFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryMemberHistory:
+    schema: ServiceTerritoryMemberHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryWorkType:
+    schema: ServiceTerritoryWorkType.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryWorkTypeFeed:
+    schema: ServiceTerritoryWorkTypeFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceTerritoryWorkTypeHistory:
+    schema: ServiceTerritoryWorkTypeHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/SessionHijackingEventStore:
+    schema: SessionHijackingEventStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/SessionHijackingEventStoreFeed:
+    schema: SessionHijackingEventStoreFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/SessionPermSetActivation:
+    schema: SessionPermSetActivation.schema.yaml
+    key:
+      - /Id
+  acmeCo/SetupAssistantStep:
+    schema: SetupAssistantStep.schema.yaml
+    key:
+      - /Id
+  acmeCo/SetupAuditTrail:
+    schema: SetupAuditTrail.schema.yaml
+    key:
+      - /Id
+  acmeCo/SetupEntityAccess:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        ParentId:
+          type:
+            - string
+            - "null"
+        SetupEntityId:
+          type:
+            - string
+            - "null"
+        SetupEntityType:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Shift:
+    schema: Shift.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShiftFeed:
+    schema: ShiftFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShiftHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+        ShiftId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ShiftShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/ShiftStatus:
+    schema: ShiftStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/Shipment:
+    schema: Shipment.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShipmentFeed:
+    schema: ShipmentFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShipmentHistory:
+    schema: ShipmentHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShipmentItem:
+    schema: ShipmentItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShipmentItemFeed:
+    schema: ShipmentItemFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShipmentItemHistory:
+    schema: ShipmentItemHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/ShipmentShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Site:
+    schema: Site.schema.yaml
+    key:
+      - /Id
+  acmeCo/SiteFeed:
+    schema: SiteFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/SiteHistory:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        CreatedById:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        DataType:
+          type:
+            - string
+            - "null"
+        Field:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        NewValue:
+          type:
+            - string
+            - "null"
+        OldValue:
+          type:
+            - string
+            - "null"
+        SiteId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/SiteIframeWhiteListUrl:
+    schema: SiteIframeWhiteListUrl.schema.yaml
+    key:
+      - /Id
+  acmeCo/SiteRedirectMapping:
+    schema: SiteRedirectMapping.schema.yaml
+    key:
+      - /Id
+  acmeCo/Skill:
+    schema: Skill.schema.yaml
+    key:
+      - /Id
+  acmeCo/SkillRequirement:
+    schema: SkillRequirement.schema.yaml
+    key:
+      - /Id
+  acmeCo/SkillRequirementFeed:
+    schema: SkillRequirementFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/SkillRequirementHistory:
+    schema: SkillRequirementHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/SlaProcess:
+    schema: SlaProcess.schema.yaml
+    key:
+      - /Id
+  acmeCo/Solution:
+    schema: Solution.schema.yaml
+    key:
+      - /Id
+  acmeCo/SolutionFeed:
+    schema: SolutionFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/SolutionHistory:
+    schema: SolutionHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/SolutionStatus:
+    schema: SolutionStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/Stamp:
+    schema: Stamp.schema.yaml
+    key:
+      - /Id
+  acmeCo/StampAssignment:
+    schema: StampAssignment.schema.yaml
+    key:
+      - /Id
+  acmeCo/StaticResource:
+    schema: StaticResource.schema.yaml
+    key:
+      - /Id
+  acmeCo/StreamingChannel:
+    schema: StreamingChannel.schema.yaml
+    key:
+      - /Id
+  acmeCo/StreamingChannelShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/TabDefinition:
+    schema: TabDefinition.schema.yaml
+    key:
+      - /Id
+  acmeCo/Task:
+    schema: Task.schema.yaml
+    key:
+      - /Id
+  acmeCo/TaskFeed:
+    schema: TaskFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/TaskPriority:
+    schema: TaskPriority.schema.yaml
+    key:
+      - /Id
+  acmeCo/TaskStatus:
+    schema: TaskStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/TenantUsageEntitlement:
+    schema: TenantUsageEntitlement.schema.yaml
+    key:
+      - /Id
+  acmeCo/TestSuiteMembership:
+    schema: TestSuiteMembership.schema.yaml
+    key:
+      - /Id
+  acmeCo/ThirdPartyAccountLink:
+    schema: ThirdPartyAccountLink.schema.yaml
+    key:
+      - /Id
+  acmeCo/ThreatDetectionFeedback:
+    schema: ThreatDetectionFeedback.schema.yaml
+    key:
+      - /Id
+  acmeCo/ThreatDetectionFeedbackFeed:
+    schema: ThreatDetectionFeedbackFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/TimeSlot:
+    schema: TimeSlot.schema.yaml
+    key:
+      - /Id
+  acmeCo/TodayGoal:
+    schema: TodayGoal.schema.yaml
+    key:
+      - /Id
+  acmeCo/TodayGoalShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/Topic:
+    schema: Topic.schema.yaml
+    key:
+      - /Id
+  acmeCo/TopicAssignment:
+    schema: TopicAssignment.schema.yaml
+    key:
+      - /Id
+  acmeCo/TopicFeed:
+    schema: TopicFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/TopicUserEvent:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ActionEnum:
+          type:
+            - string
+            - "null"
+        CreatedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        TopicId:
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/TransactionSecurityPolicy:
+    schema: TransactionSecurityPolicy.schema.yaml
+    key:
+      - /Id
+  acmeCo/Translation:
+    schema: Translation.schema.yaml
+    key:
+      - /Id
+  acmeCo/UiFormulaCriterion:
+    schema: UiFormulaCriterion.schema.yaml
+    key:
+      - /Id
+  acmeCo/UiFormulaRule:
+    schema: UiFormulaRule.schema.yaml
+    key:
+      - /Id
+  acmeCo/UndecidedEventRelation:
+    schema: UndecidedEventRelation.schema.yaml
+    key:
+      - /Id
+  acmeCo/UriEvent:
+    schema: UriEvent.schema.yaml
+    key:
+      - /Id
+  acmeCo/User:
+    schema: User.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserAppInfo:
+    schema: UserAppInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserAppMenuCustomization:
+    schema: UserAppMenuCustomization.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserAppMenuCustomizationShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/UserAppMenuItem:
+    schema: UserAppMenuItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserEmailPreferredPerson:
+    schema: UserEmailPreferredPerson.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserEmailPreferredPersonShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/UserFeed:
+    schema: UserFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserLicense:
+    schema: UserLicense.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserListView:
+    schema: UserListView.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserListViewCriterion:
+    schema: UserListViewCriterion.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserLogin:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        IsFrozen:
+          type:
+            - boolean
+            - "null"
+        IsPasswordLocked:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/UserPackageLicense:
+    schema: UserPackageLicense.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserPermissionAccess:
+    schema: UserPermissionAccess.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserPreference:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        Preference:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+        Value:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/UserProvAccount:
+    schema: UserProvAccount.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserProvAccountStaging:
+    schema: UserProvAccountStaging.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserProvMockTarget:
+    schema: UserProvMockTarget.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserProvisioningConfig:
+    schema: UserProvisioningConfig.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserProvisioningLog:
+    schema: UserProvisioningLog.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserProvisioningRequest:
+    schema: UserProvisioningRequest.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserProvisioningRequestShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/UserRole:
+    schema: UserRole.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserSetupEntityAccess:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        DeveloperName:
+          type:
+            - string
+            - "null"
+        DurableId:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        KeyPrefix:
+          type:
+            - string
+            - "null"
+        LastCacheUpdate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        NamespacePrefix:
+          type:
+            - string
+            - "null"
+        SetupEntityId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/UserShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        Id:
+          type: string
+        IsActive:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserAccessLevel:
+          type:
+            - string
+            - "null"
+        UserId:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/VerificationHistory:
+    schema: VerificationHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/VisualforceAccessMetrics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        ApexPageId:
+          type:
+            - string
+            - "null"
+        DailyPageViewCount:
+          type:
+            - integer
+            - "null"
+        Id:
+          type: string
+        LogDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        MetricsDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ProfileId:
+          type:
+            - string
+            - "null"
+        SystemModstamp:
+          format: date-time
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/VoiceCall:
+    schema: VoiceCall.schema.yaml
+    key:
+      - /Id
+  acmeCo/VoiceCallFeed:
+    schema: VoiceCallFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/VoiceCallRecording:
+    schema: VoiceCallRecording.schema.yaml
+    key:
+      - /Id
+  acmeCo/VoiceCallShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/VoiceVendorInfo:
+    schema: VoiceVendorInfo.schema.yaml
+    key:
+      - /Id
+  acmeCo/WaveAutoInstallRequest:
+    schema: WaveAutoInstallRequest.schema.yaml
+    key:
+      - /Id
+  acmeCo/WaveCompatibilityCheckItem:
+    schema: WaveCompatibilityCheckItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebCart:
+    schema: WebCart.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebCartAdjustmentGroup:
+    schema: WebCartAdjustmentGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebCartHistory:
+    schema: WebCartHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebCartShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WebLink:
+    schema: WebLink.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebStore:
+    schema: WebStore.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebStoreBuyerGroup:
+    schema: WebStoreBuyerGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebStoreCatalog:
+    schema: WebStoreCatalog.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebStoreCatalogHistory:
+    schema: WebStoreCatalogHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WebStoreShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WorkOrder:
+    schema: WorkOrder.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderFeed:
+    schema: WorkOrderFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderHistory:
+    schema: WorkOrderHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderLineItem:
+    schema: WorkOrderLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderLineItemFeed:
+    schema: WorkOrderLineItemFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderLineItemHistory:
+    schema: WorkOrderLineItemHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderLineItemStatus:
+    schema: WorkOrderLineItemStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WorkOrderStatus:
+    schema: WorkOrderStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlan:
+    schema: WorkPlan.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanFeed:
+    schema: WorkPlanFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanHistory:
+    schema: WorkPlanHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplate:
+    schema: WorkPlanTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplateEntry:
+    schema: WorkPlanTemplateEntry.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplateEntryFeed:
+    schema: WorkPlanTemplateEntryFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplateEntryHistory:
+    schema: WorkPlanTemplateEntryHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplateFeed:
+    schema: WorkPlanTemplateFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplateHistory:
+    schema: WorkPlanTemplateHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkPlanTemplateShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WorkStep:
+    schema: WorkStep.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepFeed:
+    schema: WorkStepFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepHistory:
+    schema: WorkStepHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepStatus:
+    schema: WorkStepStatus.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepTemplate:
+    schema: WorkStepTemplate.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepTemplateFeed:
+    schema: WorkStepTemplateFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepTemplateHistory:
+    schema: WorkStepTemplateHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkStepTemplateShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WorkType:
+    schema: WorkType.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeFeed:
+    schema: WorkTypeFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroup:
+    schema: WorkTypeGroup.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroupFeed:
+    schema: WorkTypeGroupFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroupHistory:
+    schema: WorkTypeGroupHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroupMember:
+    schema: WorkTypeGroupMember.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroupMemberFeed:
+    schema: WorkTypeGroupMemberFeed.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroupMemberHistory:
+    schema: WorkTypeGroupMemberHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeGroupShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id
+  acmeCo/WorkTypeHistory:
+    schema: WorkTypeHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkTypeShare:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        AccessLevel:
+          type:
+            - string
+            - "null"
+        Id:
+          type: string
+        IsDeleted:
+          type:
+            - boolean
+            - "null"
+        LastModifiedById:
+          type:
+            - string
+            - "null"
+        LastModifiedDate:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ParentId:
+          type:
+            - string
+            - "null"
+        RowCause:
+          type:
+            - string
+            - "null"
+        UserOrGroupId:
+          type:
+            - string
+            - "null"
+      reduce:
+        strategy: merge
+      required:
+        - Id
+      type: object
+    key:
+      - /Id

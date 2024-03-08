@@ -1,0 +1,90 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ActionReference:
+    type:
+      - string
+      - "null"
+  ContextRecord:
+    type:
+      - string
+      - "null"
+  ContextRecordName:
+    type:
+      - string
+      - "null"
+  ContextRecordType:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  OnBehalfOf:
+    type:
+      - string
+      - "null"
+  OnBehalfOfName:
+    type:
+      - string
+      - "null"
+  OnBehalfOfType:
+    type:
+      - string
+      - "null"
+  RecommendationKey:
+    type:
+      - string
+      - "null"
+  RecommendationName:
+    type:
+      - string
+      - "null"
+  RecommendationType:
+    type:
+      - string
+      - "null"
+  Response:
+    type:
+      - string
+      - "null"
+  StrategyReference:
+    type:
+      - string
+      - "null"
+  StrategyVersion:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object
