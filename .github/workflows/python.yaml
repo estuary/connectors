@@ -35,19 +35,19 @@ jobs:
           - name: source-asana
             type: capture
             version: v1
-            usage_rate: 1.0
+            usage_rate: "1.0"
           - name: source-hubspot-native
             type: capture
             version: v1
-            usage_rate: 1.0
+            usage_rate: "1.0"
           - name: source-gladly
             type: capture
             version: v1
-            usage_rate: 1.0
+            usage_rate: "1.0"
           - name: source-google-sheets-native
             type: capture
             version: v1
-            usage_rate: 0.0
+            usage_rate: "0.0"
 
     steps:
       - uses: actions/checkout@v4
