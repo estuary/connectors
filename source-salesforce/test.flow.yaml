@@ -1,21 +1,10 @@
 ---
-import:
-  - acmeCo/flow.yaml
 captures:
   acmeCo/source-salesforce:
     endpoint:
-      local:
-        command:
-          - python
-          # - "-Xfrozen_modules=off"
-          # - "-m"
-          # - debugpy
-          # - "--listen"
-          # - "0.0.0.0:5678"
-          # - "--wait-for-client"
-          - "-m"
-          - source-salesforce
-        config: config.yaml
+        connector:
+          image: "ghcr.io/estuary/source-salesforce:v1"
+          config: config.yaml
     bindings:
       - resource:
           stream: AIApplication
