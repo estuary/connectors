@@ -9,6 +9,7 @@ on:
       - "source-gladly/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
+      - "source-salesforce/**"
   pull_request:
     branches: [main]
     paths:
@@ -17,6 +18,7 @@ on:
       - "source-gladly/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
+      - "source-salesforce/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,6 +50,9 @@ jobs:
             type: capture
             version: v1
             usage_rate: "0.0"
+          - name: source-salesforce
+            type: capture
+            version: v2
 
     steps:
       - uses: actions/checkout@v4
