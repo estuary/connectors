@@ -85,7 +85,7 @@ jobs:
           build-args: |
             CONNECTOR_NAME=${{ matrix.connector.name }}
             CONNECTOR_TYPE=${{ matrix.connector.type }}
-            USAGE_RATE=${{ matrix.usage_rate }}
+            USAGE_RATE=${{ matrix.connector.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
 
       - name: Deployment
