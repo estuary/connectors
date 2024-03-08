@@ -22,7 +22,7 @@ type client struct {
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, false))
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +56,12 @@ func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) er
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	if len(tc.Path) > 1 {
+		var schemaName = tc.Path[0]
+		if _, err := c.db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q", schemaName)); err != nil {
+			return err
+		}
+	}
 	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
@@ -99,7 +105,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
 			case 390201:
-				// This means "doesn't exist or not authorized", and we don't have a way to
+				// This means "doesn't exist or not authorized", and we don't have a great way to
 				// distinguish between that for the database, schema, or warehouse. The snowflake
 				// error message in these cases is fairly decent fortunately.
 			case 390189:

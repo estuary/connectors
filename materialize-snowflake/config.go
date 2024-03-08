@@ -40,9 +40,9 @@ type advancedConfig struct {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI(tenant string) string {
+func (c *config) ToURI(tenant string, withSchema bool) string {
 	// Build a DSN connection string.
-	var configCopy = c.asSnowflakeConfig(tenant)
+	var configCopy = c.asSnowflakeConfig(tenant, withSchema)
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
 	// Without this, the authentication token will expire after 4 hours of inactivity.
 	// The Params map will not have been initialized if the endpoint config didn't specify
@@ -75,15 +75,20 @@ func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
 	return nil, fmt.Errorf("only supported with JWT authentication")
 }
 
-func (c *config) asSnowflakeConfig(tenant string) sf.Config {
+func (c *config) asSnowflakeConfig(tenant string, withSchema bool) sf.Config {
 	var maxStatementCount string = "0"
 	var json string = "json"
+
+	var schema = ""
+	if withSchema {
+		schema = c.Schema
+	}
 
 	var conf = sf.Config{
 		Account:     c.Account,
 		Host:        c.Host,
 		Database:    c.Database,
-		Schema:      c.Schema,
+		Schema:      schema,
 		Warehouse:   c.Warehouse,
 		Role:        c.Role,
 		Application: fmt.Sprintf("%s_EstuaryFlow", tenant),
