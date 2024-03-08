@@ -136,6 +136,9 @@ jobs:
           - connector: source-hubspot
             connector_type: capture
             python: true
+          - connector: source-salesforce
+            connector_type: capture
+            python: true
 
     steps:
       - uses: actions/checkout@v2
