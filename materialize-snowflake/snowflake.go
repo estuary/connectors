@@ -62,9 +62,6 @@ func schemasEqual(s1 string, s2 string) bool {
 }
 
 func (c tableConfig) Path() sql.TablePath {
-	if c.Schema == "" || schemasEqual(c.Schema, c.endpointSchema) {
-		return []string{c.Table}
-	}
 	return []string{c.Schema, c.Table}
 }
 
@@ -95,7 +92,7 @@ func newSnowflakeDriver() *sql.Driver {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			var metaBase sql.TablePath
+			var metaBase sql.TablePath = []string{parsed.Schema}
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			var dialect = snowflakeDialect(parsed.Schema)
@@ -185,7 +182,7 @@ func newTransactor(
 
 	dialect := snowflakeDialect(cfg.Schema)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true))
 	if err != nil {
 		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
@@ -218,12 +215,13 @@ func newTransactor(
 	d.store.fence = &fence
 
 	// Establish connections.
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
+
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
