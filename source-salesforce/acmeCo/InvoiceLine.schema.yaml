@@ -1,0 +1,149 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AdjustmentAmount:
+    type:
+      - number
+      - "null"
+  AdjustmentAmountWithTax:
+    type:
+      - number
+      - "null"
+  AdjustmentTaxAmount:
+    type:
+      - number
+      - "null"
+  ChargeAmount:
+    type:
+      - number
+      - "null"
+  ChargeAmountWithTax:
+    type:
+      - number
+      - "null"
+  ChargeTaxAmount:
+    type:
+      - number
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  GroupReferenceEntityItemId:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InvoiceId:
+    type:
+      - string
+      - "null"
+  InvoiceLineEndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  InvoiceLineStartDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  InvoiceStatus:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LineAmount:
+    type:
+      - number
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  Product2Id:
+    type:
+      - string
+      - "null"
+  Quantity:
+    type:
+      - number
+      - "null"
+  ReferenceEntityItemId:
+    type:
+      - string
+      - "null"
+  ReferenceEntityItemType:
+    type:
+      - string
+      - "null"
+  ReferenceEntityItemTypeCode:
+    type:
+      - string
+      - "null"
+  RelatedLineId:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TaxAmount:
+    type:
+      - number
+      - "null"
+  TaxCode:
+    type:
+      - string
+      - "null"
+  TaxEffectiveDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TaxName:
+    type:
+      - string
+      - "null"
+  TaxRate:
+    type:
+      - number
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  UnitPrice:
+    type:
+      - number
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

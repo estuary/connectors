@@ -1,0 +1,122 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  AssetId:
+    type:
+      - string
+      - "null"
+  BusinessHoursId:
+    type:
+      - string
+      - "null"
+  CasesPerEntitlement:
+    type:
+      - integer
+      - "null"
+  ContractLineItemId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsPerIncident:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LocationId:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  RemainingCases:
+    type:
+      - integer
+      - "null"
+  RemainingWorkOrders:
+    type:
+      - integer
+      - "null"
+  ServiceContractId:
+    type:
+      - string
+      - "null"
+  SlaProcessId:
+    type:
+      - string
+      - "null"
+  StartDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SvcApptBookingWindowsId:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  WorkOrdersPerEntitlement:
+    type:
+      - integer
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

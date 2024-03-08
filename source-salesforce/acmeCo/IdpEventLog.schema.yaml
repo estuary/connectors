@@ -1,0 +1,52 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AppId:
+    type:
+      - string
+      - "null"
+  AuthSessionId:
+    type:
+      - string
+      - "null"
+  ErrorCode:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IdentityUsed:
+    type:
+      - string
+      - "null"
+  InitiatedBy:
+    type:
+      - string
+      - "null"
+  OptionsHasLogoutUrl:
+    type:
+      - boolean
+      - "null"
+  SamlEntityUrl:
+    type:
+      - string
+      - "null"
+  SsoType:
+    type:
+      - string
+      - "null"
+  Timestamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

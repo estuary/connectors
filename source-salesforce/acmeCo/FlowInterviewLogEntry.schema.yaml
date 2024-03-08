@@ -1,0 +1,71 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DurationSinceStartInMinutes:
+    type:
+      - number
+      - "null"
+  ElementApiName:
+    type:
+      - string
+      - "null"
+  ElementDurationInMinutes:
+    type:
+      - number
+      - "null"
+  ElementLabel:
+    type:
+      - string
+      - "null"
+  FlowInterviewLogId:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LogEntryTimestamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LogEntryType:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

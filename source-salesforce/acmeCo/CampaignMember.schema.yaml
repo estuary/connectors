@@ -1,0 +1,155 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CampaignId:
+    type:
+      - string
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  CompanyOrAccount:
+    type:
+      - string
+      - "null"
+  ContactId:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  DoNotCall:
+    type:
+      - boolean
+      - "null"
+  Email:
+    type:
+      - string
+      - "null"
+  Fax:
+    type:
+      - string
+      - "null"
+  FirstName:
+    type:
+      - string
+      - "null"
+  FirstRespondedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  HasOptedOutOfEmail:
+    type:
+      - boolean
+      - "null"
+  HasOptedOutOfFax:
+    type:
+      - boolean
+      - "null"
+  HasResponded:
+    type:
+      - boolean
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastName:
+    type:
+      - string
+      - "null"
+  LeadId:
+    type:
+      - string
+      - "null"
+  LeadOrContactId:
+    type:
+      - string
+      - "null"
+  LeadOrContactOwnerId:
+    type:
+      - string
+      - "null"
+  LeadSource:
+    type:
+      - string
+      - "null"
+  MobilePhone:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  Salutation:
+    type:
+      - string
+      - "null"
+  State:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  Street:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

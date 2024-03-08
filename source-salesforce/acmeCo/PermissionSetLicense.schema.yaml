@@ -1,0 +1,1243 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  ExpirationDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  Language:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LicenseExpirationPolicy:
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  MaximumPermissionsAICreateInsightObjects:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAIViewInsightObjects:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAccessCMC:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAccessContentBuilder:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAccountSwitcherUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsActivateContract:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsActivateOrder:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsActivitiesAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAddAnalyticsRemoteConnections:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAddDirectMessageMembers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAddWaveNotificationRecipients:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowEmailIC:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowLightningLogin:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowObjectDetection:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowObjectDetectionTraining:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowUniversalSearch:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowViewEditConvertedLeads:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAllowViewKnowledge:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsApexRestServices:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsApiEnabled:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsApiUserOnly:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAppointmentBookingUserAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAssignPermissionSets:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAssignTopics:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAuthorApex:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsAutomaticActivityCapture:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsB2BMarketingAnalyticsUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsBotManageBots:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsBotManageBotsTrainingData:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsBulkApiHardDelete:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsBulkMacrosAllowed:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCampaignInfluence2:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanAccessCE:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanApproveFeedPost:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanEditDataPrepRecipe:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanEditPrompts:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanInsertFeedSystemFields:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanManageMaps:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanToggleCallRecordings:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanUseNewDashboardBuilder:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCanVerifyComment:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChangeDashboardColors:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterComposeUiCodesnippet:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterEditOwnPost:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterEditOwnRecordPost:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterFileLink:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterInternalUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterInviteExternalUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsChatterOwnGroups:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCloseConversations:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsConfigCustomRecs:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsConfigureLiveMessage:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsConnectOrgToEnvironmentHub:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsConsentApiUpdate:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsContentAdministrator:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsContentHubUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsContentWorkspaces:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsConvertLeads:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateCustomizeDashboards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateCustomizeFilters:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateCustomizeReports:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateDashboardFolders:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateLtngTempFolder:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateLtngTempInPub:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreatePackaging:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateReportFolders:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateReportInLightning:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateTopics:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCreateWorkspaces:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCustomMobileAppsAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCustomSidebarOnAllPages:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsCustomizeApplication:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsDataExport:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsDelegatedTwoFactor:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsDeleteActivatedContract:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsDeleteTopics:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsDistributeFromPersWksp:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditActivatedOrders:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditBillingInfo:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditBrandTemplates:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditCaseComments:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditEvent:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditHtmlTemplates:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditKnowledge:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditMyDashboards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditMyReports:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditOppLineItemUnitPrice:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditPublicDocuments:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditPublicFilters:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditPublicTemplates:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditReadonlyFields:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditTask:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEditTopics:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEmailAdministration:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEmailMass:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEmailSingle:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEmailTemplateManagement:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEnableCommunityAppLauncher:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsEnableNotifications:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsExportReport:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsFSCComprehensiveUserAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsFeedPinning:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsFlowUFLRequired:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsForceTwoFactor:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsGiveRecognitionBadge:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsGovernNetworks:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsHasUnlimitedNBAExecutions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsHeadlessCMSAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsHideReadByList:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIdentityConnect:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIdentityEnabled:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsImportCustomObjects:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsImportLeads:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsImportPersonal:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInsightsAppAdmin:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInsightsAppDashboardEditor:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInsightsAppEltEditor:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInsightsAppUploadUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInsightsAppUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInsightsCreateApplication:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsInstallPackaging:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIsContactCenterAdmin:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIsContactCenterAgent:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIsotopeAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIsotopeCToCUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsIsotopeLEX:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLMEndMessagingSessionUserPerm:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLMOutboundMessagingUserPerm:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLearningManager:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLifecycleManagementAPIUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLightningConsoleAllowedForUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLightningExperienceUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLightningSchedulerUserAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsListEmailSend:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLiveMessageAgent:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsLtngPromoReserved01UserPerm:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageAnalyticSnapshots:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageAuthProviders:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageBusinessHourHolidays:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageC360AConnections:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCMS:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCallCenters:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCases:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCategories:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCertificates:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageChatterMessages:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageContentPermissions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageContentProperties:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageContentTypes:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCustomPermissions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageCustomReportTypes:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageDashbdsInPubFolders:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageDataCategories:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageDataIntegrations:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageDynamicDashboards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageEmailClientConfig:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageEncryptionKeys:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageEntitlements:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageExchangeConfig:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageExternalConnections:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageHealthCheck:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageHubConnections:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageInteraction:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageInternalUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageIpAddresses:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageKnowledge:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageKnowledgeImportExport:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageLeads:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageLearningReporting:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageLoginAccessPolicies:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageMobile:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageNetworks:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManagePasswordPolicies:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageProfilesPermissionsets:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManagePropositions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManagePvtRptsAndDashbds:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageRecommendationStrategies:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageReleaseUpdates:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageRemoteAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageReportsInPubFolders:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageRoles:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSearchPromotionRules:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSecurityCommandCenter:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSessionPermissionSets:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSharing:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSolutions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSubscriptions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSurveys:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageSynonyms:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageTemplatedApp:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageTwoFactor:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageUnlistedGroups:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsManageUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsMassInlineEdit:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsMergeTopics:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsModerateChatter:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsModerateNetworkUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsModifyAllData:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsModifyDataClassification:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsModifyMetadata:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsNativeWebviewScrolling:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsNewReportBuilder:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsOmnichannelInventorySync:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPackaging2:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPackaging2Delete:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPackaging2PromoteVersion:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPasswordNeverExpires:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPaymentsAPIUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPreventClassicExperience:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPrivacyDataAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsPublishPackaging:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsQueryAllFiles:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsQuipMetricsAccess:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsQuipUserEngagementMetrics:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsRecordVisibilityAPI:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsRemoveDirectMessageMembers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsResetPasswords:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsRunFlow:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsRunReports:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSalesConsole:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSalesforceIQInbox:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSalesforceIQInternal:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSandboxTestingInCommunityApp:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsScheduleReports:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSchedulingFacilityManager:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSchedulingLineAmbassador:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSelectFilesFromSalesforce:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSendAnnouncementEmails:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSendCustomNotifications:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSendSitRequests:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsShareInternalArticles:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsShowCompanyNameAsUserBadge:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSkipIdentityConfirmation:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSolutionImport:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsStdAutomaticActivityCapture:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubmitMacrosAllowed:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeDashboardRolesGrps:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeDashboardToOtherUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeReportRolesGrps:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeReportToOtherUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeReportsRunAsUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeToLightningDashboards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsSubscribeToLightningReports:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsTraceXdsQueries:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsTransactionalEmailSend:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsTransferAnyCase:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsTransferAnyEntity:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsTransferAnyLead:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsTwoFactorApi:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseAssistantDialog:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseFulfillmentAPIs:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseMySearch:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseOmnichannelInventoryAPIs:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseOrderEntry:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseQuerySuggestions:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseReturnOrder:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseReturnOrderAPIs:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseSubscriptionEmails:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseTeamReassignWizards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseTemplatedApp:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsUseWebLink:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAllActivities:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAllCustomSettings:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAllData:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAllForeignKeyNames:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAllProfiles:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAllUsers:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewAnomalyEvents:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewContent:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewDataAssessment:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewDataCategories:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewDataLeakageEvents:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewEncryptedData:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewEventLogFiles:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewHealthCheck:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewHelpLink:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewMyTeamsDashboards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewOnlyEmbeddedAppUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewPlatformEvents:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewPrivateStaticResources:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewPublicDashboards:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewPublicReports:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewRestrictionAndScopingRules:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewRoles:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewSecurityCommandCenter:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewSetup:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsViewUserPII:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsWaveCommunityUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsWaveManagePrivateAssetsUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsWaveTabularDownload:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsWorkCalibrationUser:
+    type:
+      - boolean
+      - "null"
+  MaximumPermissionsWorkDotComUserPerm:
+    type:
+      - boolean
+      - "null"
+  PermissionSetLicenseKey:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TotalLicenses:
+    type:
+      - integer
+      - "null"
+  UsedLicenses:
+    type:
+      - integer
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

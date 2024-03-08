@@ -1,0 +1,168 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  AdjustmentAmount:
+    type:
+      - number
+      - "null"
+  Balance:
+    type:
+      - number
+      - "null"
+  BaseCurrencyAmount:
+    type:
+      - number
+      - "null"
+  BaseCurrencyBalance:
+    type:
+      - number
+      - "null"
+  BaseCurrencyFxDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  BaseCurrencyFxRate:
+    type:
+      - number
+      - "null"
+  BaseCurrencyIsoCode:
+    type:
+      - string
+      - "null"
+  ChargeAmount:
+    type:
+      - number
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DueDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EffectiveDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventType:
+    type:
+      - string
+      - "null"
+  FinanceBalanceSnapshotNumber:
+    type:
+      - string
+      - "null"
+  FinanceSystemIntegrationMode:
+    type:
+      - string
+      - "null"
+  FinanceSystemIntegrationStatus:
+    type:
+      - string
+      - "null"
+  FinanceSystemName:
+    type:
+      - string
+      - "null"
+  FinanceSystemTransactionNumber:
+    type:
+      - string
+      - "null"
+  FinanceTransactionId:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  ImpactAmount:
+    type:
+      - number
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LegalEntityId:
+    type:
+      - string
+      - "null"
+  OriginalEventType:
+    type:
+      - string
+      - "null"
+  OriginalReferenceEntityType:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  ReferenceEntityId:
+    type:
+      - string
+      - "null"
+  ReferenceEntityType:
+    type:
+      - string
+      - "null"
+  Subtotal:
+    type:
+      - number
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TaxAmount:
+    type:
+      - number
+      - "null"
+  TotalAmountWithTax:
+    type:
+      - number
+      - "null"
+  TransactionDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

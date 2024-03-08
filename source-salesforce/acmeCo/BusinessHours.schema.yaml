@@ -1,0 +1,111 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  FridayEndTime:
+    type:
+      - string
+      - "null"
+  FridayStartTime:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  IsDefault:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MondayEndTime:
+    type:
+      - string
+      - "null"
+  MondayStartTime:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  SaturdayEndTime:
+    type:
+      - string
+      - "null"
+  SaturdayStartTime:
+    type:
+      - string
+      - "null"
+  SundayEndTime:
+    type:
+      - string
+      - "null"
+  SundayStartTime:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ThursdayEndTime:
+    type:
+      - string
+      - "null"
+  ThursdayStartTime:
+    type:
+      - string
+      - "null"
+  TimeZoneSidKey:
+    type:
+      - string
+      - "null"
+  TuesdayEndTime:
+    type:
+      - string
+      - "null"
+  TuesdayStartTime:
+    type:
+      - string
+      - "null"
+  WednesdayEndTime:
+    type:
+      - string
+      - "null"
+  WednesdayStartTime:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

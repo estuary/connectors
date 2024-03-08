@@ -1,0 +1,79 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ApiVersion:
+    type:
+      - number
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventType:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  Interval:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LogDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LogFile:
+    type:
+      - string
+      - "null"
+  LogFileContentType:
+    type:
+      - string
+      - "null"
+  LogFileFieldNames:
+    type:
+      - string
+      - "null"
+  LogFileFieldTypes:
+    type:
+      - string
+      - "null"
+  LogFileLength:
+    type:
+      - number
+      - "null"
+  Sequence:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

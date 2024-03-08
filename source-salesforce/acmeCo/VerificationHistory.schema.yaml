@@ -1,0 +1,87 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Activity:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventGroup:
+    type:
+      - integer
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LoginGeoId:
+    type:
+      - string
+      - "null"
+  LoginHistoryId:
+    type:
+      - string
+      - "null"
+  Policy:
+    type:
+      - string
+      - "null"
+  Remarks:
+    type:
+      - string
+      - "null"
+  ResourceId:
+    type:
+      - string
+      - "null"
+  SourceIp:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+  VerificationMethod:
+    type:
+      - string
+      - "null"
+  VerificationTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

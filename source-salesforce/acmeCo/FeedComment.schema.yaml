@@ -1,0 +1,99 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CommentBody:
+    type:
+      - string
+      - "null"
+  CommentType:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  FeedItemId:
+    type:
+      - string
+      - "null"
+  HasEntityLinks:
+    type:
+      - boolean
+      - "null"
+  Id:
+    type: string
+  InsertedById:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsRichText:
+    type:
+      - boolean
+      - "null"
+  IsVerified:
+    type:
+      - boolean
+      - "null"
+  LastEditById:
+    type:
+      - string
+      - "null"
+  LastEditDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  RelatedRecordId:
+    type:
+      - string
+      - "null"
+  Revision:
+    type:
+      - integer
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ThreadChildrenCount:
+    type:
+      - integer
+      - "null"
+  ThreadLastUpdatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ThreadLevel:
+    type:
+      - integer
+      - "null"
+  ThreadParentId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,184 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ActiveContacts:
+    type:
+      - integer
+      - "null"
+  AnnualRevenue:
+    type:
+      - number
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  CompanyId:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CountryCode:
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  DunsNumber:
+    type:
+      - string
+      - "null"
+  EmployeeQuantityGrowthRate:
+    type:
+      - number
+      - "null"
+  ExternalId:
+    type:
+      - string
+      - "null"
+  Fax:
+    type:
+      - string
+      - "null"
+  FortuneRank:
+    type:
+      - integer
+      - "null"
+  FullAddress:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IncludedInSnP500:
+    type:
+      - string
+      - "null"
+  Industry:
+    type:
+      - string
+      - "null"
+  IsInCrm:
+    type:
+      - boolean
+      - "null"
+  IsInactive:
+    type:
+      - boolean
+      - "null"
+  IsOwned:
+    type:
+      - boolean
+      - "null"
+  NaicsCode:
+    type:
+      - string
+      - "null"
+  NaicsDesc:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NumberOfEmployees:
+    type:
+      - integer
+      - "null"
+  Ownership:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  PremisesMeasure:
+    type:
+      - integer
+      - "null"
+  PremisesMeasureReliability:
+    type:
+      - string
+      - "null"
+  PremisesMeasureUnit:
+    type:
+      - string
+      - "null"
+  PriorYearEmployees:
+    type:
+      - integer
+      - "null"
+  PriorYearRevenue:
+    type:
+      - number
+      - "null"
+  SalesTurnoverGrowthRate:
+    type:
+      - number
+      - "null"
+  Sic:
+    type:
+      - string
+      - "null"
+  SicCodeDesc:
+    type:
+      - string
+      - "null"
+  SicDesc:
+    type:
+      - string
+      - "null"
+  Site:
+    type:
+      - string
+      - "null"
+  State:
+    type:
+      - string
+      - "null"
+  StateCode:
+    type:
+      - string
+      - "null"
+  Street:
+    type:
+      - string
+      - "null"
+  TickerSymbol:
+    type:
+      - string
+      - "null"
+  TradeStyle:
+    type:
+      - string
+      - "null"
+  UpdatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Website:
+    type:
+      - string
+      - "null"
+  YearStarted:
+    type:
+      - string
+      - "null"
+  Zip:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

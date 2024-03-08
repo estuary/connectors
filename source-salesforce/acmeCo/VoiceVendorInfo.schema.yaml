@@ -1,0 +1,66 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CorporateNumber:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LocalPresenceDefaultNumber:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TenantConfigVersion:
+    type:
+      - string
+      - "null"
+  VendorAccountKey:
+    type:
+      - string
+      - "null"
+  VendorProviderName:
+    type:
+      - string
+      - "null"
+  VendorType:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

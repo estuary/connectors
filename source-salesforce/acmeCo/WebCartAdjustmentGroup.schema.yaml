@@ -1,0 +1,86 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AdjustmentSource:
+    type:
+      - string
+      - "null"
+  AdjustmentTargetType:
+    type:
+      - string
+      - "null"
+  AdjustmentType:
+    type:
+      - string
+      - "null"
+  AdjustmentValue:
+    type:
+      - number
+      - "null"
+  CartId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  PriceAdjustmentCauseId:
+    type:
+      - string
+      - "null"
+  Priority:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TaxAmount:
+    type:
+      - number
+      - "null"
+  TotalAmount:
+    type:
+      - number
+      - "null"
+  TotalAmountWithTax:
+    type:
+      - number
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

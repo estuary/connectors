@@ -1,0 +1,201 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ActivityId:
+    type:
+      - string
+      - "null"
+  CallAcceptDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CallCenterId:
+    type:
+      - string
+      - "null"
+  CallConnectDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CallDisposition:
+    type:
+      - string
+      - "null"
+  CallDurationInSeconds:
+    type:
+      - integer
+      - "null"
+  CallEndDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CallQueuedDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CallRecordingId:
+    type:
+      - string
+      - "null"
+  CallResolution:
+    type:
+      - string
+      - "null"
+  CallStartDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CallType:
+    type:
+      - string
+      - "null"
+  CallerId:
+    type:
+      - string
+      - "null"
+  CallerIdType:
+    type:
+      - string
+      - "null"
+  ConferenceKey:
+    type:
+      - string
+      - "null"
+  ConversationId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CurrencyCode:
+    type:
+      - string
+      - "null"
+  CustomerHoldDuration:
+    type:
+      - integer
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  FromPhoneNumber:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsRecorded:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LongestHoldDuration:
+    type:
+      - integer
+      - "null"
+  MediaProviderId:
+    type:
+      - string
+      - "null"
+  NextCallId:
+    type:
+      - string
+      - "null"
+  NumberOfHolds:
+    type:
+      - integer
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  PreviousCallId:
+    type:
+      - string
+      - "null"
+  Price:
+    type:
+      - number
+      - "null"
+  QueueName:
+    type:
+      - string
+      - "null"
+  RecipientId:
+    type:
+      - string
+      - "null"
+  RelatedRecordId:
+    type:
+      - string
+      - "null"
+  SourceType:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ToPhoneNumber:
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+  VendorCallKey:
+    type:
+      - string
+      - "null"
+  VendorParentCallKey:
+    type:
+      - string
+      - "null"
+  VendorType:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

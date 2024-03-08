@@ -1,0 +1,121 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AnnouncementId:
+    type:
+      - string
+      - "null"
+  BannerPhotoUrl:
+    type:
+      - string
+      - "null"
+  CanHaveGuests:
+    type:
+      - boolean
+      - "null"
+  CollaborationType:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  FullPhotoUrl:
+    type:
+      - string
+      - "null"
+  GroupEmail:
+    type:
+      - string
+      - "null"
+  HasPrivateFieldsAccess:
+    type:
+      - boolean
+      - "null"
+  Id:
+    type: string
+  InformationBody:
+    type:
+      - string
+      - "null"
+  InformationTitle:
+    type:
+      - string
+      - "null"
+  IsArchived:
+    type:
+      - boolean
+      - "null"
+  IsAutoArchiveDisabled:
+    type:
+      - boolean
+      - "null"
+  IsBroadcast:
+    type:
+      - boolean
+      - "null"
+  LastFeedModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MediumPhotoUrl:
+    type:
+      - string
+      - "null"
+  MemberCount:
+    type:
+      - integer
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  SmallPhotoUrl:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,143 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AbsenceNumber:
+    type:
+      - string
+      - "null"
+  Address:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  End:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Latitude:
+    type:
+      - number
+      - "null"
+  Longitude:
+    type:
+      - number
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  ResourceId:
+    type:
+      - string
+      - "null"
+  Start:
+    format: date-time
+    type:
+      - string
+      - "null"
+  State:
+    type:
+      - string
+      - "null"
+  Street:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

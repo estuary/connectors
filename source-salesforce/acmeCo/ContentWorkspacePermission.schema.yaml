@@ -1,0 +1,98 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  PermissionsAddComment:
+    type:
+      - boolean
+      - "null"
+  PermissionsAddContent:
+    type:
+      - boolean
+      - "null"
+  PermissionsAddContentOBO:
+    type:
+      - boolean
+      - "null"
+  PermissionsArchiveContent:
+    type:
+      - boolean
+      - "null"
+  PermissionsChatterSharing:
+    type:
+      - boolean
+      - "null"
+  PermissionsDeleteContent:
+    type:
+      - boolean
+      - "null"
+  PermissionsDeliverContent:
+    type:
+      - boolean
+      - "null"
+  PermissionsFeatureContent:
+    type:
+      - boolean
+      - "null"
+  PermissionsManageWorkspace:
+    type:
+      - boolean
+      - "null"
+  PermissionsModifyComments:
+    type:
+      - boolean
+      - "null"
+  PermissionsOrganizeFileAndFolder:
+    type:
+      - boolean
+      - "null"
+  PermissionsTagContent:
+    type:
+      - boolean
+      - "null"
+  PermissionsViewComments:
+    type:
+      - boolean
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

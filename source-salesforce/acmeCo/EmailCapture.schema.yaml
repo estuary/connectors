@@ -1,0 +1,71 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CaptureDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  FromPattern:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RawMessage:
+    type:
+      - string
+      - "null"
+  RawMessageLength:
+    type:
+      - integer
+      - "null"
+  Recipient:
+    type:
+      - string
+      - "null"
+  Sender:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ToPattern:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

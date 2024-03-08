@@ -1,0 +1,130 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  BusinessHoursId:
+    type:
+      - string
+      - "null"
+  ConsentType:
+    type:
+      - string
+      - "null"
+  ConversationEndResponse:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  DeveloperName:
+    type:
+      - string
+      - "null"
+  DoubleOptInPrompt:
+    type:
+      - string
+      - "null"
+  EngagedResponse:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InitialResponse:
+    type:
+      - string
+      - "null"
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsLinkedRecordOpenedAsSubTab:
+    type:
+      - boolean
+      - "null"
+  IsRequireDoubleOptIn:
+    type:
+      - boolean
+      - "null"
+  IsRestrictedToBusinessHours:
+    type:
+      - boolean
+      - "null"
+  IsoCountryCode:
+    type:
+      - string
+      - "null"
+  Language:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LinkingPreference:
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  MessageType:
+    type:
+      - string
+      - "null"
+  MessagingPlatformKey:
+    type:
+      - string
+      - "null"
+  OfflineAgentsResponse:
+    type:
+      - string
+      - "null"
+  OptInPrompt:
+    type:
+      - string
+      - "null"
+  OutsideBusinessHoursResponse:
+    type:
+      - string
+      - "null"
+  RoutingType:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TargetQueueId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

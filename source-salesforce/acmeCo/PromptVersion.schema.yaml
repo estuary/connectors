@@ -1,0 +1,205 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ActionButtonLabel:
+    type:
+      - string
+      - "null"
+  ActionButtonLink:
+    type:
+      - string
+      - "null"
+  Body:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  DelayDays:
+    type:
+      - integer
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  DismissButtonLabel:
+    type:
+      - string
+      - "null"
+  DisplayPosition:
+    type:
+      - string
+      - "null"
+  DisplayType:
+    type:
+      - string
+      - "null"
+  ElementRelativePosition:
+    type:
+      - string
+      - "null"
+  EndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Header:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  ImageAltText:
+    type:
+      - string
+      - "null"
+  ImageId:
+    type:
+      - string
+      - "null"
+  ImageLocation:
+    type:
+      - string
+      - "null"
+  IndexWithIsPublished:
+    type:
+      - string
+      - "null"
+  IndexWithoutIsPublished:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsPublished:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MasterLabel:
+    type:
+      - string
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  PublishedByUserId:
+    type:
+      - string
+      - "null"
+  PublishedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ReferenceElementContext:
+    type:
+      - string
+      - "null"
+  ShouldDisplayActionButton:
+    type:
+      - boolean
+      - "null"
+  ShouldIgnoreGlobalDelay:
+    type:
+      - boolean
+      - "null"
+  StartDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  StepNumber:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TargetAppDeveloperName:
+    type:
+      - string
+      - "null"
+  TargetAppNamespacePrefix:
+    type:
+      - string
+      - "null"
+  TargetPageKey1:
+    type:
+      - string
+      - "null"
+  TargetPageKey1Ref:
+    type:
+      - string
+      - "null"
+  TargetPageKey2:
+    type:
+      - string
+      - "null"
+  TargetPageKey3:
+    type:
+      - string
+      - "null"
+  TargetPageType:
+    type:
+      - string
+      - "null"
+  ThemeColor:
+    type:
+      - string
+      - "null"
+  ThemeSaturation:
+    type:
+      - string
+      - "null"
+  TimesToDisplay:
+    type:
+      - integer
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+  UserAccess:
+    type:
+      - string
+      - "null"
+  UserProfileAccess:
+    type:
+      - string
+      - "null"
+  VersionNumber:
+    type:
+      - integer
+      - "null"
+  VideoLink:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,114 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  ArchivedById:
+    type:
+      - string
+      - "null"
+  ArchivedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ContentAssetId:
+    type:
+      - string
+      - "null"
+  ContentModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ContentSize:
+    type:
+      - integer
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  FileExtension:
+    type:
+      - string
+      - "null"
+  FileType:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsArchived:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LatestPublishedVersionId:
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  ParentId:
+    type:
+      - string
+      - "null"
+  PublishStatus:
+    type:
+      - string
+      - "null"
+  SharingOption:
+    type:
+      - string
+      - "null"
+  SharingPrivacy:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

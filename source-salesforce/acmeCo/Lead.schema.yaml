@@ -1,0 +1,284 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Address:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  AnnualRevenue:
+    type:
+      - number
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  CleanStatus:
+    type:
+      - string
+      - "null"
+  Company:
+    type:
+      - string
+      - "null"
+  CompanyDunsNumber:
+    type:
+      - string
+      - "null"
+  ConvertedAccountId:
+    type:
+      - string
+      - "null"
+  ConvertedContactId:
+    type:
+      - string
+      - "null"
+  ConvertedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ConvertedOpportunityId:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CurrentGenerators__c:
+    type:
+      - string
+      - "null"
+  DandbCompanyId:
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Email:
+    type:
+      - string
+      - "null"
+  EmailBouncedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EmailBouncedReason:
+    type:
+      - string
+      - "null"
+  Fax:
+    type:
+      - string
+      - "null"
+  FirstName:
+    type:
+      - string
+      - "null"
+  GeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IndividualId:
+    type:
+      - string
+      - "null"
+  Industry:
+    type:
+      - string
+      - "null"
+  IsConverted:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsUnreadByOwner:
+    type:
+      - boolean
+      - "null"
+  Jigsaw:
+    type:
+      - string
+      - "null"
+  JigsawContactId:
+    type:
+      - string
+      - "null"
+  LastActivityDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastName:
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Latitude:
+    type:
+      - number
+      - "null"
+  LeadSource:
+    type:
+      - string
+      - "null"
+  Longitude:
+    type:
+      - number
+      - "null"
+  MasterRecordId:
+    type:
+      - string
+      - "null"
+  MobilePhone:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NumberOfEmployees:
+    type:
+      - integer
+      - "null"
+  NumberofLocations__c:
+    type:
+      - number
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  Phone:
+    type:
+      - string
+      - "null"
+  PhotoUrl:
+    type:
+      - string
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  Primary__c:
+    type:
+      - string
+      - "null"
+  ProductInterest__c:
+    type:
+      - string
+      - "null"
+  Rating:
+    type:
+      - string
+      - "null"
+  SICCode__c:
+    type:
+      - string
+      - "null"
+  Salutation:
+    type:
+      - string
+      - "null"
+  State:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  Street:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Title:
+    type:
+      - string
+      - "null"
+  Website:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

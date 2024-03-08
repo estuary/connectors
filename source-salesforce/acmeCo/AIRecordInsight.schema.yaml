@@ -1,0 +1,92 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AiApplicationId:
+    type:
+      - string
+      - "null"
+  Confidence:
+    type:
+      - number
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  MlPredictionDefinitionId:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  PredictionField:
+    type:
+      - string
+      - "null"
+  RunGuid:
+    type:
+      - string
+      - "null"
+  RunStartTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TargetField:
+    type:
+      - string
+      - "null"
+  TargetId:
+    type:
+      - string
+      - "null"
+  TargetSobjectType:
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  ValidUntil:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

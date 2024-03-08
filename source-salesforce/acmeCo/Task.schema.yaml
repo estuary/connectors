@@ -1,0 +1,171 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  ActivityDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CallDisposition:
+    type:
+      - string
+      - "null"
+  CallDurationInSeconds:
+    type:
+      - integer
+      - "null"
+  CallObject:
+    type:
+      - string
+      - "null"
+  CallType:
+    type:
+      - string
+      - "null"
+  CompletedDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsArchived:
+    type:
+      - boolean
+      - "null"
+  IsClosed:
+    type:
+      - boolean
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsHighPriority:
+    type:
+      - boolean
+      - "null"
+  IsRecurrence:
+    type:
+      - boolean
+      - "null"
+  IsReminderSet:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  Priority:
+    type:
+      - string
+      - "null"
+  RecurrenceActivityId:
+    type:
+      - string
+      - "null"
+  RecurrenceDayOfMonth:
+    type:
+      - integer
+      - "null"
+  RecurrenceDayOfWeekMask:
+    type:
+      - integer
+      - "null"
+  RecurrenceEndDateOnly:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RecurrenceInstance:
+    type:
+      - string
+      - "null"
+  RecurrenceInterval:
+    type:
+      - integer
+      - "null"
+  RecurrenceMonthOfYear:
+    type:
+      - string
+      - "null"
+  RecurrenceRegeneratedType:
+    type:
+      - string
+      - "null"
+  RecurrenceStartDateOnly:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RecurrenceTimeZoneSidKey:
+    type:
+      - string
+      - "null"
+  RecurrenceType:
+    type:
+      - string
+      - "null"
+  ReminderDateTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  Subject:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TaskSubtype:
+    type:
+      - string
+      - "null"
+  WhatId:
+    type:
+      - string
+      - "null"
+  WhoId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

@@ -1,0 +1,107 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GatewayAuthCode:
+    type:
+      - string
+      - "null"
+  GatewayAvsCode:
+    type:
+      - string
+      - "null"
+  GatewayDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  GatewayMessage:
+    type:
+      - string
+      - "null"
+  GatewayRefNumber:
+    type:
+      - string
+      - "null"
+  GatewayResultCode:
+    type:
+      - string
+      - "null"
+  GatewayResultCodeDescription:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  InteractionStatus:
+    type:
+      - string
+      - "null"
+  InteractionType:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsNotification:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  PaymentGatewayId:
+    type:
+      - string
+      - "null"
+  PaymentGatewayLogNumber:
+    type:
+      - string
+      - "null"
+  ReferencedEntityId:
+    type:
+      - string
+      - "null"
+  Request:
+    type:
+      - string
+      - "null"
+  Response:
+    type:
+      - string
+      - "null"
+  SfRefNumber:
+    type:
+      - string
+      - "null"
+  SfResultCode:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

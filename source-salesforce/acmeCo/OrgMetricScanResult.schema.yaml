@@ -1,0 +1,83 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Date:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Flags:
+    type:
+      - integer
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  ItemStatus:
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  Object:
+    type:
+      - string
+      - "null"
+  OrgMetricScanSummaryId:
+    type:
+      - string
+      - "null"
+  Profile:
+    type:
+      - integer
+      - "null"
+  Quantity:
+    type:
+      - integer
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  Url:
+    type:
+      - string
+      - "null"
+  User:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

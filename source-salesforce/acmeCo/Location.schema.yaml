@@ -1,0 +1,164 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  CloseDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ConstructionEndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ConstructionStartDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Description:
+    type:
+      - string
+      - "null"
+  DrivingDirections:
+    type:
+      - string
+      - "null"
+  ExternalReference:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  IsInventoryLocation:
+    type:
+      - boolean
+      - "null"
+  IsMobile:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastReferencedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastViewedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Latitude:
+    type:
+      - number
+      - "null"
+  Location:
+    properties:
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+    type:
+      - object
+      - "null"
+  LocationLevel:
+    type:
+      - integer
+      - "null"
+  LocationType:
+    type:
+      - string
+      - "null"
+  LogoId:
+    type:
+      - string
+      - "null"
+  Longitude:
+    type:
+      - number
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  OpenDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  OwnerId:
+    type:
+      - string
+      - "null"
+  ParentLocationId:
+    type:
+      - string
+      - "null"
+  PossessionDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RemodelEndDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RemodelStartDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  RootLocationId:
+    type:
+      - string
+      - "null"
+  ShouldSyncWithOci:
+    type:
+      - boolean
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  TimeZone:
+    type:
+      - string
+      - "null"
+  VisitorAddressId:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

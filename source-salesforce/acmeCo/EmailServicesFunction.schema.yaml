@@ -1,0 +1,94 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AddressInactiveAction:
+    type:
+      - string
+      - "null"
+  ApexClassId:
+    type:
+      - string
+      - "null"
+  AttachmentOption:
+    type:
+      - string
+      - "null"
+  AuthenticationFailureAction:
+    type:
+      - string
+      - "null"
+  AuthorizationFailureAction:
+    type:
+      - string
+      - "null"
+  AuthorizedSenders:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  ErrorRoutingAddress:
+    type:
+      - string
+      - "null"
+  FunctionInactiveAction:
+    type:
+      - string
+      - "null"
+  FunctionName:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsActive:
+    type:
+      - boolean
+      - "null"
+  IsAuthenticationRequired:
+    type:
+      - boolean
+      - "null"
+  IsErrorRoutingEnabled:
+    type:
+      - boolean
+      - "null"
+  IsTextAttachmentsAsBinary:
+    type:
+      - boolean
+      - "null"
+  IsTlsRequired:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  OverLimitAction:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

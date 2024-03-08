@@ -1,0 +1,80 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AppType:
+    type:
+      - string
+      - "null"
+  ConversationId:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  JoinedTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastActiveTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  LeftTime:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  ParticipantContext:
+    type:
+      - string
+      - "null"
+  ParticipantDisplayName:
+    type:
+      - string
+      - "null"
+  ParticipantEntityId:
+    type:
+      - string
+      - "null"
+  ParticipantKey:
+    type:
+      - string
+      - "null"
+  ParticipantRole:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

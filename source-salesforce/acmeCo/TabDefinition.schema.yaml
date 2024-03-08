@@ -1,0 +1,55 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  DurableId:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  IsAvailableInAloha:
+    type:
+      - boolean
+      - "null"
+  IsAvailableInDesktop:
+    type:
+      - boolean
+      - "null"
+  IsAvailableInLightning:
+    type:
+      - boolean
+      - "null"
+  IsAvailableInMobile:
+    type:
+      - boolean
+      - "null"
+  IsCustom:
+    type:
+      - boolean
+      - "null"
+  Label:
+    type:
+      - string
+      - "null"
+  MobileUrl:
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  SobjectName:
+    type:
+      - string
+      - "null"
+  Url:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

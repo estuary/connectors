@@ -1,0 +1,135 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - string
+      - "null"
+  Comments:
+    type:
+      - string
+      - "null"
+  CompanyName:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  ImplementorType:
+    type:
+      - string
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Name:
+    type:
+      - string
+      - "null"
+  NickName:
+    type:
+      - string
+      - "null"
+  PaymentMethodAddress:
+    properties:
+      city:
+        type:
+          - "null"
+          - string
+      country:
+        type:
+          - "null"
+          - string
+      geocodeAccuracy:
+        type:
+          - "null"
+          - string
+      latitude:
+        type:
+          - "null"
+          - number
+      longitude:
+        type:
+          - "null"
+          - number
+      postalCode:
+        type:
+          - "null"
+          - string
+      state:
+        type:
+          - "null"
+          - string
+      street:
+        type:
+          - "null"
+          - string
+    type:
+      - object
+      - "null"
+  PaymentMethodCity:
+    type:
+      - string
+      - "null"
+  PaymentMethodCountry:
+    type:
+      - string
+      - "null"
+  PaymentMethodGeocodeAccuracy:
+    type:
+      - string
+      - "null"
+  PaymentMethodLatitude:
+    type:
+      - number
+      - "null"
+  PaymentMethodLongitude:
+    type:
+      - number
+      - "null"
+  PaymentMethodPostalCode:
+    type:
+      - string
+      - "null"
+  PaymentMethodState:
+    type:
+      - string
+      - "null"
+  PaymentMethodStreet:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

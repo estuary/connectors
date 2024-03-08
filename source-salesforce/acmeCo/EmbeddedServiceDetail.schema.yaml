@@ -1,0 +1,135 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AvatarImg:
+    type:
+      - string
+      - "null"
+  ContrastInvertedColor:
+    type:
+      - string
+      - "null"
+  ContrastPrimaryColor:
+    type:
+      - string
+      - "null"
+  CustomMinimizedComponent:
+    type:
+      - string
+      - "null"
+  CustomPrechatComponent:
+    type:
+      - string
+      - "null"
+  DurableId:
+    type:
+      - string
+      - "null"
+  FieldServiceConfirmCardImg:
+    type:
+      - string
+      - "null"
+  FieldServiceHomeImg:
+    type:
+      - string
+      - "null"
+  FieldServiceLogoImg:
+    type:
+      - string
+      - "null"
+  Font:
+    type:
+      - string
+      - "null"
+  FontSize:
+    type:
+      - string
+      - "null"
+  Height:
+    type:
+      - integer
+      - "null"
+  Id:
+    type: string
+  IsFieldServiceEnabled:
+    type:
+      - boolean
+      - "null"
+  IsLiveAgentEnabled:
+    type:
+      - boolean
+      - "null"
+  IsOfflineCaseEnabled:
+    type:
+      - boolean
+      - "null"
+  IsPrechatEnabled:
+    type:
+      - boolean
+      - "null"
+  IsQueuePositionEnabled:
+    type:
+      - boolean
+      - "null"
+  NavBarColor:
+    type:
+      - string
+      - "null"
+  NavBarTextColor:
+    type:
+      - string
+      - "null"
+  OfflineCaseBackgroundImg:
+    type:
+      - string
+      - "null"
+  PrechatBackgroundImg:
+    type:
+      - string
+      - "null"
+  PrimaryColor:
+    type:
+      - string
+      - "null"
+  SecondaryColor:
+    type:
+      - string
+      - "null"
+  SecondaryNavBarColor:
+    type:
+      - string
+      - "null"
+  ShouldHideAuthDialog:
+    type:
+      - boolean
+      - "null"
+  ShouldShowExistingAppointment:
+    type:
+      - boolean
+      - "null"
+  ShouldShowNewAppointment:
+    type:
+      - boolean
+      - "null"
+  Site:
+    type:
+      - string
+      - "null"
+  SmallCompanyLogoImg:
+    type:
+      - string
+      - "null"
+  WaitingStateBackgroundImg:
+    type:
+      - string
+      - "null"
+  Width:
+    type:
+      - integer
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

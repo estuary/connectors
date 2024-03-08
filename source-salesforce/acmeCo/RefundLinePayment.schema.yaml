@@ -1,0 +1,110 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Amount:
+    type:
+      - number
+      - "null"
+  AppliedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  AssociatedAccountId:
+    type:
+      - string
+      - "null"
+  AssociatedRefundLinePaymentId:
+    type:
+      - string
+      - "null"
+  Comments:
+    type:
+      - string
+      - "null"
+  CreatedById:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Date:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EffectiveDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EffectiveImpactAmount:
+    type:
+      - number
+      - "null"
+  HasBeenUnapplied:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  ImpactAmount:
+    type:
+      - number
+      - "null"
+  IsDeleted:
+    type:
+      - boolean
+      - "null"
+  LastModifiedById:
+    type:
+      - string
+      - "null"
+  LastModifiedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  PaymentBalance:
+    type:
+      - number
+      - "null"
+  PaymentId:
+    type:
+      - string
+      - "null"
+  RefundBalance:
+    type:
+      - number
+      - "null"
+  RefundId:
+    type:
+      - string
+      - "null"
+  RefundLinePaymentNumber:
+    type:
+      - string
+      - "null"
+  SystemModstamp:
+    format: date-time
+    type:
+      - string
+      - "null"
+  Type:
+    type:
+      - string
+      - "null"
+  UnappliedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object

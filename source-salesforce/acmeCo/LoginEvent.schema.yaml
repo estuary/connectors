@@ -1,0 +1,165 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  AdditionalInfo:
+    type:
+      - string
+      - "null"
+  ApiType:
+    type:
+      - string
+      - "null"
+  ApiVersion:
+    type:
+      - string
+      - "null"
+  Application:
+    type:
+      - string
+      - "null"
+  AuthMethodReference:
+    type:
+      - string
+      - "null"
+  AuthServiceId:
+    type:
+      - string
+      - "null"
+  Browser:
+    type:
+      - string
+      - "null"
+  CipherSuite:
+    type:
+      - string
+      - "null"
+  City:
+    type:
+      - string
+      - "null"
+  ClientVersion:
+    type:
+      - string
+      - "null"
+  Country:
+    type:
+      - string
+      - "null"
+  CountryIso:
+    type:
+      - string
+      - "null"
+  CreatedDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EvaluationTime:
+    type:
+      - number
+      - "null"
+  EventDate:
+    format: date-time
+    type:
+      - string
+      - "null"
+  EventIdentifier:
+    type:
+      - string
+      - "null"
+  HttpMethod:
+    type:
+      - string
+      - "null"
+  Id:
+    type: string
+  LoginGeoId:
+    type:
+      - string
+      - "null"
+  LoginHistoryId:
+    type:
+      - string
+      - "null"
+  LoginKey:
+    type:
+      - string
+      - "null"
+  LoginLatitude:
+    type:
+      - number
+      - "null"
+  LoginLongitude:
+    type:
+      - number
+      - "null"
+  LoginType:
+    type:
+      - string
+      - "null"
+  LoginUrl:
+    type:
+      - string
+      - "null"
+  Platform:
+    type:
+      - string
+      - "null"
+  PolicyId:
+    type:
+      - string
+      - "null"
+  PolicyOutcome:
+    type:
+      - string
+      - "null"
+  PostalCode:
+    type:
+      - string
+      - "null"
+  RelatedEventIdentifier:
+    type:
+      - string
+      - "null"
+  SessionKey:
+    type:
+      - string
+      - "null"
+  SessionLevel:
+    type:
+      - string
+      - "null"
+  SourceIp:
+    type:
+      - string
+      - "null"
+  Status:
+    type:
+      - string
+      - "null"
+  Subdivision:
+    type:
+      - string
+      - "null"
+  TlsProtocol:
+    type:
+      - string
+      - "null"
+  UserId:
+    type:
+      - string
+      - "null"
+  UserType:
+    type:
+      - string
+      - "null"
+  Username:
+    type:
+      - string
+      - "null"
+reduce:
+  strategy: merge
+required:
+  - Id
+type: object
