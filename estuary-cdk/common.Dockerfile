@@ -30,7 +30,7 @@ ARG USAGE_RATE
 
 LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
 LABEL FLOW_RUNTIME_CODEC=json
-LABEL dev.estuary.usage-rate=$USAGE_RATE
+LABEL dev.estuary.usage-rate=${USAGE_RATE}
 
 COPY --from=builder /opt/$CONNECTOR_NAME /opt/$CONNECTOR_NAME
 COPY --from=builder /opt/estuary-cdk /opt/estuary-cdk
