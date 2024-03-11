@@ -7,7 +7,7 @@ import tracemalloc
 
 import pytest
 import requests_mock
-from conftest import generate_stream
+from .conftest import generate_stream
 from source_salesforce.streams import BulkIncrementalSalesforceStream
 
 
