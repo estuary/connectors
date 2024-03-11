@@ -53,6 +53,7 @@ jobs:
           - name: source-salesforce
             type: capture
             version: v2
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4
