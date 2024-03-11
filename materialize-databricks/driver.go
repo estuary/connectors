@@ -122,14 +122,6 @@ type transactor struct {
 
 	localStagingPath string
 
-	// Variables exclusively used by Load.
-	load struct {
-		conn *stdsql.Conn
-	}
-	// Variables exclusively used by Store.
-	store struct {
-		conn *stdsql.Conn
-	}
 	bindings []*binding
 
 	updateDelay time.Duration
@@ -195,17 +187,11 @@ func newTransactor(
 		}
 	}
 
-	// Establish connections.
-	if db, err := stdsql.Open("databricks", cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("load sql.Open: %w", err)
-	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("load db.Conn: %w", err)
+	db, err := stdsql.Open("databricks", d.cfg.ToURI())
+	if err != nil {
+		return nil, fmt.Errorf("sql.Open: %w", err)
 	}
-	if db, err := stdsql.Open("databricks", cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("store sql.Open: %w", err)
-	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("store db.Conn: %w", err)
-	}
+	defer db.Close()
 
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, open.Range); err != nil {
@@ -214,7 +200,7 @@ func newTransactor(
 	}
 
 	// Create volume for storing staged files
-	if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", cfg.SchemaName, volumeName)); err != nil {
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", cfg.SchemaName, volumeName)); err != nil {
 		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
 	}
 
@@ -320,10 +306,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	log.Info("load: starting join query")
 
 	if len(queries) > 0 {
+		db, err := stdsql.Open("databricks", d.cfg.ToURI())
+		if err != nil {
+			return fmt.Errorf("sql.Open: %w", err)
+		}
+		defer db.Close()
+
 		// Issue a union join of the target tables and their (now staged) load keys,
 		// and send results to the |loaded| callback.
 		var unionQuery = strings.Join(queries, "\nUNION ALL\n")
-		rows, err := d.load.conn.QueryContext(ctx, unionQuery)
+		rows, err := db.QueryContext(ctx, unionQuery)
 		if err != nil {
 			return fmt.Errorf("querying Load documents: %w", err)
 		}
@@ -454,6 +446,16 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	log.Info("store: starting committing changes")
 
+	var db *stdsql.DB
+	if len(d.cp) > 0 {
+		var err error
+		db, err = stdsql.Open("databricks", d.cfg.ToURI())
+		if err != nil {
+			return nil, fmt.Errorf("sql.Open: %w", err)
+		}
+		defer db.Close()
+	}
+
 	for stateKey, item := range d.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
@@ -461,7 +463,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		if _, err := d.store.conn.ExecContext(ctx, item.Query); err != nil {
+		if _, err := db.ExecContext(ctx, item.Query); err != nil {
 			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 			// it is okay to skip them in this case
 			if d.cpRecovery {
@@ -517,8 +519,6 @@ func pathsWithRoot(root string, paths []string) []string {
 }
 
 func (d *transactor) Destroy() {
-	d.load.conn.Close()
-	d.store.conn.Close()
 }
 
 func main() {
