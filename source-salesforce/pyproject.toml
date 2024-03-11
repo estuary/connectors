@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
-flow-sdk = {path="../python", develop=true}
+estuary-cdk = {path="../estuary-cdk", develop = true}
 airbyte-cdk = "0.51.14"
 backoff = "^1.11"
 pendulum = "^3.0.0"

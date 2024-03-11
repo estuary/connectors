@@ -19,14 +19,14 @@ def time_sleep_mock(mocker):
 
 @pytest.fixture(scope="module")
 def bulk_catalog():
-    with open("unit_tests/bulk_catalog.json") as f:
+    with open("source-salesforce/tests/bulk_catalog.json") as f:
         data = json.loads(f.read())
     return ConfiguredAirbyteCatalog.parse_obj(data)
 
 
 @pytest.fixture(scope="module")
 def rest_catalog():
-    with open("unit_tests/rest_catalog.json") as f:
+    with open("source-salesforce/tests/rest_catalog.json") as f:
         data = json.loads(f.read())
     return ConfiguredAirbyteCatalog.parse_obj(data)
 
@@ -42,13 +42,13 @@ def stream_config():
     """Generates streams settings for BULK logic"""
     return {
         "credentials": {
-        "client_id": "fake_client_id",
-        "client_secret": "fake_client_secret",
-        "refresh_token": "fake_refresh_token",
+            "client_id": "fake_client_id",
+            "client_secret": "fake_client_secret",
+            "refresh_token": "fake_refresh_token",},
         "start_date": "2010-01-18T21:18:20Z",
         "is_sandbox": False,
         "wait_timeout": 15,
-        }
+        
     }
 
 
@@ -57,13 +57,13 @@ def stream_config_date_format():
     """Generates streams settings with `start_date` in format YYYY-MM-DD"""
     return {
         "credentials": {
-        "client_id": "fake_client_id",
-        "client_secret": "fake_client_secret",
-        "refresh_token": "fake_refresh_token",
+            "client_id": "fake_client_id",
+            "client_secret": "fake_client_secret",
+            "refresh_token": "fake_refresh_token",
+            },
         "start_date": "2010-01-18",
         "is_sandbox": False,
         "wait_timeout": 15,
-        }
     }
 
 
@@ -75,9 +75,9 @@ def stream_config_without_start_date():
         "client_id": "fake_client_id",
         "client_secret": "fake_client_secret",
         "refresh_token": "fake_refresh_token",
+        },
         "is_sandbox": False,
         "wait_timeout": 15,
-        }
     }
 
 
