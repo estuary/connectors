@@ -13,7 +13,7 @@ from unittest.mock import Mock
 import pytest
 import requests_mock
 from airbyte_cdk.models import AirbyteStream, ConfiguredAirbyteCatalog, ConfiguredAirbyteStream, DestinationSyncMode, SyncMode, Type
-from conftest import encoding_symbols_parameters, generate_stream
+from .conftest import encoding_symbols_parameters, generate_stream
 from requests.exceptions import HTTPError
 from source_salesforce.api import Salesforce
 from source_salesforce.source import SourceSalesforce
