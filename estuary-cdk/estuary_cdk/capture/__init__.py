@@ -262,7 +262,13 @@ class BaseCaptureConnector(
             # Gracefully exit after the capture interval has elapsed.
             # We don't do this within the TaskGroup because we don't
             # want to block on it.
-            asyncio.create_task(stop_on_elapsed_interval(open.capture.intervalSeconds))
+            asyncio.create_task(
+                stop_on_elapsed_interval(
+                    int(open.capture.config.restart_interval.total_seconds())
+                    if open.capture.config.restart_interval
+                    else open.capture.intervalSeconds
+                )
+            )
 
             async with asyncio.TaskGroup() as tg:
 

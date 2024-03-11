@@ -1,9 +1,22 @@
 import abc
 from dataclasses import dataclass
-from pydantic import BaseModel, NonNegativeInt, PositiveInt
-from typing import Any, Literal, TypeVar, Generic, Literal
+from datetime import timedelta
+from pydantic import BaseModel, Field, NonNegativeInt, PositiveInt
+from typing import Any, Literal, Optional, TypeVar, Generic, Literal
 
 from .pydantic_polyfill import GenericModel
+
+
+class BaseEndpointConfig(abc.ABC, BaseModel, extra="forbid"):
+    """
+    BaseEndpointConfig defines the endpoint config attribute(s) shared by all connectors.
+    """
+
+    # If unset, use the default `intervalSeconds` provided as part of the Open request
+    restart_interval: Optional[timedelta] = Field(
+        default=None, description="How long before the connector restarts automatically"
+    )
+
 
 # The type of this invoked connector.
 ConnectorType = Literal[
@@ -12,7 +25,7 @@ ConnectorType = Literal[
 ]
 
 # Generic type of a connector's endpoint configuration.
-EndpointConfig = TypeVar("EndpointConfig")
+EndpointConfig = TypeVar("EndpointConfig", bound=BaseEndpointConfig)
 
 # Generic type of a connector's resource configuration.
 ResourceConfig = TypeVar("ResourceConfig", bound=BaseModel)
