@@ -4,42 +4,22 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
-        "credentials": {
-          "properties": {
-            "auth_type": {
-              "const": "Client",
-              "default": "Client",
-              "type": "string"
-            },
-            "client_id": {
-              "airbyte_secret": true,
-              "description": "Enter your Salesforce developer application's Client ID",
-              "order": 2,
-              "title": "Client ID",
-              "type": "string"
-            },
-            "client_secret": {
-              "airbyte_secret": true,
-              "description": "Enter your Salesforce developer application's Client secret",
-              "order": 3,
-              "title": "Client Secret",
-              "type": "string"
-            },
-            "refresh_token": {
-              "airbyte_secret": true,
-              "description": "Enter your application's Salesforce Refresh Token used to access your Salesforce account.",
-              "order": 4,
-              "title": "Refresh Token",
-              "type": "string"
-            }
-          },
-          "required": [
-            "client_id",
-            "client_secret",
-            "refresh_token"
-          ],
-          "type": "object",
-          "x-oauth2-provider": "salesforce"
+        "auth_type": {
+          "const": "Client",
+          "type": "string"
+        },
+        "client_id": {
+          "description": "Enter your Salesforce developer application's <a href=\"https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG\">Client ID</a>",
+          "order": 2,
+          "title": "Client ID",
+          "type": "string"
+        },
+        "client_secret": {
+          "airbyte_secret": true,
+          "description": "Enter your Salesforce developer application's <a href=\"https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG\">Client secret</a>",
+          "order": 3,
+          "title": "Client Secret",
+          "type": "string"
         },
         "is_sandbox": {
           "default": false,
@@ -48,12 +28,20 @@
           "title": "Sandbox",
           "type": "boolean"
         },
+        "refresh_token": {
+          "airbyte_secret": true,
+          "description": "Enter your application's <a href=\"https://developer.salesforce.com/docs/atlas.en-us.mobile_sdk.meta/mobile_sdk/oauth_refresh_token_flow.htm\">Salesforce Refresh Token</a> used for Airbyte to access your Salesforce account.",
+          "order": 4,
+          "title": "Refresh Token",
+          "type": "string"
+        },
         "start_date": {
-          "description": "Enter the date in the YYYY-MM-DD format. We will replicate the data added on and after this date. If this field is blank, we will replicate all data.",
+          "description": "Enter the date in the YYYY-MM-DD format. Airbyte will replicate the data added on and after this date. If this field is blank, Airbyte will replicate the data for last two years.",
           "examples": [
+            "2021-07-25",
             "2021-07-25T00:00:00Z"
           ],
-          "format": "date",
+          "format": "date-time",
           "order": 5,
           "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?)$",
           "title": "Start Date",
@@ -97,12 +85,13 @@
         }
       },
       "required": [
-        "credentials"
+        "credentials",
+        "start_date"
       ],
       "title": "Salesforce Source Spec",
       "type": "object"
     },
-    "documentationUrl": "https://go.estuary.dev/AyWXIh",
+    "documentationUrl": "https://docs.airbyte.com/integrations/sources/salesforce",
     "oauth2": {
       "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {
