@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
@@ -379,7 +381,9 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 
 func parseDataType(typeName, fullColumnType string) any {
 	if typeName == "enum" {
-		return &mysqlColumnType{Type: "enum", EnumValues: append(parseEnumValues(fullColumnType), "")}
+		// Illegal values are represented internally by MySQL as the integer 0. Adding
+		// this to the list as the zero-th element allows everything else to flow naturally.
+		return &mysqlColumnType{Type: "enum", EnumValues: append([]string{""}, parseEnumValues(fullColumnType)...)}
 	} else if typeName == "set" {
 		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
 	}
@@ -400,14 +404,8 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 	switch t.Type {
 	case "enum":
 		if index, ok := val.(int64); ok {
-			if 1 <= index && index <= int64(len(t.EnumValues)) {
-				return t.EnumValues[index-1], nil
-			} else if index == 0 {
-				// Illegal values are represented internally by MySQL as the integer 0.
-				// Backfill queries return this as the empty string, which is our chosen
-				// representation as well, but we have to handle the conversion of replicated
-				// values since they're just provided as the raw integer.
-				return "", nil
+			if 0 <= index && int(index) < len(t.EnumValues) {
+				return t.EnumValues[index], nil
 			}
 		} else if bs, ok := val.([]byte); ok {
 			return string(bs), nil
@@ -431,6 +429,20 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 		return val, nil
 	}
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
+}
+
+func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
+	switch t.Type {
+	case "enum":
+		if bs, ok := val.([]byte); ok {
+			if idx := slices.Index(t.EnumValues, string(bs)); idx >= 0 {
+				return idx, nil
+			}
+			return val, fmt.Errorf("internal error: failed to translate enum value %q to integer index", string(bs))
+		}
+		return val, nil
+	}
+	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
 }
 
 // enumValuesRegexp matches a MySQL-format single-quoted string followed by

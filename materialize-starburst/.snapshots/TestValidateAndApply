@@ -88,8 +88,8 @@ Big Schema Changed Types Constraints:
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
 {"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDateField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'DATE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMP(6) WITH TIME ZONE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 {"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'VARCHAR' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
@@ -120,14 +120,14 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"arrayfield","Nullable":"YES","Type":"varchar"}
 {"Name":"boolfield","Nullable":"YES","Type":"boolean"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"intfield","Nullable":"YES","Type":"bigint"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"multiplefield","Nullable":"YES","Type":"varchar"}
 {"Name":"numfield","Nullable":"YES","Type":"double"}
 {"Name":"objfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatetimefield","Nullable":"YES","Type":"varchar"}
+{"Name":"stringdatefield","Nullable":"YES","Type":"date"}
+{"Name":"stringdatetimefield","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"stringdurationfield","Nullable":"YES","Type":"varchar"}
 {"Name":"stringemailfield","Nullable":"YES","Type":"varchar"}
 {"Name":"stringfield","Nullable":"YES","Type":"varchar"}
@@ -158,14 +158,14 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"arrayfield","Nullable":"YES","Type":"varchar"}
 {"Name":"boolfield","Nullable":"YES","Type":"boolean"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"intfield","Nullable":"YES","Type":"bigint"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"multiplefield","Nullable":"YES","Type":"varchar"}
 {"Name":"numfield","Nullable":"YES","Type":"double"}
 {"Name":"objfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatetimefield","Nullable":"YES","Type":"varchar"}
+{"Name":"stringdatefield","Nullable":"YES","Type":"date"}
+{"Name":"stringdatetimefield","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"stringdurationfield","Nullable":"YES","Type":"varchar"}
 {"Name":"stringemailfield","Nullable":"YES","Type":"varchar"}
 {"Name":"stringfield","Nullable":"YES","Type":"varchar"}
@@ -235,7 +235,7 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"arrayfield","Nullable":"YES","Type":"varchar"}
 {"Name":"boolfield","Nullable":"YES","Type":"bigint"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"intfield","Nullable":"YES","Type":"varchar"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"multiplefield","Nullable":"YES","Type":"varchar"}
@@ -273,7 +273,7 @@ add a single field:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
 {"Name":"addedoptionalstring","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
@@ -287,7 +287,7 @@ add a single field:
 remove a single optional field:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
@@ -301,7 +301,7 @@ remove a single optional field:
 remove a single required field:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
@@ -317,7 +317,7 @@ add and remove many fields:
 {"Name":"addedoptionalstring","Nullable":"YES","Type":"varchar"}
 {"Name":"addedrequiredstring","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"key","Nullable":"YES","Type":"varchar"}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
@@ -337,7 +337,7 @@ Challenging Field Names Materialized Columns:
 {"Name":"_id","Nullable":"YES","Type":"varchar"}
 {"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"varchar"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
 {"Name":"value with separated words","Nullable":"YES","Type":"varchar"}
 {"Name":"value-with-separated-words","Nullable":"YES","Type":"varchar"}
 {"Name":"value.with-separated_words","Nullable":"YES","Type":"varchar"}

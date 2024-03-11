@@ -1,0 +1,95 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "title": "Airtable Source Spec",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "credentials": {
+          "title": "Personal Access Token",
+          "type": "object",
+          "required": [
+            "api_key"
+          ],
+          "properties": {
+            "auth_method": {
+              "type": "string",
+              "const": "api_key",
+              "default": "api_key",
+              "order": 0
+            },
+            "api_key": {
+              "type": "string",
+              "description": "The Personal Access Token for the Airtable account. See https://airtable.com/developers/web/guides/personal-access-tokens for more information on how to obtain this token.",
+              "title": "Personal Access Token",
+              "secret": true
+            }
+          }
+        }
+      },
+      "required": [
+        "credentials"
+      ]
+    },
+    "resourceConfigSchema": {
+      "title": "ResourceConfig",
+      "description": "ResourceConfig encodes a configured resource stream",
+      "type": "object",
+      "properties": {
+        "stream": {
+          "title": "Stream",
+          "description": "Name of this stream",
+          "type": "string"
+        },
+        "syncMode": {
+          "title": "Sync Mode",
+          "description": "Sync this resource incrementally, or fully refresh it every run",
+          "enum": [
+            "full_refresh",
+            "incremental"
+          ],
+          "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
+          "type": "string"
+        },
+        "cursorField": {
+          "title": "Cursor Field",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "additionalProperties": false
+    },
+    "documentationUrl": "https://docs.airbyte.com/integrations/sources/airtable",
+    "oauth2": {
+      "provider": "airtable",
+      "authUrlTemplate": "https://airtable.com/oauth2/v1/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}&scope=data.records:read%20data.recordComments:read%20schema.bases:read&code_challenge={{#urlencode}}{{{ code_challenge }}}{{/urlencode}}&code_challenge_method={{{ code_challenge_method }}}",
+      "accessTokenUrlTemplate": "https://airtable.com/oauth2/v1/token",
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&code_verifier={{#urlencode}}{{{ code_verifier }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{client_secret }}}{{/basicauth}}",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token",
+        "refresh_token": "/refresh_token",
+        "token_expiry_date": "{{#now_plus}}{{ expires_in }}{{/now_plus}}"
+      }
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

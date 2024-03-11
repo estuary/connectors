@@ -1,0 +1,50 @@
+[
+  [
+    "acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f",
+    {
+      "_airtable_created_time": "2023-10-26T19:15:35.000Z",
+      "_airtable_id": "recEi9L0zVx5T1TXa",
+      "_airtable_table_name": "Pizzas",
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "cost": 200,
+      "name": "Pepperoni",
+      "status": "In progress",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f",
+    {
+      "_airtable_created_time": "2023-10-26T19:15:35.000Z",
+      "_airtable_id": "recwIuv53qfJI2o7E",
+      "_airtable_table_name": "Pizzas",
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "cost": 100,
+      "name": "Pineapple",
+      "status": "Done",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f",
+    {
+      "_airtable_created_time": "2023-10-26T19:15:35.000Z",
+      "_airtable_id": "recyiWwcNMoh2SDvd",
+      "_airtable_table_name": "Pizzas",
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "cost": 300,
+      "name": "Cheese",
+      "status": "To do",
+      "ts": "redacted-timestamp"
+    }
+  ]
+]

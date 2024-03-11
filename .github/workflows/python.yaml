@@ -5,20 +5,28 @@ on:
     branches: [main]
     paths:
       - "estuary-cdk/**"
+      - "source-airtable/**"
       - "source-asana/**"
+      - "source-facebook-marketing/**"
       - "source-gladly/**"
+      - "source-google-ads/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-salesforce/**"
+      - "source-hubspot/**"
   pull_request:
     branches: [main]
     paths:
       - "estuary-cdk/**"
+      - "source-airtable/**"
       - "source-asana/**"
+      - "source-facebook-marketing/**"
       - "source-gladly/**"
+      - "source-google-ads/**"
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-salesforce/**"
+      - "source-hubspot/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,17 +42,25 @@ jobs:
           # Note that every entry here must specify usage_rate. We're unable to
           # set a default and selectively override it with `0.0`, because GH actions
           # considers zero values to be "unset" (which is bs and I'm salty about it).
+          - name: source-airtable
+            type: capture
+            version: v1
+            usage_rate: "1.0"
           - name: source-asana
             type: capture
             version: v1
             usage_rate: "1.0"
-          - name: source-hubspot-native
+          - name: source-facebook-marketing
             type: capture
-            version: v1
+            version: v4
             usage_rate: "1.0"
           - name: source-gladly
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-google-ads
+            type: capture
+            version: v2
             usage_rate: "1.0"
           - name: source-google-sheets-native
             type: capture
@@ -53,6 +69,13 @@ jobs:
           - name: source-salesforce
             type: capture
             version: v2
+          - name: source-hubspot-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-hubspot
+            type: capture
+            version: v5
             usage_rate: "1.0"
 
     steps:

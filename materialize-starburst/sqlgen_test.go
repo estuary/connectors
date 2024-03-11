@@ -14,7 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = starburstDialect
+var targetTableDialect = starburstTrinoDialect
+var tempTableDialect = starburstHiveDialect
 
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
@@ -27,27 +28,39 @@ func TestSQLGeneration(t *testing.T) {
 		Table:  "target_table",
 	})
 
-	table1, err := sqlDriver.ResolveTable(shape1, testDialect)
+	targetTable, err := sqlDriver.ResolveTable(shape1, targetTableDialect)
+	require.NoError(t, err)
+	tempTable, err := sqlDriver.ResolveTable(shape1, tempTableDialect)
 	require.NoError(t, err)
 
-	templates := renderTemplates(testDialect)
+	targetTableTemplates := renderTemplates(targetTableDialect)
+	tempTableTemplates := renderTemplates(tempTableDialect)
 
 	var snap strings.Builder
 
 	for _, tpl := range []*template.Template{
-		templates.fetchVersionAndSpec,
-		templates.createTargetTable,
-		templates.createLoadTempTable,
-		templates.dropLoadTempTable,
-		templates.loadQuery,
-		templates.createStoreTempTable,
-		templates.dropStoreTempTable,
-		templates.mergeIntoTarget,
+		targetTableTemplates.fetchVersionAndSpec,
+		targetTableTemplates.createTargetTable,
+		targetTableTemplates.loadQuery,
+		targetTableTemplates.mergeIntoTarget,
 	} {
-		var testcase = table1.Identifier + " " + tpl.Name()
+		var testcase = targetTable.Identifier + " " + tpl.Name()
 
 		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(&snap, &table1))
+		require.NoError(t, tpl.Execute(&snap, &targetTable))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
+	for _, tpl := range []*template.Template{
+		tempTableTemplates.createLoadTempTable,
+		tempTableTemplates.dropLoadTempTable,
+		tempTableTemplates.createStoreTempTable,
+		tempTableTemplates.dropStoreTempTable,
+	} {
+		var testcase = tempTable.Identifier + " " + tpl.Name()
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(&snap, &tempTable))
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
@@ -57,18 +70,18 @@ func TestSQLGeneration(t *testing.T) {
 		ColumnIdentifier string
 		NullableDDL      string
 	}
-	require.NoError(t, templates.alterTableColumns.Execute(&snap,
-		AlterTableTemplateParams{table1.Identifier, "first_new_column", "STRING"}))
+	require.NoError(t, targetTableTemplates.alterTableColumns.Execute(&snap,
+		AlterTableTemplateParams{targetTable.Identifier, "first_new_column", "STRING"}))
 	snap.WriteString("--- End alter table add columns ---\n\n")
 
 	var shapeNoValues = sqlDriver.BuildTableShape(spec, 2, tableConfig{
 		Table: "target_table_no_values_materialized",
 	})
-	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, testDialect)
+	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, targetTableDialect)
 	require.NoError(t, err)
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	require.NoError(t, templates.mergeIntoTarget.Execute(&snap, &tableNoValues))
+	require.NoError(t, targetTableTemplates.mergeIntoTarget.Execute(&snap, &tableNoValues))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 
 	cupaloy.SnapshotT(t, snap.String())

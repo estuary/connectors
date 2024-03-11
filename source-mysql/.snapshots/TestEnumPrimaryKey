@@ -1,0 +1,28 @@
+# ================================
+# Collection "acmeCo/test/test_enumprimarykey_18676708": 20 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:0"}},"category":"","data":"E1","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:1"}},"category":"","data":"E2","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:2"}},"category":"","data":"E3","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:3"}},"category":"","data":"E4","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:4"}},"category":"A","data":"A1","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:5"}},"category":"A","data":"A2","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:6"}},"category":"A","data":"A3","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:7"}},"category":"A","data":"A4","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:8"}},"category":"C","data":"C1","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:9"}},"category":"C","data":"C2","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:10"}},"category":"C","data":"C3","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:11"}},"category":"C","data":"C4","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:12"}},"category":"B","data":"B1","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:13"}},"category":"B","data":"B2","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:14"}},"category":"B","data":"B3","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:15"}},"category":"B","data":"B4","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:16"}},"category":"D","data":"D1","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:17"}},"category":"D","data":"D2","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:18"}},"category":"D","data":"D3","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:19"}},"category":"D","data":"D4","id":4}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FEnumPrimaryKey_18676708":{"backfilled":20,"key_columns":["category","id"],"metadata":{"schema":{"columns":["category","id","data"],"types":{"category":{"enum":["","A","C","B","D"],"type":"enum"},"data":"text","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

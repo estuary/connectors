@@ -7,10 +7,12 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/trinodb/trino-go-client/trino"
 )
 
 var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
@@ -41,8 +43,28 @@ var doubleConverter sql.ElementConverter = func(te tuple.TupleElement) (interfac
 	return fmt.Sprintf("%v", te), nil
 }
 
-// starburstDialect returns a representation of the Starburst SQL dialect.
-var starburstDialect = func() sql.Dialect {
+var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
+	parsed, err := time.Parse(time.RFC3339, te.(string))
+	if err != nil {
+		return nil, err
+	}
+	timestamp := trino.Timestamp(parsed.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), parsed.Nanosecond())
+	return timestamp, nil
+}
+
+// starburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
+var starburstTrinoDialect = func() sql.Dialect {
+	dateTimeMapper := sql.NewStaticMapper("TIMESTAMP(6) WITH TIME ZONE", sql.WithElementConverter(timestampConverter))
+	return starburstDialect(sql.NewStaticMapper("DATE"), dateTimeMapper)
+}()
+
+// starburstHiveDialect returns a representation of the Starburst Hive format SQL dialect used for temp table.
+var starburstHiveDialect = func() sql.Dialect {
+	return starburstDialect(sql.NewStaticMapper("VARCHAR"), sql.NewStaticMapper("VARCHAR"))
+}()
+
+var starburstDialect = func(dateMapper sql.TypeMapper, dateTimeMapper sql.TypeMapper) sql.Dialect {
+
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
 		sql.BINARY:   sql.NewStaticMapper("VARBINARY"),
@@ -62,6 +84,8 @@ var starburstDialect = func() sql.Dialect {
 					PrimaryKey: sql.NewStaticMapper("STRING"),
 					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "inf", "-inf"))),
 				},
+				"date":      dateMapper,
+				"date-time": dateTimeMapper,
 			},
 		},
 	}
@@ -71,6 +95,8 @@ var starburstDialect = func() sql.Dialect {
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp(6) with time zone"}, Validate: sql.DateTimeCompatible},
 	)
 
 	return sql.Dialect{
@@ -106,7 +132,7 @@ var starburstDialect = func() sql.Dialect {
 		MaxColumnCharLength:    0, // Starburst has no limit on how long column names can be that I can find
 		CaseInsensitiveColumns: true,
 	}
-}()
+}
 
 // stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
 // be materialized, since these are all materialized as VARCHAR columns.
@@ -223,24 +249,24 @@ MERGE INTO {{ $.Identifier }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	WHEN MATCHED THEN
-	UPDATE SET {{ range $ind, $key := $.Values }}
+	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{ end -}}
-	{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		{{ $val.Identifier }} = {{ template "cast" $val }}
 	{{- end -}}
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 	{{- end }}
 	WHEN NOT MATCHED THEN
 	INSERT (
-	{{- range $ind, $key := $.Columns }}
+	{{- range $ind, $col := $.Columns }}
 	{{- if $ind }}, {{ end -}}
-	{{$key.Identifier -}}
+		{{$col.Identifier -}}
 	{{- end -}}
 	)
 	VALUES (
-	{{- range $ind, $key := $.Columns }}
+	{{- range $ind, $col := $.Columns }}
 	{{- if $ind }}, {{ end -}}
-	r.{{ $key.Identifier }}
+		{{ template "cast" $col -}}
 	{{- end -}}
 	)
 {{ end }}
@@ -251,6 +277,16 @@ DROP TABLE IF EXISTS {{$.Identifier}}_store_temp
 
 {{ define "alterTableColumns" }}
 ALTER TABLE {{.TableIdentifier}} ADD COLUMN {{.ColumnIdentifier}} {{.NullableDDL}}
+{{ end }}
+
+{{ define "cast" }}
+{{- if Contains $.DDL "DATE" -}}
+	from_iso8601_date(r.{{ $.Identifier}})
+{{- else if Contains $.DDL  "TIMESTAMP" -}}
+	from_iso8601_timestamp_nanos(r.{{ $.Identifier}})
+{{- else -}}
+	r.{{ $.Identifier }}
+{{- end -}}
 {{ end }}
 
   `)
