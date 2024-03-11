@@ -1,0 +1,106 @@
+---
+properties:
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  filter:
+    properties:
+      all:
+        items:
+          properties:
+            field:
+              type:
+                - "null"
+                - string
+            operator:
+              type:
+                - "null"
+                - string
+            value:
+              type:
+                - "null"
+                - string
+                - number
+                - boolean
+          type:
+            - object
+        type:
+          - "null"
+          - array
+      any:
+        items:
+          properties:
+            field:
+              type:
+                - "null"
+                - string
+            operator:
+              type:
+                - "null"
+                - string
+            value:
+              type:
+                - "null"
+                - string
+          type:
+            - object
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  id:
+    type: integer
+  policy_metrics:
+    items:
+      properties:
+        business_hours:
+          type:
+            - "null"
+            - boolean
+        metric:
+          type:
+            - "null"
+            - string
+        priority:
+          type:
+            - "null"
+            - string
+        target:
+          type:
+            - "null"
+            - integer
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  position:
+    type:
+      - "null"
+      - integer
+  title:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

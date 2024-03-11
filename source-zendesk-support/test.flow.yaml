@@ -1,0 +1,154 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-zendesk-support:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-zendesk-support:v1"
+        config: connector_config.yaml
+    bindings:
+      - resource:
+          stream: audit_logs
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/audit_logs
+      - resource:
+          stream: group_memberships
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/group_memberships
+      - resource:
+          stream: groups
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/groups
+      - resource:
+          stream: macros
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/macros
+      - resource:
+          stream: organizations
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/organizations
+      - resource:
+          stream: organization_memberships
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/organization_memberships
+      - resource:
+          stream: posts
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/posts
+      - resource:
+          stream: post_comments
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/post_comments
+      - resource:
+          stream: post_comment_votes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/post_comment_votes
+      - resource:
+          stream: post_votes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/post_votes
+      - resource:
+          stream: satisfaction_ratings
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/satisfaction_ratings
+      - resource:
+          stream: sla_policies
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/sla_policies
+      - resource:
+          stream: tags
+          syncMode: full_refresh
+          cursorField:
+            - name
+        target: acmeCo/tags
+      - resource:
+          stream: ticket_audits
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/ticket_audits
+      - resource:
+          stream: ticket_comments
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/ticket_comments
+      - resource:
+          stream: ticket_fields
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/ticket_fields
+      - resource:
+          stream: ticket_metrics
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/ticket_metrics
+      - resource:
+          stream: ticket_metric_events
+          syncMode: incremental
+          cursorField:
+            - time
+        target: acmeCo/ticket_metric_events
+      - resource:
+          stream: ticket_skips
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/ticket_skips
+      - resource:
+          stream: tickets
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/tickets
+      - resource:
+          stream: users
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/users
+      - resource:
+          stream: brands
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/brands
+      - resource:
+          stream: custom_roles
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/custom_roles
+      - resource:
+          stream: schedules
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/schedules

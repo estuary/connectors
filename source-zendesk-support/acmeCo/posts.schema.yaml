@@ -1,0 +1,49 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  author_id:
+    type:
+      - "null"
+      - number
+  content_tag_ids:
+    items:
+      type:
+        - "null"
+        - number
+    type:
+      - "null"
+      - array
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  featured:
+    type:
+      - "null"
+      - boolean
+  id:
+    type: integer
+  title:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+title: Posts Schema
+type:
+  - object
