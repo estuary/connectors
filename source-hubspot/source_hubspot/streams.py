@@ -368,7 +368,7 @@ class Stream(HttpStream, ABC):
         return json_schema
 
 
-    @retry_401()
+    @retry_401(max_tries=20)
     def handle_request(
         self,
         stream_slice: Mapping[str, Any] = None,
