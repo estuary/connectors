@@ -4,39 +4,43 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
-        "auth_type": {
-          "const": "Client",
-          "type": "string"
-        },
-        "client_id": {
-          "description": "Enter your Salesforce developer application's <a href=\"https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG\">Client ID</a>",
-          "order": 2,
-          "title": "Client ID",
-          "type": "string"
-        },
-        "client_secret": {
-          "airbyte_secret": true,
-          "description": "Enter your Salesforce developer application's <a href=\"https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG\">Client secret</a>",
-          "order": 3,
-          "title": "Client Secret",
-          "type": "string"
-        },
-        "is_sandbox": {
-          "default": false,
-          "description": "Toggle if you're using a <a href=\"https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5\">Salesforce Sandbox</a>",
-          "order": 1,
-          "title": "Sandbox",
-          "type": "boolean"
-        },
-        "refresh_token": {
-          "airbyte_secret": true,
-          "description": "Enter your application's <a href=\"https://developer.salesforce.com/docs/atlas.en-us.mobile_sdk.meta/mobile_sdk/oauth_refresh_token_flow.htm\">Salesforce Refresh Token</a> used for Airbyte to access your Salesforce account.",
-          "order": 4,
-          "title": "Refresh Token",
-          "type": "string"
+        "credentials": {
+          "properties": {
+            "auth_type": {
+              "const": "Client",
+              "type": "string"
+            },
+            "client_id": {
+              "description": "Enter your Salesforce developer application's <a href=\"https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG\">Client ID</a>",
+              "order": 2,
+              "title": "Client ID",
+              "type": "string"
+            },
+            "client_secret": {
+              "airbyte_secret": true,
+              "description": "Enter your Salesforce developer application's <a href=\"https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG\">Client secret</a>",
+              "order": 3,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "is_sandbox": {
+              "default": false,
+              "description": "Toggle if you're using a <a href=\"https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5\">Salesforce Sandbox</a>",
+              "order": 1,
+              "title": "Sandbox",
+              "type": "boolean"
+            },
+            "refresh_token": {
+              "airbyte_secret": true,
+              "description": "Enter your application's <a href=\"https://developer.salesforce.com/docs/atlas.en-us.mobile_sdk.meta/mobile_sdk/oauth_refresh_token_flow.htm\">Salesforce Refresh Token</a> used to access your Salesforce account.",
+              "order": 4,
+              "title": "Refresh Token",
+              "type": "string"
+            }
+          }
         },
         "start_date": {
-          "description": "Enter the date in the YYYY-MM-DD format. Airbyte will replicate the data added on and after this date. If this field is blank, Airbyte will replicate the data for last two years.",
+          "description": "Enter the date in the YYYY-MM-DD format. We will replicate the data added on and after this date. If this field is blank, We will replicate the data for last two years.",
           "examples": [
             "2021-07-25",
             "2021-07-25T00:00:00Z"
@@ -91,7 +95,7 @@
       "title": "Salesforce Source Spec",
       "type": "object"
     },
-    "documentationUrl": "https://docs.airbyte.com/integrations/sources/salesforce",
+    "documentationUrl": "https://go.estuary.dev/AyWXIh",
     "oauth2": {
       "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {
