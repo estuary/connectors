@@ -6759,6 +6759,12 @@
                 "number"
               ]
             },
+            "hs_call_video_meeting_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_call_video_recording_url": {
               "type": [
                 "null",
@@ -14587,6 +14593,13 @@
               ]
             },
             "hs_all_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_applied_sla_rule_config_at": {
+              "format": "date-time",
               "type": [
                 "null",
                 "string"
