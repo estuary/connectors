@@ -32,14 +32,15 @@ shim_airbyte_cdk.CaptureShim(
     oauth2={
         "provider": "hubspot",
         "authUrlTemplate": (
-            "https://app.hubspot.com/oauth/authorize?"
+            "https://app.hubspot.com/login/beta?"
+            r"loginRedirectUrl={{#urlencode}}https://app.hubspot.com/oauth/authorize?{{/urlencode}}"
             r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-            r"&scope="
+            + r"{{#urlencode}}&scope="
             + urllib.parse.quote(" ".join(scopes))
             + r"&optional_scope="
             + urllib.parse.quote(" ".join(optional_scopes))
-            + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
-            r"&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+            + r"&redirect_uri={{/urlencode}}{{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
+            + r"{{#urlencode}}&response_type=code&state={{{ state }}}{{/urlencode}}"
         ),
         "accessTokenUrlTemplate": "https://api.hubapi.com/oauth/v1/token",
         "accessTokenHeaders": {"content-type": "application/x-www-form-urlencoded"},
