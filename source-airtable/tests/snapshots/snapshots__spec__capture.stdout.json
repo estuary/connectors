@@ -14,11 +14,17 @@
             "api_key"
           ],
           "properties": {
+            "auth_method": {
+              "type": "string",
+              "const": "api_key",
+              "default": "api_key",
+              "order": 0
+            },
             "api_key": {
               "type": "string",
               "description": "The Personal Access Token for the Airtable account. See https://airtable.com/developers/web/guides/personal-access-tokens for more information on how to obtain this token.",
               "title": "Personal Access Token",
-              "airbyte_secret": true
+              "secret": true
             }
           }
         }
