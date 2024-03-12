@@ -1,9 +1,9 @@
 credentials:
     access_token_sops: ""
     auth_type: Client
-    client_id_sops: ENC[AES256_GCM,data:apqcTdUGMn2LsZTY1oeY2TXRiviAVL1+9OuDSERdegEbLornGOfYdgLKYvLGYZKWDB3Yjgn2Wet6sKzUvx9x6VV3jOWg5+Ao,iv:GamkfGuhn8sExbammSWlz1tFsnkoYAgfK3wjXBBlmIY=,tag:sibLOJapEMVVdAk2dLFd0g==,type:str]
-    client_secret_sops: ENC[AES256_GCM,data:lSuQS9Mm2JLTc37rTDON97nsSey78TCTfFVz56HGMzdwzTM=,iv:FbZZgx/O981rJJ3vWiuI1IvfyYFqUElICzAzta1HwR0=,tag:ed695eI+RYxKG5qTfjFDBQ==,type:str]
-    refresh_token_sops: ENC[AES256_GCM,data:P1tkuvjuwARqCA4xrMSXwlsdYd5JnEa7nNNMaSpid4IlYFOvWiK+CNhOqn+tTEy8y5g7oc3UagZ5MYyqVsUQrk+MVTvj56HZvYvj/Ibjqn1b/6HvWuW6aXRPJLU1hbq2cU4+Ea8ylQ==,iv:MlveRn0VEO8Ksu4UFsU1l9hTqHJd9qIwe9I38QmSKbQ=,tag:WHQzzmly3uX+G9bS7JjlQQ==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:nKYrLSJa8tX4AIud6zEjAJArzfXZ8nJhbJy1jvrZCQUF+FwY8aSBBjYm2DULDwjFavY71Lg9xs0tBVMztg5ERwreJDv7ZhZmUQ==,iv:xTIsdgelxfuYKqsHa4wWJrAnuVhoZZ5gJMYwphJhqEA=,tag:dS7rZCH1oKE0dkPA8cAX8w==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:lTaxOBRDGT1FzNcwhEjPZzB1UJhOdjpFsWviEEMfXkkCdd4=,iv:SzIH9vkXctgh9EO/NAeUfPgZBWRv/0QQyBoVG+b6AQE=,tag:OYcbeln0r4QQhhZWndWuwg==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:S4bW08hyZuMnB+VIExQHon5cAED+CKUw015ZLjw1NGKHwJqYNuhMwhEDwS0Vr4TCq/a5/eJa7vVbJldGZbLvo8b3aJtOSXLmylOt66Gq4TZYXoE1DVAQqIJMAlQg/fO59UsoSXkt2g==,iv:GmgFm8/zEs2/EX8nipgJ65DO2JjGqpqUqTuxbzEpnF4=,tag:1oXaulNxwVcc7VDTn+LwiA==,type:str]
 date_ranges_start_date: "2020-01-01"
 property_id: "431462875"
 window_in_days: 1
@@ -11,13 +11,13 @@ sops:
     kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2024-03-12T13:46:55Z"
-          enc: CiQAdmEdwjHmP42OLOT4KJpi3gOzUMIY4//76mYntIqSqaZ5iVwSSQCVvC1zjkDrRQQZF8dltgIUABTeVllt365mSCgVlZbxJ0GFB6zW0T6aRj4prngkjBcHwrISTkQfreWYj6ugEIOTUuyB/ULSPe0=
+          created_at: "2024-03-21T18:45:08Z"
+          enc: CiQAdmEdwt1N/pN5+OV1sli/b0qNy+Gc2o2mWE8lhej5FiwhZs8SSQCSobQjwPAxI+9zMwM9cYCzoGQ7f5KGNvHrQHgUxcPL5tivIssUv1QUV5TS6/kMoqr6ElvAop+ETXgE/gvv6KYm2nHv+amBL38=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-03-21T17:10:59Z"
-    mac: ENC[AES256_GCM,data:8xpRLws8FS+hxU1RAGGYt20NQOe2iVyQlANXRXXU/xP74f8y/febpHttwPTDiFcuXjD3iNPBicahI5YePw13d3VnjEOYi8cVQ6ZltEAT+Uok8VvFfbBKdxRtHu6m7KYKJbX/EF9vfMU3aniT3yzVlasywNLIcJBadfbhZxEyQHA=,iv:m7SCAW/LgKMViHIFQq4vjFpr2Fye2BGDuR6YqbgvI9o=,tag:s5uc6Gju9XRfAA/AxMzt+Q==,type:str]
+    lastmodified: "2024-03-21T18:45:09Z"
+    mac: ENC[AES256_GCM,data:PVVW6eya/X8Rcomp+1ZodFIwbK0kQ82xXNF+OPIYaQVR3sGtj9rpqETcKtv5ok7vWfKlkKMFJbvAapytYGiUfHueEIIqYhJfOLdMqJPoImXKpNdQC+kuzGK/gnI3pm8ObeXVBMA9alJEVOaK8Q0awiiEUITRwVisoQzH+917PqY=,iv:Y61qDhNjXg1FjkoIbvD5C7iNxWUXGLgNJe94Kdz2chE=,tag:b/42AMBnTQIPdeSyLJ4BgA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

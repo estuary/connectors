@@ -16,7 +16,7 @@
   },
   {
     "name": "devices",
-    "dimensions": ["date", "deviceCategory", "operatingSystem", "browser"],
+    "dimensions": ["date", "browser", "deviceCategory", "operatingSystem"],
     "metrics": [
       "totalUsers",
       "newUsers",
@@ -30,7 +30,7 @@
   },
   {
     "name": "locations",
-    "dimensions": ["region", "country", "city", "date"],
+    "dimensions": ["date", "city", "country", "region"],
     "metrics": [
       "totalUsers",
       "newUsers",

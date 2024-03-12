@@ -114,7 +114,7 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
 
     @property
     def primary_key(self):
-        pk = ["property_id"] + self.config.get("dimensions", [])
+        pk = self.config.get("dimensions", []) + ["property_id"]
         if "cohort_spec" not in self.config and "date" not in pk:
             pk.append("startDate")
             pk.append("endDate")
@@ -139,7 +139,7 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
         """
         schema: Dict[str, Any] = {
             "$schema": "https://json-schema.org/draft-07/schema#",
-            "type": ["null", "object"],
+            "type": ["object"],
             "additionalProperties": True,
             "properties": {
                 "property_id": {"type": ["string"]},
@@ -170,6 +170,8 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
                 for m in self.config["metrics"]
             }
         )
+
+        schema["required"] = self.config["dimensions"] + ["property_id"]
 
         return schema
 

@@ -1,10 +1,14 @@
 {
-  "documentationUrl": "https://docs.airbyte.com/integrations/sources/google-analytics-data-api",
+  "documentationUrl": "https://go.estuary.dev/RIcwJU",
   "connectionSpecification": {
     "$schema": "https://json-schema.org/draft-07/schema#",
-    "title": "Google Analytics (Data API) Spec",
+    "title": "Google Analytics Data API Spec",
     "type": "object",
-    "required": ["property_id", "date_ranges_start_date"],
+    "required": [
+      "property_id",
+      "date_ranges_start_date",
+      "credentials"
+    ],
     "additionalProperties": true,
     "properties": {
       "credentials": {
@@ -12,21 +16,27 @@
         "type": "object",
         "title": "Credentials",
         "description": "Credentials for the service",
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
         "oneOf": [
           {
             "title": "Authenticate via Google (Oauth)",
             "type": "object",
+            "x-oauth2-provider": "google",
             "required": ["client_id", "client_secret", "refresh_token"],
             "properties": {
               "auth_type": {
                 "type": "string",
                 "const": "Client",
+                "default": "Client",
                 "order": 0
               },
               "client_id": {
                 "title": "Client ID",
                 "type": "string",
                 "description": "The Client ID of your Google Analytics developer application.",
+                "airbyte_secret": true,
                 "order": 1
               },
               "client_secret": {
@@ -60,6 +70,7 @@
               "auth_type": {
                 "type": "string",
                 "const": "Service",
+                "default": "Service",
                 "order": 0
               },
               "credentials_json": {
@@ -69,8 +80,7 @@
                 "examples": [
                   "{ \"type\": \"service_account\", \"project_id\": YOUR_PROJECT_ID, \"private_key_id\": YOUR_PRIVATE_KEY, ... }"
                 ],
-                "airbyte_secret": true,
-                "order": 1
+                "airbyte_secret": true
               }
             }
           }
@@ -97,13 +107,13 @@
       "custom_reports": {
         "order": 3,
         "type": "string",
-        "title": "Custom Reports",
-        "description": "A JSON array describing the custom reports you want to sync from Google Analytics. See <a href=\"https://docs.airbyte.com/integrations/sources/google-analytics-v4/#custom-reports\">the docs</a> for more information about the exact format you can use to fill out this field."
+        "title": "Custom Reports (Optional)",
+        "description": "A JSON array describing the custom reports you want to sync from Google Analytics. See  our docs for more info about exactly how to fill out this field: https://go.estuary.dev/fz3SSy"
       },
       "window_in_days": {
         "type": "integer",
-        "title": "Data request time increment in days",
-        "description": "The time increment used by the connector when requesting data from the Google Analytics API. More information is available in the <a href=\"https://docs.airbyte.com/integrations/sources/google-analytics-v4/#sampling-in-reports\">the docs</a>. The bigger this value is, the faster the sync will be, but the more likely that sampling will be applied to your data, potentially causing inaccuracies in the returned results. We recommend setting this to 1 unless you have a hard requirement to make the sync faster at the expense of accuracy. The minimum allowed value for this field is 1, and the maximum is 364. Not applied to custom Cohort reports.",
+        "title": "Data request time increment in days (Optional)",
+        "description": "The time increment used by the connector when requesting data from the Google Analytics API.  We recommend setting this to 1 unless you have a hard requirement to make the sync faster at the expense of accuracy. The minimum allowed value for this field is 1, and the maximum is 364.  More info can be found in our docs: https://go.estuary.dev/C9pwjr",
         "examples": [30, 60, 90, 120, 200, 364],
         "minimum": 1,
         "maximum": 364,
