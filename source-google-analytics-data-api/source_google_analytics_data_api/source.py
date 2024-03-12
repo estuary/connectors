@@ -114,7 +114,7 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
 
     @property
     def primary_key(self):
-        pk = ["property_id"] + self.config.get("dimensions", [])
+        pk = self.config.get("dimensions", []) + ["property_id"]
         if "cohort_spec" not in self.config and "date" not in pk:
             pk.append("startDate")
             pk.append("endDate")
@@ -139,7 +139,7 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
         """
         schema: Dict[str, Any] = {
             "$schema": "https://json-schema.org/draft-07/schema#",
-            "type": ["null", "object"],
+            "type": ["object"],
             "additionalProperties": True,
             "properties": {
                 "property_id": {"type": ["string"]},
@@ -170,6 +170,8 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
                 for m in self.config["metrics"]
             }
         )
+
+        schema["required"] = self.config["dimensions"] + ["property_id"]
 
         return schema
 
@@ -230,10 +232,10 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
             yield record
 
     def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]):
-        updated_state = utils.string_to_date(latest_record[self.cursor_field], self._record_date_format)
+        updated_state = utils.string_to_date(latest_record[self.cursor_field], old_format=self._record_date_format)
         stream_state_value = current_stream_state.get(self.cursor_field)
         if stream_state_value:
-            stream_state_value = utils.string_to_date(stream_state_value, self._record_date_format, old_format=DATE_FORMAT)
+            stream_state_value = utils.string_to_date(stream_state_value, old_format=self._record_date_format)
             updated_state = max(updated_state, stream_state_value)
         current_stream_state[self.cursor_field] = updated_state.strftime(self._record_date_format)
         return current_stream_state
@@ -261,15 +263,16 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
         self, *, sync_mode: SyncMode, cursor_field: List[str] = None, stream_state: Mapping[str, Any] = None
     ) -> Iterable[Optional[Mapping[str, Any]]]:
 
-        today: datetime.date = datetime.date.today()
+        today: datetime.datetime = datetime.date.today()
+        start_date_config = utils.string_to_date(self.config["date_ranges_start_date"])
 
         start_date = stream_state and stream_state.get(self.cursor_field)
         if start_date:
-            start_date = utils.string_to_date(start_date, self._record_date_format, old_format=DATE_FORMAT)
+            start_date = utils.string_to_date(start_date, old_format=self._record_date_format)
             start_date -= LOOKBACK_WINDOW
-            start_date = max(start_date, self.config["date_ranges_start_date"])
+            start_date = max(start_date, start_date_config)
         else:
-            start_date = self.config["date_ranges_start_date"]
+            start_date = start_date_config
 
         while start_date <= today:
             # stop producing slices if 429 + specific scenario is hit
@@ -395,7 +398,7 @@ class SourceGoogleAnalyticsDataApi(AbstractSource):
 
         if not config.get("window_in_days"):
             source_spec = self.spec(logging.getLogger("airbyte"))
-            config["window_in_days"] = source_spec.connectionSpecification["properties"]["window_in_days"]["default"]
+            config["window_in_days"] = 1
 
         return config
 

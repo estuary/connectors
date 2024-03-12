@@ -4,6 +4,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "active1DayUsers": {
           "description": "The number of distinct active users on your site or app within a 1 day period. The 1 day period includes the last day in the report's date range. Note: this is the same as Active Users.",
           "type": [
@@ -16,7 +27,9 @@
           "type": "string"
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         }
       },
       "required": [
@@ -45,6 +58,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "active7DayUsers": {
           "description": "The number of distinct active users on your site or app within a 7 day period. The 7 day period includes the last day in the report's date range.",
           "type": [
@@ -57,7 +81,9 @@
           "type": "string"
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         }
       },
       "required": [
@@ -86,6 +112,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "active28DayUsers": {
           "description": "The number of distinct active users on your site or app within a 28 day period. The 28 day period includes the last day in the report's date range.",
           "type": [
@@ -98,7 +135,9 @@
           "type": "string"
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         }
       },
       "required": [
@@ -127,6 +166,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "averageSessionDuration": {
           "description": "The average duration (in seconds) of users` sessions.",
           "type": [
@@ -165,7 +215,9 @@
           "type": "string"
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         },
         "screenPageViews": {
           "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
@@ -205,9 +257,9 @@
       },
       "required": [
         "date",
-        "browser",
         "deviceCategory",
         "operatingSystem",
+        "browser",
         "property_id"
       ],
       "type": [
@@ -216,9 +268,9 @@
     },
     "key": [
       "/date",
-      "/browser",
       "/deviceCategory",
       "/operatingSystem",
+      "/browser",
       "/property_id"
     ],
     "recommendedName": "devices",
@@ -235,6 +287,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "averageSessionDuration": {
           "description": "The average duration (in seconds) of users` sessions.",
           "type": [
@@ -269,7 +332,9 @@
           ]
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         },
         "region": {
           "description": "The geographic region from which the user activity originated, derived from their IP address.",
@@ -312,10 +377,10 @@
         }
       },
       "required": [
-        "date",
-        "city",
-        "country",
         "region",
+        "country",
+        "city",
+        "date",
         "property_id"
       ],
       "type": [
@@ -323,10 +388,10 @@
       ]
     },
     "key": [
-      "/date",
-      "/city",
-      "/country",
       "/region",
+      "/country",
+      "/city",
+      "/date",
       "/property_id"
     ],
     "recommendedName": "locations",
@@ -343,6 +408,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "bounceRate": {
           "description": "The percentage of sessions that were not engaged ((Sessions Minus Engaged sessions) divided by Sessions). This metric is returned as a fraction; for example, 0.2761 means 27.61% of sessions were bounces.",
           "type": [
@@ -363,7 +439,9 @@
           "type": "string"
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         },
         "screenPageViews": {
           "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
@@ -403,6 +481,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "averageSessionDuration": {
           "description": "The average duration (in seconds) of users` sessions.",
           "type": [
@@ -429,7 +518,9 @@
           ]
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         },
         "screenPageViews": {
           "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
@@ -505,6 +596,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "averageSessionDuration": {
           "description": "The average duration (in seconds) of users` sessions.",
           "type": [
@@ -531,7 +633,9 @@
           ]
         },
         "property_id": {
-          "type": "string"
+          "type": [
+            "string"
+          ]
         },
         "screenPageViews": {
           "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",

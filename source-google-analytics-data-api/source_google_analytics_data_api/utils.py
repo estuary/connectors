@@ -84,6 +84,8 @@ def string_to_date(d: str, f: str = DATE_FORMAT, old_format=None) -> datetime.da
             return datetime.datetime.strptime(d, old_format).date()
         except ValueError:
             pass
+    elif type(d) == datetime.date: # handle FakeDate from tests
+        return d 
     return datetime.datetime.strptime(d, f).date()
 
 
