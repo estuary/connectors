@@ -769,6 +769,36 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 				}
 			}
 		}
+
+		// This is a temporary piece of migration logic added in March of 2024. In the PR
+		// https://github.com/estuary/connectors/pull/1336 the ordering of enum cases in this
+		// metadata was changed to simplify the decoding logic. Specifically the order of the
+		// cases was changed from ["A", "B", ""] to ["", "A", "B"] to more directly mirror how
+		// MySQL represents the illegal-enum value "" as integer 0. However this introduced a bug
+		// when the new indexing code was used with older metadata from before that change, and
+		// by the time this was discovered there were captures in production with the new ordering
+		// in their checkpointed metadata, so a simple revert was not an option.
+		//
+		// The solution is to push forward and add the missing migration step, so that upon table
+		// activation any metadata containing the old ordering will be updated to the new. Once all
+		// metadata in production has been so updated, it will be safe to remove this logic and the
+		// associated 'TestEnumDecodingFix' test case.
+		for column, columnType := range metadata.Schema.ColumnTypes {
+			if enumType, ok := columnType.(*mysqlColumnType); ok && enumType.Type == "enum" {
+				if len(enumType.EnumValues) > 0 && enumType.EnumValues[0] != "" {
+					var logEntry = logrus.WithField("column", column)
+					var vals = enumType.EnumValues
+					logEntry.WithField("vals", vals).Warn("old enum metadata ordering detected, will migrate")
+					if vals[len(vals)-1] == "" {
+						logEntry.Info("trimming empty-string case from the end")
+						vals = vals[:len(vals)-1]
+					}
+					vals = append([]string{""}, vals...)
+					logEntry.WithField("vals", vals).Info("migrated old enum metadata")
+					enumType.EnumValues = vals
+				}
+			}
+		}
 	} else if discovery != nil {
 		// If metadata JSON is not present, construct new default metadata based on the discovery info.
 		logrus.WithField("stream", streamID).Debug("initializing table metadata")
