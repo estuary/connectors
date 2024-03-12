@@ -395,7 +395,7 @@ class SourceGoogleAnalyticsDataApi(AbstractSource):
 
         if not config.get("window_in_days"):
             source_spec = self.spec(logging.getLogger("airbyte"))
-            config["window_in_days"] = source_spec.connectionSpecification["properties"]["window_in_days"]["default"]
+            config["window_in_days"] = 1
 
         return config
 
