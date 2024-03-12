@@ -1,0 +1,593 @@
+[
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "active1DayUsers": {
+          "description": "The number of distinct active users on your site or app within a 1 day period. The 1 day period includes the last day in the report's date range. Note: this is the same as Active Users.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/property_id"
+    ],
+    "recommendedName": "daily_active_users",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "daily_active_users",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "active7DayUsers": {
+          "description": "The number of distinct active users on your site or app within a 7 day period. The 7 day period includes the last day in the report's date range.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/property_id"
+    ],
+    "recommendedName": "weekly_active_users",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "weekly_active_users",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "active28DayUsers": {
+          "description": "The number of distinct active users on your site or app within a 28 day period. The 28 day period includes the last day in the report's date range.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/property_id"
+    ],
+    "recommendedName": "four_weekly_active_users",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "four_weekly_active_users",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "averageSessionDuration": {
+          "description": "The average duration (in seconds) of users` sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "bounceRate": {
+          "description": "The percentage of sessions that were not engaged ((Sessions Minus Engaged sessions) divided by Sessions). This metric is returned as a fraction; for example, 0.2761 means 27.61% of sessions were bounces.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "browser": {
+          "description": "The browsers used to view your website.",
+          "type": "string"
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "deviceCategory": {
+          "description": "The type of device: Desktop, Tablet, or Mobile.",
+          "type": "string"
+        },
+        "newUsers": {
+          "description": "The number of users who interacted with your site or launched your app for the first time (event triggered: first_open or first_visit).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "operatingSystem": {
+          "description": "The operating systems used by visitors to your app or website. Includes desktop and mobile operating systems such as Windows and Android.",
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        },
+        "screenPageViews": {
+          "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "screenPageViewsPerSession": {
+          "description": "The number of app screens or web pages your users viewed per session. Repeated views of a single page or screen are counted. (screen_view + page_view events) / sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sessions": {
+          "description": "The number of sessions that began on your site or app (event triggered: session_start).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "sessionsPerUser": {
+          "description": "The average number of sessions per user (Sessions divided by Active Users).",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "totalUsers": {
+          "description": "The number of distinct users who have logged at least one event, regardless of whether the site or app was in use when that event was logged.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "browser",
+        "deviceCategory",
+        "operatingSystem",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/browser",
+      "/deviceCategory",
+      "/operatingSystem",
+      "/property_id"
+    ],
+    "recommendedName": "devices",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "devices",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "averageSessionDuration": {
+          "description": "The average duration (in seconds) of users` sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "bounceRate": {
+          "description": "The percentage of sessions that were not engaged ((Sessions Minus Engaged sessions) divided by Sessions). This metric is returned as a fraction; for example, 0.2761 means 27.61% of sessions were bounces.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "city": {
+          "description": "The city from which the user activity originated.",
+          "type": "string"
+        },
+        "country": {
+          "description": "The country from which the user activity originated.",
+          "type": "string"
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "newUsers": {
+          "description": "The number of users who interacted with your site or launched your app for the first time (event triggered: first_open or first_visit).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "property_id": {
+          "type": "string"
+        },
+        "region": {
+          "description": "The geographic region from which the user activity originated, derived from their IP address.",
+          "type": "string"
+        },
+        "screenPageViews": {
+          "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "screenPageViewsPerSession": {
+          "description": "The number of app screens or web pages your users viewed per session. Repeated views of a single page or screen are counted. (screen_view + page_view events) / sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sessions": {
+          "description": "The number of sessions that began on your site or app (event triggered: session_start).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "sessionsPerUser": {
+          "description": "The average number of sessions per user (Sessions divided by Active Users).",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "totalUsers": {
+          "description": "The number of distinct users who have logged at least one event, regardless of whether the site or app was in use when that event was logged.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "city",
+        "country",
+        "region",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/city",
+      "/country",
+      "/region",
+      "/property_id"
+    ],
+    "recommendedName": "locations",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "locations",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "bounceRate": {
+          "description": "The percentage of sessions that were not engaged ((Sessions Minus Engaged sessions) divided by Sessions). This metric is returned as a fraction; for example, 0.2761 means 27.61% of sessions were bounces.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "hostName": {
+          "description": "Includes the subdomain and domain names of a URL; for example, the Host Name of www.example.com/contact.html is www.example.com.",
+          "type": "string"
+        },
+        "pagePathPlusQueryString": {
+          "description": "The portion of the URL following the hostname for web pages visited; for example, the `pagePathPlusQueryString` portion of `https://www.example.com/store/contact-us?query_string=true` is `/store/contact-us?query_string=true`.",
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        },
+        "screenPageViews": {
+          "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "hostName",
+        "pagePathPlusQueryString",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/hostName",
+      "/pagePathPlusQueryString",
+      "/property_id"
+    ],
+    "recommendedName": "pages",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "pages",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "averageSessionDuration": {
+          "description": "The average duration (in seconds) of users` sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "bounceRate": {
+          "description": "The percentage of sessions that were not engaged ((Sessions Minus Engaged sessions) divided by Sessions). This metric is returned as a fraction; for example, 0.2761 means 27.61% of sessions were bounces.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "newUsers": {
+          "description": "The number of users who interacted with your site or launched your app for the first time (event triggered: first_open or first_visit).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "property_id": {
+          "type": "string"
+        },
+        "screenPageViews": {
+          "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "screenPageViewsPerSession": {
+          "description": "The number of app screens or web pages your users viewed per session. Repeated views of a single page or screen are counted. (screen_view + page_view events) / sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sessionMedium": {
+          "description": "The medium that initiated a session on your website or app.",
+          "type": "string"
+        },
+        "sessionSource": {
+          "description": "The source that initiated a session on your website or app.",
+          "type": "string"
+        },
+        "sessions": {
+          "description": "The number of sessions that began on your site or app (event triggered: session_start).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "sessionsPerUser": {
+          "description": "The average number of sessions per user (Sessions divided by Active Users).",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "totalUsers": {
+          "description": "The number of distinct users who have logged at least one event, regardless of whether the site or app was in use when that event was logged.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "sessionSource",
+        "sessionMedium",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/sessionSource",
+      "/sessionMedium",
+      "/property_id"
+    ],
+    "recommendedName": "traffic_sources",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "traffic_sources",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "averageSessionDuration": {
+          "description": "The average duration (in seconds) of users` sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "bounceRate": {
+          "description": "The percentage of sessions that were not engaged ((Sessions Minus Engaged sessions) divided by Sessions). This metric is returned as a fraction; for example, 0.2761 means 27.61% of sessions were bounces.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "date": {
+          "description": "The date of the event, formatted as YYYYMMDD.",
+          "type": "string"
+        },
+        "newUsers": {
+          "description": "The number of users who interacted with your site or launched your app for the first time (event triggered: first_open or first_visit).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "property_id": {
+          "type": "string"
+        },
+        "screenPageViews": {
+          "description": "The number of app screens or web pages your users viewed. Repeated views of a single page or screen are counted. (screen_view + page_view events).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "screenPageViewsPerSession": {
+          "description": "The number of app screens or web pages your users viewed per session. Repeated views of a single page or screen are counted. (screen_view + page_view events) / sessions.",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sessions": {
+          "description": "The number of sessions that began on your site or app (event triggered: session_start).",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "sessionsPerUser": {
+          "description": "The average number of sessions per user (Sessions divided by Active Users).",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "totalUsers": {
+          "description": "The number of distinct users who have logged at least one event, regardless of whether the site or app was in use when that event was logged.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "property_id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/date",
+      "/property_id"
+    ],
+    "recommendedName": "website_overview",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "website_overview",
+      "syncMode": "incremental"
+    }
+  }
+]
