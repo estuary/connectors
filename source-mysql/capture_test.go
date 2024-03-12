@@ -183,6 +183,9 @@ func TestEnumPrimaryKey(t *testing.T) {
 }
 
 func TestEnumDecodingFix(t *testing.T) {
+	// This test is part of the fix for the enum decoding bug introduced by https://github.com/estuary/connectors/pull/1336
+	// and can be deleted after the metadata migration logic is also removed. The metadata migration logic can safely be
+	// removed after all live captures we care about have run the fix code and updated their checkpoint metadata.
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var uniqueID = "32314857"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, category ENUM('A', 'C', 'B', 'D'))")
