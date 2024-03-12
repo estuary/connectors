@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
@@ -179,4 +180,25 @@ func TestEnumPrimaryKey(t *testing.T) {
 		{"E", 1, "E1"}, {"E", 2, "E2"}, {"E", 3, "E3"}, {"E", 4, "E4"},
 	})
 	tests.VerifiedCapture(ctx, t, cs)
+}
+
+func TestEnumDecodingFix(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "32314857"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, category ENUM('A', 'C', 'B', 'D'))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	// Insert various test values and then capture them via replication
+	tb.Insert(ctx, t, tableName, [][]interface{}{{1, "A"}, {2, "B"}, {3, "C"}, {4, "D"}, {5, "error"}})
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]interface{}{{6, "A"}, {7, "B"}, {8, "C"}, {9, "D"}, {10, "error"}})
+	t.Run("replication1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Manually fiddle with the persisted checkpoint metadata used for enum decoding, to
+	// simulate the situation where an old capture with old metadata is used with the newer
+	// enum decoding logic.
+	cs.Checkpoint = json.RawMessage(strings.ReplaceAll(string(cs.Checkpoint), `"enum":["","A","C","B","D"]`, `"enum":["A","C","B","D",""]`))
+	tb.Insert(ctx, t, tableName, [][]interface{}{{11, "A"}, {12, "B"}, {13, "C"}, {14, "D"}, {15, "error"}})
+	t.Run("replication2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
