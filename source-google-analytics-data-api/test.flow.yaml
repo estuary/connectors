@@ -5,6 +5,6 @@ captures:
       logLevel: debug
     endpoint:
         connector: 
-          image: "ghcr.io/estuary/source-google-analytics-data-api:b3b4a82"
+          image: "ghcr.io/estuary/source-google-analytics-data-api:v3"
           config: config.yaml
     bindings: []
