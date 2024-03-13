@@ -62,6 +62,12 @@ func schemasEqual(s1 string, s2 string) bool {
 }
 
 func (c tableConfig) Path() sql.TablePath {
+	// This is here for backward compatibility purposes. There was a time when binding resources could not
+	// have schema configuration. If we change this for all bindings to be a two-part resource path, that will
+	// lead to a re-backfilling of the bindings which did not previously have a schema as part of their resource path
+	if c.Schema == "" || schemasEqual(c.Schema, c.endpointSchema) {
+		return []string{c.Table}
+	}
 	return []string{c.Schema, c.Table}
 }
 

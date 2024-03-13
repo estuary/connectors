@@ -56,13 +56,25 @@ func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) er
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	var schemaName = c.cfg.Schema
 	if len(tc.Path) > 1 {
-		var schemaName = tc.Path[0]
-		if _, err := c.db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q", schemaName)); err != nil {
-			return err
-		}
+		schemaName = tc.Path[0]
 	}
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+
+	var conn, err = c.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q", schemaName)); err != nil {
+		return err
+	}
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
+		return err
+	}
+
+	_, err = conn.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
@@ -70,7 +82,14 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var conn, err = c.db.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
+			return err
+		}
+		_, err = conn.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -83,7 +102,14 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	alterColumnStmt := alterColumnStmtBuilder.String()
 
 	return alterColumnStmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, alterColumnStmt)
+		var conn, err = c.db.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
+			return err
+		}
+		_, err = c.db.ExecContext(ctx, alterColumnStmt)
 		return err
 	}, nil
 }
