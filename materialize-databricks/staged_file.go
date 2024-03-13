@@ -194,7 +194,7 @@ func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) err
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: uploading")
 
 		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
-		if _, err := f.conn.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s'`, file, f.remoteFilePath(fName))); err != nil {
+		if _, err := f.conn.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
 			return fmt.Errorf("put file: %w", err)
 		}
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: upload done")
