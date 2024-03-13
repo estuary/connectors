@@ -1,0 +1,197 @@
+---
+$defs:
+  Address:
+    additionalProperties: true
+    properties: {}
+    title: Address
+    type: object
+  BillingInfo:
+    additionalProperties: true
+    properties: {}
+    title: BillingInfo
+    type: object
+  CustomFields:
+    additionalProperties: true
+    properties: {}
+    title: CustomFields
+    type: object
+  ExternalAccounts:
+    additionalProperties: true
+    properties: {}
+    title: ExternalAccounts
+    type: object
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+  ShippingAddress:
+    additionalProperties: true
+    properties: {}
+    title: ShippingAddress
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    title: Object
+    type: string
+  state:
+    title: State
+    type: string
+  hosted_login_token:
+    title: Hosted Login Token
+    type: string
+  shipping_address:
+    $ref: "#/$defs/ShippingAddress"
+  has_live_subscription:
+    title: Has Live Subscription
+    type: boolean
+  has_active_subscription:
+    title: Has Active Subscription
+    type: boolean
+  has_future_subscription:
+    title: Has Future Subscription
+    type: boolean
+  has_canceled_subscription:
+    title: Has Canceled Subscription
+    type: boolean
+  has_paused_subscription:
+    title: Has Paused Subscription
+    type: boolean
+  has_past_due_invoice:
+    title: Has Past Due Invoice
+    type: boolean
+  created_at:
+    format: date-time
+    title: Created At
+    type: string
+  updated_at:
+    format: date-time
+    title: Updated At
+    type: string
+  deleted_at:
+    format: date-time
+    title: Deleted At
+    type: string
+  code:
+    title: Code
+    type: string
+  username:
+    title: Username
+    type: string
+  email:
+    title: Email
+    type: string
+  override_business_entity_id:
+    title: Override Business Entity Id
+    type: string
+  preferred_locale:
+    title: Preferred Locale
+    type: string
+  preferred_time_zone:
+    title: Preferred Time Zone
+    type: string
+  cc_emails:
+    title: Cc Emails
+    type: string
+  first_name:
+    title: First Name
+    type: string
+  last_name:
+    title: Last Name
+    type: string
+  company:
+    title: Company
+    type: string
+  vat_number:
+    title: Vat Number
+    type: string
+  tax_exempt:
+    title: Tax Exempt
+    type: boolean
+  exemption_certificate:
+    title: Exemption Certificate
+    type: string
+  externalAccounts:
+    $ref: "#/$defs/ExternalAccounts"
+  parent_account_id:
+    title: Parent Account Id
+    type: string
+  bill_to:
+    title: Bill To
+    type: string
+  dunning_campaign_id:
+    title: Dunning Campaign Id
+    type: string
+  invoice_template_id:
+    title: Invoice Template Id
+    type: string
+  address:
+    $ref: "#/$defs/Address"
+  billing_info:
+    $ref: "#/$defs/BillingInfo"
+  custom_fields:
+    $ref: "#/$defs/CustomFields"
+required:
+  - id
+  - object
+  - state
+  - hosted_login_token
+  - shipping_address
+  - has_live_subscription
+  - has_active_subscription
+  - has_future_subscription
+  - has_canceled_subscription
+  - has_paused_subscription
+  - has_past_due_invoice
+  - created_at
+  - updated_at
+  - deleted_at
+  - code
+  - username
+  - email
+  - override_business_entity_id
+  - preferred_locale
+  - preferred_time_zone
+  - cc_emails
+  - first_name
+  - last_name
+  - company
+  - vat_number
+  - tax_exempt
+  - exemption_certificate
+  - externalAccounts
+  - parent_account_id
+  - bill_to
+  - dunning_campaign_id
+  - invoice_template_id
+  - address
+  - billing_info
+  - custom_fields
+title: Account
+type: object
+x-infer-schema: true

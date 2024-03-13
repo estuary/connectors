@@ -1,0 +1,6 @@
+---
+collections:
+  acmeCo/Account:
+    schema: Account.schema.yaml
+    key:
+      - /id

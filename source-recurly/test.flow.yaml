@@ -1,0 +1,25 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-recurly:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - "source_recurly"
+          # - "debugpy"
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          # - source-recurly/source_recurly
+
+        config:
+          apiToken: f57d4d24cb924e9a860350d96203f9ab
+    bindings:
+      - resource:
+          name: Account
+        target: acmeCo/Account
+    shards:
+      logLevel: debug
