@@ -78,7 +78,7 @@ type stagedFile struct {
 	// start() and `false` by flush().
 	started bool
 
-	conn *stdsql.Conn
+	cfg *config
 
 	// References to the current file being written.
 	buf     *fileBuffer
@@ -94,7 +94,7 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(conn *stdsql.Conn, root string, fields []string) *stagedFile {
+func newStagedFile(cfg *config, root string, fields []string) *stagedFile {
 	uuid := uuid.NewString()
 	var tempdir = os.TempDir()
 
@@ -102,7 +102,7 @@ func newStagedFile(conn *stdsql.Conn, root string, fields []string) *stagedFile 
 		fields: fields,
 		dir:    filepath.Join(tempdir, uuid),
 		root:   root,
-		conn:   conn,
+		cfg:    cfg,
 	}
 }
 
@@ -193,8 +193,15 @@ func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) err
 		var fName = filepath.Base(file)
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: uploading")
 
+		db, err := stdsql.Open("databricks", f.cfg.ToURI())
+		if err != nil {
+			return fmt.Errorf("sql.Open: %w", err)
+		}
+		defer db.Close()
+
 		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
-		if _, err := f.conn.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
+
+		if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
 			return fmt.Errorf("put file: %w", err)
 		}
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: upload done")

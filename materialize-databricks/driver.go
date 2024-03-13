@@ -241,8 +241,8 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 		return out
 	}
 
-	b.loadFile = newStagedFile(t.store.conn, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
-	b.storeFile = newStagedFile(t.store.conn, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
+	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
 
 	t.bindings = append(t.bindings, b)
 
