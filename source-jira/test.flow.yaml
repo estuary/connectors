@@ -1,0 +1,17 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-jira:
+    endpoint:
+      # connector:
+      #   image: ghcr.io/estuary/source-jira:v1
+      #   config: connector_config.yaml
+
+      local:
+        command:
+          - python
+          - "-m"
+          - source_jira
+        config: connector_config.yaml
+    bindings: []

@@ -1,0 +1,6 @@
+lookback_window_minutes: 0
+start_date: "" # ???
+email: "johndoe@example.com"
+api_token: abc123
+domain: "example.atlassian.net"
+projects: []
