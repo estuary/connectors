@@ -29,6 +29,7 @@ require (
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gogo/protobuf v1.3.2
+	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.3.1
 	github.com/iancoleman/orderedmap v0.2.0
 	github.com/invopop/jsonschema v0.5.0
@@ -65,7 +66,7 @@ require (
 	google.golang.org/api v0.146.0
 	google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13
 	google.golang.org/grpc v1.59.0
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.33.0
 	vitess.io/vitess v0.15.3
 )
 
@@ -126,7 +127,6 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/glog v1.1.2 // indirect
