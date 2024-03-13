@@ -3,6 +3,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "auth_token": {
           "type": [
             "null",
@@ -36,7 +47,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
           "type": [
@@ -186,9 +200,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -196,9 +207,6 @@
     ],
     "recommendedName": "accounts",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "accounts",
       "syncMode": "full_refresh"
     }
@@ -207,6 +215,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -270,7 +289,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "street": {
           "type": [
@@ -303,9 +325,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -313,9 +332,6 @@
     ],
     "recommendedName": "addresses",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "addresses",
       "syncMode": "full_refresh"
     }
@@ -324,6 +340,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -406,7 +433,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "url": {
           "type": [
@@ -415,9 +445,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -436,6 +463,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -481,7 +519,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "sms_fallback_method": {
           "type": [
@@ -562,9 +603,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -572,9 +610,6 @@
     ],
     "recommendedName": "applications",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "applications",
       "syncMode": "full_refresh"
     }
@@ -583,6 +618,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "beta": {
           "type": [
             "null",
@@ -590,7 +636,10 @@
           ]
         },
         "country": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "country_code": {
           "type": [
@@ -632,19 +681,13 @@
           ]
         }
       },
-      "required": [
-        "country"
-      ],
       "type": "object"
     },
     "key": [
-      "/country"
+      "/_meta/row_id"
     ],
     "recommendedName": "available_phone_number_countries",
     "resourceConfig": {
-      "cursorField": [
-        "country"
-      ],
       "stream": "available_phone_number_countries",
       "syncMode": "full_refresh"
     }
@@ -653,6 +696,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "address_requirements": {
           "type": [
             "null",
@@ -735,7 +789,10 @@
           ]
         },
         "phone_number": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "postal_code": {
           "type": [
@@ -756,19 +813,13 @@
           ]
         }
       },
-      "required": [
-        "phone_number"
-      ],
       "type": "object"
     },
     "key": [
-      "/phone_number"
+      "/_meta/row_id"
     ],
     "recommendedName": "available_phone_numbers_local",
     "resourceConfig": {
-      "cursorField": [
-        "phone_number"
-      ],
       "stream": "available_phone_numbers_local",
       "syncMode": "full_refresh"
     }
@@ -777,6 +828,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "address_requirements": {
           "type": [
             "null",
@@ -859,7 +921,10 @@
           ]
         },
         "phone_number": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "postal_code": {
           "type": [
@@ -880,19 +945,13 @@
           ]
         }
       },
-      "required": [
-        "phone_number"
-      ],
       "type": "object"
     },
     "key": [
-      "/phone_number"
+      "/_meta/row_id"
     ],
     "recommendedName": "available_phone_numbers_mobile",
     "resourceConfig": {
-      "cursorField": [
-        "phone_number"
-      ],
       "stream": "available_phone_numbers_mobile",
       "syncMode": "full_refresh"
     }
@@ -901,6 +960,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "address_requirements": {
           "type": [
             "null",
@@ -983,7 +1053,10 @@
           ]
         },
         "phone_number": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "postal_code": {
           "type": [
@@ -1004,19 +1077,13 @@
           ]
         }
       },
-      "required": [
-        "phone_number"
-      ],
       "type": "object"
     },
     "key": [
-      "/phone_number"
+      "/_meta/row_id"
     ],
     "recommendedName": "available_phone_numbers_toll_free",
     "resourceConfig": {
-      "cursorField": [
-        "phone_number"
-      ],
       "stream": "available_phone_numbers_toll_free",
       "syncMode": "full_refresh"
     }
@@ -1025,6 +1092,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -1143,7 +1221,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "start_time": {
           "format": "date-time",
@@ -1252,9 +1333,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -1273,8 +1351,22 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "call_sid": {
           "type": [
@@ -1295,7 +1387,10 @@
           ]
         },
         "conference_sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "date_created": {
           "format": "date-time",
@@ -1354,10 +1449,6 @@
           ]
         }
       },
-      "required": [
-        "account_sid",
-        "conference_sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -1366,10 +1457,6 @@
     ],
     "recommendedName": "conference_participants",
     "resourceConfig": {
-      "cursorField": [
-        "account_sid",
-        "conference_sid"
-      ],
       "stream": "conference_participants",
       "syncMode": "full_refresh"
     }
@@ -1378,6 +1465,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -1429,7 +1527,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
           "type": [
@@ -1465,9 +1566,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -1486,6 +1584,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -1537,7 +1646,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "state": {
           "type": [
@@ -1564,9 +1676,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -1574,9 +1683,6 @@
     ],
     "recommendedName": "conversations",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "conversations",
       "syncMode": "full_refresh"
     }
@@ -1586,6 +1692,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -1687,6 +1804,12 @@
         },
         "links": {
           "properties": {
+            "channel_metadata": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "delivery_receipts": {
               "type": [
                 "null",
@@ -1745,7 +1868,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "url": {
           "type": [
@@ -1754,9 +1880,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -1764,9 +1887,6 @@
     ],
     "recommendedName": "conversation_messages",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "conversation_messages",
       "syncMode": "full_refresh"
     }
@@ -1776,6 +1896,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -1859,7 +1990,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "url": {
           "type": [
@@ -1868,9 +2002,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -1878,9 +2009,6 @@
     ],
     "recommendedName": "conversation_participants",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "conversation_participants",
       "syncMode": "full_refresh"
     }
@@ -1889,6 +2017,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -1973,7 +2112,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "sms_application_sid": {
           "type": [
@@ -2066,9 +2208,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2076,9 +2215,6 @@
     ],
     "recommendedName": "dependent_phone_numbers",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "dependent_phone_numbers",
       "syncMode": "full_refresh"
     }
@@ -2088,6 +2224,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2130,9 +2277,16 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
+          "enum": [
+            "published",
+            "draft"
+          ],
           "type": [
             "string",
             "null"
@@ -2151,9 +2305,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2161,9 +2312,6 @@
     ],
     "recommendedName": "flows",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "flows",
       "syncMode": "full_refresh"
     }
@@ -2173,6 +2321,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2240,7 +2399,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
           "type": [
@@ -2255,9 +2417,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "title": "Executions",
       "type": "object"
     },
@@ -2266,9 +2425,6 @@
     ],
     "recommendedName": "executions",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "executions",
       "syncMode": "full_refresh"
     }
@@ -2277,6 +2433,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2403,7 +2570,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "sms_application_sid": {
           "type": [
@@ -2451,6 +2621,21 @@
           "type": [
             "null",
             "string"
+          ]
+        },
+        "subresource_uris": {
+          "additionalProperties": true,
+          "properties": {
+            "assigned_add_ons": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
           ]
         },
         "trunk_sid": {
@@ -2508,9 +2693,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2518,9 +2700,6 @@
     ],
     "recommendedName": "incoming_phone_numbers",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "incoming_phone_numbers",
       "syncMode": "full_refresh"
     }
@@ -2529,6 +2708,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "date_created": {
           "format": "date-time",
           "type": [
@@ -2550,12 +2740,12 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2563,9 +2753,6 @@
     ],
     "recommendedName": "keys",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "keys",
       "syncMode": "full_refresh"
     }
@@ -2574,6 +2761,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2607,7 +2805,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "uri": {
           "type": [
@@ -2616,9 +2817,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2637,6 +2835,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2731,7 +2940,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
           "type": [
@@ -2773,9 +2985,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2794,6 +3003,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2827,7 +3047,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "uri": {
           "type": [
@@ -2836,9 +3059,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2846,9 +3066,6 @@
     ],
     "recommendedName": "outgoing_caller_ids",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "outgoing_caller_ids",
       "syncMode": "full_refresh"
     }
@@ -2857,6 +3074,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -2902,7 +3130,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "subresource_uris": {
           "additionalProperties": true,
@@ -2926,9 +3157,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -2936,9 +3164,6 @@
     ],
     "recommendedName": "queues",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "queues",
       "syncMode": "full_refresh"
     }
@@ -2947,6 +3172,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -3052,7 +3288,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "source": {
           "type": [
@@ -3101,9 +3340,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -3120,8 +3356,471 @@
   },
   {
     "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "friendly_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "permissions": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "service_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "Roles Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/sid"
+    ],
+    "recommendedName": "roles",
+    "resourceConfig": {
+      "stream": "roles",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "consumption_report_interval": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "date_created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_channel_creator_role_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_channel_role_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_service_role_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "friendly_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "limits": {
+          "properties": {
+            "channel_members": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "user_channels": {
+              "type": [
+                "null",
+                "number"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "links": {
+          "properties": {
+            "bindings": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "channels": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "roles": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "users": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "media": {
+          "properties": {
+            "compatibility_message": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "size_limit_mb": {
+              "type": [
+                "null",
+                "number"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "notifications": {
+          "properties": {
+            "users": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "post_webhook_retry_count": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "post_webhook_url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "pre_webhook_retry_count": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "pre_webhook_url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "reachability_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "read_status_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "typing_indicator_timeout": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "webhook_filters": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "webhook_method": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "Services Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/sid"
+    ],
+    "recommendedName": "services",
+    "resourceConfig": {
+      "stream": "services",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "context": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_created": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "execution_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "flow_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "links": {
+          "properties": {
+            "step_context": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "parent_step_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "transitioned_from": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "transitioned_to": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "Step Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/sid"
+    ],
+    "recommendedName": "step",
+    "resourceConfig": {
+      "stream": "step",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -3173,7 +3872,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
           "type": [
@@ -3200,9 +3902,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -3210,10 +3909,191 @@
     ],
     "recommendedName": "transcriptions",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "transcriptions",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "auth_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "auth_type_set": {
+          "items": {
+            "auth_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "cnam_lookup_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "date_created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "disaster_recovery_method": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "disaster_recovery_url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "domain_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "friendly_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "links": {
+          "properties": {
+            "credential_lists": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "ip_access_control_lists": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "origination_urls": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "phone_numbers": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "recording": {
+          "properties": {
+            "mode": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "trim": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "secure": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "transfer_caller_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "transfer_mode": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "Trunks Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/sid"
+    ],
+    "recommendedName": "trunks",
+    "resourceConfig": {
+      "stream": "trunks",
       "syncMode": "full_refresh"
     }
   },
@@ -3221,8 +4101,22 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "api_version": {
           "type": [
@@ -3237,7 +4131,10 @@
           ]
         },
         "category": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "count": {
           "type": [
@@ -3359,10 +4256,6 @@
           ]
         }
       },
-      "required": [
-        "account_sid",
-        "category"
-      ],
       "type": "object"
     },
     "key": [
@@ -3382,6 +4275,17 @@
     "documentSchema": {
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "account_sid": {
           "type": [
             "null",
@@ -3446,7 +4350,10 @@
           ]
         },
         "sid": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "trigger_by": {
           "type": [
@@ -3479,9 +4386,6 @@
           ]
         }
       },
-      "required": [
-        "sid"
-      ],
       "type": "object"
     },
     "key": [
@@ -3489,10 +4393,523 @@
     ],
     "recommendedName": "usage_triggers",
     "resourceConfig": {
-      "cursorField": [
-        "sid"
-      ],
       "stream": "usage_triggers",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "attributes": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "chat_service_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_created": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "friendly_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "identity": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "is_notifiable": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "is_online": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "links": {
+          "properties": {
+            "user_conversations": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "role_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "Users Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/sid"
+    ],
+    "recommendedName": "users",
+    "resourceConfig": {
+      "stream": "users",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "attributes": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "chat_service_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "conversation_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "conversation_state": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created_by": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_created": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "friendly_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_read_message_index": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "links": {
+          "properties": {
+            "conversation": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "participant": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "notification_level": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "participant_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "timers": {
+          "properties": {
+            "chat_service_sid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "unique_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "unread_messages_count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "user_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "User Conversation Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/account_sid"
+    ],
+    "recommendedName": "user_conversations",
+    "resourceConfig": {
+      "stream": "user_conversations",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "code_length": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "custom_code_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "date_created": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "date_updated": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_template_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "do_not_share_warning_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "dtmf_input_required": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "friendly_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "links": {
+          "properties": {
+            "access_tokens": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "entities": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "messaging_configurations": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "rate_limits": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "verification_checks": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "verifications": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "webhooks": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "lookup_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "mailer_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "psd2_enabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "push": {
+          "properties": {
+            "apn_credential_sid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "fcm_credential_sid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "include_date": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "skip_sms_to_landlines": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "totp": {
+          "properties": {
+            "code_length": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "issuer": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "skew": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "time_step": {
+              "type": [
+                "null",
+                "number"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "tts_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "title": "Verify - Services Schema",
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "key": [
+      "/sid"
+    ],
+    "recommendedName": "verify_services",
+    "resourceConfig": {
+      "stream": "verify_services",
       "syncMode": "full_refresh"
     }
   }
