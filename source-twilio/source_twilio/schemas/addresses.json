@@ -33,7 +33,7 @@
       "type": ["null", "string"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "street": {
       "type": ["null", "string"]
@@ -52,5 +52,6 @@
     }
   },
   "type": "object",
-  "additionalProperties": true
+  "additionalProperties": true,
+  "required": ["sid"]
 }

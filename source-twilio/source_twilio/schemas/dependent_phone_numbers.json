@@ -1,7 +1,7 @@
 {
   "properties": {
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "account_sid": {
       "type": ["null", "string"]
@@ -94,5 +94,6 @@
     }
   },
   "type": "object",
-  "additionalProperties": true
+  "additionalProperties": true,
+  "required": ["sid"]
 }

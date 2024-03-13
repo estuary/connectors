@@ -28,7 +28,7 @@
       "type": ["null", "integer"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "price": {
       "type": ["null", "number"]
@@ -89,5 +89,6 @@
     }
   },
   "type": "object",
-  "additionalProperties": true
+  "additionalProperties": true,
+  "required": ["sid"]
 }

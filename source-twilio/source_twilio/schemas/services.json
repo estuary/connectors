@@ -85,7 +85,7 @@
       "type": ["null", "boolean"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "typing_indicator_timeout": {
       "type": ["null", "number"]
@@ -113,5 +113,6 @@
         }
       }
     }
-  }
+  },
+  "required": ["sid"]
 }

@@ -55,7 +55,7 @@
       "type": ["null", "boolean"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "push": {
       "type": ["null", "object"],
@@ -109,5 +109,6 @@
         }
       }
     }
-  }
+  },
+  "required": ["sid"]
 }

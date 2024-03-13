@@ -5,7 +5,7 @@
   "additionalProperties": true,
   "properties": {
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "account_sid": {
       "type": ["null", "string"]
@@ -45,5 +45,6 @@
         "steps": { "type": ["null", "string"] }
       }
     }
-  }
+  },
+  "required": ["sid"]
 }

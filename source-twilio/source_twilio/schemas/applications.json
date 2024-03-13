@@ -21,7 +21,7 @@
       "type": ["null", "string"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "sms_fallback_method": {
       "type": ["null", "string"]
@@ -67,5 +67,6 @@
     }
   },
   "type": "object",
-  "additionalProperties": true
+  "additionalProperties": true,
+  "required": ["sid"]
 }

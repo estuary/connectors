@@ -1,7 +1,7 @@
 {
   "properties": {
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "date_created": {
       "format": "date-time",
@@ -120,5 +120,6 @@
     }
   },
   "type": "object",
-  "additionalProperties": true
+  "additionalProperties": true,
+  "required": ["sid"]
 }

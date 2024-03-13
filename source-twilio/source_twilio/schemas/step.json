@@ -26,7 +26,7 @@
       "type": ["null", "string"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "transitioned_from": {
       "type": ["null", "string"]
@@ -48,5 +48,6 @@
         }
       }
     }
-  }
+  },
+  "required": ["sid"]
 }

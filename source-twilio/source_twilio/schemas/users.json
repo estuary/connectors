@@ -29,7 +29,7 @@
       "type": ["null", "string"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "attributes": {
       "type": ["null", "string"]
@@ -48,5 +48,6 @@
         }
       }
     }
-  }
+  },
+  "required": ["sid"]
 }

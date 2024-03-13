@@ -24,7 +24,7 @@
       "type": ["null", "integer"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "uri": {
       "type": ["null", "string"]
@@ -40,5 +40,6 @@
     }
   },
   "type": "object",
-  "additionalProperties": true
+  "additionalProperties": true,
+  "required": ["sid"]
 }

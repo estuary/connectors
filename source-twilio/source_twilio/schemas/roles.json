@@ -5,7 +5,7 @@
   "type": ["null", "object"],
   "properties": {
     "sid": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "account_sid": {
       "type": ["null", "string"]
@@ -36,5 +36,6 @@
     "url": {
       "type": ["null", "string"]
     }
-  }
+  },
+  "required": ["sid"]
 }
