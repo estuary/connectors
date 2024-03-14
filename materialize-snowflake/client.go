@@ -65,6 +65,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q", schemaName)); err != nil {
 		return err
@@ -86,6 +87,8 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 		if err != nil {
 			return err
 		}
+		defer conn.Close()
+
 		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
 			return err
 		}
@@ -106,10 +109,12 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err != nil {
 			return err
 		}
+		defer conn.Close()
+
 		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
 			return err
 		}
-		_, err = c.db.ExecContext(ctx, alterColumnStmt)
+		_, err = conn.ExecContext(ctx, alterColumnStmt)
 		return err
 	}, nil
 }
