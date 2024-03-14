@@ -171,6 +171,15 @@ func (db *mysqlDatabase) translateRecordFields(columnTypes map[string]interface{
 		return nil
 	}
 	for id, val := range f {
+		// MariaDB versions 10.4 and up include a synthetic `DB_ROW_HASH_1` column in the
+		// binlog row change events for certain tables with unique hash indices (see issue
+		// https://github.com/estuary/connectors/issues/1344). In such cases we won't have
+		// any type information for the column, but we also don't want it anyway, so as a
+		// special case we just delete the 'DB_ROW_HASH_1' property from the document.
+		if id == "DB_ROW_HASH_1" && columnTypes[id] == nil {
+			delete(f, id)
+			continue
+		}
 		var translated, err = db.translateRecordField(columnTypes[id], val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
