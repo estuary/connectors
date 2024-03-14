@@ -28,6 +28,28 @@ Binding 0:
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -94,9 +116,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {
@@ -138,6 +157,28 @@ Binding 1:
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -204,9 +245,6 @@ Binding 1:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {
