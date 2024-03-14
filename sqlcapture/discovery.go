@@ -127,11 +127,40 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 								Required: []string{"op", "source"},
 							},
 						},
-						"reduce": map[string]interface{}{
-							"strategy": "merge",
-						},
 					},
 					Required: []string{"_meta"},
+					If: &jsonschema.Schema{
+						Extras: map[string]interface{}{
+							"properties": map[string]*jsonschema.Schema{
+								"_meta": {
+									Extras: map[string]interface{}{
+										"properties": map[string]*jsonschema.Schema{
+											"op": {
+												Extras: map[string]interface{}{
+													"const": "d",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Then: &jsonschema.Schema{
+						Extras: map[string]interface{}{
+							"reduce": map[string]interface{}{
+								"strategy": "merge",
+								"delete":   true,
+							},
+						},
+					},
+					Else: &jsonschema.Schema{
+						Extras: map[string]interface{}{
+							"reduce": map[string]interface{}{
+								"strategy": "merge",
+							},
+						},
+					},
 				},
 				{Ref: "#" + anchor},
 			},
