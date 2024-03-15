@@ -37,5 +37,6 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["actor_id", "event_time", "event_type", "object_id"]
 }

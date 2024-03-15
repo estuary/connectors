@@ -517,7 +517,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -3192,7 +3195,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -6504,7 +6510,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -12180,6 +12189,9 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "id"
       ]
     },
     "key": [
@@ -15906,6 +15918,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -19644,6 +19661,13 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start",
+        "age",
+        "gender"
       ]
     },
     "key": [
@@ -23379,6 +23403,12 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start",
+        "country"
       ]
     },
     "key": [
@@ -27113,6 +27143,12 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start",
+        "region"
       ]
     },
     "key": [
@@ -30847,6 +30883,12 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start",
+        "dma"
       ]
     },
     "key": [
@@ -34591,6 +34633,14 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start",
+        "publisher_platform",
+        "platform_position",
+        "impression_device"
       ]
     },
     "key": [
@@ -38322,6 +38372,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -38517,6 +38572,9 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "id"
       ]
     },
     "key": [
@@ -38782,7 +38840,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -38993,7 +39054,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -39089,6 +39153,12 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "actor_id",
+        "event_time",
+        "event_type",
+        "object_id"
       ]
     },
     "key": [
@@ -39286,6 +39356,12 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start",
+        "publisher_platform"
       ]
     },
     "key": [

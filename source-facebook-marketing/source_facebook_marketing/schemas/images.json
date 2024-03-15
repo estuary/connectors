@@ -56,5 +56,6 @@
     "width": {
       "type": ["null", "integer"]
     }
-  }
+  },
+  "required": ["id"]
 }
