@@ -30,19 +30,32 @@ var sqlserverDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
 	Connect:          connectSQLServer,
+	HistoryMode:      historyMode,
+}
+
+func historyMode(cfg json.RawMessage) (bool, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return false, fmt.Errorf("error parsing config json: %w", err)
+	}
+
+	return config.HistoryMode, nil
 }
 
 const defaultPort = "1433"
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address       string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User          string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password      string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database      string         `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Timezone      string         `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
-	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=true,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
