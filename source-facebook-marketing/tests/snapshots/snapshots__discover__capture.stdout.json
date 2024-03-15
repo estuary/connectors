@@ -271,7 +271,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -608,7 +607,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -3333,7 +3331,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -6541,7 +6538,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -12209,7 +12205,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -12443,7 +12438,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -14007,7 +14001,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -15940,7 +15933,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -16174,7 +16166,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -17738,7 +17729,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -19632,13 +19622,11 @@
         },
         "age": {
           "type": [
-            "null",
             "string"
           ]
         },
         "gender": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -19685,7 +19673,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -19919,7 +19906,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -21483,7 +21469,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -23377,7 +23362,6 @@
         },
         "country": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -23423,7 +23407,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -23657,7 +23640,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -25221,7 +25203,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -27115,7 +27096,6 @@
         },
         "region": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -27161,7 +27141,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -27395,7 +27374,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -28959,7 +28937,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -30853,7 +30830,6 @@
         },
         "dma": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -30899,7 +30875,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -31133,7 +31108,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -32697,7 +32671,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -34591,19 +34564,16 @@
         },
         "publisher_platform": {
           "type": [
-            "null",
             "string"
           ]
         },
         "platform_position": {
           "type": [
-            "null",
             "string"
           ]
         },
         "impression_device": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -34651,7 +34621,6 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -34885,7 +34854,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -36449,7 +36417,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38444,7 +38411,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38567,7 +38533,6 @@
       "properties": {
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38713,7 +38678,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39048,7 +39012,6 @@
       "properties": {
         "actor_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39060,7 +39023,6 @@
         },
         "application_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39081,7 +39043,6 @@
         },
         "event_type": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39093,7 +39054,6 @@
         },
         "object_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39152,7 +39112,6 @@
       "properties": {
         "account_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39164,7 +39123,6 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39207,7 +39165,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39312,7 +39269,6 @@
         },
         "publisher_platform": {
           "type": [
-            "null",
             "string"
           ]
         },
