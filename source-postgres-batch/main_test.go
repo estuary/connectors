@@ -139,6 +139,20 @@ func TestSchemaFilter(t *testing.T) {
 	})
 }
 
+func TestKeyDiscovery(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "329932"
+	var tableName = fmt.Sprintf("test.key_discovery_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(k_smallint SMALLINT, k_int INTEGER, k_bigint BIGINT, k_bool BOOLEAN, k_str VARCHAR(8), data TEXT, PRIMARY KEY (k_smallint, k_int, k_bigint, k_bool, k_str))", tableName))
+
+	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
+	snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
+}
+
 func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {

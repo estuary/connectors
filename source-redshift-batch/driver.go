@@ -159,14 +159,6 @@ func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Res
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
-var excludedSystemSchemas = []string{
-	"pg_catalog",
-	"information_schema",
-	"pg_internal",
-	"catalog_history",
-	"cron",
-}
-
 // Discover enumerates tables and views from `information_schema.tables` and generates
 // placeholder capture queries for thos tables.
 func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
@@ -202,11 +194,6 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 
 	var bindings []*pc.Response_Discovered_Binding
 	for _, table := range tables {
-		// Exclude tables in "system schemas" such as information_schema or pg_catalog.
-		if slices.Contains(excludedSystemSchemas, table.Schema) {
-			continue
-		}
-
 		var tableID = table.Schema + "." + table.Name
 
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
@@ -271,9 +258,21 @@ type discoveredTable struct {
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
 	var query = new(strings.Builder)
 	var args []any
-	fmt.Fprintf(query, "SELECT table_schema, table_name, table_type FROM information_schema.tables")
+
+	fmt.Fprintf(query, "SELECT n.nspname AS table_schema,")
+	fmt.Fprintf(query, "       c.relname AS table_name,")
+	fmt.Fprintf(query, "       CASE")
+	fmt.Fprintf(query, "         WHEN c.relkind = ANY (ARRAY['r'::\"char\", 'p'::\"char\"]) THEN 'BASE TABLE'::text")
+	fmt.Fprintf(query, "         WHEN c.relkind = 'v'::\"char\" THEN 'VIEW'::text")
+	fmt.Fprintf(query, "         WHEN c.relkind = 'f'::\"char\" THEN 'FOREIGN'::text")
+	fmt.Fprintf(query, "         ELSE ''::text")
+	fmt.Fprintf(query, "       END::information_schema.character_data AS table_type")
+	fmt.Fprintf(query, " FROM pg_catalog.pg_class c")
+	fmt.Fprintf(query, " JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)")
+	fmt.Fprintf(query, " WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
+	fmt.Fprintf(query, "  AND c.relkind IN ('r', 'p', 'v', 'f')")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, " WHERE table_schema = ANY ($1)")
+		fmt.Fprintf(query, "  AND n.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
 	}
 	fmt.Fprintf(query, ";")
@@ -309,29 +308,35 @@ type discoveredPrimaryKey struct {
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
 	var args []any
-	// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
-	// overkill but shouldn't hurt, and helps to make absolutely sure that we're
-	// matching up the constraint type with the column names/positions correctly.
-	fmt.Fprintf(query, "SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, col.data_type")
-	fmt.Fprintf(query, " FROM information_schema.key_column_usage kcu")
-	fmt.Fprintf(query, " JOIN information_schema.table_constraints tcs")
-	fmt.Fprintf(query, "  ON  tcs.constraint_catalog = kcu.constraint_catalog")
-	fmt.Fprintf(query, "  AND tcs.constraint_schema = kcu.constraint_schema")
-	fmt.Fprintf(query, "  AND tcs.constraint_name = kcu.constraint_name")
-	fmt.Fprintf(query, "  AND tcs.table_catalog = kcu.table_catalog")
-	fmt.Fprintf(query, "  AND tcs.table_schema = kcu.table_schema")
-	fmt.Fprintf(query, "  AND tcs.table_name = kcu.table_name")
-	fmt.Fprintf(query, " JOIN information_schema.columns col")
-	fmt.Fprintf(query, "  ON  col.table_catalog = kcu.table_catalog")
-	fmt.Fprintf(query, "  AND col.table_schema = kcu.table_schema")
-	fmt.Fprintf(query, "  AND col.table_name = kcu.table_name")
-	fmt.Fprintf(query, "  AND col.column_name = kcu.column_name")
-	fmt.Fprintf(query, " WHERE tcs.constraint_type = 'PRIMARY KEY'")
+
+	fmt.Fprintf(query, "SELECT nr.nspname::information_schema.sql_identifier AS table_schema,")
+	fmt.Fprintf(query, "       r.relname::information_schema.sql_identifier AS table_name,")
+	fmt.Fprintf(query, "       a.attname::information_schema.sql_identifier AS column_name,")
+	fmt.Fprintf(query, "       pos.n::information_schema.cardinal_number AS ordinal_position,")
+	// The handling of type names here is a bit weak, refer to how the `information_schema.columns`
+	// view computes its `data_type` column for a more comprehensive approach. But in practice we
+	// don't need all of that complexity just to identify basic integer columns, so this ought to
+	// be sufficient for now.
+	fmt.Fprintf(query, "       t.typname AS type_name")
+	fmt.Fprintf(query, "  FROM pg_namespace nr,")
+	fmt.Fprintf(query, "       pg_class r,")
+	fmt.Fprintf(query, "       pg_attribute a,")
+	fmt.Fprintf(query, "       pg_type t,")
+	fmt.Fprintf(query, "       pg_constraint c,")
+	fmt.Fprintf(query, "       generate_series(1,100,1) pos(n)")
+	fmt.Fprintf(query, "  WHERE nr.oid = r.relnamespace")
+	fmt.Fprintf(query, "    AND r.oid = a.attrelid")
+	fmt.Fprintf(query, "    AND r.oid = c.conrelid")
+	fmt.Fprintf(query, "    AND t.oid = a.atttypid")
+	fmt.Fprintf(query, "    AND c.conkey[pos.n] = a.attnum")
+	fmt.Fprintf(query, "    AND NOT a.attisdropped")
+	fmt.Fprintf(query, "    AND c.contype = 'p'::\"char\"")
+	fmt.Fprintf(query, "    AND r.relkind = 'r'::\"char\"")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, "  AND kcu.table_schema = ANY ($1)")
+		fmt.Fprintf(query, "    AND nr.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
 	}
-	fmt.Fprintf(query, " ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;")
+	fmt.Fprintf(query, "  ORDER BY r.relname, pos.n;")
 
 	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
@@ -378,10 +383,11 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 }
 
 var databaseTypeToJSON = map[string]*jsonschema.Schema{
-	"integer":  {Type: "integer"},
-	"bigint":   {Type: "integer"},
-	"smallint": {Type: "integer"},
-	"boolean":  {Type: "boolean"},
+	"int2":    {Type: "integer"},
+	"int4":    {Type: "integer"},
+	"int8":    {Type: "integer"},
+	"bool":    {Type: "boolean"},
+	"varchar": {Type: "string"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
