@@ -1,16 +1,16 @@
 {
   "properties": {
     "ad_format_asset": { "type": ["null", "string"] },
-    "age": { "type": ["null", "string"] },
+    "age": { "type": ["string"] },
     "app_id": { "type": ["null", "string"] },
     "body_asset": { "type": ["null", "string"] },
     "call_to_action_asset": { "type": ["null", "string"] },
-    "country": { "type": ["null", "string"] },
+    "country": { "type": ["string"] },
     "description_asset": { "type": ["null", "string"] },
     "device_platform": { "type": ["null", "string"] },
-    "dma": { "type": ["null", "string"] },
+    "dma": { "type": ["string"] },
     "frequency_value": { "type": ["null", "string"] },
-    "gender": { "type": ["null", "string"] },
+    "gender": { "type": ["string"] },
     "hourly_stats_aggregated_by_advertiser_time_zone": {
       "type": ["null", "string"]
     },
@@ -24,7 +24,7 @@
     "platform_position": { "type": ["null", "string"] },
     "product_id": { "type": ["null", "string"] },
     "publisher_platform": { "type": ["null", "string"] },
-    "region": { "type": ["null", "string"] },
+    "region": { "type": ["string"] },
     "skan_conversion_id": { "type": ["null", "string"] },
     "title_asset": { "type": ["null", "string"] },
     "video_asset": { "type": ["null", "string"] }
