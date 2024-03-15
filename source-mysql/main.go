@@ -45,6 +45,17 @@ var mysqlDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-mysql",
 	Connect:          connectMySQL,
+	HistoryMode:      historyMode,
+}
+
+func historyMode(cfg json.RawMessage) bool {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return nil, fmt.Errorf("error parsing config json: %w", err)
+	}
+	config.SetDefaults()
+
+	return config.HistoryMode
 }
 
 func main() {

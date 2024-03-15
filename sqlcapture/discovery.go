@@ -15,7 +15,7 @@ import (
 
 // DiscoverCatalog queries the database and generates discovered bindings
 // describing the available tables and their columns.
-func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovered_Binding, error) {
+func DiscoverCatalog(ctx context.Context, db Database, historyMode bool) ([]*pc.Response_Discovered_Binding, error) {
 	tables, err := db.DiscoverTables(ctx)
 	if err != nil {
 		return nil, err
@@ -34,6 +34,27 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		AllowAdditionalProperties: true,
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
+
+	var reduce = map[string]interface{}{
+		"strategy": "merge",
+	}
+
+	// reduction strategy for _meta/before
+	var reduceMetaBefore = map[string]interface{}{
+		"strategy": "firstWriteWins",
+	}
+
+	if historyMode {
+		reduce = map[string]interface{}{
+			"strategy":    "lastWriteWins",
+			"associative": false,
+		}
+
+		reduceMetaBefore = map[string]interface{}{
+			"strategy":    "lastWriteWins",
+			"associative": false,
+		}
+	}
 
 	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
@@ -114,22 +135,16 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 											Ref:         "#" + anchor,
 											Description: "Record state immediately before this change was applied.",
 											Extras: map[string]interface{}{
-												"reduce": map[string]interface{}{
-													"strategy": "firstWriteWins",
-												},
+												"reduce": reduceMetaBefore,
 											},
 										},
 									},
-									"reduce": map[string]interface{}{
-										"strategy": "merge",
-									},
+									"reduce": reduce,
 								},
 								Required: []string{"op", "source"},
 							},
 						},
-						"reduce": map[string]interface{}{
-							"strategy": "merge",
-						},
+						"reduce": reduce,
 					},
 					Required: []string{"_meta"},
 				},
