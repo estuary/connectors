@@ -205,3 +205,36 @@ func TestEnumDecodingFix(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]interface{}{{11, "A"}, {12, "B"}, {13, "C"}, {14, "D"}, {15, "error"}})
 	t.Run("replication2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
+
+func TestBackfillModes(t *testing.T) {
+	// Create two tables with 1,000 rows each
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueA, uniqueB = "11837744", "25282936"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id VARCHAR(32) PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id VARCHAR(32) PRIMARY KEY, data TEXT)")
+
+	// TODO: Generate more challenging keys?
+	var rows [][]any
+	for idx := 0; idx < 1000; idx++ {
+		rows = append(rows, []any{fmt.Sprintf("Row %d", idx), fmt.Sprintf("Data for row %d", idx)})
+	}
+	tb.Insert(ctx, t, tableA, rows)
+	tb.Insert(ctx, t, tableB, rows)
+
+	// Capture both tables, one with a precise backfill and one imprecise
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	var resA, resB sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &resA))
+	require.NoError(t, json.Unmarshal(cs.Bindings[1].ResourceConfigJson, &resB))
+	resA.Mode = sqlcapture.BackfillModeNormal
+	resB.Mode = sqlcapture.BackfillModePrecise
+	resourceSpecA, err := json.Marshal(resA)
+	require.NoError(t, err)
+	resourceSpecB, err := json.Marshal(resB)
+	require.NoError(t, err)
+	cs.Bindings[0].ResourceConfigJson = resourceSpecA
+	cs.Bindings[1].ResourceConfigJson = resourceSpecB
+
+	tests.VerifiedCapture(ctx, t, cs)
+}
