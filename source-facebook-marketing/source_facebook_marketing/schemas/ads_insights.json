@@ -338,5 +338,6 @@
       "type": ["null", "number"]
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["account_id", "ad_id", "date_start"]
 }
