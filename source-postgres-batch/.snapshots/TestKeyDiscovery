@@ -1,22 +1,26 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_basic_datatypes_13111208",
-      "template": "{{if .IsFirstQuery -}}\n  SELECT xmin AS txid, * FROM \"test\".\"basic_datatypes_13111208\" ORDER BY xmin::text::bigint;\n{{- else -}}\n  SELECT xmin AS txid, * FROM \"test\".\"basic_datatypes_13111208\" WHERE xmin::text::bigint \u003e $1 ORDER BY xmin::text::bigint;\n{{- end}}",
+      "name": "test_key_discovery_329932",
+      "template": "{{if .IsFirstQuery -}}\n  SELECT xmin AS txid, * FROM \"test\".\"key_discovery_329932\" ORDER BY xmin::text::bigint;\n{{- else -}}\n  SELECT xmin AS txid, * FROM \"test\".\"key_discovery_329932\" WHERE xmin::text::bigint \u003e $1 ORDER BY xmin::text::bigint;\n{{- end}}",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_basic_datatypes_13111208"
+      "test_key_discovery_329932"
     ],
     "collection": {
-      "name": "acmeCo/test/test_basic_datatypes_13111208",
+      "name": "acmeCo/test/test_key_discovery_329932",
       "read_schema_json": {
         "type": "object",
         "required": [
           "_meta",
-          "id"
+          "k_smallint",
+          "k_int",
+          "k_bigint",
+          "k_bool",
+          "k_str"
         ],
         "properties": {
           "_meta": {
@@ -41,17 +45,33 @@ Binding 0:
               "index"
             ]
           },
-          "id": {
+          "k_bigint": {
             "type": "integer"
+          },
+          "k_bool": {
+            "type": "boolean"
+          },
+          "k_int": {
+            "type": "integer"
+          },
+          "k_smallint": {
+            "type": "integer"
+          },
+          "k_str": {
+            "type": "string"
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/id"
+        "/k_smallint",
+        "/k_int",
+        "/k_bigint",
+        "/k_bool",
+        "/k_str"
       ],
       "projections": null
     },
-    "state_key": "test_basic_datatypes_13111208"
+    "state_key": "test_key_discovery_329932"
   }
 
