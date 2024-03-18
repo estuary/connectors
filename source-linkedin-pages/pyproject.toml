@@ -1,11 +1,10 @@
 [tool.poetry]
-name = "source-linkedin-pages-estuary"
+name = "source_linkedin_pages"
 version = "0.1.0"
 description = ""
 authors = ["Jonathan Wihl <jonathan@estuary.dev>"]
 
 [tool.poetry.dependencies]
-source_linkedin_pages = { path = "source_linkedin_pages", develop = true}
 airbyte-cdk = "^0.52"
 flow-sdk = {path="../python", develop = true}
 jsonlines = "^4.0.0"
@@ -16,10 +15,14 @@ python = ">=3.11,<3.12"
 requests = "^2.31.0"
 types-requests = "^2.31"
 pytest = "^7.4.3"
+debugpy = "^1.8.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
 pytest-insta = "^0.2.0"
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+
 
 [build-system]
 requires = ["poetry-core"]

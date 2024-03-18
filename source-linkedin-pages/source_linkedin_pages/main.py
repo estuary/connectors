@@ -6,7 +6,7 @@
 import sys
 
 from airbyte_cdk.entrypoint import launch
-from source_linkedin_pages import SourceLinkedinPages
+from .source_linkedin_pages import SourceLinkedinPages
 
 if __name__ == "__main__":
     source = SourceLinkedinPages()

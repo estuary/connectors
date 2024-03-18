@@ -1,9 +1,18 @@
 from flow_sdk import shim_airbyte_cdk
-from source_linkedin_pages import SourceLinkedinPages
+from source_linkedin_pages.source_linkedin_pages import SourceLinkedinPages
 
 
 scopes = " ".join([
-    "email"
+    "r_organization_followers",
+    "r_organization_social",
+    "rw_organization_admin",
+    "r_organization_social_feed",
+    "w_member_social",
+    "w_organization_social",
+    "r_basicprofile",
+    "w_organization_social_feed",
+    "w_member_social_feed",
+    "r_1st_connections_size"
 ])
 
 def wrap_with_braces(body: str, count: int):
@@ -39,7 +48,8 @@ shim_airbyte_cdk.CaptureShim(
             f"redirect_uri={urlencode_field('redirect_uri')}"
         ),
         "accessTokenResponseMap": {
-            "access_token": "/access_token"
+            "access_token": "/access_token",
+            "refresh_token": "/refresh_token"
         }
     }
 ).main()
