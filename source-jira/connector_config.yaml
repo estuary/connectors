@@ -1,0 +1,32 @@
+api_token_sops: ENC[AES256_GCM,data:S2H7YakJ+VJlB10Q8zHAH79Lkm7tBGNE44AxZug0SlVidrq4QPQZTfvmFvDGGQ8Eaixr9peu3fuSn8gjbeckEoHHr8JiyLF8+WX7GQzpa3JvP+w3yMFbwoj/3WniaN/gdaB0ruPsPAwAswg9nvbYb1luEWLcnE+ksn4seIa3OROp7iBKwXal6n/OOoxNkDTC9fZjV6UHDr8mx6o5fIeHhBIBOv3LAaxeVKcbsuL1LNSz69AHaS8nBuYVNyAUVtPd,iv:Refwby8Rzy77ipyCM/Zf2rI0r46g6r1NIXSuJTOy56o=,tag:0zru+Trf/RDUtX9MfwOoXg==,type:str]
+domain: apploi.atlassian.net
+email: dev@apploi.com
+enable_experimental_streams: false
+expand_issue_changelog: true
+projects:
+  - A3S
+  - INTP
+  - BDRK
+  - "ON"
+  - CP
+  - DE
+  - SP
+  - QA
+  - SEC
+  - DES
+  - MP
+render_fields: false
+sops:
+  kms: []
+  gcp_kms:
+    - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+      created_at: "2024-03-13T19:43:15Z"
+      enc: CiQAdmEdwoDKawTVEEGQ6/bm6D7b18h1gO+ilwWk0Fiap1Mz/dYSSQCVvC1zfKu8IAilziM9P9oG/dIWhdFCJTAOAt2P0SxPNovNT+yQcN/negJ0Fa2Ke7Js9xbO0CQJ+1b4LA8zPHvRnjGpo+3bRCo=
+  azure_kv: []
+  hc_vault: []
+  age: []
+  lastmodified: "2024-03-13T19:43:16Z"
+  mac: ENC[AES256_GCM,data:W/7SvE2SNDgHszYj8/MvkPzekEKC8ppwx+k0vV+lub4NcANcgl3mCUA2K0rlC3Tj3/OOA1EHE46+5YxhXvVv1CxnExzGbU36NUyv2RvyISAubYT+vZQyK37NLWsA6Z0b1R4Imw2373qISUIE/DCI9TauJ+KdzqqeGgs3SxUKqp4=,iv:U8HKQVcAyr8mfO6FUHq8+5eVjIrUBDcLTXmaDIodCaE=,tag:yl/MjtizgLMV2Xf0wFM6ow==,type:str]
+  pgp: []
+  encrypted_suffix: _sops
+  version: 3.8.1
