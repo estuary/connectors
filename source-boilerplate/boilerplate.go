@@ -273,17 +273,21 @@ func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge 
 }
 
 func newProtoCodec(ctx context.Context) pc.Connector_CaptureServer {
+	var bw = bufio.NewWriter(os.Stdout)
+
 	return &protoCodec{
 		ctx: ctx,
 		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
-		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		bw:  bw,
+		pw:  protoio.NewUint32DelimitedWriter(bw, binary.LittleEndian),
 	}
 }
 
 type protoCodec struct {
 	ctx context.Context
 	r   *bufio.Reader
-	w   protoio.Writer
+	bw  *bufio.Writer
+	pw  protoio.Writer
 }
 
 func (c *protoCodec) Context() context.Context {
@@ -291,7 +295,14 @@ func (c *protoCodec) Context() context.Context {
 }
 
 func (c *protoCodec) Send(m *pc.Response) error {
-	return c.SendMsg(m)
+	if err := c.SendMsg(m); err != nil {
+		return err
+	}
+
+	if m.Captured == nil {
+		return c.bw.Flush()
+	}
+	return nil
 }
 func (c *protoCodec) Recv() (*pc.Request, error) {
 	var m = new(pc.Request)
@@ -301,7 +312,7 @@ func (c *protoCodec) Recv() (*pc.Request, error) {
 	return m, nil
 }
 func (c *protoCodec) SendMsg(m interface{}) error {
-	return c.w.WriteMsg(m.(proto.Message))
+	return c.pw.WriteMsg(m.(proto.Message))
 }
 func (c *protoCodec) RecvMsg(m interface{}) error {
 	var lengthBytes [4]byte
