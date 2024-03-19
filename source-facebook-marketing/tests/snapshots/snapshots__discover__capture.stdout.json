@@ -12218,7 +12218,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -12451,7 +12452,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -14014,7 +14016,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -15951,7 +15954,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -16184,7 +16188,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -17747,7 +17752,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -19639,13 +19645,17 @@
         },
         "age": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "gender": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -19665,9 +19675,7 @@
       "required": [
         "account_id",
         "ad_id",
-        "date_start",
-        "age",
-        "gender"
+        "date_start"
       ]
     },
     "key": [
@@ -19698,7 +19706,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -19931,7 +19940,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -21494,7 +21504,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -23386,8 +23397,10 @@
         },
         "country": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -23407,8 +23420,7 @@
       "required": [
         "account_id",
         "ad_id",
-        "date_start",
-        "country"
+        "date_start"
       ]
     },
     "key": [
@@ -23438,7 +23450,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -23671,7 +23684,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -25234,7 +25248,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -27126,8 +27141,10 @@
         },
         "region": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -27147,8 +27164,7 @@
       "required": [
         "account_id",
         "ad_id",
-        "date_start",
-        "region"
+        "date_start"
       ]
     },
     "key": [
@@ -27178,7 +27194,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -27411,7 +27428,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -28974,7 +28992,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -30866,8 +30885,10 @@
         },
         "dma": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -30887,8 +30908,7 @@
       "required": [
         "account_id",
         "ad_id",
-        "date_start",
-        "dma"
+        "date_start"
       ]
     },
     "key": [
@@ -30918,7 +30938,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -31151,7 +31172,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -32714,7 +32736,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -34606,18 +34629,24 @@
         },
         "publisher_platform": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "platform_position": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "impression_device": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -34637,10 +34666,7 @@
       "required": [
         "account_id",
         "ad_id",
-        "date_start",
-        "publisher_platform",
-        "platform_position",
-        "impression_device"
+        "date_start"
       ]
     },
     "key": [
@@ -34672,7 +34698,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -34905,7 +34932,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -36468,7 +36496,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -39183,7 +39212,8 @@
         "account_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -39194,7 +39224,8 @@
         "ad_id": {
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_name": {
           "type": [
@@ -39236,7 +39267,8 @@
           "format": "date",
           "type": [
             "string"
-          ]
+          ],
+          "default": ""
         },
         "date_stop": {
           "format": "date",
@@ -39339,8 +39371,10 @@
         },
         "publisher_platform": {
           "type": [
+            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -39360,8 +39394,7 @@
       "required": [
         "account_id",
         "ad_id",
-        "date_start",
-        "publisher_platform"
+        "date_start"
       ]
     },
     "key": [

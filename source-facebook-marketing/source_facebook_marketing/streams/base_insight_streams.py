@@ -301,16 +301,9 @@ class AdsInsights(FBMarketingIncrementalStream):
             if k not in schema["properties"]:
                 continue
 
-            tys = schema["properties"][k]["type"]
-
-            if "null" in tys:
-                schema["properties"][k]["type"].remove("null")
-
-            if "required" not in schema:
-                schema["required"] = []
-
-            if k not in schema["required"]:
-                schema["required"].append(k)
+            typ = schema["properties"][k]["type"]
+            if "string" in typ or typ == "string":
+                schema["properties"][k]["default"] = ""
 
         return schema
 
