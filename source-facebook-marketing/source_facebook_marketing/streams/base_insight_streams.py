@@ -300,10 +300,11 @@ class AdsInsights(FBMarketingIncrementalStream):
         for k in self.primary_key:
             if k not in schema["properties"]:
                 continue
-
+            
             typ = schema["properties"][k]["type"]
             if "string" in typ or typ == "string":
-                schema["properties"][k]["default"] = ""
+                if "format" not in schema["properties"][k]:
+                    schema["properties"][k]["default"] = ""
 
         return schema
 
