@@ -667,7 +667,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
       "flow_published_at": "2023-07-12T18:28:48.465279Z",
       "id": 8,
-      "multiple": "",
+      "multiple": null,
       "nested": "{\"id\":\"i8\"}",
       "nullable_int": 8,
       "str_field": "str8 v2"
@@ -679,7 +679,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"f5b064a8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[91,92],\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
       "flow_published_at": "2023-07-12T18:28:55.677252Z",
       "id": 9,
-      "multiple": "",
+      "multiple": null,
       "nested": "{\"id\":\"i9\"}",
       "nullable_int": null,
       "str_field": "str9 v2"
@@ -691,7 +691,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[1,2],\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
       "flow_published_at": "2023-07-12T18:29:04.671352Z",
       "id": 10,
-      "multiple": "",
+      "multiple": null,
       "nested": "{\"id\":\"i10\"}",
       "nullable_int": 10,
       "str_field": "str10 v2"
