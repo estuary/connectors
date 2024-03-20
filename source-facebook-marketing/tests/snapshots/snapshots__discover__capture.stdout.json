@@ -14016,8 +14016,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -17752,8 +17751,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -21504,8 +21502,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -25248,8 +25245,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -28992,8 +28988,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -32736,8 +32731,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -36496,8 +36490,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
@@ -39267,8 +39260,7 @@
           "format": "date",
           "type": [
             "string"
-          ],
-          "default": ""
+          ]
         },
         "date_stop": {
           "format": "date",
