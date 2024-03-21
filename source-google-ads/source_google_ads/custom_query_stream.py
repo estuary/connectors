@@ -17,12 +17,14 @@ class CustomQueryMixin:
     @property
     def primary_key(self) -> str:
         """
-        The primary_key option is disabled. Config should not provide the primary key.
+        The primary_key option is disabled. Config should not
+        provide the primary key.
         It will be ignored if provided.
-        If you need to enable it, uncomment the next line instead of `return None` and modify your config
+        If you need to enable it, uncomment the next line instead of
+        `return None` and modify your config
         """
-        # return self.config.get("primary_key") or None
-        return None
+        return self.config.get("primary_key") or None
+        # return None
 
     @property
     def name(self):
@@ -43,7 +45,18 @@ class CustomQueryMixin:
             "properties": {},
             "additionalProperties": True,
         }
-        # full list {'ENUM', 'STRING', 'DATE', 'DOUBLE', 'RESOURCE_NAME', 'INT32', 'INT64', 'BOOLEAN', 'MESSAGE'}
+        # full list
+        # {
+        #     "ENUM",
+        #     "STRING",
+        #     "DATE",
+        #     "DOUBLE",
+        #     "RESOURCE_NAME",
+        #     "INT32",
+        #     "INT64",
+        #     "BOOLEAN",
+        #     "MESSAGE",
+        # }
 
         google_datatype_mapping = {
             "INT64": "integer",
@@ -60,12 +73,19 @@ class CustomQueryMixin:
 
         for field in fields:
             node = google_schema.get(field)
-            # Data type return in enum format: "GoogleAdsFieldDataType.<data_type>"
+            # Data type return in enum format:
+            # "GoogleAdsFieldDataType.<data_type>"
             google_data_type = node.data_type.name
             if google_data_type == "ENUM":
-                field_value = {"type": "string", "enum": list(node.enum_values)}
+                field_value = {
+                    "type": "string",
+                    "enum": list(node.enum_values),
+                }
                 if node.is_repeated:
-                    field_value = {"type": ["null", "array"], "items": field_value}
+                    field_value = {
+                        "type": ["null", "array"],
+                        "items": field_value,
+                    }
             elif google_data_type == "MESSAGE":
                 # Represents protobuf message and could be anything, set custom
                 # attribute "protobuf_message" to convert it to a string (or
@@ -77,7 +97,10 @@ class CustomQueryMixin:
                     output_type = ["string", "null"]
                 field_value = {"type": output_type, "protobuf_message": True}
             else:
-                output_type = [google_datatype_mapping.get(google_data_type, "string"), "null"]
+                output_type = [
+                    google_datatype_mapping.get(google_data_type, "string"),
+                    "null",
+                ]
                 field_value = {"type": output_type}
                 if google_data_type == "DATE":
                     field_value["format"] = "date"
@@ -89,14 +112,22 @@ class CustomQueryMixin:
 
 class IncrementalCustomQuery(CustomQueryMixin, IncrementalGoogleAdsStream):
     def get_query(self, stream_slice: Mapping[str, Any] = None) -> str:
-        start_date, end_date = stream_slice["start_date"], stream_slice["end_date"]
-        query = self.insert_segments_date_expr(self.config["query"], start_date, end_date)
+        start_date = stream_slice["start_date"]
+        end_date = stream_slice["end_date"]
+        query = self.insert_segments_date_expr(
+            self.config["query"], start_date, end_date
+        )
         return str(query)
 
     @staticmethod
-    def insert_segments_date_expr(query: GAQL, start_date: str, end_date: str) -> GAQL:
+    def insert_segments_date_expr(
+        query: GAQL,
+        start_date: str,
+        end_date: str,
+    ) -> GAQL:
         """
-        Insert segments.date condition to break query into slices for incremental stream.
+        Insert segments.date condition to break query into
+        slices for incremental stream.
         :param query Origin user defined query
         :param start_date start date for metric (inclusive)
         :param end_date end date for metric (inclusive)
