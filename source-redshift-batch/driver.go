@@ -365,10 +365,11 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 	fmt.Fprintf(query, "  WHERE a.attnum > 0")
 	fmt.Fprintf(query, "    AND NOT a.attisdropped")
 	fmt.Fprintf(query, "    AND c.relkind IN ('r', 'p', 'v', 'f')")
-	fmt.Fprintf(query, "    AND nc.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
 	if len(discoverSchemas) > 0 {
 		fmt.Fprintf(query, "    AND nc.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
+	} else {
+		fmt.Fprintf(query, "    AND nc.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
 	}
 	fmt.Fprintf(query, "  ORDER BY nc.nspname, c.relname, a.attnum;")
 
@@ -445,6 +446,8 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	if len(discoverSchemas) > 0 {
 		fmt.Fprintf(query, "    AND nr.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
+	} else {
+		fmt.Fprintf(query, "    AND nr.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
 	}
 	fmt.Fprintf(query, "  ORDER BY r.relname, pos.n;")
 
