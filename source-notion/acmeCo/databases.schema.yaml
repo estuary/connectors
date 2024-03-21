@@ -1,0 +1,658 @@
+---
+$defs:
+  options.json:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    additionalProperties: true
+    properties:
+      color:
+        enum:
+          - default
+          - gray
+          - brown
+          - orange
+          - yellow
+          - green
+          - blue
+          - purple
+          - pink
+          - red
+      id:
+        type: string
+      name:
+        type: string
+    type:
+      - "null"
+      - object
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  archived:
+    type: boolean
+  cover:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    additionalProperties: true
+    properties:
+      caption:
+        items:
+          $schema: "http://json-schema.org/draft-07/schema#"
+          properties:
+            annotations:
+              additionalProperties: true
+              properties:
+                bold:
+                  type:
+                    - "null"
+                    - boolean
+                code:
+                  type:
+                    - "null"
+                    - boolean
+                color:
+                  type:
+                    - "null"
+                    - string
+                italic:
+                  type:
+                    - "null"
+                    - boolean
+                strikethrough:
+                  type:
+                    - "null"
+                    - boolean
+                underline:
+                  type:
+                    - "null"
+                    - boolean
+              type:
+                - "null"
+                - object
+            href:
+              type:
+                - "null"
+                - string
+            plain_text:
+              type:
+                - "null"
+                - string
+            rich_text:
+              additionalProperties: true
+              properties:
+                content:
+                  type:
+                    - "null"
+                    - string
+                link:
+                  additionalProperties: true
+                  properties:
+                    type:
+                      type: string
+                    url:
+                      type:
+                        - "null"
+                        - string
+                  type:
+                    - "null"
+                    - object
+              type:
+                - "null"
+                - object
+            text:
+              additionalProperties: true
+              properties:
+                content:
+                  type:
+                    - "null"
+                    - string
+                link:
+                  additionalProperties: true
+                  properties:
+                    type:
+                      type: string
+                    url:
+                      type:
+                        - "null"
+                        - string
+                  type:
+                    - "null"
+                    - object
+              type:
+                - "null"
+                - object
+            type:
+              type:
+                - "null"
+                - string
+          type: object
+        type:
+          - "null"
+          - array
+      external:
+        additionalProperties: true
+        properties:
+          url:
+            type: string
+        type:
+          - "null"
+          - object
+      file:
+        additionalProperties: true
+        properties:
+          expiry_time:
+            type: string
+          url:
+            type: string
+        type:
+          - "null"
+          - object
+      type:
+        type: string
+    type:
+      - "null"
+      - object
+  created_by:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    additionalProperties: true
+    properties:
+      avatar_url:
+        type:
+          - "null"
+          - string
+      bot:
+        additionalProperties: true
+        properties:
+          owner:
+            properties:
+              type:
+                type: string
+              workspace:
+                type:
+                  - "null"
+                  - boolean
+            type: object
+        type:
+          - "null"
+          - object
+      id:
+        type: string
+      name:
+        type: string
+      object:
+        type: string
+      person:
+        additionalProperties: true
+        properties:
+          email:
+            type: string
+        type:
+          - "null"
+          - object
+      type:
+        type: string
+    type: object
+  created_time:
+    type: string
+  icon:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    anyOf:
+      - $schema: "http://json-schema.org/draft-07/schema#"
+        additionalProperties: true
+        properties:
+          caption:
+            items:
+              $schema: "http://json-schema.org/draft-07/schema#"
+              properties:
+                annotations:
+                  additionalProperties: true
+                  properties:
+                    bold:
+                      type:
+                        - "null"
+                        - boolean
+                    code:
+                      type:
+                        - "null"
+                        - boolean
+                    color:
+                      type:
+                        - "null"
+                        - string
+                    italic:
+                      type:
+                        - "null"
+                        - boolean
+                    strikethrough:
+                      type:
+                        - "null"
+                        - boolean
+                    underline:
+                      type:
+                        - "null"
+                        - boolean
+                  type:
+                    - "null"
+                    - object
+                href:
+                  type:
+                    - "null"
+                    - string
+                plain_text:
+                  type:
+                    - "null"
+                    - string
+                rich_text:
+                  additionalProperties: true
+                  properties:
+                    content:
+                      type:
+                        - "null"
+                        - string
+                    link:
+                      additionalProperties: true
+                      properties:
+                        type:
+                          enum:
+                            - url
+                        url:
+                          type:
+                            - "null"
+                            - string
+                      type:
+                        - "null"
+                        - object
+                  type:
+                    - "null"
+                    - object
+                text:
+                  additionalProperties: true
+                  properties:
+                    content:
+                      type:
+                        - "null"
+                        - string
+                    link:
+                      additionalProperties: true
+                      properties:
+                        type:
+                          enum:
+                            - url
+                        url:
+                          type:
+                            - "null"
+                            - string
+                      type:
+                        - "null"
+                        - object
+                  type:
+                    - "null"
+                    - object
+                type:
+                  type:
+                    - "null"
+                    - string
+              type: object
+            type:
+              - "null"
+              - array
+          external:
+            additionalProperties: true
+            properties:
+              url:
+                type: string
+            type:
+              - "null"
+              - object
+          file:
+            additionalProperties: true
+            properties:
+              expiry_time:
+                type: string
+              url:
+                type: string
+            type:
+              - "null"
+              - object
+          type:
+            enum:
+              - file
+              - external
+        type:
+          - "null"
+          - object
+      - $schema: "http://json-schema.org/draft-07/schema#"
+        additionalProperties: true
+        properties:
+          emoji:
+            type: string
+          type:
+            type: string
+        type:
+          - "null"
+          - object
+  id:
+    type: string
+  is_inline:
+    type:
+      - "null"
+      - boolean
+  last_edited_by:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    additionalProperties: true
+    properties:
+      avatar_url:
+        type:
+          - "null"
+          - string
+      bot:
+        additionalProperties: true
+        properties:
+          owner:
+            properties:
+              type:
+                type: string
+              workspace:
+                type:
+                  - "null"
+                  - boolean
+            type: object
+        type:
+          - "null"
+          - object
+      id:
+        type: string
+      name:
+        type: string
+      object:
+        type: string
+      person:
+        additionalProperties: true
+        properties:
+          email:
+            type: string
+        type:
+          - "null"
+          - object
+      type:
+        type: string
+    type: object
+  last_edited_time:
+    type: string
+  object:
+    type: string
+  parent:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    additionalProperties: true
+    properties:
+      database_id:
+        type: string
+      page_id:
+        type: string
+      type:
+        type: string
+      workspace:
+        type: boolean
+    type: object
+  properties:
+    items:
+      additionalProperties: true
+      properties:
+        name:
+          type:
+            - "null"
+            - string
+        value:
+          additionalProperties: true
+          anyOf:
+            - properties:
+                id:
+                  type: string
+                type:
+                  type: string
+              type: object
+            - additionalProperties: true
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                type:
+                  enum:
+                    - title
+                    - rich_text
+                    - date
+                    - people
+                    - files
+                    - checkbox
+                    - url
+                    - email
+                    - phone_number
+                    - created_time
+                    - created_by
+                    - last_edited_time
+                    - last_edited_by
+              type: object
+            - properties:
+                format:
+                  enum:
+                    - number
+                    - number_with_commas
+                    - percent
+                    - dollar
+                    - canadian_dollar
+                    - euro
+                    - pound
+                    - yen
+                    - ruble
+                    - rupee
+                    - won
+                    - yuan
+                    - real
+                    - lira
+                    - rupiah
+                    - franc
+                    - hong_kong_dollar
+                    - new_zealand_dollar
+                    - krona
+                    - norwegian_krone
+                    - mexican_peso
+                    - rand
+                    - new_taiwan_dollar
+                    - danish_krone
+                    - zloty
+                    - baht
+                    - forint
+                    - koruna
+                    - shekel
+                    - chilean_peso
+                    - philippine_peso
+                    - dirham
+                    - colombian_peso
+                    - riyal
+                    - ringgit
+                    - leu
+                id:
+                  type: string
+                name:
+                  type: string
+                type:
+                  enum:
+                    - number
+              type: object
+            - properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                options:
+                  items:
+                    $ref: "#/$defs/options.json"
+                  type: array
+                type:
+                  enum:
+                    - select
+                    - multi_select
+              type: object
+            - properties:
+                expression:
+                  type: string
+                id:
+                  type: string
+                name:
+                  type: string
+                type:
+                  enum:
+                    - formula
+              type: object
+            - properties:
+                database_id:
+                  type: string
+                id:
+                  type: string
+                name:
+                  type: string
+                synced_property_id:
+                  type:
+                    - "null"
+                    - string
+                synced_property_name:
+                  type:
+                    - "null"
+                    - string
+                type:
+                  enum:
+                    - relation
+              type: object
+            - properties:
+                function:
+                  enum:
+                    - count_all
+                    - count_values
+                    - count_unique_values
+                    - count_empty
+                    - count_not_empty
+                    - percent_empty
+                    - percent_not_empty
+                    - sum
+                    - average
+                    - median
+                    - min
+                    - max
+                    - range
+                    - show_original
+                id:
+                  type: string
+                name:
+                  type: string
+                relation_property_id:
+                  type: string
+                relation_property_name:
+                  type: string
+                rollup_property_id:
+                  type: string
+                rollup_property_name:
+                  type: string
+                type:
+                  enum:
+                    - rollup
+              type: object
+          type: object
+      type:
+        - "null"
+        - object
+    type: array
+  title:
+    items:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      properties:
+        annotations:
+          additionalProperties: true
+          properties:
+            bold:
+              type:
+                - "null"
+                - boolean
+            code:
+              type:
+                - "null"
+                - boolean
+            color:
+              type:
+                - "null"
+                - string
+            italic:
+              type:
+                - "null"
+                - boolean
+            strikethrough:
+              type:
+                - "null"
+                - boolean
+            underline:
+              type:
+                - "null"
+                - boolean
+          type:
+            - "null"
+            - object
+        href:
+          type:
+            - "null"
+            - string
+        plain_text:
+          type:
+            - "null"
+            - string
+        rich_text:
+          additionalProperties: true
+          properties:
+            content:
+              type:
+                - "null"
+                - string
+            link:
+              additionalProperties: true
+              properties:
+                type:
+                  type: string
+                url:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+          type:
+            - "null"
+            - object
+        text:
+          additionalProperties: true
+          properties:
+            content:
+              type:
+                - "null"
+                - string
+            link:
+              additionalProperties: true
+              properties:
+                type:
+                  type: string
+                url:
+                  type:
+                    - "null"
+                    - string
+              type:
+                - "null"
+                - object
+          type:
+            - "null"
+            - object
+        type:
+          type:
+            - "null"
+            - string
+      type: object
+    type: array
+  url:
+    type: string
+required:
+  - id
+type: object
