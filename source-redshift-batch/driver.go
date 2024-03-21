@@ -86,10 +86,7 @@ type documentMetadata struct {
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 }
 
-// The fallback collection key just refers to the polling iteration and result index of each document.
-var fallbackKey = []string{"/_meta/polled", "/_meta/index"}
-
-func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
+func generateCollectionSchema(keyColumns []string, columnTypes map[string]columnType) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
@@ -99,18 +96,12 @@ func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsons
 	metadataSchema.Definitions = nil
 	metadataSchema.AdditionalProperties = nil
 
-	var required = []string{"_meta"}
+	var required = append([]string{"_meta"}, keyColumns...)
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
-
-	for _, colName := range keyColumns {
-		var columnType = columnTypes[colName]
-		if columnType == nil {
-			return nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
-		}
-		properties[colName] = columnType
-		required = append(required, colName)
+	for colName, colType := range columnTypes {
+		properties[colName] = colType.JSONSchema()
 	}
 
 	var schema = &jsonschema.Schema{
@@ -118,8 +109,7 @@ func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsons
 		Required:             required,
 		AdditionalProperties: nil,
 		Extras: map[string]interface{}{
-			"properties":     properties,
-			"x-infer-schema": true,
+			"properties": properties,
 		},
 	}
 
@@ -130,14 +120,6 @@ func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsons
 	}
 	return json.RawMessage(bs), nil
 }
-
-var minimalSchema = func() json.RawMessage {
-	var schema, err = generateCollectionSchema(nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	return schema
-}()
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
@@ -174,24 +156,41 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
+	// Run discovery queries
 	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing columns: %w", err)
 	}
 	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing primary keys: %w", err)
 	}
 
-	// We rebuild this map even though `discoverPrimaryKeys` already built and
-	// discarded it, in order to keep the `discoverTables` / `discoverPrimaryKeys`
-	// interface as stupidly simple as possible, which ought to make it just that
-	// little bit easier to do this generically for multiple databases.
-	var keysByTable = make(map[string]*discoveredPrimaryKey)
-	for _, key := range keys {
-		keysByTable[key.Schema+"."+key.Table] = key
+	// Aggregate column information by table
+	var columnsByTable = make(map[string][]*discoveredColumn)
+	for _, column := range columns {
+		var tableID = column.Schema + "." + column.Table
+		columnsByTable[tableID] = append(columnsByTable[tableID], column)
+		if column.Index != len(columnsByTable[tableID]) {
+			return nil, fmt.Errorf("internal error: column %q of table %q appears out of order", column.Name, tableID)
+		}
 	}
 
+	// Aggregate primary-key information by table
+	var keysByTable = make(map[string][]*discoveredPrimaryKey)
+	for _, key := range keys {
+		var tableID = key.Schema + "." + key.Table
+		keysByTable[tableID] = append(keysByTable[tableID], key)
+		if key.Index != len(keysByTable[tableID]) {
+			return nil, fmt.Errorf("internal error: primary key column %q of table %q appears out of order", key.Column, tableID)
+		}
+	}
+
+	// Generate discovery resource and collection schema for this table
 	var bindings []*pc.Response_Discovered_Binding
 	for _, table := range tables {
 		var tableID = table.Schema + "." + table.Name
@@ -211,26 +210,32 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		// Try to generate a useful collection schema, but on error fall back to the
-		// minimal schema with the default key [/_meta/polled, /_meta/index].
-		var collectionSchema = minimalSchema
-		var collectionKey = fallbackKey
-		if tableKey, ok := keysByTable[tableID]; ok {
-			if generatedSchema, err := generateCollectionSchema(tableKey.Columns, tableKey.ColumnTypes); err == nil {
-				collectionSchema = generatedSchema
-				collectionKey = nil
-				for _, colName := range tableKey.Columns {
-					collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
-				}
-			} else {
-				log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
-			}
+		// Generate a collection schema from the column types and key column names of this table.
+		var keyColumns []string
+		for _, key := range keysByTable[tableID] {
+			keyColumns = append(keyColumns, key.Column)
+		}
+
+		var columnTypes = make(map[string]columnType)
+		for _, column := range columnsByTable[tableID] {
+			columnTypes[column.Name] = column.DataType
+		}
+
+		generatedSchema, err := generateCollectionSchema(keyColumns, columnTypes)
+		if err != nil {
+			log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
+			continue
+		}
+
+		var collectionKey []string
+		for _, colName := range keyColumns {
+			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
 			RecommendedName:    recommendedName,
 			ResourceConfigJson: resourceConfigJSON,
-			DocumentSchemaJson: collectionSchema,
+			DocumentSchemaJson: generatedSchema,
 			Key:                collectionKey,
 			ResourcePath:       []string{res.Name},
 		})
@@ -259,7 +264,7 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	var query = new(strings.Builder)
 	var args []any
 
-	fmt.Fprintf(query, "SELECT n.nspname AS table_schema,")
+	fmt.Fprintf(query, "SELECT nc.nspname AS table_schema,")
 	fmt.Fprintf(query, "       c.relname AS table_name,")
 	fmt.Fprintf(query, "       CASE")
 	fmt.Fprintf(query, "         WHEN c.relkind = ANY (ARRAY['r'::\"char\", 'p'::\"char\"]) THEN 'BASE TABLE'::text")
@@ -268,12 +273,13 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	fmt.Fprintf(query, "         ELSE ''::text")
 	fmt.Fprintf(query, "       END::information_schema.character_data AS table_type")
 	fmt.Fprintf(query, " FROM pg_catalog.pg_class c")
-	fmt.Fprintf(query, " JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)")
-	fmt.Fprintf(query, " WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
-	fmt.Fprintf(query, "  AND c.relkind IN ('r', 'p', 'v', 'f')")
+	fmt.Fprintf(query, " JOIN pg_catalog.pg_namespace nc ON (nc.oid = c.relnamespace)")
+	fmt.Fprintf(query, " WHERE c.relkind IN ('r', 'p', 'v', 'f')")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, "  AND n.nspname = ANY ($1)")
+		fmt.Fprintf(query, "  AND nc.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
+	} else {
+		fmt.Fprintf(query, "  AND nc.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
 	}
 	fmt.Fprintf(query, ";")
 
@@ -298,11 +304,122 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	return tables, nil
 }
 
+type discoveredColumn struct {
+	Schema      string     // The schema in which the table resides
+	Table       string     // The name of the table with this column
+	Name        string     // The name of the column
+	Index       int        // The ordinal position of the column within a row
+	IsNullable  bool       // Whether the column can be null
+	DataType    columnType // The datatype of the column
+	Description *string    // The description of the column, if present and known
+}
+
+type columnType interface {
+	JSONSchema() *jsonschema.Schema
+}
+
+type basicColumnType struct {
+	jsonType        string
+	contentEncoding string
+	format          string
+	nullable        bool
+	description     string
+}
+
+func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
+	var sch = &jsonschema.Schema{
+		Format: ct.format,
+		Extras: make(map[string]interface{}),
+	}
+
+	if ct.contentEncoding != "" {
+		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
+	}
+
+	if ct.jsonType == "" {
+		// No type constraint.
+	} else if !ct.nullable {
+		sch.Type = ct.jsonType
+	} else {
+		sch.Extras["type"] = []string{ct.jsonType, "null"}
+	}
+	return sch
+}
+
+func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredColumn, error) {
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, "SELECT nc.nspname as table_schema,")
+	fmt.Fprintf(query, "       c.relname as table_name,")
+	fmt.Fprintf(query, "       a.attname as column_name,")
+	fmt.Fprintf(query, "       a.attnum as column_index,")
+	fmt.Fprintf(query, "       NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,")
+	fmt.Fprintf(query, "       COALESCE(bt.typname, t.typname) AS udt_name,")
+	fmt.Fprintf(query, "       t.typtype::text AS typtype")
+	fmt.Fprintf(query, "  FROM pg_catalog.pg_attribute a")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_type t ON a.atttypid = t.oid")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_class c ON a.attrelid = c.oid")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_namespace nc ON c.relnamespace = nc.oid")
+	fmt.Fprintf(query, "  LEFT JOIN (pg_catalog.pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)")
+	fmt.Fprintf(query, "    ON t.typtype = 'd'::\"char\" AND t.typbasetype = bt.oid")
+	fmt.Fprintf(query, "  WHERE a.attnum > 0")
+	fmt.Fprintf(query, "    AND NOT a.attisdropped")
+	fmt.Fprintf(query, "    AND c.relkind IN ('r', 'p', 'v', 'f')")
+	fmt.Fprintf(query, "    AND nc.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
+	if len(discoverSchemas) > 0 {
+		fmt.Fprintf(query, "    AND nc.nspname = ANY ($1)")
+		args = append(args, discoverSchemas)
+	}
+	fmt.Fprintf(query, "  ORDER BY nc.nspname, c.relname, a.attnum;")
+
+	rows, err := db.QueryContext(ctx, query.String(), args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
+	}
+	defer rows.Close()
+
+	var columns []*discoveredColumn
+	for rows.Next() {
+		var tableSchema, tableName, columnName string
+		var columnIndex int
+		var isNullable bool
+		var typeName, typeType string
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &typeType); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		// Decode column type information into a usable form
+		var dataType columnType
+		switch typeType {
+		case "e": // enum values are captured as strings
+			dataType = &basicColumnType{jsonType: "string"}
+		case "r", "m": // ranges and multiranges are captured as strings
+			dataType = &basicColumnType{jsonType: "string"}
+		default:
+			var ok bool
+			dataType, ok = databaseTypeToJSON[typeName]
+			if !ok {
+				dataType = &basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
+			}
+		}
+
+		columns = append(columns, &discoveredColumn{
+			Schema:     tableSchema,
+			Table:      tableName,
+			Name:       columnName,
+			Index:      columnIndex,
+			IsNullable: isNullable,
+			DataType:   dataType,
+		})
+	}
+	return columns, nil
+}
+
 type discoveredPrimaryKey struct {
-	Schema      string
-	Table       string
-	Columns     []string
-	ColumnTypes map[string]*jsonschema.Schema
+	Schema string
+	Table  string
+	Column string
+	Index  int
 }
 
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
@@ -312,22 +429,15 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	fmt.Fprintf(query, "SELECT nr.nspname::information_schema.sql_identifier AS table_schema,")
 	fmt.Fprintf(query, "       r.relname::information_schema.sql_identifier AS table_name,")
 	fmt.Fprintf(query, "       a.attname::information_schema.sql_identifier AS column_name,")
-	fmt.Fprintf(query, "       pos.n::information_schema.cardinal_number AS ordinal_position,")
-	// The handling of type names here is a bit weak, refer to how the `information_schema.columns`
-	// view computes its `data_type` column for a more comprehensive approach. But in practice we
-	// don't need all of that complexity just to identify basic integer columns, so this ought to
-	// be sufficient for now.
-	fmt.Fprintf(query, "       t.typname AS type_name")
+	fmt.Fprintf(query, "       pos.n::information_schema.cardinal_number AS ordinal_position")
 	fmt.Fprintf(query, "  FROM pg_namespace nr,")
 	fmt.Fprintf(query, "       pg_class r,")
 	fmt.Fprintf(query, "       pg_attribute a,")
-	fmt.Fprintf(query, "       pg_type t,")
 	fmt.Fprintf(query, "       pg_constraint c,")
 	fmt.Fprintf(query, "       generate_series(1,100,1) pos(n)")
 	fmt.Fprintf(query, "  WHERE nr.oid = r.relnamespace")
 	fmt.Fprintf(query, "    AND r.oid = a.attrelid")
 	fmt.Fprintf(query, "    AND r.oid = c.conrelid")
-	fmt.Fprintf(query, "    AND t.oid = a.atttypid")
 	fmt.Fprintf(query, "    AND c.conkey[pos.n] = a.attnum")
 	fmt.Fprintf(query, "    AND NOT a.attisdropped")
 	fmt.Fprintf(query, "    AND c.contype = 'p'::\"char\"")
@@ -344,50 +454,69 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	}
 	defer rows.Close()
 
-	var keysByTable = make(map[string]*discoveredPrimaryKey)
+	var keys []*discoveredPrimaryKey
 	for rows.Next() {
-		var tableSchema, tableName, columnName, dataType string
+		var tableSchema, tableName, columnName string
 		var ordinalPosition int
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition, &dataType); err != nil {
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
-		var tableID = tableSchema + "." + tableName
-		var keyInfo = keysByTable[tableID]
-		if keyInfo == nil {
-			keyInfo = &discoveredPrimaryKey{
-				Schema:      tableSchema,
-				Table:       tableName,
-				ColumnTypes: make(map[string]*jsonschema.Schema),
-			}
-			keysByTable[tableID] = keyInfo
-		}
-		keyInfo.Columns = append(keyInfo.Columns, columnName)
-		if jsonSchema, ok := databaseTypeToJSON[dataType]; ok {
-			keyInfo.ColumnTypes[columnName] = jsonSchema
-		} else {
-			// Assume unknown types are strings, because it's almost always a string.
-			// (Or it's an object, but those can't be Flow collection keys anyway)
-			keyInfo.ColumnTypes[columnName] = &jsonschema.Schema{Type: "string"}
-		}
-		if ordinalPosition != len(keyInfo.Columns) {
-			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
-		}
-	}
-
-	var keys []*discoveredPrimaryKey
-	for _, key := range keysByTable {
-		keys = append(keys, key)
+		keys = append(keys, &discoveredPrimaryKey{
+			Schema: tableSchema,
+			Table:  tableName,
+			Column: columnName,
+			Index:  ordinalPosition,
+		})
 	}
 	return keys, nil
 }
 
-var databaseTypeToJSON = map[string]*jsonschema.Schema{
-	"int2":    {Type: "integer"},
-	"int4":    {Type: "integer"},
-	"int8":    {Type: "integer"},
-	"bool":    {Type: "boolean"},
-	"varchar": {Type: "string"},
+var databaseTypeToJSON = map[string]columnType{
+	"bool": &basicColumnType{jsonType: "boolean"},
+
+	"int2": &basicColumnType{jsonType: "integer"},
+	"int4": &basicColumnType{jsonType: "integer"},
+	"int8": &basicColumnType{jsonType: "integer"},
+
+	"numeric": &basicColumnType{jsonType: "string", format: "number"},
+	"float4":  &basicColumnType{jsonType: "number"},
+	"float8":  &basicColumnType{jsonType: "number"},
+
+	"varchar": &basicColumnType{jsonType: "string"},
+	"bpchar":  &basicColumnType{jsonType: "string"},
+	"text":    &basicColumnType{jsonType: "string"},
+	"bytea":   &basicColumnType{jsonType: "string", contentEncoding: "base64"},
+	"xml":     &basicColumnType{jsonType: "string"},
+	"bit":     &basicColumnType{jsonType: "string"},
+	"varbit":  &basicColumnType{jsonType: "string"},
+
+	"json":     &basicColumnType{},
+	"jsonb":    &basicColumnType{},
+	"jsonpath": &basicColumnType{jsonType: "string"},
+
+	// Domain-Specific Types
+	"date":        &basicColumnType{jsonType: "string", format: "date-time"},
+	"timestamp":   &basicColumnType{jsonType: "string", format: "date-time"},
+	"timestamptz": &basicColumnType{jsonType: "string", format: "date-time"},
+	"time":        &basicColumnType{jsonType: "integer"},
+	"timetz":      &basicColumnType{jsonType: "string", format: "time"},
+	"interval":    &basicColumnType{jsonType: "string"},
+	"money":       &basicColumnType{jsonType: "string"},
+	"point":       &basicColumnType{jsonType: "string"},
+	"line":        &basicColumnType{jsonType: "string"},
+	"lseg":        &basicColumnType{jsonType: "string"},
+	"box":         &basicColumnType{jsonType: "string"},
+	"path":        &basicColumnType{jsonType: "string"},
+	"polygon":     &basicColumnType{jsonType: "string"},
+	"circle":      &basicColumnType{jsonType: "string"},
+	"inet":        &basicColumnType{jsonType: "string"},
+	"cidr":        &basicColumnType{jsonType: "string"},
+	"macaddr":     &basicColumnType{jsonType: "string"},
+	"macaddr8":    &basicColumnType{jsonType: "string"},
+	"tsvector":    &basicColumnType{jsonType: "string"},
+	"tsquery":     &basicColumnType{jsonType: "string"},
+	"uuid":        &basicColumnType{jsonType: "string", format: "uuid"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)

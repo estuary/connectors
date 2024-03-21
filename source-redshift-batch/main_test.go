@@ -194,6 +194,20 @@ func TestKeyDiscovery(t *testing.T) {
 	snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
 }
 
+func TestKeylessDiscovery(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "10352"
+	var tableName = fmt.Sprintf("test.keyless_discovery_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(v_smallint SMALLINT, v_int INTEGER, v_bigint BIGINT, v_bool BOOLEAN, v_str VARCHAR(8), v_ts TIMESTAMP, v_tstz TIMESTAMP WITH TIME ZONE, v_text TEXT)", tableName))
+
+	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
+	snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
+}
+
 func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
@@ -208,7 +222,7 @@ func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	if controlPass == "" {
 		controlPass = *dbCapturePass
 	}
-	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s?sslmode=require`, controlUser, controlPass, *dbAddress, *dbName)
+	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, controlUser, controlPass, *dbAddress, *dbName)
 	log.WithField("uri", controlURI).Debug("opening database control connection")
 	var conn, err = sql.Open("pgx", controlURI)
 	require.NoError(t, err)
