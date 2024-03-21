@@ -156,19 +156,43 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
-	// Run discovery queries
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing tables: %w", err)
+	// Run discovery queries in parallel for lower discovery latency on large databases.
+	// TODO(wgd): See if there's a nice context-and-errors-aware promise library we could use
+	// here instead of just doing the same copy-paste channels-and-errgroup pattern thrice.
+	var tablesCh = make(chan []*discoveredTable, 1)
+	var columnsCh = make(chan []*discoveredColumn, 1)
+	var keysCh = make(chan []*discoveredPrimaryKey, 1)
+	var workerGroup, workerCtx = errgroup.WithContext(ctx)
+	workerGroup.Go(func() error {
+		tables, err := discoverTables(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		if err != nil {
+			return fmt.Errorf("error listing tables: %w", err)
+		}
+		tablesCh <- tables
+		return nil
+	})
+	workerGroup.Go(func() error {
+		columns, err := discoverColumns(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		if err != nil {
+			return fmt.Errorf("error listing columns: %w", err)
+		}
+		columnsCh <- columns
+		return nil
+	})
+	workerGroup.Go(func() error {
+		keys, err := discoverPrimaryKeys(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		if err != nil {
+			return fmt.Errorf("error listing primary keys: %w", err)
+		}
+		keysCh <- keys
+		return nil
+	})
+	if err := workerGroup.Wait(); err != nil {
+		return nil, err
 	}
-	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing columns: %w", err)
-	}
-	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing primary keys: %w", err)
-	}
+	var tables = <-tablesCh
+	var columns = <-columnsCh
+	var keys = <-keysCh
 
 	// Aggregate column information by table
 	var columnsByTable = make(map[string][]*discoveredColumn)
