@@ -1,0 +1,34 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-notion:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-notion:v2"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: users
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/users
+      - resource:
+          stream: databases
+          syncMode: incremental
+          cursorField:
+            - last_edited_time
+        target: acmeCo/databases
+      - resource:
+          stream: pages
+          syncMode: incremental
+          cursorField:
+            - last_edited_time
+        target: acmeCo/pages
+      - resource:
+          stream: blocks
+          syncMode: incremental
+          cursorField:
+            - last_edited_time
+        target: acmeCo/blocks
