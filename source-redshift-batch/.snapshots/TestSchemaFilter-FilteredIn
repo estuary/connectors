@@ -39,11 +39,13 @@ Binding 0:
               "index"
             ]
           },
+          "data": {
+            "type": "string"
+          },
           "id": {
             "type": "integer"
           }
-        },
-        "x-infer-schema": true
+        }
       },
       "key": [
         "/id"

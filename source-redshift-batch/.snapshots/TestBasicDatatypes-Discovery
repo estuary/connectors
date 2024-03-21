@@ -39,11 +39,28 @@ Binding 0:
               "index"
             ]
           },
+          "a_bool": {
+            "type": "boolean"
+          },
+          "a_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "a_real": {
+            "type": "number"
+          },
+          "a_ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "a_tstz": {
+            "type": "string",
+            "format": "date-time"
+          },
           "id": {
             "type": "integer"
           }
-        },
-        "x-infer-schema": true
+        }
       },
       "key": [
         "/id"

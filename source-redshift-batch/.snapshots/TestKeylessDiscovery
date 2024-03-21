@@ -1,24 +1,19 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_key_discovery_329932",
-      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"key_discovery_329932\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"key_discovery_329932\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"key_discovery_329932\";\n{{- end}}\n",
+      "name": "test_keyless_discovery_10352",
+      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"keyless_discovery_10352\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"keyless_discovery_10352\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"keyless_discovery_10352\";\n{{- end}}\n",
       "cursor": null
     },
     "resource_path": [
-      "test_key_discovery_329932"
+      "test_keyless_discovery_10352"
     ],
     "collection": {
-      "name": "acmeCo/test/test_key_discovery_329932",
+      "name": "acmeCo/test/test_keyless_discovery_10352",
       "read_schema_json": {
         "type": "object",
         "required": [
-          "_meta",
-          "k_smallint",
-          "k_int",
-          "k_bigint",
-          "k_bool",
-          "k_str"
+          "_meta"
         ],
         "properties": {
           "_meta": {
@@ -43,35 +38,36 @@ Binding 0:
               "index"
             ]
           },
-          "data": {
-            "type": "string"
-          },
-          "k_bigint": {
+          "v_bigint": {
             "type": "integer"
           },
-          "k_bool": {
+          "v_bool": {
             "type": "boolean"
           },
-          "k_int": {
+          "v_int": {
             "type": "integer"
           },
-          "k_smallint": {
+          "v_smallint": {
             "type": "integer"
           },
-          "k_str": {
+          "v_str": {
             "type": "string"
+          },
+          "v_text": {
+            "type": "string"
+          },
+          "v_ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "v_tstz": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
-      "key": [
-        "/k_smallint",
-        "/k_int",
-        "/k_bigint",
-        "/k_bool",
-        "/k_str"
-      ],
       "projections": null
     },
-    "state_key": "test_key_discovery_329932"
+    "state_key": "test_keyless_discovery_10352"
   }
 
