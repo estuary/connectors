@@ -1,0 +1,148 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "credentials": {
+          "description": "Pick an authentication method.",
+          "discriminator": {
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "access_token": {
+                  "airbyte_secret": true,
+                  "description": "Access Token is a token you received by complete the OauthWebFlow of Notion.",
+                  "title": "Access Token",
+                  "type": "string"
+                },
+                "auth_type": {
+                  "const": "OAuth2.0",
+                  "default": "OAuth2.0",
+                  "type": "string"
+                },
+                "client_id": {
+                  "airbyte_secret": true,
+                  "description": "The ClientID of your Notion integration.",
+                  "title": "Client ID",
+                  "type": "string"
+                },
+                "client_secret": {
+                  "airbyte_secret": true,
+                  "description": "The ClientSecret of your Notion integration.",
+                  "title": "Client Secret",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "auth_type",
+                "client_id",
+                "client_secret",
+                "access_token"
+              ],
+              "title": "OAuth2.0",
+              "type": "object",
+              "x-oauth2-provider": "notion"
+            },
+            {
+              "properties": {
+                "auth_type": {
+                  "const": "token",
+                  "default": "token",
+                  "type": "string"
+                },
+                "token": {
+                  "airbyte_secret": true,
+                  "description": "Notion API access token, see the docs for more information: https://go.estuary.dev/u5BKFR",
+                  "title": "Access Token",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "auth_type",
+                "token"
+              ],
+              "title": "Access Token",
+              "type": "object"
+            }
+          ],
+          "order": 1,
+          "title": "Authenticate using",
+          "type": "object"
+        },
+        "start_date": {
+          "default": "2023-04-17T00:00:00.000Z",
+          "description": "UTC date and time in the format 2017-01-25T00:00:00.000Z. Any data before this date will not be replicated.",
+          "examples": [
+            "2020-11-16T00:00:00.000Z"
+          ],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}Z$",
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_date",
+        "credentials"
+      ],
+      "title": "Notion Source Spec",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ResourceSpec",
+      "type": "object",
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "properties": {
+        "cursorField": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "type": "string",
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ]
+        }
+      }
+    },
+    "documentationUrl": "https://go.estuary.dev/9iXgpB",
+    "oauth2": {
+      "provider": "notion",
+      "authUrlTemplate": "https://api.notion.com/v1/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&owner=user&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://api.notion.com/v1/oauth/token",
+      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
+      "accessTokenHeaders": {
+        "Authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{client_secret }}}{{/basicauth}}",
+        "Content-Type": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]
