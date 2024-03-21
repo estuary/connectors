@@ -1,22 +1,31 @@
 conversion_window_days: 14
 credentials:
-    client_id_sops: ENC[AES256_GCM,data:ZsF2Lbd7Qs5bRUhQmZGZR3ZCs5s/z0+yM9g2+VSv/WM+xQfg3l9UoB3jI2p2f5FLjfbBqf/u9L2hcDWjXF4qb03B6hu6AaVY,iv:YJ/LP4svB3gZNiSrm9mfXwXolSaPLssAWTSXt4KSRy4=,tag:VG7gHrvGR3dPB+bAhPo0WQ==,type:str]
-    client_secret_sops: ENC[AES256_GCM,data:U5aP0B0voAiSZ2JNgoSn3jTKwKE3XFyuFw13+1iDNalYl7A=,iv:Y//VY6aSCPjhcgd8bLjKscReBjlPxN21yAA5yUsRpcg=,tag:Rv4epw5yFRZa9PPhrQW0xw==,type:str]
-    developer_token_sops: ENC[AES256_GCM,data:s5gH/Pjazxh6VwsDF035qhXeNN6qIQ==,iv:ne8jYwF91t8yTgEqpTgwxn4l94Xx4XkiIpGTZyStsvU=,tag:mJ6whBzLoGJidgeoMl+knA==,type:str]
-    refresh_token_sops: ENC[AES256_GCM,data:bNgS+zsZZnTrpn3zbc1V/eRD/WhlUKr7SN42FC3jx5C031SdMR5qtE2MapYRw6Y1f2Kojzj4FZh10b2oRMY8MovrTRx7eNILfNFsWVZwUJe3D0L/ETk1SCMU/BfvOFhfNW3sqcS4AA==,iv:dIT7FRHpn0zcausNIxQzguQO7RC4Rcvu9ycBMOhzOeU=,tag:EuC/r3mrEHqjPTcWDj5Xpw==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:8WgIkKsrK1IqKArD0YRT6RzLuH0SK02q9cjgAObGINR25C1H6rRnpcMnfcr0laY1uNy3UMmIJqsiIGcUHl7t64XyUGYg5qm9,iv:WSWdofGPEp8i776SGf2m7iJvJl/fb9rOwdZoTDY/8Z8=,tag:xpIVkyv+48cSajQMxZ5bLQ==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:VQ1b9eGY+KxMpr0PQEj4/rFkf3ces4XSLAglID+jGf10iss=,iv:5kZ71TMYWlxqFKeNQ4u+e8X81gfidMB2KPW0lCxgPm4=,tag:4jR+MLrLFBlxyCSE6pk6ZQ==,type:str]
+    developer_token_sops: ENC[AES256_GCM,data:bv+ddS11AW9RGlJ3/QDxItxZlg1TuQ==,iv:GHrwFOXku6dc2YqddecN+ycDlB1Vu/HkHa5u+WOUX/c=,tag:JW6x7MQtdcAVkgAensEO9A==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:7pThdov5EltVmHuS6kAbOMSjm1nx4sHbb6vnyTIYUsnCU4NPOfPXxQeMwJNeFohGgn96PqkiSSXT0CBSktumRH9Njoe96e4BmiktAwZ5uttUJkKQTwpQ1QTOXd937JAzQea8Smbguw==,iv:EW+k13SNfJm9tKw1u7+VXtHgPC0eaYoUaA7zUjRtpHc=,tag:ciaiXgbKrGKujZknyu4TeQ==,type:str]
+custom_queries:
+    - query: SELECT segments.ad_destination_type, segments.ad_network_type, segments.day_of_week, customer.auto_tagging_enabled, customer.id, metrics.conversions, campaign.start_date FROM campaign
+      primary_key: customer.id
+      cursor_field: null
+      table_name: unhappytable
+    - query: SELECT ad_group.targeting_setting.target_restrictions FROM ad_group
+      primary_key: customer.id
+      cursor_field: null
+      table_name: ad_group_custom
 customer_id: "6458773721"
 start_date: "2022-01-01"
 sops:
     kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2024-02-01T15:11:34Z"
-          enc: CiQAdmEdwpewZLDvu80ySB31XOaRpBuQ5twOS4zpydRmn3imRsQSSQCVvC1zm2KgUypWm0F//eD1yeScHf7y/TMYBC5tqXHiK6Qy4eb7deyHVe5dO5rYenWveJzy7enCAhxAxk9N7RHXUjK89lsgn6E=
+          created_at: "2024-03-21T17:23:42Z"
+          enc: CiQAdmEdwvK590m1n59RHcelPtJUvJec4N+2MGLbrMoX42DpiNISSQCSobQjVRDdX4DDCcvCnqdimvUjMaL3awz9c1kDjw25gROXylJxvQd8g7EddcoQSXGCbgBMxsYnb776jdrIcA/S3sZ8qox+7d4=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-02-01T15:12:59Z"
-    mac: ENC[AES256_GCM,data:kuLSbiCpD9A3PkLg4pEVxYWj8PFXXmoYrH/XGVKZcoJgNUlMehvfcrB2XKIfEnE/lEE9jyQNGMMExwXKFyLrSbT4dwR7rkjD3aW1yyoFaSmAcDReQKKkhhXd+vaOIOgvH0Rjap3btyKSF6M5/WjMo/eM15C4l4Z0809d7dzONvI=,iv:c8YHHO36hDWU7AFgChk+tHcE99krMmbo4UcuTGknSY0=,tag:yLyvkC55JnKSzznTN23Gjw==,type:str]
+    lastmodified: "2024-03-21T17:23:43Z"
+    mac: ENC[AES256_GCM,data:rss+rv+rzLmLHdqVUeRzpWm/byxb+DyXq299rsallEDx0oyWQusBM4tHDjfFaD1F5W37SH6Gu8ojPh5S6wJj367cLWoCEneth6X1AtuaKA0hXCVCvksnwIRp+SEIojFfvxFLwNgsnn6G0swhQuouiRFxDdmW2DowrqUQ0jV/48g=,iv:yjbQMDiAt0FtuA7sYNytkdgMohpQWf7IMkVY8RLfOhQ=,tag:mkSpNZ4EpkYD2ZzA08q9Sg==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.7.3
+    version: 3.8.1
