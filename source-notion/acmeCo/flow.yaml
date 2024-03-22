@@ -4,6 +4,10 @@ collections:
     schema: blocks.schema.yaml
     key:
       - /id
+  acmeCo/comments:
+    schema: comments.schema.yaml
+    key:
+      - /id
   acmeCo/databases:
     schema: databases.schema.yaml
     key:
