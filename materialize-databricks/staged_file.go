@@ -16,7 +16,7 @@ import (
 )
 
 const fileSizeLimit = 128 * 1024 * 1024
-const uploadConcurrency = 5 // that means we may use up to 1.28GB disk space
+const uploadConcurrency = 3
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
 // buffer and close the underlying file.
