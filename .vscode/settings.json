@@ -8,4 +8,9 @@
         "**/.pytest_cache": true,
         "**/__pycache__": true,
     },
+    "python.testing.pytestArgs": [
+        "source-notion"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
 }
