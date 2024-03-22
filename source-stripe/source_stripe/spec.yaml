@@ -11,20 +11,16 @@ connectionSpecification:
     account_id:
       type: string
       title: Account ID
-      description: >-
-        Your Stripe account ID (starts with 'acct_', find yours <a
-        href="https://dashboard.stripe.com/settings/account">here</a>).
+      description: "Your Stripe account ID (starts with acct_). Find yours here: https://go.estuary.dev/t7DgTg"
       order: 0
     client_secret:
       type: string
       title: Secret Key
-      description: >-
-        Stripe API key (usually starts with 'sk_live_'; find yours <a
-        href="https://dashboard.stripe.com/apikeys">here</a>).
+      description: "Stripe API key (usually starts with sk_live_). Find yours here: https://go.estuary.dev/t7DgTg"
       airbyte_secret: true
       order: 1
     start_date:
-      type: string
+      type: date-time
       title: Replication start date
       pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$
       description: >-
@@ -39,11 +35,7 @@ connectionSpecification:
       title: Lookback Window in days
       default: 0
       minimum: 0
-      description: >-
-        When set, the connector will always re-export data from the past N days,
-        where N is the value set here. This is useful if your data is frequently updated
-        after creation. More info <a
-        href="https://docs.airbyte.com/integrations/sources/stripe#requirements">here</a>
+      description: "When set, the connector will always re-export data from the past N days, where N is the value set here. This is useful if your data is frequently updated after creation. More info here https://go.estuary.dev/OhUbgL"
       order: 3
     slice_range:
       type: integer

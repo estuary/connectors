@@ -3,12 +3,11 @@ name = "source-stripe"
 version = "0.1.0"
 description = ""
 authors = ["Pedro Moreira <pedroantonionm@pm.me>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
 airbyte-cdk = "^0.68.4"
-estuary-cdk = {path="../estuary-cdk", develop = true}
+estuary-cdk = { path = "../estuary-cdk", develop = true }
 types-requests = "^2.31"
 stripe = "^8.8.0"
 

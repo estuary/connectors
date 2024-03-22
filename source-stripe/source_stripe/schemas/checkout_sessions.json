@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": [
+    "null",
     "object"
   ],
   "properties": {
@@ -348,11 +349,9 @@
       }
     },
     "payment_method_types": {
-      "type": [
-        "null",
-        "array"
-      ],
+      "type": "array",
       "items": {
+        "card": null,
         "type": [
           "string",
           "null"

@@ -445,6 +445,10 @@
             ]
           },
           "purchase_details": {
+            "fuel": null,
+            "lodging": null,
+            "receipt": null,
+            "reference": null,
             "properties": {
               "flight": {
                 "properties": {
@@ -478,7 +482,8 @@
                       "string"
                     ]
                   }
-                }
+                },
+                "travel_agency": null
               },
               "fuel": {
                 "type": [

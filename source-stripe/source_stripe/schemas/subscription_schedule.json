@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": [
+    "null",
     "object"
   ],
   "additionalProperties": true,
@@ -25,15 +26,17 @@
     },
     "canceled_at": {
       "type": [
-        "null",
-        "string"
-      ]
+        "string",
+        "null"
+      ],
+      "format": "date-time"
     },
     "completed_at": {
       "type": [
-        "null",
-        "string"
-      ]
+        "string",
+        "null"
+      ],
+      "format": "date-time"
     },
     "created": {
       "type": [
@@ -43,8 +46,8 @@
     },
     "current_phase": {
       "type": [
-        "null",
-        "object"
+        "object",
+        "null"
       ],
       "additionalProperties": true,
       "properties": {
@@ -126,8 +129,9 @@
         },
         "invoice_settings": {
           "type": [
+            "string",
             "null",
-            "string"
+            "object"
           ]
         },
         "on_behalf_of": {
@@ -194,8 +198,8 @@
                 },
                 "quantity": {
                   "type": [
-                    "null",
-                    "string"
+                    "integer",
+                    "null"
                   ]
                 },
                 "tax_rates": {
@@ -359,14 +363,16 @@
           },
           "end_date": {
             "type": [
-              "null",
-              "integer"
-            ]
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "invoice_settings": {
             "type": [
+              "string",
               "null",
-              "string"
+              "object"
             ]
           },
           "items": {
@@ -402,8 +408,8 @@
                 },
                 "quantity": {
                   "type": [
-                    "null",
-                    "integer"
+                    "integer",
+                    "null"
                   ]
                 },
                 "tax_rates": {
@@ -443,9 +449,10 @@
           },
           "start_date": {
             "type": [
-              "null",
-              "integer"
-            ]
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           },
           "transfer_data": {
             "type": [
@@ -455,18 +462,20 @@
           },
           "trial_end": {
             "type": [
-              "null",
-              "string"
-            ]
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }
     },
     "released_at": {
       "type": [
-        "null",
-        "string"
-      ]
+        "string",
+        "null"
+      ],
+      "format": "date-time"
     },
     "released_subscription": {
       "type": [
