@@ -4,15 +4,16 @@ import:
 captures:
   acmeCo/source-notion:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-notion:v2"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_notion
         config: config.yaml
     bindings:
       - resource:
           stream: users
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/users
       - resource:
           stream: databases
@@ -32,3 +33,9 @@ captures:
           cursorField:
             - last_edited_time
         target: acmeCo/blocks
+      - resource:
+          stream: comments
+          syncMode: incremental
+          cursorField:
+            - page_last_edited_time
+        target: acmeCo/comments
