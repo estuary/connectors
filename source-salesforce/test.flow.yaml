@@ -1,0 +1,8 @@
+---
+captures:
+  acmeCo/source-salesforce:
+    endpoint:
+        connector:
+          image: "ghcr.io/estuary/source-salesforce:v1"
+          config: config.yaml
+    bindings: []
