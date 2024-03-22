@@ -1,5 +1,5 @@
 {
-  "documentationUrl": "https://docs.airbyte.com/integrations/sources/notion",
+  "documentationUrl": "https://go.estuary.dev/source-notion",
   "connectionSpecification": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Notion Source Spec",
@@ -17,13 +17,17 @@
       },
       "credentials": {
         "title": "Authentication Method",
-        "description": "Choose either OAuth (recommended for Airbyte Cloud) or Access Token. See our <a href='https://docs.airbyte.com/integrations/sources/notion#setup-guide'>docs</a> for more information.",
+        "description": "Choose either OAuth or Access Token.",
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
         "type": "object",
         "order": 1,
         "oneOf": [
           {
             "type": "object",
             "title": "OAuth2.0",
+            "x-oauth2-provider": "notion",
             "required": [
               "auth_type",
               "client_id",
@@ -38,19 +42,19 @@
               "client_id": {
                 "title": "Client ID",
                 "type": "string",
-                "description": "The Client ID of your Notion integration. See our <a href='https://docs.airbyte.com/integrations/sources/notion#step-2-set-permissions-and-acquire-authorization-credentials'>docs</a> for more information.",
+                "description": "The Client ID of your Notion integration.",
                 "airbyte_secret": true
               },
               "client_secret": {
                 "title": "Client Secret",
                 "type": "string",
-                "description": "The Client Secret of your Notion integration. See our <a href='https://docs.airbyte.com/integrations/sources/notion#step-2-set-permissions-and-acquire-authorization-credentials'>docs</a> for more information.",
+                "description": "The Client Secret of your Notion integration.",
                 "airbyte_secret": true
               },
               "access_token": {
                 "title": "Access Token",
                 "type": "string",
-                "description": "The Access Token received by completing the OAuth flow for your Notion integration. See our <a href='https://docs.airbyte.com/integrations/sources/notion#step-2-set-permissions-and-acquire-authorization-credentials'>docs</a> for more information.",
+                "description": "The Access Token received by completing the OAuth flow for your Notion integration.",
                 "airbyte_secret": true
               }
             }
@@ -66,7 +70,7 @@
               },
               "token": {
                 "title": "Access Token",
-                "description": "The Access Token for your private Notion integration. See the <a href='https://docs.airbyte.com/integrations/sources/notion#step-1-create-an-integration-in-notion'>docs</a> for more information on how to obtain this token.",
+                "description": "The Access Token for your private Notion integration. See the docs for more information: https://go.estuary.dev/u5BKFR",
                 "type": "string",
                 "airbyte_secret": true
               }
