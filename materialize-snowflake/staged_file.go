@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -156,7 +155,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	return nil
 }
 
-func (f *stagedFile) encodeRow(row []interface{}, collection pf.Collection) error {
+func (f *stagedFile) encodeRow(row []interface{}) error {
 	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
 	// file, or for the very first call to encodeRow().
 	if f.encoder == nil {
@@ -165,19 +164,8 @@ func (f *stagedFile) encodeRow(row []interface{}, collection pf.Collection) erro
 		}
 	}
 
-	initialWritten := f.encoder.Written()
-
 	if err := f.encoder.Encode(row); err != nil {
 		return fmt.Errorf("encoding row: %w", err)
-	}
-
-	// Temporary logging for encoding large documents that exceed Snowflake's 16MB limit.
-	delta := f.encoder.Written() - initialWritten
-	if delta > 16*1024*1024 {
-		log.WithFields(log.Fields{
-			"collection": collection.String(),
-			"docSize":    delta,
-		}).Warn("encoded a large document")
 	}
 
 	// Concurrently start the PUT process for this file if the current file has reached

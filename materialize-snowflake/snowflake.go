@@ -288,7 +288,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return err
 		} else if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else if err = b.load.stage.encodeRow(converted, b.target.Source); err != nil {
+		} else if err = b.load.stage.encodeRow(converted); err != nil {
 			return fmt.Errorf("encoding Load key to scratch file: %w", err)
 		}
 	}
@@ -422,7 +422,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
-		} else if err = b.store.stage.encodeRow(converted, b.target.Source); err != nil {
+		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
 	}
