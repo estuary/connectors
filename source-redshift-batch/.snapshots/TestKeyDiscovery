@@ -43,7 +43,10 @@ Binding 0:
             ]
           },
           "data": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "k_bigint": {
             "type": "integer"

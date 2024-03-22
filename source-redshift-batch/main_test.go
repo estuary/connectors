@@ -202,7 +202,7 @@ func TestKeylessDiscovery(t *testing.T) {
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
-	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(v_smallint SMALLINT, v_int INTEGER, v_bigint BIGINT, v_bool BOOLEAN, v_str VARCHAR(8), v_ts TIMESTAMP, v_tstz TIMESTAMP WITH TIME ZONE, v_text TEXT)", tableName))
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(v_smallint SMALLINT, v_int INTEGER, v_bigint BIGINT, v_bool BOOLEAN, v_str VARCHAR(8), v_ts TIMESTAMP, v_tstz TIMESTAMP WITH TIME ZONE, v_text TEXT, v_int_notnull INTEGER NOT NULL, v_text_notnull TEXT NOT NULL)", tableName))
 
 	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
 	snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
