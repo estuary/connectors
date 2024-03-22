@@ -264,82 +264,10 @@ WHEN NOT MATCHED THEN
 	{{- end -}}
 	);
 {{ end }}
-
-{{ define "installFence" }}
--- Our desired fence
-DECLARE vMaterialization STRING DEFAULT {{ Literal $.Materialization.String }};
-DECLARE vKeyBegin INT64 DEFAULT {{ $.KeyBegin }};
-DECLARE vKeyEnd INT64 DEFAULT {{ $.KeyEnd }};
-
--- The current values
-DECLARE curFence INT64;
-DECLARE curKeyBegin INT64;
-DECLARE curKeyEnd INT64;
-DECLARE curCheckpoint STRING;
-
-BEGIN TRANSACTION;
-
--- Increment the fence value of _any_ checkpoint which overlaps our key range.
-UPDATE {{ Identifier $.TablePath }}
-	SET fence=fence+1
-	WHERE materialization = vMaterialization
-	AND key_end >= vKeyBegin
-	AND key_begin <= vKeyEnd;
-
--- Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
-SET (curFence, curKeyBegin, curKeyEnd, curCheckpoint) = (
-	SELECT AS STRUCT fence, key_begin, key_end, checkpoint
-		FROM {{ Identifier $.TablePath }}
-		WHERE materialization = vMaterialization
-		AND key_begin <= vKeyBegin
-		AND key_end >= vKeyEnd
-		ORDER BY key_end - key_begin ASC
-		LIMIT 1
-);
-
--- Create a new fence if none exists.
-IF curFence IS NULL THEN
-	SET curFence = {{ $.Fence }};
-	SET curKeyBegin = 1;
-	SET curKeyEnd = 0;
-	SET curCheckpoint = {{ Literal (Base64Std $.Checkpoint) }};
-END IF;
-
--- If any of the key positions don't line up, create a new fence.
--- Either it's new or we are starting a split shard.
-IF vKeyBegin <> curKeyBegin OR vKeyEnd <> curKeyEnd THEN
-	INSERT INTO {{ Identifier $.TablePath }} (materialization, key_begin, key_end, fence, checkpoint)
-	VALUES (vMaterialization, vKeyBegin, vKeyEnd, curFence, curCheckpoint);
-END IF;
-
-COMMIT TRANSACTION;
-
--- Get the current value
-SELECT curFence AS fence, curCheckpoint AS checkpoint;
-{{ end }}
-
-{{ define "updateFence" }}
-IF (
-	SELECT fence
-	FROM {{ Identifier $.TablePath }}
-	WHERE materialization={{ Literal $.Materialization.String }} AND key_begin={{ $.KeyBegin }} AND key_end={{ $.KeyEnd }} AND fence={{ $.Fence }}
-) IS NULL THEN
-	RAISE USING MESSAGE = 'This instance was fenced off by another';
-END IF;
-
-UPDATE {{ Identifier $.TablePath }}
-	SET checkpoint={{ Literal (Base64Std $.Checkpoint) }}
-	WHERE materialization={{ Literal $.Materialization.String }}
-	AND key_begin={{ $.KeyBegin }}
-	AND key_end={{ $.KeyEnd }}
-	AND fence={{ $.Fence }};
-{{ end }}
 `)
 	tplTempTableName     = tplAll.Lookup("tempTableName")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
 	tplStoreInsert       = tplAll.Lookup("storeInsert")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
