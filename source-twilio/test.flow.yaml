@@ -1,0 +1,20 @@
+---
+captures:
+  acmeCo/source-twilio:
+    autoDiscover:
+      addNewBindings: true
+      evolveIncompatibleCollections: true
+    endpoint:
+      local:
+        command:
+          - python
+          # - "-Xfrozen_modules=off"
+          # - "-m"
+          # - debugpy
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          - "-m"
+          - source_twilio
+        config: config.yaml
+    bindings: []
