@@ -76,7 +76,10 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
-	} else if prereqErrs := client.PreReqs(ctx); prereqErrs.Len() != 0 {
+	}
+	defer client.Close()
+
+	if prereqErrs := client.PreReqs(ctx); prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	} else if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
