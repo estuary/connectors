@@ -44,7 +44,7 @@ async def all_resources(
             fetch_changes=functools.partial(
                 fetch_events,
                 http,
-                config.organization,
+                config,
                 entity,
             ),
         )
