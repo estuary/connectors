@@ -1,0 +1,19 @@
+---
+captures:
+  acmeCo/source-google-analytics-data-api:
+    shards:
+      logLevel: debug
+    endpoint:
+      local:
+        command:
+          - python
+          # - "-Xfrozen_modules=off"
+          # - "-m"
+          # - debugpy
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
+          - "-m"
+          - source_google_analytics_data_api
+        config: config.yaml
+    bindings: []
