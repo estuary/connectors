@@ -2,6 +2,10 @@
   [
     "acmeCo/users",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "avatar_url": null,
       "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
       "name": "WillB Estuary",
@@ -13,11 +17,15 @@
   [
     "acmeCo/users",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "avatar_url": null,
       "bot": {
         "owner": {
-          "type": "workspace",
-          "workspace": true
+          "info": true,
+          "type": "workspace"
         },
         "workspace_name": "WillB Estuary's Notion"
       },
@@ -30,6 +38,10 @@
   [
     "acmeCo/databases",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "archived": false,
       "cover": null,
       "created_by": {
@@ -117,6 +129,10 @@
   [
     "acmeCo/pages",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "archived": false,
       "cover": null,
       "created_by": {
@@ -169,6 +185,10 @@
   [
     "acmeCo/pages",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "archived": false,
       "cover": null,
       "created_by": {
@@ -223,6 +243,10 @@
   [
     "acmeCo/pages",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "archived": false,
       "cover": null,
       "created_by": {
@@ -293,6 +317,10 @@
   [
     "acmeCo/pages",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "archived": false,
       "cover": null,
       "created_by": {
@@ -347,6 +375,10 @@
   [
     "acmeCo/pages",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "archived": false,
       "cover": null,
       "created_by": {
@@ -423,6 +455,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -451,6 +487,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -497,6 +537,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -544,6 +588,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -590,6 +638,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -637,6 +689,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -665,6 +721,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
       "archived": false,
       "created_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -693,6 +753,10 @@
   [
     "acmeCo/blocks",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "archived": false,
       "code": {
         "caption": [],
