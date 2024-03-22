@@ -414,19 +414,20 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		}
 
 		// Decode column type information into a usable form
-		var dataType columnType
+		var dataType basicColumnType
 		switch typeType {
 		case "e": // enum values are captured as strings
-			dataType = &basicColumnType{jsonType: "string"}
+			dataType = basicColumnType{jsonType: "string"}
 		case "r", "m": // ranges and multiranges are captured as strings
-			dataType = &basicColumnType{jsonType: "string"}
+			dataType = basicColumnType{jsonType: "string"}
 		default:
 			var ok bool
 			dataType, ok = databaseTypeToJSON[typeName]
 			if !ok {
-				dataType = &basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
+				dataType = basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
 			}
 		}
+		dataType.nullable = isNullable
 
 		columns = append(columns, &discoveredColumn{
 			Schema:     tableSchema,
@@ -434,7 +435,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			Name:       columnName,
 			Index:      columnIndex,
 			IsNullable: isNullable,
-			DataType:   dataType,
+			DataType:   &dataType,
 		})
 	}
 	return columns, nil
@@ -499,51 +500,51 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	return keys, nil
 }
 
-var databaseTypeToJSON = map[string]columnType{
-	"bool": &basicColumnType{jsonType: "boolean"},
+var databaseTypeToJSON = map[string]basicColumnType{
+	"bool": {jsonType: "boolean"},
 
-	"int2": &basicColumnType{jsonType: "integer"},
-	"int4": &basicColumnType{jsonType: "integer"},
-	"int8": &basicColumnType{jsonType: "integer"},
+	"int2": {jsonType: "integer"},
+	"int4": {jsonType: "integer"},
+	"int8": {jsonType: "integer"},
 
-	"numeric": &basicColumnType{jsonType: "string", format: "number"},
-	"float4":  &basicColumnType{jsonType: "number"},
-	"float8":  &basicColumnType{jsonType: "number"},
+	"numeric": {jsonType: "string", format: "number"},
+	"float4":  {jsonType: "number"},
+	"float8":  {jsonType: "number"},
 
-	"varchar": &basicColumnType{jsonType: "string"},
-	"bpchar":  &basicColumnType{jsonType: "string"},
-	"text":    &basicColumnType{jsonType: "string"},
-	"bytea":   &basicColumnType{jsonType: "string", contentEncoding: "base64"},
-	"xml":     &basicColumnType{jsonType: "string"},
-	"bit":     &basicColumnType{jsonType: "string"},
-	"varbit":  &basicColumnType{jsonType: "string"},
+	"varchar": {jsonType: "string"},
+	"bpchar":  {jsonType: "string"},
+	"text":    {jsonType: "string"},
+	"bytea":   {jsonType: "string", contentEncoding: "base64"},
+	"xml":     {jsonType: "string"},
+	"bit":     {jsonType: "string"},
+	"varbit":  {jsonType: "string"},
 
-	"json":     &basicColumnType{},
-	"jsonb":    &basicColumnType{},
-	"jsonpath": &basicColumnType{jsonType: "string"},
+	"json":     {},
+	"jsonb":    {},
+	"jsonpath": {jsonType: "string"},
 
 	// Domain-Specific Types
-	"date":        &basicColumnType{jsonType: "string", format: "date-time"},
-	"timestamp":   &basicColumnType{jsonType: "string", format: "date-time"},
-	"timestamptz": &basicColumnType{jsonType: "string", format: "date-time"},
-	"time":        &basicColumnType{jsonType: "integer"},
-	"timetz":      &basicColumnType{jsonType: "string", format: "time"},
-	"interval":    &basicColumnType{jsonType: "string"},
-	"money":       &basicColumnType{jsonType: "string"},
-	"point":       &basicColumnType{jsonType: "string"},
-	"line":        &basicColumnType{jsonType: "string"},
-	"lseg":        &basicColumnType{jsonType: "string"},
-	"box":         &basicColumnType{jsonType: "string"},
-	"path":        &basicColumnType{jsonType: "string"},
-	"polygon":     &basicColumnType{jsonType: "string"},
-	"circle":      &basicColumnType{jsonType: "string"},
-	"inet":        &basicColumnType{jsonType: "string"},
-	"cidr":        &basicColumnType{jsonType: "string"},
-	"macaddr":     &basicColumnType{jsonType: "string"},
-	"macaddr8":    &basicColumnType{jsonType: "string"},
-	"tsvector":    &basicColumnType{jsonType: "string"},
-	"tsquery":     &basicColumnType{jsonType: "string"},
-	"uuid":        &basicColumnType{jsonType: "string", format: "uuid"},
+	"date":        {jsonType: "string", format: "date-time"},
+	"timestamp":   {jsonType: "string", format: "date-time"},
+	"timestamptz": {jsonType: "string", format: "date-time"},
+	"time":        {jsonType: "integer"},
+	"timetz":      {jsonType: "string", format: "time"},
+	"interval":    {jsonType: "string"},
+	"money":       {jsonType: "string"},
+	"point":       {jsonType: "string"},
+	"line":        {jsonType: "string"},
+	"lseg":        {jsonType: "string"},
+	"box":         {jsonType: "string"},
+	"path":        {jsonType: "string"},
+	"polygon":     {jsonType: "string"},
+	"circle":      {jsonType: "string"},
+	"inet":        {jsonType: "string"},
+	"cidr":        {jsonType: "string"},
+	"macaddr":     {jsonType: "string"},
+	"macaddr8":    {jsonType: "string"},
+	"tsvector":    {jsonType: "string"},
+	"tsquery":     {jsonType: "string"},
+	"uuid":        {jsonType: "string", format: "uuid"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
