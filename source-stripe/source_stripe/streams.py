@@ -918,7 +918,7 @@ class UsageRecords(StripeStream, HttpSubStream):
     Docs: https://stripe.com/docs/api/usage_records/subscription_item_summary_list
     """
 
-    primary_key = None
+    primary_key = "id"
 
     def __init__(self, **kwargs):
         parent = SubscriptionItems(**kwargs)

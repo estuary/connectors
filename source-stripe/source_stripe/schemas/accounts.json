@@ -4,240 +4,453 @@
   "type": "object",
   "properties": {
     "business_profile": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "mcc": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "product_description": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "support_address": {
           "$ref": "address.json"
         },
         "support_email": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "support_phone": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "support_url": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "url": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "business_type": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "capabilities": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "afterpay_clearpay_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "au_becs_debit_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "bacs_debit_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "bancontact_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "card_issuing": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "card_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "cartes_bancaires_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "eps_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "fpx_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "giropay_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "grabpay_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "ideal_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "jcb_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "legacy_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "oxxo_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "p24_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "sepa_debit_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "sofort_payments": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "tax_reporting_us_1099_k": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "tax_reporting_us_1099_misc": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "transfers": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "charges_enabled": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "company": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "address": {
           "$ref": "address.json"
         },
         "address_kana": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "city": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "country": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line1": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line2": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "postal_code": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "state": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "town": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         },
         "address_kanji": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "city": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "country": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line1": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line2": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "postal_code": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "state": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "town": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         },
         "directors_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "executives_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "export_license_id": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "export_purpose_code": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name_kana": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name_kanji": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "owners_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "ownership_declaration": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "date": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "ip": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "user_agent": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         },
         "phone": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "structure": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "tax_id_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "tax_id_registrar": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "vat_id_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "verification": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "document": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true,
               "properties": {
                 "back": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "details": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "details_code": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               }
             }
@@ -246,499 +459,907 @@
       }
     },
     "country": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "created": {
-      "type": ["null", "integer"]
+      "type": [
+        "null",
+        "integer"
+      ]
     },
     "default_currency": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "details_submitted": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "external_accounts": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "data": {
-          "type": ["null", "array"]
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "has_more": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "object": {
-          "enum": ["list"],
-          "type": ["null", "string"]
+          "enum": [
+            "list"
+          ],
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "url": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "id": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "individual": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "id": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "object": {
-          "type": ["null", "string"],
-          "enum": ["person"]
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "person"
+          ]
         },
         "account": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "address": {
           "$ref": "address.json"
         },
         "address_kana": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "city": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "country": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line1": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line2": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "postal_code": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "state": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "town": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         },
         "address_kanji": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "city": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "country": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line1": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "line2": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "postal_code": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "state": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "town": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         },
         "created": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "dob": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "day": {
-              "type": ["null", "number"]
+              "type": [
+                "null",
+                "number"
+              ]
             },
             "month": {
-              "type": ["null", "number"]
+              "type": [
+                "null",
+                "number"
+              ]
             },
             "year": {
-              "type": ["null", "number"]
+              "type": [
+                "null",
+                "number"
+              ]
             }
           }
         },
         "email": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "first_name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "first_name_kane": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "first_name_kanji": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "full_name_aliases": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "full_requirements": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "alternatives": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "array"
+              ],
               "additionalProperties": true,
-              "properties": {
-                "alternative_fields_due": {
-                  "type": ["null", "array"],
-                  "items": {
-                    "type": ["null", "string"]
-                  }
-                },
-                "original_fields_due": {
-                  "type": ["null", "array"],
-                  "items": {
-                    "type": ["null", "string"]
-                  }
-                }
-              }
+              "properties": {}
             },
             "currently_due": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "errors": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "object"],
+                "type": [
+                  "null",
+                  "object"
+                ],
                 "additionalProperties": true,
                 "properties": {
                   "code": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "reason": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "requirement": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   }
                 }
               }
             },
             "eventually_due": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "past_due": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "pending_verification": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             }
           }
         },
         "gender": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "id_number_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "id_number_secondary_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "last_name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "last_name_kana": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "last_name_kanji": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "maiden_name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "metadata": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true
         },
         "nationality": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "phone": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "political_exposure": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "registered_address": {
           "$ref": "address.json"
         },
         "relationship": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "director": {
-              "type": ["null", "boolean"]
+              "type": [
+                "null",
+                "boolean"
+              ]
             },
             "executive": {
-              "type": ["null", "boolean"]
+              "type": [
+                "null",
+                "boolean"
+              ]
             },
             "owner": {
-              "type": ["null", "boolean"]
+              "type": [
+                "null",
+                "boolean"
+              ]
             },
             "percent_ownership": {
-              "type": ["null", "number"]
+              "type": [
+                "null",
+                "number"
+              ]
             },
             "representative": {
-              "type": ["null", "boolean"]
+              "type": [
+                "null",
+                "boolean"
+              ]
             },
             "title": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         },
         "requirements": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "alternatives": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "array"
+              ],
               "additionalProperties": true,
               "properties": {
                 "alternative_fields_due": {
-                  "type": ["null", "array"],
+                  "type": [
+                    "null",
+                    "array"
+                  ],
                   "items": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   }
                 },
                 "original_fields_due": {
-                  "type": ["null", "array"],
+                  "type": [
+                    "null",
+                    "array"
+                  ],
                   "items": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   }
                 }
               }
             },
             "currently_due": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "errors": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "object"],
+                "type": [
+                  "null",
+                  "object"
+                ],
                 "additionalProperties": true,
                 "properties": {
                   "code": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "reason": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "requirement": {
-                    "type": ["null", "string"]
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   }
                 }
               }
             },
             "eventually_due": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "past_due": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "pending_verification": {
-              "type": ["null", "array"],
+              "type": [
+                "null",
+                "array"
+              ],
               "items": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             }
           }
         },
         "ssn_last_4_provided": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "verification": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
             "additional_document": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true,
               "properties": {
                 "back": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "details": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "details_code": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               }
             },
             "details": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "details_code": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "document": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true,
               "properties": {
                 "back": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "details": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "details_code": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "front": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               }
             },
             "status": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             }
           }
         }
       }
     },
     "metadata": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true
     },
     "object": {
-      "enum": ["account"],
-      "type": ["null", "string"]
+      "enum": [
+        "account"
+      ],
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "payouts_enabled": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "requirements": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "alternatives": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
             "additionalProperties": true,
             "properties": {
               "alternative_fields_due": {
-                "type": ["null", "array"],
+                "type": [
+                  "null",
+                  "array"
+                ],
                 "items": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               },
               "original_fields_due": {
-                "type": ["null", "array"],
+                "type": [
+                  "null",
+                  "array"
+                ],
                 "items": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               }
             }
           }
         },
         "currently_due": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "disabled_reason": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "errors": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "object"],
+            "type": [
+              "null",
+              "object"
+            ],
             "additionalProperties": true,
             "properties": {
               "code": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "reason": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "requirement": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             }
           }
         },
         "eventually_due": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "past_due": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "pending_verification": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }
     },
     "settings": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true
     },
     "tos_acceptance": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "date": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "ip": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "service_agreement": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "user_agent": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "type": {
-      "enum": ["custom", "express", "standard"],
-      "type": ["null", "string"]
+      "enum": [
+        "custom",
+        "express",
+        "standard"
+      ],
+      "type": [
+        "null",
+        "string"
+      ]
     }
   }
 }
