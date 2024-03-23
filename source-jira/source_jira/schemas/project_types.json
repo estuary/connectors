@@ -26,6 +26,11 @@
       "type": "string",
       "description": "The color of the project type.",
       "readOnly": true
+    },
+    "descriptionKey": {
+      "description": "The key of the project type's description.",
+      "readOnly": true,
+      "type": "string"
     }
   },
   "additionalProperties": true,
