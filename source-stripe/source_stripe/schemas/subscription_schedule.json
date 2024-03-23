@@ -1,154 +1,294 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": ["null", "object"],
+  "type": [
+    "object"
+  ],
   "additionalProperties": true,
   "properties": {
     "id": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "object": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "application": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "canceled_at": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "completed_at": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "created": {
-      "type": ["null", "integer"]
+      "type": [
+        "null",
+        "integer"
+      ]
     },
     "current_phase": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true,
       "properties": {
         "end_date": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "start_date": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         }
       }
     },
     "customer": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "default_settings": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "application_fee_percent": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "automatic_tax": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
             "enabled": {
-              "type": ["null", "boolean"]
+              "type": [
+                "null",
+                "boolean"
+              ]
             }
           }
         },
         "billing_cycle_anchor": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "billing_thresholds": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "collection_method": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "default_payment_method": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "description": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "invoice_settings": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "on_behalf_of": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "transfer_data": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "end_behavior": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "livemode": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "metadata": {
-      "type": ["null", "object"]
+      "type": [
+        "null",
+        "object"
+      ]
     },
     "phases": {
-      "type": ["null", "array"],
+      "type": [
+        "null",
+        "array"
+      ],
       "items": {
-        "type": ["null", "object"],
+        "type": [
+          "null",
+          "object"
+        ],
         "additionalProperties": true,
         "properties": {
           "add_invoice_items": {
-            "type": ["null", "array"],
+            "type": [
+              "null",
+              "array"
+            ],
             "items": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true,
               "properties": {
                 "price": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "quantity": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "tax_rates": {
-                  "type": ["null", "array"],
+                  "type": [
+                    "null",
+                    "array"
+                  ],
                   "items": {
-                    "type": ["null", "object"],
+                    "type": [
+                      "null",
+                      "object"
+                    ],
                     "additionalProperties": true,
                     "properties": {
                       "id": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "object": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "active": {
-                        "type": ["null", "boolean"]
+                        "type": [
+                          "null",
+                          "boolean"
+                        ]
                       },
                       "country": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "created": {
-                        "type": ["null", "string"],
+                        "type": [
+                          "null",
+                          "string"
+                        ],
                         "format": "date-time"
                       },
                       "display_name": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "inclusive": {
-                        "type": ["null", "boolean"]
+                        "type": [
+                          "null",
+                          "boolean"
+                        ]
                       },
                       "jurisdiction": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "livemode": {
-                        "type": ["null", "boolean"]
+                        "type": [
+                          "null",
+                          "boolean"
+                        ]
                       },
                       "metadata": {
-                        "type": ["null", "object"],
+                        "type": [
+                          "null",
+                          "object"
+                        ],
                         "additionalProperties": true
                       },
                       "percentage": {
-                        "type": ["null", "number"]
+                        "type": [
+                          "null",
+                          "number"
+                        ]
                       },
                       "state": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "tax_type": {
-                        "type": ["null", "string"]
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       }
                     }
                   }
@@ -157,65 +297,125 @@
             }
           },
           "application_fee_percent": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "billing_cycle_anchor": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "billing_thresholds": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "collection_method": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "coupon": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "currency": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "default_payment_method": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "default_tax_rates": {
-            "type": ["null", "array"],
+            "type": [
+              "null",
+              "array"
+            ],
             "items": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true
             }
           },
           "description": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "end_date": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "invoice_settings": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "items": {
-            "type": ["null", "array"],
+            "type": [
+              "null",
+              "array"
+            ],
             "items": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true,
               "properties": {
                 "billing_thresholds": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "metadata": {
-                  "type": ["null", "object"],
+                  "type": [
+                    "null",
+                    "object"
+                  ],
                   "additionalProperties": true
                 },
                 "price": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "quantity": {
-                  "type": ["null", "integer"]
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
                 },
                 "tax_rates": {
-                  "type": ["null", "array"],
+                  "type": [
+                    "null",
+                    "array"
+                  ],
                   "items": {
-                    "type": ["null", "object"],
+                    "type": [
+                      "null",
+                      "object"
+                    ],
                     "additionalProperties": true
                   }
                 }
@@ -223,41 +423,74 @@
             }
           },
           "metadata": {
-            "type": ["null", "object"],
+            "type": [
+              "null",
+              "object"
+            ],
             "additionalProperties": true
           },
           "on_behalf_of": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "proration_behavior": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "start_date": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "transfer_data": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "trial_end": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }
     },
     "released_at": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "released_subscription": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "status": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "subscription": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "test_clock": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     }
   }
 }

@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "source-stripe"
+version = "0.1.0"
+description = ""
+authors = ["Pedro Moreira <pedroantonionm@pm.me>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+airbyte-cdk = "^0.68.4"
+estuary-cdk = {path="../estuary-cdk", develop = true}
+types-requests = "^2.31"
+stripe = "^8.8.0"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+pytest = "^7.4.3"
+requests-mock = "^1.11.0"
+pytest-snapshot = "^0.9.0"
+pytest-mock = "^3.14.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
