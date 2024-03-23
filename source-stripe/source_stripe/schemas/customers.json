@@ -1,5 +1,47 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "additionalProperties": true,
-  "$ref": "customer.json"
+  "$ref": "customer.json",
+  "properties": {
+    "tax_info": {
+      "properties": {
+        "tax_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "tax_info_verification": {
+      "properties": {
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verified_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
 }
