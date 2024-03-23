@@ -2,7 +2,6 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "additionalProperties": true,
   "type": [
-    "null",
     "object"
   ],
   "properties": {
@@ -65,7 +64,6 @@
             "null",
             "object"
           ],
-          "additional_properties": null,
           "properties": {}
         },
         "bacs_debit": {
@@ -73,7 +71,6 @@
             "null",
             "object"
           ],
-          "additional_properties": null,
           "properties": {}
         },
         "bancontact": {
@@ -235,7 +232,6 @@
             "null",
             "object"
           ],
-          "additional_properties": null,
           "properties": {}
         },
         "sofort": {
