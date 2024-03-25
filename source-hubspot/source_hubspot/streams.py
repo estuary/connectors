@@ -444,6 +444,9 @@ class Stream(HttpStream, ABC):
         pagination_complete = False
 
         next_page_token = None
+        # Here we define both the new expiry date and its copy
+        # This will be used to compare wether the token expiry date has rotated
+        # if the token has a new expiry date, it means we have a new token
         self.authenticator._token_expiry_date = self.authenticator._token_expiry_date.subtract(minutes=2)
         old_expiry_date = deepcopy(self.authenticator._token_expiry_date)
         try:
@@ -464,10 +467,17 @@ class Stream(HttpStream, ABC):
                     )
                     records = self._transform(self.parse_response(response, stream_state=stream_state, stream_slice=stream_slice))
 
+                # When self.handle_request or self._read_stream_records is called
+                # a self.authenticator instance is called, this will verify wether
+                # our token has expired and calculate the new _token_expiry_date
+                # then, we compare with the deep copy of the last token expiry date
+                # if its different, that means we have a new token. 
                 if old_expiry_date != self.authenticator._token_expiry_date:
                     # this means that we got a new token
                     self.logger.info(" GOT NEW TOKEN ")
                     self.authenticator._token_expiry_date = self.authenticator._token_expiry_date.subtract(minutes=2)
+                    # we have a new expiry date, so we deep copy it again to make sure we can compare it
+                    # with a new token expiry date
                     old_expiry_date = deepcopy(self.authenticator._token_expiry_date)
                 if self.filter_old_records:
                     records = self._filter_old_records(records)
