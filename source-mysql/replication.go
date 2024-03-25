@@ -480,7 +480,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
 	switch stmt := stmt.(type) {
-	case *sqlparser.CreateDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
+	case *sqlparser.CreateDatabase, *sqlparser.AlterDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
