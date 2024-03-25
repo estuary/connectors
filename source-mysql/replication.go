@@ -452,6 +452,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
+var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|# [^\n]*)$`)
 var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
 
 func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
@@ -467,6 +468,10 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	//     that we don't care about, either because they change things that
 	//     don't impact our capture or because we get the relevant information
 	//     by some other means.
+	if silentIgnoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Trace("silently ignoring query event")
+		return nil
+	}
 	if ignoreQueriesRe.MatchString(query) {
 		logrus.WithField("query", query).Info("ignoring query event")
 		return nil
