@@ -22,7 +22,6 @@ import (
 )
 
 type client struct {
-	db  *stdsql.DB
 	cfg *config
 	ep  *sql.Endpoint
 }
@@ -30,13 +29,7 @@ type client struct {
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	db, err := stdsql.Open("databricks", cfg.ToURI())
-	if err != nil {
-		return nil, err
-	}
-
 	return &client{
-		db:  db,
 		cfg: cfg,
 		ep:  ep,
 	}, nil
@@ -63,7 +56,13 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+	db, err := stdsql.Open("databricks", c.cfg.ToURI())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
 		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
 		from system.information_schema.columns
 		where table_catalog = %s
@@ -110,12 +109,24 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.QueryString)
+	db, err := stdsql.Open("databricks", c.cfg.ToURI())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.ExecContext(ctx, updateSpec.QueryString)
 	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	db, err := stdsql.Open("databricks", c.cfg.ToURI())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
@@ -123,7 +134,13 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s;", databricksDialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		db, err := stdsql.Open("databricks", c.cfg.ToURI())
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		_, err = db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -150,8 +167,14 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		db, err := stdsql.Open("databricks", c.cfg.ToURI())
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
 		for _, stmt := range stmts {
-			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
 				return err
 			}
 		}
@@ -201,7 +224,13 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	if err := c.db.PingContext(ctx); err != nil {
+	db, err := stdsql.Open("databricks", c.cfg.ToURI())
+	if err != nil {
+		errs.Err(fmt.Errorf("Connecting to warehouse: %w", err))
+	}
+	defer db.Close()
+
+	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var execErr dbsqlerr.DBExecutionError
 		var netConnErr *net.DNSError
@@ -229,9 +258,15 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 }
 
 func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
+	db, err := stdsql.Open("databricks", c.cfg.ToURI())
+	if err != nil {
+		return "", "", err
+	}
+	defer db.Close()
+
 	var version, spec string
 
-	if err := c.db.QueryRowContext(
+	if err := db.QueryRowContext(
 		ctx,
 		fmt.Sprintf(
 			"SELECT version, spec FROM %s WHERE materialization = %s;",
@@ -246,7 +281,13 @@ func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, mater
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
-	return sql.StdSQLExecStatements(ctx, c.db, statements)
+	db, err := stdsql.Open("databricks", c.cfg.ToURI())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return sql.StdSQLExecStatements(ctx, db, statements)
 }
 
 // InstallFence is a no-op since materialize-databricks doesn't use fencing.
@@ -255,5 +296,4 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 }
 
 func (c *client) Close() {
-	c.db.Close()
 }
