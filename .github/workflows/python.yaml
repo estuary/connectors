@@ -13,6 +13,7 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+      - "source-notion/**"
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +26,7 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+      - "source-notion/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -71,6 +73,10 @@ jobs:
           - name: source-hubspot
             type: capture
             version: v5
+            usage_rate: "1.0"
+          - name: source-notion
+            type: capture
+            version: v2
             usage_rate: "1.0"
 
     steps:
