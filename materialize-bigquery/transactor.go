@@ -331,7 +331,8 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		var query = t.client.newQuery(item.Query)
-		var edcs = map[string]bigquery.ExternalDataConfig{item.TempTableName: *item.EDC}
+		var edcs = make(map[string]bigquery.ExternalData)
+		edcs[item.TempTableName] = item.EDC
 		query.TableDefinitions = edcs
 
 		log.WithField("table", item.Table).Info("store: starting query")

@@ -1,24 +1,558 @@
 {
   "applied": {
-    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
+    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
   }
 }
 {
-  "opened": {
-    "runtimeCheckpoint": {}
-  }
+  "opened": {}
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "estuary-theatre%2Ftesting%2Fduplicate_keys": null,
+        "estuary-theatre%2Ftesting%2Fformatted_strings": null,
+        "estuary-theatre%2Ftesting%2Fmultiple_types": null,
+        "estuary-theatre%2Ftesting%2Fsimple": null
+      }
+    }
+  }
 }
 {
   "flushed": {}
 }
 {
-  "startedCommit": {}
+  "startedCommit": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "estuary-theatre%2Ftesting%2Fduplicate_keys": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c4",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/30c6ff92-234d-44d9-99d5-e9d3ac8db4ad/92c0b0d9-c0e3-43f4-b34b-9828ea2a025b"
+            ]
+          },
+          "Files": [
+            "30c6ff92-234d-44d9-99d5-e9d3ac8db4ad/92c0b0d9-c0e3-43f4-b34b-9828ea2a025b"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.duplicate_keys AS l\nUSING flow_temp_table_1 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c4 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.c1, l.int = r.c2, l.str = r.c3, l.flow_document = r.c4\nWHEN NOT MATCHED THEN\n\tINSERT (id, flow_published_at, int, str, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4);\n",
+          "Table": "`estuary-theatre`.testing.duplicate_keys",
+          "TempTableName": "flow_temp_table_1"
+        },
+        "estuary-theatre%2Ftesting%2Fformatted_strings": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "DATE"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c4",
+                "PolicyTags": null,
+                "Precision": 38,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "BIGNUMERIC"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c5",
+                "PolicyTags": null,
+                "Precision": 38,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "BIGNUMERIC"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c6",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "FLOAT"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c7",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "FLOAT"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c8",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c9",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/318d841f-cb22-45c7-a12b-5bf600d404d7/0847333a-13b8-4085-a62e-28c42d97a795"
+            ]
+          },
+          "Files": [
+            "318d841f-cb22-45c7-a12b-5bf600d404d7/0847333a-13b8-4085-a62e-28c42d97a795"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.formatted_strings AS l\nUSING flow_temp_table_3 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c9 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.date = r.c1, l.datetime = r.c2, l.flow_published_at = r.c3, l.int_and_str = r.c4, l.int_str = r.c5, l.num_and_str = r.c6, l.num_str = r.c7, l.time = r.c8, l.flow_document = r.c9\nWHEN NOT MATCHED THEN\n\tINSERT (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
+          "Table": "`estuary-theatre`.testing.formatted_strings",
+          "TempTableName": "flow_temp_table_3"
+        },
+        "estuary-theatre%2Ftesting%2Fmultiple_types": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "BOOLEAN"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "FLOAT"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c4",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c5",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "JSON"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c6",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c7",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c8",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c9",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/8a3dfc1f-4d00-4900-81b7-50b38d1caa58/6e6aa2b6-0edb-4bb4-895b-97e2fdb1fc68"
+            ]
+          },
+          "Files": [
+            "8a3dfc1f-4d00-4900-81b7-50b38d1caa58/6e6aa2b6-0edb-4bb4-895b-97e2fdb1fc68"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c9 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.bool_field = r.c2, l.float_field = r.c3, l.flow_published_at = r.c4, l.multiple = r.c5, l.nested = r.c6, l.nullable_int = r.c7, l.str_field = r.c8, l.flow_document = r.c9\nWHEN NOT MATCHED THEN\n\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
+          "Table": "`estuary-theatre`.testing.multiple_types",
+          "TempTableName": "flow_temp_table_2"
+        },
+        "estuary-theatre%2Ftesting%2Fsimple": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/5d1c1e98-105a-49ff-bc4e-f2bca5f6188f/92f28d24-ba84-4234-aeda-6062254b75c4"
+            ]
+          },
+          "Files": [
+            "5d1c1e98-105a-49ff-bc4e-f2bca5f6188f/92f28d24-ba84-4234-aeda-6062254b75c4"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.simple AS l\nUSING flow_temp_table_0 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c3 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.canary = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED THEN\n\tINSERT (id, canary, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
+          "Table": "`estuary-theatre`.testing.simple",
+          "TempTableName": "flow_temp_table_0"
+        }
+      }
+    }
+  }
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "estuary-theatre%2Ftesting%2Fduplicate_keys": null,
+        "estuary-theatre%2Ftesting%2Fformatted_strings": null,
+        "estuary-theatre%2Ftesting%2Fmultiple_types": null,
+        "estuary-theatre%2Ftesting%2Fsimple": null
+      }
+    }
+  }
 }
 {
   "loaded": {
@@ -208,10 +742,536 @@
   "flushed": {}
 }
 {
-  "startedCommit": {}
+  "startedCommit": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "estuary-theatre%2Ftesting%2Fduplicate_keys": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c4",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/30c6ff92-234d-44d9-99d5-e9d3ac8db4ad/09a1fd53-841e-4caf-af89-a840825e928c"
+            ]
+          },
+          "Files": [
+            "30c6ff92-234d-44d9-99d5-e9d3ac8db4ad/09a1fd53-841e-4caf-af89-a840825e928c"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.duplicate_keys AS l\nUSING flow_temp_table_1 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c4 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.c1, l.int = r.c2, l.str = r.c3, l.flow_document = r.c4\nWHEN NOT MATCHED THEN\n\tINSERT (id, flow_published_at, int, str, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4);\n",
+          "Table": "`estuary-theatre`.testing.duplicate_keys",
+          "TempTableName": "flow_temp_table_1"
+        },
+        "estuary-theatre%2Ftesting%2Fformatted_strings": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "DATE"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c4",
+                "PolicyTags": null,
+                "Precision": 38,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "BIGNUMERIC"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c5",
+                "PolicyTags": null,
+                "Precision": 38,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "BIGNUMERIC"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c6",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "FLOAT"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c7",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "FLOAT"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c8",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c9",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/318d841f-cb22-45c7-a12b-5bf600d404d7/36954c97-1267-4080-8df4-d295e96dfac8"
+            ]
+          },
+          "Files": [
+            "318d841f-cb22-45c7-a12b-5bf600d404d7/36954c97-1267-4080-8df4-d295e96dfac8"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.formatted_strings AS l\nUSING flow_temp_table_3 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c9 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.date = r.c1, l.datetime = r.c2, l.flow_published_at = r.c3, l.int_and_str = r.c4, l.int_str = r.c5, l.num_and_str = r.c6, l.num_str = r.c7, l.time = r.c8, l.flow_document = r.c9\nWHEN NOT MATCHED THEN\n\tINSERT (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
+          "Table": "`estuary-theatre`.testing.formatted_strings",
+          "TempTableName": "flow_temp_table_3"
+        },
+        "estuary-theatre%2Ftesting%2Fmultiple_types": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "BOOLEAN"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "FLOAT"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c4",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c5",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "JSON"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c6",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c7",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": false,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c8",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c9",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/8a3dfc1f-4d00-4900-81b7-50b38d1caa58/4c735b7a-aaf1-4af3-a03d-627485265367"
+            ]
+          },
+          "Files": [
+            "8a3dfc1f-4d00-4900-81b7-50b38d1caa58/4c735b7a-aaf1-4af3-a03d-627485265367"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c9 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.bool_field = r.c2, l.float_field = r.c3, l.flow_published_at = r.c4, l.multiple = r.c5, l.nested = r.c6, l.nullable_int = r.c7, l.str_field = r.c8, l.flow_document = r.c9\nWHEN NOT MATCHED THEN\n\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
+          "Table": "`estuary-theatre`.testing.multiple_types",
+          "TempTableName": "flow_temp_table_2"
+        },
+        "estuary-theatre%2Ftesting%2Fsimple": {
+          "Bucket": "estuary-bigquery-test",
+          "EDC": {
+            "AutoDetect": false,
+            "Compression": "GZIP",
+            "ConnectionID": "",
+            "DecimalTargetTypes": null,
+            "HivePartitioningOptions": null,
+            "IgnoreUnknownValues": false,
+            "MaxBadRecords": 0,
+            "Options": null,
+            "ReferenceFileSchemaURI": "",
+            "Schema": [
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c0",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "INTEGER"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c1",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c2",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "TIMESTAMP"
+              },
+              {
+                "Collation": "",
+                "DefaultValueExpression": "",
+                "Description": "",
+                "MaxLength": 0,
+                "Name": "c3",
+                "PolicyTags": null,
+                "Precision": 0,
+                "Repeated": false,
+                "Required": true,
+                "Scale": 0,
+                "Schema": null,
+                "Type": "STRING"
+              }
+            ],
+            "SourceFormat": "NEWLINE_DELIMITED_JSON",
+            "SourceURIs": [
+              "gs://estuary-bigquery-test/5d1c1e98-105a-49ff-bc4e-f2bca5f6188f/27adda32-3703-4989-b31c-b1c2efba9ef8"
+            ]
+          },
+          "Files": [
+            "5d1c1e98-105a-49ff-bc4e-f2bca5f6188f/27adda32-3703-4989-b31c-b1c2efba9ef8"
+          ],
+          "Query": "MERGE INTO `estuary-theatre`.testing.simple AS l\nUSING flow_temp_table_0 AS r\nON l.id = r.c0\nWHEN MATCHED AND r.c3 IS NULL THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.canary = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED THEN\n\tINSERT (id, canary, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
+          "Table": "`estuary-theatre`.testing.simple",
+          "TempTableName": "flow_temp_table_0"
+        }
+      }
+    }
+  }
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {
+        "estuary-theatre%2Ftesting%2Fduplicate_keys": null,
+        "estuary-theatre%2Ftesting%2Fformatted_strings": null,
+        "estuary-theatre%2Ftesting%2Fmultiple_types": null,
+        "estuary-theatre%2Ftesting%2Fsimple": null
+      }
+    }
+  }
 }
 [
   1,
@@ -494,16 +1554,13 @@
   }
 }
 {
-  "opened": {
-    "runtimeCheckpoint": {
-      "sources": {
-        "a/read/journal;suffix": {
-          "readThrough": "1"
-        }
-      }
-    }
-  }
+  "opened": {}
 }
 {
-  "acknowledged": {}
+  "acknowledged": {
+    "state": {
+      "mergePatch": true,
+      "updated": {}
+    }
+  }
 }
