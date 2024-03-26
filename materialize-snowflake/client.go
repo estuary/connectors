@@ -67,11 +67,11 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	}
 	defer conn.Close()
 
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %q", schemaName)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))); err != nil {
 		return err
 	}
 
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 		}
 		defer conn.Close()
 
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
 			return err
 		}
 		_, err = conn.ExecContext(ctx, stmt)
@@ -111,7 +111,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		defer conn.Close()
 
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %q", c.cfg.Schema)); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
 			return err
 		}
 		_, err = conn.ExecContext(ctx, alterColumnStmt)

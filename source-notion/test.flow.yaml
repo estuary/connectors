@@ -1,0 +1,41 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-notion:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_notion
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: users
+          syncMode: full_refresh
+        target: acmeCo/users
+      - resource:
+          stream: databases
+          syncMode: incremental
+          cursorField:
+            - last_edited_time
+        target: acmeCo/databases
+      - resource:
+          stream: pages
+          syncMode: incremental
+          cursorField:
+            - last_edited_time
+        target: acmeCo/pages
+      - resource:
+          stream: blocks
+          syncMode: incremental
+          cursorField:
+            - last_edited_time
+        target: acmeCo/blocks
+      - resource:
+          stream: comments
+          syncMode: incremental
+          cursorField:
+            - page_last_edited_time
+        target: acmeCo/comments

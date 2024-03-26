@@ -192,11 +192,43 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 	if err != nil {
 		return fmt.Errorf("user %q needs the REPLICATION CLIENT permission", db.config.User)
 	}
+
 	if len(results.Values) == 0 {
 		// This failure condition has nothing to do with user permissions, but since we're
 		// already running SHOW MASTER STATUS it would be redundant to do it again in a separate
 		// check just to verify that the result is non-empty.
 		return fmt.Errorf("unable to query latest binlog position (is binary logging enabled?)")
+	}
+
+	// The result of a `SHOW MASTER STATUS` query also tells us if only specific schemas are
+	// written to the binlog because the user specified --binlog-do-db startup flags. There are
+	// a lot of ways this could theoretically be misconfigured so we won't bother trying to check
+	// for every possible misconfiguration, but the specific case of "the schemas of interest are
+	// logged but the schema containing the Flow watermarks table isn't" occurs often enough that
+	// it's worth explicitly checking and producing a nice error in that case.
+	for _, rowValues := range results.Values {
+		// Translate the result row into a map so that minor changes we don't care
+		// about don't impact our processing.
+		var row = make(map[string]any)
+		for colIdx, colValue := range rowValues {
+			var key = string(results.Fields[colIdx].Name)
+			var val = colValue.Value()
+			if bs, ok := val.([]byte); ok {
+				val = string(bs)
+			}
+			row[key] = val
+		}
+
+		// Blindly splitting and indexing is valid here because validation for the Config
+		// struct already checked that the watermarks table name is fully-qualified.
+		var watermarksSchema = strings.Split(db.config.Advanced.WatermarksTable, ".")[0]
+
+		// The use of strings.Contains here could result in false negatives, but this is
+		// much less of a concern than potential false positives and the extra code needed
+		// to parse this column value into an actual list of schema names.
+		if doDB, ok := row["Binlog_Do_DB"].(string); ok && doDB != "" && !strings.Contains(doDB, watermarksSchema) {
+			return fmt.Errorf("binlog-do-db is set to %q, which doesn't include the watermark table schema %q", doDB, watermarksSchema)
+		}
 	}
 	results.Close()
 

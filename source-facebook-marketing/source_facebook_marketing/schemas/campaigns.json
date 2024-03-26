@@ -45,7 +45,7 @@
       "type": ["null", "string"]
     },
     "id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "issues_info": {
       "type": ["null", "array"],
@@ -107,5 +107,6 @@
       "type": "string"
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["id"]
 }

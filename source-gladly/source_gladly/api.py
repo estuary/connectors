@@ -1,12 +1,12 @@
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import AsyncGenerator
+from urllib.parse import urljoin
 
-from estuary_cdk.http import HTTPSession
 from estuary_cdk.capture.common import LogCursor
+from estuary_cdk.http import HTTPSession
 
-
-from .models import Event
+from .models import EndpointConfig, Event
 
 
 # fetch_events gets the latest Events, starting with log_cursor and continuing to as close to the
@@ -16,14 +16,16 @@ from .models import Event
 # ensures consistency of data while the connector is in normal operation.
 async def fetch_events(
     http: HTTPSession,
-    organization: str,
+    config: EndpointConfig,
     entity: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Event | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    url = f"https://{organization}.gladly.com/api/v1/events"
+    base = config.advanced.base_url if config.advanced.base_url else f"https://{config.organization}.gladly.com"
+    url = urljoin(base, "api/v1/events")
+
     params = {
         "startAt": log_cursor.isoformat(),
         "entities": entity,

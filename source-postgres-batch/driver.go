@@ -47,7 +47,7 @@ type BatchSQLDriver struct {
 type Resource struct {
 	Name         string   `json:"name" jsonschema:"title=Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
 	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) which will be rendered and then executed." jsonschema_extras:"multiline=true,order=3"`
-	Cursor       []string `json:"cursor" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=2"`
+	Cursor       []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=2"`
 	PollSchedule string   `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=1,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 }
 
@@ -155,14 +155,6 @@ func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Res
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
-var excludedSystemSchemas = []string{
-	"pg_catalog",
-	"information_schema",
-	"pg_internal",
-	"catalog_history",
-	"cron",
-}
-
 // Discover enumerates tables and views from `information_schema.tables` and generates
 // placeholder capture queries for thos tables.
 func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
@@ -198,11 +190,6 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 
 	var bindings []*pc.Response_Discovered_Binding
 	for _, table := range tables {
-		// Exclude tables in "system schemas" such as information_schema or pg_catalog.
-		if slices.Contains(excludedSystemSchemas, table.Schema) {
-			continue
-		}
-
 		var tableID = table.Schema + "." + table.Name
 
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
@@ -267,12 +254,25 @@ type discoveredTable struct {
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
 	var query = new(strings.Builder)
 	var args []any
-	fmt.Fprintf(query, "SELECT table_schema, table_name, table_type FROM information_schema.tables")
+
+	fmt.Fprintf(query, "SELECT n.nspname AS table_schema,")
+	fmt.Fprintf(query, "       c.relname AS table_name,")
+	fmt.Fprintf(query, "       CASE")
+	fmt.Fprintf(query, "         WHEN n.oid = pg_my_temp_schema() THEN 'LOCAL TEMPORARY'::text")
+	fmt.Fprintf(query, "         WHEN c.relkind = ANY (ARRAY['r'::\"char\", 'p'::\"char\"]) THEN 'BASE TABLE'::text")
+	fmt.Fprintf(query, "         WHEN c.relkind = 'v'::\"char\" THEN 'VIEW'::text")
+	fmt.Fprintf(query, "         WHEN c.relkind = 'f'::\"char\" THEN 'FOREIGN'::text")
+	fmt.Fprintf(query, "         ELSE ''::text")
+	fmt.Fprintf(query, "       END::information_schema.character_data AS table_type")
+	fmt.Fprintf(query, " FROM pg_catalog.pg_class c")
+	fmt.Fprintf(query, " JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)")
+	fmt.Fprintf(query, " WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
+	fmt.Fprintf(query, "  AND c.relkind IN ('r', 'p', 'v', 'f')")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, " WHERE table_schema = ANY ($1)")
+		fmt.Fprintf(query, "  AND n.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
 	}
-	fmt.Fprintf(query, ";")
+	fmt.Fprintf(query, "  AND NOT c.relispartition;") // Exclude subpartitions of a partitioned table from discovery
 
 	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
@@ -305,29 +305,28 @@ type discoveredPrimaryKey struct {
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
 	var args []any
-	// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
-	// overkill but shouldn't hurt, and helps to make absolutely sure that we're
-	// matching up the constraint type with the column names/positions correctly.
-	fmt.Fprintf(query, "SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, col.data_type")
-	fmt.Fprintf(query, " FROM information_schema.key_column_usage kcu")
-	fmt.Fprintf(query, " JOIN information_schema.table_constraints tcs")
-	fmt.Fprintf(query, "  ON  tcs.constraint_catalog = kcu.constraint_catalog")
-	fmt.Fprintf(query, "  AND tcs.constraint_schema = kcu.constraint_schema")
-	fmt.Fprintf(query, "  AND tcs.constraint_name = kcu.constraint_name")
-	fmt.Fprintf(query, "  AND tcs.table_catalog = kcu.table_catalog")
-	fmt.Fprintf(query, "  AND tcs.table_schema = kcu.table_schema")
-	fmt.Fprintf(query, "  AND tcs.table_name = kcu.table_name")
-	fmt.Fprintf(query, " JOIN information_schema.columns col")
-	fmt.Fprintf(query, "  ON  col.table_catalog = kcu.table_catalog")
-	fmt.Fprintf(query, "  AND col.table_schema = kcu.table_schema")
-	fmt.Fprintf(query, "  AND col.table_name = kcu.table_name")
-	fmt.Fprintf(query, "  AND col.column_name = kcu.column_name")
-	fmt.Fprintf(query, " WHERE tcs.constraint_type = 'PRIMARY KEY'")
+
+	fmt.Fprintf(query, "SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ, result.TYPE_NAME")
+	fmt.Fprintf(query, " FROM (")
+	fmt.Fprintf(query, "  SELECT n.nspname AS TABLE_SCHEM,")
+	fmt.Fprintf(query, "   ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,")
+	fmt.Fprintf(query, "   (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, ci.relname AS PK_NAME,")
+	fmt.Fprintf(query, "   information_schema._pg_expandarray(i.indkey) AS KEYS, a.attnum AS A_ATTNUM,")
+	fmt.Fprintf(query, "   t.typname AS TYPE_NAME")
+	fmt.Fprintf(query, "  FROM pg_catalog.pg_class ct")
+	fmt.Fprintf(query, "   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)")
+	fmt.Fprintf(query, "   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)")
+	fmt.Fprintf(query, "   JOIN pg_catalog.pg_index i ON (a.attrelid = i.indrelid)")
+	fmt.Fprintf(query, "   JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)")
+	fmt.Fprintf(query, "   JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)")
+	fmt.Fprintf(query, "  WHERE i.indisprimary")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, "  AND kcu.table_schema = ANY ($1)")
+		fmt.Fprintf(query, "   AND n.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
 	}
-	fmt.Fprintf(query, " ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;")
+	fmt.Fprintf(query, " ) result")
+	fmt.Fprintf(query, " WHERE result.A_ATTNUM = (result.KEYS).x")
+	fmt.Fprintf(query, " ORDER BY result.table_name, result.pk_name, result.key_seq;")
 
 	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
@@ -374,10 +373,11 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 }
 
 var databaseTypeToJSON = map[string]*jsonschema.Schema{
-	"integer":  {Type: "integer"},
-	"bigint":   {Type: "integer"},
-	"smallint": {Type: "integer"},
-	"boolean":  {Type: "boolean"},
+	"int2":    {Type: "integer"},
+	"int4":    {Type: "integer"},
+	"int8":    {Type: "integer"},
+	"bool":    {Type: "boolean"},
+	"varchar": {Type: "string"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)

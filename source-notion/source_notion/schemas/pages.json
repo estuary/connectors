@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "object": {
+      "enum": ["page"]
+    },
+    "id": {
+      "type": "string"
+    },
+    "created_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "$ref": "user.json"
+    },
+    "last_edited_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_edited_by": {
+      "$ref": "user.json"
+    },
+    "archived": {
+      "type": "boolean"
+    },
+    "icon": {
+      "$ref": "icon.json"
+    },
+    "cover": {
+      "$ref": "file.json"
+    },
+    "parent": {
+      "$ref": "parent.json"
+    },
+    "url": {
+      "type": "string"
+    },
+    "public_url": {
+      "type": ["null", "string"]
+    },
+    "properties": {
+      "type": "array"
+    }
+  }
+}

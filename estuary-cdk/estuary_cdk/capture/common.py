@@ -133,7 +133,8 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
             description="LogCursor at which incremental replication began"
         )
         next_page: PageCursor = Field(
-            description="PageCursor of the next page to fetch"
+            description="PageCursor of the next page to fetch",
+            default=None
         )
 
     class Snapshot(BaseModel, extra="forbid"):

@@ -452,6 +452,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
+var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|# [^\n]*)$`)
 var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
 
 func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
@@ -467,11 +468,15 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	//     that we don't care about, either because they change things that
 	//     don't impact our capture or because we get the relevant information
 	//     by some other means.
-	if ignoreQueriesRe.MatchString(query) {
-		logrus.WithField("query", query).Trace("ignoring query event")
+	if silentIgnoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Trace("silently ignoring query event")
 		return nil
 	}
-	logrus.WithField("query", query).Debug("handling query event")
+	if ignoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Info("ignoring query event")
+		return nil
+	}
+	logrus.WithField("query", query).Info("handling query event")
 
 	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
@@ -480,7 +485,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
 	switch stmt := stmt.(type) {
-	case *sqlparser.CreateDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
+	case *sqlparser.CreateDatabase, *sqlparser.AlterDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.

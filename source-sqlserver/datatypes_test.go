@@ -45,7 +45,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `image`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 
 		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date"}`, InputValue: `1991-08-31`, ExpectValue: `"1991-08-31"`},
-		{ColumnType: `time`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `12:34:54.125`, ExpectValue: `"12:34:54.125"`},
+		{ColumnType: `time`, ExpectType: `{"type":["string","null"]}`, InputValue: `12:34:54.125`, ExpectValue: `"12:34:54.125"`},
 		{ColumnType: `datetimeoffset`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `1991-08-31T12:34:54.125-06:00`, ExpectValue: `"1991-08-31T12:34:54.125-06:00"`},
 
 		{ColumnType: `datetime`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `1991-08-31T12:34:56.789`, ExpectValue: `"1991-08-31T12:34:56.79-05:00"`},

@@ -2,7 +2,6 @@ package sqlcapture
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
