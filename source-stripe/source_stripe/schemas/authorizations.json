@@ -4,264 +4,568 @@
   "type": "object",
   "properties": {
     "amount": {
-      "type": ["null", "integer"]
+      "type": [
+        "null",
+        "integer"
+      ]
     },
     "amount_details": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "atm_fee": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         }
       }
     },
     "approved": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "authorization_method": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "balance_transactions": {
       "items": {
-        "type": ["null", "object"],
+        "type": [
+          "null",
+          "object"
+        ],
         "$ref": "balance_transactions.json"
       },
-      "type": ["null", "array"]
+      "type": [
+        "null",
+        "array"
+      ]
     },
     "card": {
       "$ref": "card.json"
     },
     "cardholder": {
-
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "created": {
-      "type": ["null", "integer"]
+      "type": [
+        "null",
+        "integer"
+      ]
     },
     "currency": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "id": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "livemode": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "merchant_amount": {
-      "type": ["null", "integer"]
+      "type": [
+        "null",
+        "integer"
+      ]
     },
     "merchant_currency": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "merchant_data": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "category": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "city": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "country": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "network_id": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "postal_code": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "state": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "metadata": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true
     },
     "object": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "pending_request": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "amount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "amount_details": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
             "atm_fee": {
-              "type": ["null", "integer"]
+              "type": [
+                "null",
+                "integer"
+              ]
             }
           }
         },
         "currency": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "is_amount_controllable": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "merchant_amount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "merchant_currency": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "request_history": {
-      "type": ["null", "array"],
+      "type": [
+        "null",
+        "array"
+      ],
       "items": {
-        "type": ["null", "object"],
+        "type": [
+          "null",
+          "object"
+        ],
         "properties": {
           "amount": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "amount_details": {
-            "type": ["null", "object"],
+            "type": [
+              "null",
+              "object"
+            ],
             "properties": {
               "atm_fee": {
-                "type": ["null", "integer"]
+                "type": [
+                  "null",
+                  "integer"
+                ]
               }
             }
           },
           "approved": {
-            "type": ["null", "boolean"]
+            "type": [
+              "null",
+              "boolean"
+            ]
           },
           "created": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "currency": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "merchant_amount": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "merchant_currency": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "reason": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }
     },
     "status": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "transactions": {
-      "type": ["null", "array"],
+      "type": [
+        "null",
+        "array"
+      ],
       "items": {
-        "type": ["null", "object"],
+        "type": [
+          "null",
+          "object"
+        ],
         "properties": {
           "amount": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "amount_details": {
-            "type": ["null", "object"],
+            "type": [
+              "null",
+              "object"
+            ],
             "properties": {
               "atm_fee": {
-                "type": ["null", "integer"]
+                "type": [
+                  "null",
+                  "integer"
+                ]
               }
             }
           },
           "authorization": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "balance_transaction": {
-
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "card": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "cardholder": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "created": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "currency": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "dispute": {
-
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "id": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "livemode": {
-            "type": ["null", "boolean"]
+            "type": [
+              "null",
+              "boolean"
+            ]
           },
           "merchant_amount": {
-            "type": ["null", "integer"]
+            "type": [
+              "null",
+              "integer"
+            ]
           },
           "merchant_currency": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "merchant_data": {
-            "type": ["null", "object"],
+            "type": [
+              "null",
+              "object"
+            ],
             "properties": {
               "category": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "city": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "country": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "name": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "network_id": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "postal_code": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "state": {
-                "type": ["null", "string"]
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             }
           },
           "metadata": {
-            "type": ["null", "object"],
+            "type": [
+              "null",
+              "object"
+            ],
             "additionalProperties": true
           },
           "object": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "purchase_details": {
-            "$ref": "issuing_transaction_purchase_details.json"
+            "properties": {
+              "flight": {
+                "properties": {
+                  "departure_at": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "passenger_name": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "refundable": {
+                    "type": [
+                      "null",
+                      "boolean"
+                    ]
+                  },
+                  "segments": {
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "travel_agency": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                }
+              },
+              "fuel": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "properties": {
+                  "unit": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "unit_cost_decimal": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "volume_decimal": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                }
+              },
+              "lodging": {
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "receipt": {
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "reference": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
           }
         }
       }
     },
     "verification_data": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "address_line1_check": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "address_postal_code_check": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "cvc_check": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "expiry_check": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         }
       }
     },
     "wallet": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     }
   }
 }

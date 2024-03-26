@@ -1,0 +1,52 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+title: Application Fees Refunds Schema
+additionalProperties: true
+type:
+  - object
+properties:
+  id:
+    type:
+      - "null"
+      - string
+  object:
+    type:
+      - "null"
+      - string
+  amount:
+    type:
+      - "null"
+      - number
+  balance_transaction:
+    type:
+      - "null"
+      - string
+  created:
+    type:
+      - "null"
+      - number
+  currency:
+    type:
+      - "null"
+      - string
+  fee:
+    type:
+      - "null"
+      - string
+  metadata:
+    type:
+      - "null"
+      - object
+    properties:
+      fee:
+        type:
+          - "null"
+          - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

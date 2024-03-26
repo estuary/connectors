@@ -1,16 +1,24 @@
 {
-  "type": ["null", "object"],
+  "type": [
+    "object"
+  ],
   "properties": {
     "billing": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "address": {
-      "$ref": "address.json"
-    }
+          "$ref": "address.json"
+        }
       }
     },
     "company": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "tax_id_provided": {
           "type": "boolean"
@@ -18,81 +26,149 @@
       }
     },
     "created": {
-      "type": ["null", "integer"]
+      "type": [
+        "null",
+        "integer"
+      ]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "id": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "individual": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "dob": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
             "day": {
-              "type": ["null", "integer"]
+              "type": [
+                "null",
+                "integer"
+              ]
             },
             "month": {
-              "type": ["null", "integer"]
+              "type": [
+                "null",
+                "integer"
+              ]
             },
             "year": {
-              "type": ["null", "integer"]
+              "type": [
+                "null",
+                "integer"
+              ]
             }
           }
         },
         "first_name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "last_name": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "verification": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
             "document": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "properties": {
                 "back": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "front": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               }
             }
           }
         }
-
       }
     },
     "livemode": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "metadata": {
-      "type": ["null", "object"]
+      "type": [
+        "null",
+        "object"
+      ]
     },
     "name": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "object": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "phone_number": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "requirements": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "disabled_reason": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "past_due": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
-            "type": ["null", "string"]
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }
@@ -101,10 +177,16 @@
       "$ref": "spending_controls.json"
     },
     "status": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "type": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     }
   }
 }

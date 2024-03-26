@@ -1,0 +1,242 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-stripe:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-stripe:v3"
+        config: connector_config.yaml
+    bindings:
+      - resource:
+          stream: accounts
+          syncMode: full_refresh
+        target: acmeCo/accounts
+      - resource:
+          stream: application_fees
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/application_fees
+      - resource:
+          stream: application_fees_refunds
+          syncMode: full_refresh
+        target: acmeCo/application_fees_refunds
+      - resource:
+          stream: authorizations
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/authorizations
+      - resource:
+          stream: balance_transactions
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/balance_transactions
+      - resource:
+          stream: bank_accounts
+          syncMode: full_refresh
+        target: acmeCo/bank_accounts
+      - resource:
+          stream: cardholders
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/cardholders
+      - resource:
+          stream: cards
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/cards
+      - resource:
+          stream: charges
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/charges
+      - resource:
+          stream: checkout_sessions
+          syncMode: incremental
+          cursorField:
+            - expires_at
+        target: acmeCo/checkout_sessions
+      - resource:
+          stream: checkout_sessions_line_items
+          syncMode: incremental
+          cursorField:
+            - checkout_session_expires_at
+        target: acmeCo/checkout_sessions_line_items
+      - resource:
+          stream: coupons
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/coupons
+      - resource:
+          stream: credit_notes
+          syncMode: full_refresh
+        target: acmeCo/credit_notes
+      - resource:
+          stream: customer_balance_transactions
+          syncMode: full_refresh
+        target: acmeCo/customer_balance_transactions
+      - resource:
+          stream: customers
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/customers
+      - resource:
+          stream: disputes
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/disputes
+      - resource:
+          stream: early_fraud_warnings
+          syncMode: full_refresh
+        target: acmeCo/early_fraud_warnings
+      - resource:
+          stream: events
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/events
+      - resource:
+          stream: external_account_bank_accounts
+          syncMode: full_refresh
+        target: acmeCo/external_account_bank_accounts
+      - resource:
+          stream: external_account_cards
+          syncMode: full_refresh
+        target: acmeCo/external_account_cards
+      - resource:
+          stream: file_links
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/file_links
+      - resource:
+          stream: files
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/files
+      - resource:
+          stream: invoice_items
+          syncMode: incremental
+          cursorField:
+            - date
+        target: acmeCo/invoice_items
+      - resource:
+          stream: invoice_line_items
+          syncMode: full_refresh
+        target: acmeCo/invoice_line_items
+      - resource:
+          stream: invoices
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/invoices
+      - resource:
+          stream: payment_intents
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/payment_intents
+      - resource:
+          stream: payment_methods
+          syncMode: full_refresh
+        target: acmeCo/payment_methods
+      - resource:
+          stream: payouts
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/payouts
+      - resource:
+          stream: plans
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/plans
+      - resource:
+          stream: products
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/products
+      - resource:
+          stream: promotion_codes
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/promotion_codes
+      - resource:
+          stream: refunds
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/refunds
+      - resource:
+          stream: reviews
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/reviews
+      - resource:
+          stream: setup_attempts
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/setup_attempts
+      - resource:
+          stream: setup_intents
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/setup_intents
+      - resource:
+          stream: subscription_items
+          syncMode: full_refresh
+        target: acmeCo/subscription_items
+      - resource:
+          stream: subscriptions
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/subscriptions
+      - resource:
+          stream: subscription_schedule
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/subscription_schedule
+      - resource:
+          stream: top_ups
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/top_ups
+      - resource:
+          stream: transactions
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/transactions
+      - resource:
+          stream: transfer_reversals
+          syncMode: full_refresh
+        target: acmeCo/transfer_reversals
+      - resource:
+          stream: transfers
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/transfers
+      - resource:
+          stream: usage_records
+          syncMode: full_refresh
+        target: acmeCo/usage_records
