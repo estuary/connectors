@@ -1,0 +1,22 @@
+---
+collections:
+  acmeCo/blocks:
+    schema: blocks.schema.yaml
+    key:
+      - /id
+  acmeCo/comments:
+    schema: comments.schema.yaml
+    key:
+      - /id
+  acmeCo/databases:
+    schema: databases.schema.yaml
+    key:
+      - /id
+  acmeCo/pages:
+    schema: pages.schema.yaml
+    key:
+      - /id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id

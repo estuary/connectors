@@ -15,7 +15,8 @@ Binding 0:
       "read_schema_json": {
         "type": "object",
         "required": [
-          "_meta"
+          "_meta",
+          "id"
         ],
         "properties": {
           "_meta": {
@@ -39,13 +40,15 @@ Binding 0:
               "polled",
               "index"
             ]
+          },
+          "id": {
+            "type": "integer"
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/_meta/polled",
-        "/_meta/index"
+        "/id"
       ],
       "projections": null
     },

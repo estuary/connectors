@@ -103,13 +103,13 @@ class InsightAsyncJobManager:
                 if job.attempt_number >= self.MAX_NUMBER_OF_ATTEMPTS:
                     raise JobException(f"{job}: failed more than {self.MAX_NUMBER_OF_ATTEMPTS} times. Terminating...")
                 elif job.attempt_number == 2:
-                    logger.info("%s: failed second time, trying to split job into smaller jobs.", job)
+                    logger.info(f"{job}: failed second time, trying to split job into smaller jobs.")
                     smaller_jobs = job.split_job()
                     grouped_jobs = ParentAsyncJob(api=self._api.api, jobs=smaller_jobs, interval=job.interval)
                     running_jobs.append(grouped_jobs)
                     grouped_jobs.start()
                 else:
-                    logger.info("%s: failed, restarting", job)
+                    logger.info(f"{job}: failed, restarting")
                     job.restart()
                     running_jobs.append(job)
                 failed_num += 1

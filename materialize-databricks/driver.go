@@ -492,6 +492,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
+
+	log.Info("store: finished committing changes")
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 

@@ -4,8 +4,6 @@ import:
 captures:
   acmeCo/source-facebook-marketing:
     endpoint:
-      # connector:
-      #   image: ghcr.io/estuary/source-facebook-marketing:testing
       local:
         command:
           - python
@@ -20,10 +18,14 @@ captures:
       - resource:
           stream: ad_sets
           syncMode: incremental
+          cursorField:
+            - updated_time
         target: acmeCo/ad_sets
       - resource:
           stream: ads
           syncMode: incremental
+          cursorField:
+            - updated_time
         target: acmeCo/ads
       - resource:
           stream: ad_creatives
@@ -32,34 +34,50 @@ captures:
       - resource:
           stream: ads_insights
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights
       - resource:
           stream: ads_insights_age_and_gender
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights_age_and_gender
       - resource:
           stream: ads_insights_country
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights_country
       - resource:
           stream: ads_insights_region
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights_region
       - resource:
           stream: ads_insights_dma
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights_dma
       - resource:
           stream: ads_insights_platform_and_device
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights_platform_and_device
       - resource:
           stream: ads_insights_action_type
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/ads_insights_action_type
       - resource:
           stream: campaigns
           syncMode: incremental
+          cursorField:
+            - updated_time
         target: acmeCo/campaigns
       - resource:
           stream: custom_conversions
@@ -68,12 +86,24 @@ captures:
       - resource:
           stream: images
           syncMode: incremental
+          cursorField:
+            - updated_time
         target: acmeCo/images
       - resource:
           stream: videos
           syncMode: incremental
+          cursorField:
+            - updated_time
         target: acmeCo/videos
+      - resource:
+          stream: activities
+          syncMode: incremental
+          cursorField:
+            - event_time
+        target: acmeCo/activities
       - resource:
           stream: customads_insights_publisher_platform
           syncMode: incremental
+          cursorField:
+            - date_start
         target: acmeCo/customads_insights_publisher_platform

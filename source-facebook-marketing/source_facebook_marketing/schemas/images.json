@@ -6,7 +6,7 @@
       "type": ["null", "string"]
     },
     "id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "name": {
       "type": ["null", "string"]
@@ -56,5 +56,6 @@
     "width": {
       "type": ["null", "integer"]
     }
-  }
+  },
+  "required": ["id"]
 }

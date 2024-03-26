@@ -1,0 +1,79 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "test_key_discovery_329932",
+      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"key_discovery_329932\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"key_discovery_329932\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"key_discovery_329932\";\n{{- end}}\n"
+    },
+    "resource_path": [
+      "test_key_discovery_329932"
+    ],
+    "collection": {
+      "name": "acmeCo/test/test_key_discovery_329932",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "k_smallint",
+          "k_int",
+          "k_bigint",
+          "k_bool",
+          "k_str"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-redshift-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index"
+            ]
+          },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "k_bigint": {
+            "type": "integer"
+          },
+          "k_bool": {
+            "type": "boolean"
+          },
+          "k_int": {
+            "type": "integer"
+          },
+          "k_smallint": {
+            "type": "integer"
+          },
+          "k_str": {
+            "type": "string"
+          }
+        }
+      },
+      "key": [
+        "/k_smallint",
+        "/k_int",
+        "/k_bigint",
+        "/k_bool",
+        "/k_str"
+      ],
+      "projections": null
+    },
+    "state_key": "test_key_discovery_329932"
+  }
+

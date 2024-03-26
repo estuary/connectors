@@ -29,7 +29,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	case json.RawMessage:
 		return string(ii), nil
 	case nil:
-		return string(json.RawMessage(nil)), nil
+		return nil, nil
 	default:
 		var m, err = json.Marshal(te)
 		if err != nil {

@@ -29,6 +29,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+const outputWriteBuffer = 1 * 1024 * 1024 // 1MiB output buffer to amortize write syscall overhead
+
 // StateKey is used to key binding-specific state a connector's driver checkpoint. It's just a type
 // alias for a string to help differentiate any old string from where a specific state key from the
 // runtime should be used.
@@ -273,17 +275,20 @@ func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge 
 }
 
 func newProtoCodec(ctx context.Context) pc.Connector_CaptureServer {
+	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
 	return &protoCodec{
 		ctx: ctx,
 		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
-		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		bw:  bw,
+		pw:  protoio.NewUint32DelimitedWriter(bw, binary.LittleEndian),
 	}
 }
 
 type protoCodec struct {
 	ctx context.Context
 	r   *bufio.Reader
-	w   protoio.Writer
+	bw  *bufio.Writer
+	pw  protoio.Writer
 }
 
 func (c *protoCodec) Context() context.Context {
@@ -291,7 +296,17 @@ func (c *protoCodec) Context() context.Context {
 }
 
 func (c *protoCodec) Send(m *pc.Response) error {
-	return c.SendMsg(m)
+	if err := c.SendMsg(m); err != nil {
+		return err
+	}
+
+	// Flush the buffered output writer after anything *other* than a captured document.
+	// This logic assumes that either a captured document is present or this is some
+	// other sort of message, which is always true in practice.
+	if m.Captured == nil {
+		return c.bw.Flush()
+	}
+	return nil
 }
 func (c *protoCodec) Recv() (*pc.Request, error) {
 	var m = new(pc.Request)
@@ -301,7 +316,7 @@ func (c *protoCodec) Recv() (*pc.Request, error) {
 	return m, nil
 }
 func (c *protoCodec) SendMsg(m interface{}) error {
-	return c.w.WriteMsg(m.(proto.Message))
+	return c.pw.WriteMsg(m.(proto.Message))
 }
 func (c *protoCodec) RecvMsg(m interface{}) error {
 	var lengthBytes [4]byte
@@ -373,6 +388,7 @@ func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 }
 
 func newJsonCodec(ctx context.Context) pc.Connector_CaptureServer {
+	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
 	return &jsonCodec{
 		ctx: ctx,
 		marshaler: jsonpb.Marshaler{
@@ -387,6 +403,7 @@ func newJsonCodec(ctx context.Context) pc.Connector_CaptureServer {
 			AnyResolver:        nil,
 		},
 		decoder: json.NewDecoder(bufio.NewReaderSize(os.Stdin, 1<<21)),
+		bw:      bw,
 	}
 }
 
@@ -395,13 +412,24 @@ type jsonCodec struct {
 	marshaler   jsonpb.Marshaler
 	unmarshaler jsonpb.Unmarshaler
 	decoder     *json.Decoder
+	bw          *bufio.Writer
 }
 
 func (c *jsonCodec) Context() context.Context {
 	return c.ctx
 }
 func (c *jsonCodec) Send(m *pc.Response) error {
-	return c.SendMsg(m)
+	if err := c.SendMsg(m); err != nil {
+		return err
+	}
+
+	// Flush the buffered output writer after anything *other* than a captured document.
+	// This logic assumes that either a captured document is present or this is some
+	// other sort of message, which is always true in practice.
+	if m.Captured == nil {
+		return c.bw.Flush()
+	}
+	return nil
 }
 func (c *jsonCodec) Recv() (*pc.Request, error) {
 	var m = new(pc.Request)
@@ -418,7 +446,7 @@ func (c *jsonCodec) SendMsg(m interface{}) error {
 	}
 	_ = w.WriteByte('\n')
 
-	var _, err = os.Stdout.Write(w.Bytes())
+	var _, err = c.bw.Write(w.Bytes())
 	return err
 }
 func (c *jsonCodec) RecvMsg(m interface{}) error {
