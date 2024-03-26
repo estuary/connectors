@@ -79,6 +79,7 @@ jobs:
           - name: source-jira
             type: capture
             version: v1
+            usage_rate: "1.0"
           - name: source-notion
             type: capture
             version: v2
