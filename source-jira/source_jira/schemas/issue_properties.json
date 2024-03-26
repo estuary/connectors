@@ -7,7 +7,10 @@
       "description": "The key of the property. Required on create and update."
     },
     "issueId": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Id of the related issue.",
       "readOnly": true
     },
@@ -15,7 +18,10 @@
       "description": "The value of the property. Required on create and update."
     },
     "isdefault": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     }
   },
   "description": "An entity property, for more information see [Entity properties](https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/)."

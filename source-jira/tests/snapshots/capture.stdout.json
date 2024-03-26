@@ -1,0 +1,2718 @@
+[
+  [
+    "acmeCo/application_roles",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "defaultGroups": [
+        "jira-servicemanagement-users-estuary-test"
+      ],
+      "defaultGroupsDetails": [
+        {
+          "groupId": "f1edec15-b4c2-4181-857e-a3251e84b9c2",
+          "name": "jira-servicemanagement-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=f1edec15-b4c2-4181-857e-a3251e84b9c2"
+        }
+      ],
+      "defined": true,
+      "groupDetails": [
+        {
+          "groupId": "16c502ad-bd64-4f84-9180-e8857adee6b5",
+          "name": "atlassian-addons-admin",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=16c502ad-bd64-4f84-9180-e8857adee6b5"
+        },
+        {
+          "groupId": "f1edec15-b4c2-4181-857e-a3251e84b9c2",
+          "name": "jira-servicemanagement-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=f1edec15-b4c2-4181-857e-a3251e84b9c2"
+        },
+        {
+          "groupId": "4648856c-d0ff-4657-af05-6a6684db1e63",
+          "name": "org-admins",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=4648856c-d0ff-4657-af05-6a6684db1e63"
+        }
+      ],
+      "groups": [
+        "org-admins",
+        "atlassian-addons-admin",
+        "jira-servicemanagement-users-estuary-test"
+      ],
+      "hasUnlimitedSeats": false,
+      "key": "jira-servicedesk",
+      "name": "Jira Service Desk",
+      "numberOfSeats": 3,
+      "platform": false,
+      "remainingSeats": 2,
+      "selectedByDefault": false,
+      "userCount": 1,
+      "userCountDescription": "agent"
+    }
+  ],
+  [
+    "acmeCo/application_roles",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "defaultGroups": [
+        "jira-software-users-estuary-test"
+      ],
+      "defaultGroupsDetails": [
+        {
+          "groupId": "cef01a92-455d-4976-8346-69309a68a6aa",
+          "name": "jira-software-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=cef01a92-455d-4976-8346-69309a68a6aa"
+        }
+      ],
+      "defined": true,
+      "groupDetails": [
+        {
+          "groupId": "16c502ad-bd64-4f84-9180-e8857adee6b5",
+          "name": "atlassian-addons-admin",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=16c502ad-bd64-4f84-9180-e8857adee6b5"
+        },
+        {
+          "groupId": "4648856c-d0ff-4657-af05-6a6684db1e63",
+          "name": "org-admins",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=4648856c-d0ff-4657-af05-6a6684db1e63"
+        },
+        {
+          "groupId": "cef01a92-455d-4976-8346-69309a68a6aa",
+          "name": "jira-software-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=cef01a92-455d-4976-8346-69309a68a6aa"
+        }
+      ],
+      "groups": [
+        "org-admins",
+        "jira-software-users-estuary-test",
+        "atlassian-addons-admin"
+      ],
+      "hasUnlimitedSeats": false,
+      "key": "jira-software",
+      "name": "Jira Software",
+      "numberOfSeats": 10,
+      "platform": false,
+      "remainingSeats": 9,
+      "selectedByDefault": false,
+      "userCount": 1,
+      "userCountDescription": "user"
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 45
+      },
+      "id": "10122",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10122",
+        "24x24": "/secure/useravatar?size=small&avatarId=10122",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10122",
+        "48x48": "/secure/useravatar?avatarId=10122"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "id": "10300",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10300",
+        "24x24": "/secure/useravatar?size=small&avatarId=10300",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10300",
+        "48x48": "/secure/useravatar?avatarId=10300"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "id": "10303",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10303",
+        "24x24": "/secure/useravatar?size=small&avatarId=10303",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10303",
+        "48x48": "/secure/useravatar?avatarId=10303"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "id": "10304",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10304",
+        "24x24": "/secure/useravatar?size=small&avatarId=10304",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10304",
+        "48x48": "/secure/useravatar?avatarId=10304"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "id": "10306",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10306",
+        "24x24": "/secure/useravatar?size=small&avatarId=10306",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10306",
+        "48x48": "/secure/useravatar?avatarId=10306"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "id": "10307",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10307",
+        "24x24": "/secure/useravatar?size=small&avatarId=10307",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10307",
+        "48x48": "/secure/useravatar?avatarId=10307"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
+      "id": "10308",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10308",
+        "24x24": "/secure/useravatar?size=small&avatarId=10308",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10308",
+        "48x48": "/secure/useravatar?avatarId=10308"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
+      "id": "10309",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10309",
+        "24x24": "/secure/useravatar?size=small&avatarId=10309",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10309",
+        "48x48": "/secure/useravatar?avatarId=10309"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
+      "id": "10310",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10310",
+        "24x24": "/secure/useravatar?size=small&avatarId=10310",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10310",
+        "48x48": "/secure/useravatar?avatarId=10310"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
+      "id": "10311",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10311",
+        "24x24": "/secure/useravatar?size=small&avatarId=10311",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10311",
+        "48x48": "/secure/useravatar?avatarId=10311"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
+      "id": "10312",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10312",
+        "24x24": "/secure/useravatar?size=small&avatarId=10312",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10312",
+        "48x48": "/secure/useravatar?avatarId=10312"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
+      "id": "10313",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10313",
+        "24x24": "/secure/useravatar?size=small&avatarId=10313",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10313",
+        "48x48": "/secure/useravatar?avatarId=10313"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 11
+      },
+      "id": "10314",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10314",
+        "24x24": "/secure/useravatar?size=small&avatarId=10314",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10314",
+        "48x48": "/secure/useravatar?avatarId=10314"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 12
+      },
+      "id": "10315",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10315",
+        "24x24": "/secure/useravatar?size=small&avatarId=10315",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10315",
+        "48x48": "/secure/useravatar?avatarId=10315"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 13
+      },
+      "id": "10316",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10316",
+        "24x24": "/secure/useravatar?size=small&avatarId=10316",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10316",
+        "48x48": "/secure/useravatar?avatarId=10316"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 14
+      },
+      "id": "10318",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10318",
+        "24x24": "/secure/useravatar?size=small&avatarId=10318",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10318",
+        "48x48": "/secure/useravatar?avatarId=10318"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 15
+      },
+      "id": "10320",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10320",
+        "24x24": "/secure/useravatar?size=small&avatarId=10320",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10320",
+        "48x48": "/secure/useravatar?avatarId=10320"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 16
+      },
+      "id": "10321",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10321",
+        "24x24": "/secure/useravatar?size=small&avatarId=10321",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10321",
+        "48x48": "/secure/useravatar?avatarId=10321"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 17
+      },
+      "id": "10322",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10322",
+        "24x24": "/secure/useravatar?size=small&avatarId=10322",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10322",
+        "48x48": "/secure/useravatar?avatarId=10322"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 18
+      },
+      "id": "10323",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10323",
+        "24x24": "/secure/useravatar?size=small&avatarId=10323",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10323",
+        "48x48": "/secure/useravatar?avatarId=10323"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 46
+      },
+      "id": "10334",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10334",
+        "24x24": "/secure/useravatar?size=small&avatarId=10334",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10334",
+        "48x48": "/secure/useravatar?avatarId=10334"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 47
+      },
+      "id": "10335",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10335",
+        "24x24": "/secure/useravatar?size=small&avatarId=10335",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10335",
+        "48x48": "/secure/useravatar?avatarId=10335"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 48
+      },
+      "id": "10336",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10336",
+        "24x24": "/secure/useravatar?size=small&avatarId=10336",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10336",
+        "48x48": "/secure/useravatar?avatarId=10336"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 49
+      },
+      "id": "10337",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10337",
+        "24x24": "/secure/useravatar?size=small&avatarId=10337",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10337",
+        "48x48": "/secure/useravatar?avatarId=10337"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 50
+      },
+      "id": "10338",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10338",
+        "24x24": "/secure/useravatar?size=small&avatarId=10338",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10338",
+        "48x48": "/secure/useravatar?avatarId=10338"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 51
+      },
+      "id": "10339",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10339",
+        "24x24": "/secure/useravatar?size=small&avatarId=10339",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10339",
+        "48x48": "/secure/useravatar?avatarId=10339"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 52
+      },
+      "id": "10340",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10340",
+        "24x24": "/secure/useravatar?size=small&avatarId=10340",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10340",
+        "48x48": "/secure/useravatar?avatarId=10340"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 53
+      },
+      "id": "10341",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10341",
+        "24x24": "/secure/useravatar?size=small&avatarId=10341",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10341",
+        "48x48": "/secure/useravatar?avatarId=10341"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 54
+      },
+      "id": "10342",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10342",
+        "24x24": "/secure/useravatar?size=small&avatarId=10342",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10342",
+        "48x48": "/secure/useravatar?avatarId=10342"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 55
+      },
+      "id": "10343",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10343",
+        "24x24": "/secure/useravatar?size=small&avatarId=10343",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10343",
+        "48x48": "/secure/useravatar?avatarId=10343"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 56
+      },
+      "id": "10344",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10344",
+        "24x24": "/secure/useravatar?size=small&avatarId=10344",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10344",
+        "48x48": "/secure/useravatar?avatarId=10344"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 57
+      },
+      "id": "10345",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10345",
+        "24x24": "/secure/useravatar?size=small&avatarId=10345",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10345",
+        "48x48": "/secure/useravatar?avatarId=10345"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 58
+      },
+      "id": "10346",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10346",
+        "24x24": "/secure/useravatar?size=small&avatarId=10346",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10346",
+        "48x48": "/secure/useravatar?avatarId=10346"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 59
+      },
+      "id": "10347",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10347",
+        "24x24": "/secure/useravatar?size=small&avatarId=10347",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10347",
+        "48x48": "/secure/useravatar?avatarId=10347"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 60
+      },
+      "id": "10348",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10348",
+        "24x24": "/secure/useravatar?size=small&avatarId=10348",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10348",
+        "48x48": "/secure/useravatar?avatarId=10348"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 61
+      },
+      "id": "10349",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10349",
+        "24x24": "/secure/useravatar?size=small&avatarId=10349",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10349",
+        "48x48": "/secure/useravatar?avatarId=10349"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 62
+      },
+      "id": "10350",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10350",
+        "24x24": "/secure/useravatar?size=small&avatarId=10350",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10350",
+        "48x48": "/secure/useravatar?avatarId=10350"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 63
+      },
+      "id": "10351",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10351",
+        "24x24": "/secure/useravatar?size=small&avatarId=10351",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10351",
+        "48x48": "/secure/useravatar?avatarId=10351"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 64
+      },
+      "id": "10352",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10352",
+        "24x24": "/secure/useravatar?size=small&avatarId=10352",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10352",
+        "48x48": "/secure/useravatar?avatarId=10352"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 19
+      },
+      "id": "10400",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10400&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10400&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10400&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10400&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 20
+      },
+      "id": "10401",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10401&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10401&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10401&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10401&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 21
+      },
+      "id": "10402",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10402&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10402&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10402&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10402&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 22
+      },
+      "id": "10403",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10403&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10403&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10403&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10403&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 23
+      },
+      "id": "10404",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10404&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10404&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10404&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10404&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 24
+      },
+      "id": "10405",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10405&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10405&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10405&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10405&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 25
+      },
+      "id": "10406",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10406&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10406&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10406&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10406&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 26
+      },
+      "id": "10407",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10407&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10407&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10407&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10407&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 27
+      },
+      "id": "10408",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10408&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10408&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10408&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10408&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 28
+      },
+      "id": "10409",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10409&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10409&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10409&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10409&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 29
+      },
+      "id": "10410",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10410&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10410&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10410&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10410&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 30
+      },
+      "id": "10411",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10411&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10411&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10411&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10411&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 31
+      },
+      "id": "10412",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10412&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10412&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10412&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10412&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 32
+      },
+      "id": "10413",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10413&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10413&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10413&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10413&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 33
+      },
+      "id": "10414",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10414&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10414&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10414&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10414&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 34
+      },
+      "id": "10415",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10415&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10415&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10415&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10415&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 35
+      },
+      "id": "10416",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10416&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10416&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10416&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10416&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 36
+      },
+      "id": "10417",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10417&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10417&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10417&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10417&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 37
+      },
+      "id": "10418",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10418&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10418&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10418&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10418&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 38
+      },
+      "id": "10419",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10419&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10419&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10419&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10419&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 39
+      },
+      "id": "10420",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10420&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10420&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10420&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10420&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 40
+      },
+      "id": "10421",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10421&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10421&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10421&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10421&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 41
+      },
+      "id": "10422",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10422&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10422&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10422&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10422&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 42
+      },
+      "id": "10423",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10423&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10423&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10423&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10423&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 43
+      },
+      "id": "10424",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10424&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10424&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10424&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10424&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 44
+      },
+      "id": "10425",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10425&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10425&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10425&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10425&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/boards",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "id": 1,
+      "location": {
+        "avatarURI": "https://estuary-test.atlassian.net/rest/api/2/universal_avatar/view/type/project/avatar/10408?size=small",
+        "displayName": "Estuary Test Project (ETP)",
+        "name": "Estuary Test Project (ETP)",
+        "projectId": 10000,
+        "projectKey": "ETP",
+        "projectName": "Estuary Test Project",
+        "projectTypeKey": "software"
+      },
+      "name": "Estuary",
+      "projectId": "10000",
+      "projectKey": "ETP",
+      "self": "https://estuary-test.atlassian.net/rest/agile/1.0/board/1",
+      "type": "simple"
+    }
+  ],
+  [
+    "acmeCo/board_issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "boardId": 1,
+      "created": "2024-03-22T15:17:28.309000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+      "fields": {
+        "created": "2024-03-22T15:17:28.309000-03:00",
+        "updated": "2024-03-22T15:17:28.358000-03:00"
+      },
+      "id": "10000",
+      "key": "ETP-1",
+      "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10000",
+      "updated": "2024-03-22T15:17:28.358000-03:00"
+    }
+  ],
+  [
+    "acmeCo/board_issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "boardId": 1,
+      "created": "2024-03-22T15:17:45.561000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+      "fields": {
+        "created": "2024-03-22T15:17:45.561000-03:00",
+        "updated": "2024-03-22T15:18:19.042000-03:00"
+      },
+      "id": "10001",
+      "key": "ETP-2",
+      "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10001",
+      "updated": "2024-03-22T15:18:19.042000-03:00"
+    }
+  ],
+  [
+    "acmeCo/board_issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "boardId": 1,
+      "created": "2024-03-22T15:17:55.354000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+      "fields": {
+        "created": "2024-03-22T15:17:55.354000-03:00",
+        "updated": "2024-03-22T15:18:16.711000-03:00"
+      },
+      "id": "10002",
+      "key": "ETP-3",
+      "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10002",
+      "updated": "2024-03-22T15:18:16.711000-03:00"
+    }
+  ],
+  [
+    "acmeCo/board_issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "boardId": 1,
+      "created": "2024-03-22T15:18:01.351000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
+      "fields": {
+        "created": "2024-03-22T15:18:01.351000-03:00",
+        "updated": "2024-03-22T15:18:01.418000-03:00"
+      },
+      "id": "10003",
+      "key": "ETP-4",
+      "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10003",
+      "updated": "2024-03-22T15:18:01.418000-03:00"
+    }
+  ],
+  [
+    "acmeCo/dashboards",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "editPermissions": [],
+      "id": "10000",
+      "isFavourite": false,
+      "isWritable": true,
+      "name": "Default dashboard",
+      "popularity": 0,
+      "self": "https://estuary-test.atlassian.net/rest/api/3/dashboard/10000",
+      "sharePermissions": [
+        {
+          "id": 10000,
+          "type": "global"
+        }
+      ],
+      "systemDashboard": true,
+      "view": "/jira/dashboards/10000"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "groupId": "12d627fc-abfc-4706-ad19-60469c5072af",
+      "name": "atlassian-addons"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "groupId": "16c502ad-bd64-4f84-9180-e8857adee6b5",
+      "name": "atlassian-addons-admin"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "groupId": "17d21437-e4d2-4f97-9cbc-3799d496becc",
+      "name": "jira-servicemanagement-user-access-admins-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "groupId": "28ef2314-6247-486e-979a-287da2470b66",
+      "name": "jira-software-user-access-admins-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "groupId": "37c23f08-32e4-48d6-a15c-67ea444340b1",
+      "name": "system-administrators"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
+      "groupId": "4648856c-d0ff-4657-af05-6a6684db1e63",
+      "name": "org-admins"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
+      "groupId": "84681f8d-f01f-4743-9cc5-9f9049df7e4a",
+      "name": "jira-admins-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
+      "groupId": "b30e89df-85c4-430d-8ecc-f01741746b50",
+      "name": "jira-servicemanagement-customers-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
+      "groupId": "cef01a92-455d-4976-8346-69309a68a6aa",
+      "name": "jira-software-users-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
+      "groupId": "d6d15bba-dd06-4538-bff7-e48fe6cb0dc4",
+      "name": "jira-servicemanagement-stakeholders-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
+      "groupId": "f1edec15-b4c2-4181-857e-a3251e84b9c2",
+      "name": "jira-servicemanagement-users-estuary-test"
+    }
+  ],
+  [
+    "acmeCo/issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "changelog": {
+        "histories": [],
+        "maxResults": 0,
+        "startAt": 0,
+        "total": 0
+      },
+      "created": "2024-03-22T15:17:28.309000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
+      "fields": {
+        "aggregateprogress": {
+          "progress": 0,
+          "total": 0
+        },
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10000/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "components": [],
+        "created": "2024-03-22T15:17:28.309000-03:00",
+        "creator": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "customfield_10018": {
+          "hasEpicLinkFieldDependency": false,
+          "nonEditableReason": {
+            "message": "The Parent Link is only available to Jira Premium users.",
+            "reason": "PLUGIN_LICENSE_ERROR"
+          },
+          "showField": false
+        },
+        "customfield_10019": "0|hzzzzz:",
+        "customfield_10032": [],
+        "fixVersions": [],
+        "issuelinks": [],
+        "issuerestriction": {
+          "issuerestrictions": {},
+          "shouldDisplay": true
+        },
+        "issuetype": {
+          "avatarId": 10318,
+          "description": "Tasks track small, distinct pieces of work.",
+          "entityId": "3cc72278-71c6-418d-a3dc-3ce7c98bbeb7",
+          "hierarchyLevel": 0,
+          "iconUrl": "https://estuary-test.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+          "id": "10001",
+          "name": "Task",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issuetype/10001",
+          "subtask": false
+        },
+        "labels": [],
+        "priority": {
+          "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
+          "id": "3",
+          "name": "Medium",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/priority/3"
+        },
+        "progress": {
+          "progress": 0,
+          "total": 0
+        },
+        "project": {
+          "avatarUrls": {
+            "16x16": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=xsmall",
+            "24x24": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=small",
+            "32x32": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=medium",
+            "48x48": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408"
+          },
+          "id": "10000",
+          "key": "ETP",
+          "name": "Estuary Test Project",
+          "projectTypeKey": "software",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/project/10000",
+          "simplified": true
+        },
+        "reporter": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "status": {
+          "description": "",
+          "iconUrl": "https://estuary-test.atlassian.net/",
+          "id": "10000",
+          "name": "To Do",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+          "statusCategory": {
+            "colorName": "blue-gray",
+            "id": 2,
+            "key": "new",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+          }
+        },
+        "statuscategorychangedate": "2024-03-22T15:17:28.696000-03:00",
+        "subtasks": [],
+        "summary": "Hello world",
+        "timetracking": {},
+        "updated": "2024-03-22T15:17:28.358000-03:00",
+        "versions": [],
+        "votes": {
+          "hasVoted": false,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-1/votes",
+          "votes": 0
+        },
+        "watches": {
+          "isWatching": false,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-1/watchers",
+          "watchCount": 0
+        },
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        },
+        "workratio": -1
+      },
+      "id": "10000",
+      "key": "ETP-1",
+      "projectId": "10000",
+      "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10000/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:17 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "statuscategorychangedate": "Friday 3:17 PM",
+        "timetracking": {},
+        "updated": "Friday 3:17 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
+      "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10000",
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:17:28.358000-03:00"
+    }
+  ],
+  [
+    "acmeCo/issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "changelog": {
+        "histories": [
+          {
+            "author": {
+              "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+              "accountType": "atlassian",
+              "active": true,
+              "avatarUrls": {
+                "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+              },
+              "displayName": "Pedro Moreira",
+              "emailAddress": "pedroantoniopara@gmail.com",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+              "timeZone": "America/Bahia"
+            },
+            "created": "2024-03-22T15:18:19.079-0300",
+            "id": "10006",
+            "items": [
+              {
+                "field": "resolution",
+                "fieldId": "resolution",
+                "fieldtype": "jira",
+                "from": null,
+                "fromString": null,
+                "to": "10000",
+                "toString": "Done"
+              },
+              {
+                "field": "status",
+                "fieldId": "status",
+                "fieldtype": "jira",
+                "from": "10001",
+                "fromString": "In Progress",
+                "to": "10002",
+                "toString": "Done"
+              }
+            ]
+          },
+          {
+            "author": {
+              "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+              "accountType": "atlassian",
+              "active": true,
+              "avatarUrls": {
+                "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+              },
+              "displayName": "Pedro Moreira",
+              "emailAddress": "pedroantoniopara@gmail.com",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+              "timeZone": "America/Bahia"
+            },
+            "created": "2024-03-22T15:18:06.676-0300",
+            "id": "10004",
+            "items": [
+              {
+                "field": "status",
+                "fieldId": "status",
+                "fieldtype": "jira",
+                "from": "10000",
+                "fromString": "To Do",
+                "to": "10001",
+                "toString": "In Progress"
+              }
+            ]
+          }
+        ],
+        "maxResults": 2,
+        "startAt": 0,
+        "total": 2
+      },
+      "created": "2024-03-22T15:17:45.561000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
+      "fields": {
+        "aggregateprogress": {
+          "progress": 0,
+          "total": 0
+        },
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10001/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "components": [],
+        "created": "2024-03-22T15:17:45.561000-03:00",
+        "creator": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "customfield_10018": {
+          "hasEpicLinkFieldDependency": false,
+          "nonEditableReason": {
+            "message": "The Parent Link is only available to Jira Premium users.",
+            "reason": "PLUGIN_LICENSE_ERROR"
+          },
+          "showField": false
+        },
+        "customfield_10019": "0|i00007:",
+        "customfield_10025": "10000_*:*_1_*:*_21115_*|*_10002_*:*_1_*:*_0_*|*_10001_*:*_1_*:*_12403",
+        "customfield_10032": [],
+        "fixVersions": [],
+        "issuelinks": [],
+        "issuerestriction": {
+          "issuerestrictions": {},
+          "shouldDisplay": true
+        },
+        "issuetype": {
+          "avatarId": 10318,
+          "description": "Tasks track small, distinct pieces of work.",
+          "entityId": "3cc72278-71c6-418d-a3dc-3ce7c98bbeb7",
+          "hierarchyLevel": 0,
+          "iconUrl": "https://estuary-test.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+          "id": "10001",
+          "name": "Task",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issuetype/10001",
+          "subtask": false
+        },
+        "labels": [],
+        "priority": {
+          "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
+          "id": "3",
+          "name": "Medium",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/priority/3"
+        },
+        "progress": {
+          "progress": 0,
+          "total": 0
+        },
+        "project": {
+          "avatarUrls": {
+            "16x16": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=xsmall",
+            "24x24": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=small",
+            "32x32": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=medium",
+            "48x48": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408"
+          },
+          "id": "10000",
+          "key": "ETP",
+          "name": "Estuary Test Project",
+          "projectTypeKey": "software",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/project/10000",
+          "simplified": true
+        },
+        "reporter": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "resolution": {
+          "description": "Work has been completed on this issue.",
+          "id": "10000",
+          "name": "Done",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/resolution/10000"
+        },
+        "resolutiondate": "2024-03-22T15:18:19.035000-03:00",
+        "status": {
+          "description": "",
+          "iconUrl": "https://estuary-test.atlassian.net/",
+          "id": "10002",
+          "name": "Done",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+          "statusCategory": {
+            "colorName": "green",
+            "id": 3,
+            "key": "done",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+          }
+        },
+        "statuscategorychangedate": "2024-03-22T15:18:19.043000-03:00",
+        "subtasks": [],
+        "summary": "Hello World 1",
+        "timetracking": {},
+        "updated": "2024-03-22T15:18:19.042000-03:00",
+        "versions": [],
+        "votes": {
+          "hasVoted": false,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-2/votes",
+          "votes": 0
+        },
+        "watches": {
+          "isWatching": true,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-2/watchers",
+          "watchCount": 1
+        },
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        },
+        "workratio": -1
+      },
+      "id": "10001",
+      "key": "ETP-2",
+      "projectId": "10000",
+      "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10001/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:17 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "resolutiondate": "Friday 3:18 PM",
+        "statuscategorychangedate": "Friday 3:18 PM",
+        "timetracking": {},
+        "updated": "Friday 3:18 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
+      "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10001",
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:18:19.042000-03:00"
+    }
+  ],
+  [
+    "acmeCo/issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "changelog": {
+        "histories": [
+          {
+            "author": {
+              "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+              "accountType": "atlassian",
+              "active": true,
+              "avatarUrls": {
+                "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+                "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+              },
+              "displayName": "Pedro Moreira",
+              "emailAddress": "pedroantoniopara@gmail.com",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+              "timeZone": "America/Bahia"
+            },
+            "created": "2024-03-22T15:18:16.741-0300",
+            "id": "10005",
+            "items": [
+              {
+                "field": "status",
+                "fieldId": "status",
+                "fieldtype": "jira",
+                "from": "10000",
+                "fromString": "To Do",
+                "to": "10001",
+                "toString": "In Progress"
+              }
+            ]
+          }
+        ],
+        "maxResults": 1,
+        "startAt": 0,
+        "total": 1
+      },
+      "created": "2024-03-22T15:17:55.354000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
+      "fields": {
+        "aggregateprogress": {
+          "progress": 0,
+          "total": 0
+        },
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10002/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "components": [],
+        "created": "2024-03-22T15:17:55.354000-03:00",
+        "creator": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "customfield_10018": {
+          "hasEpicLinkFieldDependency": false,
+          "nonEditableReason": {
+            "message": "The Parent Link is only available to Jira Premium users.",
+            "reason": "PLUGIN_LICENSE_ERROR"
+          },
+          "showField": false
+        },
+        "customfield_10019": "0|i0000f:",
+        "customfield_10032": [],
+        "fixVersions": [],
+        "issuelinks": [],
+        "issuerestriction": {
+          "issuerestrictions": {},
+          "shouldDisplay": true
+        },
+        "issuetype": {
+          "avatarId": 10318,
+          "description": "Tasks track small, distinct pieces of work.",
+          "entityId": "3cc72278-71c6-418d-a3dc-3ce7c98bbeb7",
+          "hierarchyLevel": 0,
+          "iconUrl": "https://estuary-test.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+          "id": "10001",
+          "name": "Task",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issuetype/10001",
+          "subtask": false
+        },
+        "labels": [],
+        "priority": {
+          "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
+          "id": "3",
+          "name": "Medium",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/priority/3"
+        },
+        "progress": {
+          "progress": 0,
+          "total": 0
+        },
+        "project": {
+          "avatarUrls": {
+            "16x16": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=xsmall",
+            "24x24": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=small",
+            "32x32": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=medium",
+            "48x48": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408"
+          },
+          "id": "10000",
+          "key": "ETP",
+          "name": "Estuary Test Project",
+          "projectTypeKey": "software",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/project/10000",
+          "simplified": true
+        },
+        "reporter": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "status": {
+          "description": "",
+          "iconUrl": "https://estuary-test.atlassian.net/",
+          "id": "10001",
+          "name": "In Progress",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+          "statusCategory": {
+            "colorName": "yellow",
+            "id": 4,
+            "key": "indeterminate",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+          }
+        },
+        "statuscategorychangedate": "2024-03-22T15:18:16.711000-03:00",
+        "subtasks": [],
+        "summary": "Hello World 2",
+        "timetracking": {},
+        "updated": "2024-03-22T15:18:16.711000-03:00",
+        "versions": [],
+        "votes": {
+          "hasVoted": false,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-3/votes",
+          "votes": 0
+        },
+        "watches": {
+          "isWatching": true,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-3/watchers",
+          "watchCount": 1
+        },
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        },
+        "workratio": -1
+      },
+      "id": "10002",
+      "key": "ETP-3",
+      "projectId": "10000",
+      "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10002/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:17 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "statuscategorychangedate": "Friday 3:18 PM",
+        "timetracking": {},
+        "updated": "Friday 3:18 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
+      "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10002",
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:18:16.711000-03:00"
+    }
+  ],
+  [
+    "acmeCo/issues",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "changelog": {
+        "histories": [],
+        "maxResults": 0,
+        "startAt": 0,
+        "total": 0
+      },
+      "created": "2024-03-22T15:18:01.351000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
+      "fields": {
+        "aggregateprogress": {
+          "progress": 0,
+          "total": 0
+        },
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10003/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "components": [],
+        "created": "2024-03-22T15:18:01.351000-03:00",
+        "creator": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "customfield_10018": {
+          "hasEpicLinkFieldDependency": false,
+          "nonEditableReason": {
+            "message": "The Parent Link is only available to Jira Premium users.",
+            "reason": "PLUGIN_LICENSE_ERROR"
+          },
+          "showField": false
+        },
+        "customfield_10019": "0|i0000n:",
+        "customfield_10032": [],
+        "fixVersions": [],
+        "issuelinks": [],
+        "issuerestriction": {
+          "issuerestrictions": {},
+          "shouldDisplay": true
+        },
+        "issuetype": {
+          "avatarId": 10318,
+          "description": "Tasks track small, distinct pieces of work.",
+          "entityId": "3cc72278-71c6-418d-a3dc-3ce7c98bbeb7",
+          "hierarchyLevel": 0,
+          "iconUrl": "https://estuary-test.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+          "id": "10001",
+          "name": "Task",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issuetype/10001",
+          "subtask": false
+        },
+        "labels": [],
+        "priority": {
+          "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
+          "id": "3",
+          "name": "Medium",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/priority/3"
+        },
+        "progress": {
+          "progress": 0,
+          "total": 0
+        },
+        "project": {
+          "avatarUrls": {
+            "16x16": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=xsmall",
+            "24x24": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=small",
+            "32x32": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408?size=medium",
+            "48x48": "https://estuary-test.atlassian.net/rest/api/3/universal_avatar/view/type/project/avatar/10408"
+          },
+          "id": "10000",
+          "key": "ETP",
+          "name": "Estuary Test Project",
+          "projectTypeKey": "software",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/project/10000",
+          "simplified": true
+        },
+        "reporter": {
+          "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "accountType": "atlassian",
+          "active": true,
+          "avatarUrls": {
+            "16x16": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "24x24": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "32x32": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png",
+            "48x48": "https://secure.gravatar.com/avatar/b86c355327a6d715869bdd228d1db717?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FPM-3.png"
+          },
+          "displayName": "Pedro Moreira",
+          "emailAddress": "pedroantoniopara@gmail.com",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
+          "timeZone": "America/Bahia"
+        },
+        "status": {
+          "description": "",
+          "iconUrl": "https://estuary-test.atlassian.net/",
+          "id": "10000",
+          "name": "To Do",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+          "statusCategory": {
+            "colorName": "blue-gray",
+            "id": 2,
+            "key": "new",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+          }
+        },
+        "statuscategorychangedate": "2024-03-22T15:18:01.733000-03:00",
+        "subtasks": [],
+        "summary": "Hello World 3",
+        "timetracking": {},
+        "updated": "2024-03-22T15:18:01.418000-03:00",
+        "versions": [],
+        "votes": {
+          "hasVoted": false,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-4/votes",
+          "votes": 0
+        },
+        "watches": {
+          "isWatching": true,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/ETP-4/watchers",
+          "watchCount": 1
+        },
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        },
+        "workratio": -1
+      },
+      "id": "10003",
+      "key": "ETP-4",
+      "projectId": "10000",
+      "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10003/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:18 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "statuscategorychangedate": "Friday 3:18 PM",
+        "timetracking": {},
+        "updated": "Friday 3:18 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
+      "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10003",
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:18:01.418000-03:00"
+    }
+  ]
+]
