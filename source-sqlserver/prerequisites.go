@@ -13,12 +13,12 @@ import (
 func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
-	if err := db.prerequisiteVersion(ctx); err != nil {
-		// Return early if the database version is incompatible with the connector since additional
-		// errors will be of minimal use.
-		errs = append(errs, err)
-		return errs
-	}
+	//if err := db.prerequisiteVersion(ctx); err != nil {
+	//	// Return early if the database version is incompatible with the connector since additional
+	//	// errors will be of minimal use.
+	//	errs = append(errs, err)
+	//	return errs
+	//}
 
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteCDCEnabled,
