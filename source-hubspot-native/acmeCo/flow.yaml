@@ -4,6 +4,10 @@ collections:
     schema: companies.schema.yaml
     key:
       - /id
+  acmeCo/contact_lists:
+    schema: contact_lists.schema.yaml
+    key:
+      - /id
   acmeCo/contacts:
     schema: contacts.schema.yaml
     key:
@@ -14,6 +18,26 @@ collections:
       - /id
   acmeCo/engagements:
     schema: engagements.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_calls:
+    schema: engagements_calls.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_emails:
+    schema: engagements_emails.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_meetings:
+    schema: engagements_meetings.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_notes:
+    schema: engagements_notes.schema.yaml
+    key:
+      - /id
+  acmeCo/engagements_tasks:
+    schema: engagements_tasks.schema.yaml
     key:
       - /id
   acmeCo/properties:

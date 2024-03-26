@@ -7,30 +7,64 @@ captures:
       local:
         command:
           - python
-          # - "-m"
-          # - "debugpy"
-          # - "--listen"
-          # - "0.0.0.0:5678"
-          # - "--wait-for-client"
           - "-m"
           - source_hubspot_native
         config: config.yaml
     bindings:
       - resource:
           name: companies
+          interval: PT300S
         target: acmeCo/companies
+        disable: true
       - resource:
           name: contacts
+          interval: PT300S
         target: acmeCo/contacts
+        disable: true
       - resource:
           name: deals
+          interval: PT300S
         target: acmeCo/deals
+        disable: true
       - resource:
           name: engagements
+          interval: PT300S
         target: acmeCo/engagements
+        disable: true
       - resource:
           name: tickets
+          interval: PT300S
         target: acmeCo/tickets
+        disable: true
+      - resource:
+          name: engagements_calls
+          interval: PT10S
+        target: acmeCo/engagements_calls
+        disable: true
+      - resource:
+          name: engagements_emails
+          interval: PT10S
+        target: acmeCo/engagements_emails
+      - resource:
+          name: engagements_meetings
+          interval: PT10S
+        target: acmeCo/engagements_meetings
+        disable: true
+      - resource:
+          name: engagements_notes
+          interval: PT10S
+        target: acmeCo/engagements_notes
+        disable: true
+      - resource:
+          name: engagements_tasks
+          interval: PT10S
+        target: acmeCo/engagements_tasks
+        disable: true
+      - resource:
+          name: contact_lists
+          interval: PT10S
+        target: acmeCo/contact_lists
+        disable: true
       - resource:
           name: properties
           interval: P1D
