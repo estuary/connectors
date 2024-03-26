@@ -27,7 +27,10 @@
       "description": "The ID of the issue priority."
     },
     "isDefault": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     }
   },
   "additionalProperties": true,

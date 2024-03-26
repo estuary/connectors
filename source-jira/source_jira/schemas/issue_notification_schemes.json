@@ -22,7 +22,10 @@
       "description": "The description of the notification scheme."
     },
     "notificationSchemeEvents": {
-      "type": ["array", "null"],
+      "type": [
+        "array",
+        "null"
+      ],
       "description": "The notification events and associated recipients.",
       "items": {
         "type": "object",
@@ -142,7 +145,10 @@
                           "type": "string",
                           "description": "The type of scope.",
                           "readOnly": true,
-                          "enum": ["PROJECT", "TEMPLATE"]
+                          "enum": [
+                            "PROJECT",
+                            "TEMPLATE"
+                          ]
                         },
                         "project": {
                           "description": "The project the item has scope in.",
@@ -172,7 +178,11 @@
                               "type": "string",
                               "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
                               "readOnly": true,
-                              "enum": ["software", "service_desk", "business"]
+                              "enum": [
+                                "software",
+                                "service_desk",
+                                "business"
+                              ]
                             },
                             "simplified": {
                               "type": "boolean",
@@ -373,7 +383,10 @@
                           "type": "string",
                           "description": "The type of scope.",
                           "readOnly": true,
-                          "enum": ["PROJECT", "TEMPLATE"]
+                          "enum": [
+                            "PROJECT",
+                            "TEMPLATE"
+                          ]
                         },
                         "project": {
                           "description": "The project the item has scope in.",
@@ -403,7 +416,11 @@
                               "type": "string",
                               "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
                               "readOnly": true,
-                              "enum": ["software", "service_desk", "business"]
+                              "enum": [
+                                "software",
+                                "service_desk",
+                                "business"
+                              ]
                             },
                             "simplified": {
                               "type": "boolean",
@@ -571,13 +588,19 @@
     },
     "scope": {
       "description": "The scope of the notification scheme.",
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "type": {
           "type": "string",
           "description": "The type of scope.",
           "readOnly": true,
-          "enum": ["PROJECT", "TEMPLATE"]
+          "enum": [
+            "PROJECT",
+            "TEMPLATE"
+          ]
         },
         "project": {
           "description": "The project the item has scope in.",
@@ -607,7 +630,11 @@
               "type": "string",
               "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
               "readOnly": true,
-              "enum": ["software", "service_desk", "business"]
+              "enum": [
+                "software",
+                "service_desk",
+                "business"
+              ]
             },
             "simplified": {
               "type": "boolean",

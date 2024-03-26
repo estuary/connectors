@@ -2,6 +2,10 @@
   [
     "acmeCo/application_roles",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "defaultGroups": [
         "jira-servicemanagement-users-estuary-test"
       ],
@@ -49,6 +53,10 @@
   [
     "acmeCo/application_roles",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "defaultGroups": [
         "jira-software-users-estuary-test"
       ],
@@ -96,6 +104,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 45
+      },
       "id": "10122",
       "isDeletable": false,
       "isSelected": false,
@@ -111,6 +123,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "id": "10300",
       "isDeletable": false,
       "isSelected": false,
@@ -126,6 +142,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "id": "10303",
       "isDeletable": false,
       "isSelected": false,
@@ -141,6 +161,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "id": "10304",
       "isDeletable": false,
       "isSelected": false,
@@ -156,6 +180,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "id": "10306",
       "isDeletable": false,
       "isSelected": false,
@@ -171,6 +199,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "id": "10307",
       "isDeletable": false,
       "isSelected": false,
@@ -186,6 +218,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
       "id": "10308",
       "isDeletable": false,
       "isSelected": false,
@@ -201,6 +237,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
       "id": "10309",
       "isDeletable": false,
       "isSelected": false,
@@ -216,6 +256,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
       "id": "10310",
       "isDeletable": false,
       "isSelected": false,
@@ -231,6 +275,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
       "id": "10311",
       "isDeletable": false,
       "isSelected": false,
@@ -246,6 +294,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
       "id": "10312",
       "isDeletable": false,
       "isSelected": false,
@@ -261,6 +313,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
       "id": "10313",
       "isDeletable": false,
       "isSelected": false,
@@ -276,6 +332,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 11
+      },
       "id": "10314",
       "isDeletable": false,
       "isSelected": false,
@@ -291,6 +351,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 12
+      },
       "id": "10315",
       "isDeletable": false,
       "isSelected": false,
@@ -306,6 +370,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 13
+      },
       "id": "10316",
       "isDeletable": false,
       "isSelected": false,
@@ -321,6 +389,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 14
+      },
       "id": "10318",
       "isDeletable": false,
       "isSelected": false,
@@ -336,6 +408,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 15
+      },
       "id": "10320",
       "isDeletable": false,
       "isSelected": false,
@@ -351,6 +427,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 16
+      },
       "id": "10321",
       "isDeletable": false,
       "isSelected": false,
@@ -366,6 +446,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 17
+      },
       "id": "10322",
       "isDeletable": false,
       "isSelected": false,
@@ -381,6 +465,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 18
+      },
       "id": "10323",
       "isDeletable": false,
       "isSelected": false,
@@ -396,6 +484,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 46
+      },
       "id": "10334",
       "isDeletable": false,
       "isSelected": false,
@@ -411,6 +503,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 47
+      },
       "id": "10335",
       "isDeletable": false,
       "isSelected": false,
@@ -426,6 +522,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 48
+      },
       "id": "10336",
       "isDeletable": false,
       "isSelected": false,
@@ -441,6 +541,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 49
+      },
       "id": "10337",
       "isDeletable": false,
       "isSelected": false,
@@ -456,6 +560,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 50
+      },
       "id": "10338",
       "isDeletable": false,
       "isSelected": false,
@@ -471,6 +579,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 51
+      },
       "id": "10339",
       "isDeletable": false,
       "isSelected": false,
@@ -486,6 +598,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 52
+      },
       "id": "10340",
       "isDeletable": false,
       "isSelected": false,
@@ -501,6 +617,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 53
+      },
       "id": "10341",
       "isDeletable": false,
       "isSelected": false,
@@ -516,6 +636,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 54
+      },
       "id": "10342",
       "isDeletable": false,
       "isSelected": false,
@@ -531,6 +655,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 55
+      },
       "id": "10343",
       "isDeletable": false,
       "isSelected": false,
@@ -546,6 +674,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 56
+      },
       "id": "10344",
       "isDeletable": false,
       "isSelected": false,
@@ -561,6 +693,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 57
+      },
       "id": "10345",
       "isDeletable": false,
       "isSelected": false,
@@ -576,6 +712,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 58
+      },
       "id": "10346",
       "isDeletable": false,
       "isSelected": false,
@@ -591,6 +731,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 59
+      },
       "id": "10347",
       "isDeletable": false,
       "isSelected": false,
@@ -606,6 +750,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 60
+      },
       "id": "10348",
       "isDeletable": false,
       "isSelected": false,
@@ -621,6 +769,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 61
+      },
       "id": "10349",
       "isDeletable": false,
       "isSelected": false,
@@ -636,6 +788,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 62
+      },
       "id": "10350",
       "isDeletable": false,
       "isSelected": false,
@@ -651,6 +807,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 63
+      },
       "id": "10351",
       "isDeletable": false,
       "isSelected": false,
@@ -666,6 +826,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 64
+      },
       "id": "10352",
       "isDeletable": false,
       "isSelected": false,
@@ -681,6 +845,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 19
+      },
       "id": "10400",
       "isDeletable": false,
       "isSelected": false,
@@ -696,6 +864,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 20
+      },
       "id": "10401",
       "isDeletable": false,
       "isSelected": false,
@@ -711,6 +883,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 21
+      },
       "id": "10402",
       "isDeletable": false,
       "isSelected": false,
@@ -726,6 +902,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 22
+      },
       "id": "10403",
       "isDeletable": false,
       "isSelected": false,
@@ -741,6 +921,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 23
+      },
       "id": "10404",
       "isDeletable": false,
       "isSelected": false,
@@ -756,6 +940,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 24
+      },
       "id": "10405",
       "isDeletable": false,
       "isSelected": false,
@@ -771,6 +959,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 25
+      },
       "id": "10406",
       "isDeletable": false,
       "isSelected": false,
@@ -786,6 +978,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 26
+      },
       "id": "10407",
       "isDeletable": false,
       "isSelected": false,
@@ -801,6 +997,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 27
+      },
       "id": "10408",
       "isDeletable": false,
       "isSelected": false,
@@ -816,6 +1016,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 28
+      },
       "id": "10409",
       "isDeletable": false,
       "isSelected": false,
@@ -831,6 +1035,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 29
+      },
       "id": "10410",
       "isDeletable": false,
       "isSelected": false,
@@ -846,6 +1054,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 30
+      },
       "id": "10411",
       "isDeletable": false,
       "isSelected": false,
@@ -861,6 +1073,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 31
+      },
       "id": "10412",
       "isDeletable": false,
       "isSelected": false,
@@ -876,6 +1092,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 32
+      },
       "id": "10413",
       "isDeletable": false,
       "isSelected": false,
@@ -891,6 +1111,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 33
+      },
       "id": "10414",
       "isDeletable": false,
       "isSelected": false,
@@ -906,6 +1130,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 34
+      },
       "id": "10415",
       "isDeletable": false,
       "isSelected": false,
@@ -921,6 +1149,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 35
+      },
       "id": "10416",
       "isDeletable": false,
       "isSelected": false,
@@ -936,6 +1168,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 36
+      },
       "id": "10417",
       "isDeletable": false,
       "isSelected": false,
@@ -951,6 +1187,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 37
+      },
       "id": "10418",
       "isDeletable": false,
       "isSelected": false,
@@ -966,6 +1206,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 38
+      },
       "id": "10419",
       "isDeletable": false,
       "isSelected": false,
@@ -981,6 +1225,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 39
+      },
       "id": "10420",
       "isDeletable": false,
       "isSelected": false,
@@ -996,6 +1244,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 40
+      },
       "id": "10421",
       "isDeletable": false,
       "isSelected": false,
@@ -1011,6 +1263,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 41
+      },
       "id": "10422",
       "isDeletable": false,
       "isSelected": false,
@@ -1026,6 +1282,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 42
+      },
       "id": "10423",
       "isDeletable": false,
       "isSelected": false,
@@ -1041,6 +1301,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 43
+      },
       "id": "10424",
       "isDeletable": false,
       "isSelected": false,
@@ -1056,6 +1320,10 @@
   [
     "acmeCo/avatars",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 44
+      },
       "id": "10425",
       "isDeletable": false,
       "isSelected": false,
@@ -1071,6 +1339,10 @@
   [
     "acmeCo/boards",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "id": 1,
       "location": {
         "avatarURI": "https://estuary-test.atlassian.net/rest/api/2/universal_avatar/view/type/project/avatar/10408?size=small",
@@ -1091,70 +1363,90 @@
   [
     "acmeCo/board_issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "boardId": 1,
-      "created": "2024-03-22T18:17:28.309Z",
+      "created": "2024-03-22T15:17:28.309000-03:00",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-03-22T15:17:28.309-0300",
-        "updated": "2024-03-22T18:17:28.358Z"
+        "created": "2024-03-22T15:17:28.309000-03:00",
+        "updated": "2024-03-22T15:17:28.358000-03:00"
       },
       "id": "10000",
       "key": "ETP-1",
       "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10000",
-      "updated": "2024-03-22T18:17:28.358Z"
+      "updated": "2024-03-22T15:17:28.358000-03:00"
     }
   ],
   [
     "acmeCo/board_issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "boardId": 1,
-      "created": "2024-03-22T18:17:45.561Z",
+      "created": "2024-03-22T15:17:45.561000-03:00",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-03-22T15:17:45.561-0300",
-        "updated": "2024-03-22T18:18:19.042Z"
+        "created": "2024-03-22T15:17:45.561000-03:00",
+        "updated": "2024-03-22T15:18:19.042000-03:00"
       },
       "id": "10001",
       "key": "ETP-2",
       "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10001",
-      "updated": "2024-03-22T18:18:19.042Z"
+      "updated": "2024-03-22T15:18:19.042000-03:00"
     }
   ],
   [
     "acmeCo/board_issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "boardId": 1,
-      "created": "2024-03-22T18:17:55.354Z",
+      "created": "2024-03-22T15:17:55.354000-03:00",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-03-22T15:17:55.354-0300",
-        "updated": "2024-03-22T18:18:16.711Z"
+        "created": "2024-03-22T15:17:55.354000-03:00",
+        "updated": "2024-03-22T15:18:16.711000-03:00"
       },
       "id": "10002",
       "key": "ETP-3",
       "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10002",
-      "updated": "2024-03-22T18:18:16.711Z"
+      "updated": "2024-03-22T15:18:16.711000-03:00"
     }
   ],
   [
     "acmeCo/board_issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "boardId": 1,
-      "created": "2024-03-22T18:18:01.351Z",
+      "created": "2024-03-22T15:18:01.351000-03:00",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-03-22T15:18:01.351-0300",
-        "updated": "2024-03-22T18:18:01.418Z"
+        "created": "2024-03-22T15:18:01.351000-03:00",
+        "updated": "2024-03-22T15:18:01.418000-03:00"
       },
       "id": "10003",
       "key": "ETP-4",
       "self": "https://estuary-test.atlassian.net/rest/agile/1.0/issue/10003",
-      "updated": "2024-03-22T18:18:01.418Z"
+      "updated": "2024-03-22T15:18:01.418000-03:00"
     }
   ],
   [
     "acmeCo/dashboards",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "editPermissions": [],
       "id": "10000",
       "isFavourite": false,
@@ -1175,6 +1467,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "groupId": "12d627fc-abfc-4706-ad19-60469c5072af",
       "name": "atlassian-addons"
     }
@@ -1182,6 +1478,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "groupId": "16c502ad-bd64-4f84-9180-e8857adee6b5",
       "name": "atlassian-addons-admin"
     }
@@ -1189,6 +1489,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "groupId": "17d21437-e4d2-4f97-9cbc-3799d496becc",
       "name": "jira-servicemanagement-user-access-admins-estuary-test"
     }
@@ -1196,6 +1500,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "groupId": "28ef2314-6247-486e-979a-287da2470b66",
       "name": "jira-software-user-access-admins-estuary-test"
     }
@@ -1203,6 +1511,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "groupId": "37c23f08-32e4-48d6-a15c-67ea444340b1",
       "name": "system-administrators"
     }
@@ -1210,6 +1522,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
       "groupId": "4648856c-d0ff-4657-af05-6a6684db1e63",
       "name": "org-admins"
     }
@@ -1217,6 +1533,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
       "groupId": "84681f8d-f01f-4743-9cc5-9f9049df7e4a",
       "name": "jira-admins-estuary-test"
     }
@@ -1224,6 +1544,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
       "groupId": "b30e89df-85c4-430d-8ecc-f01741746b50",
       "name": "jira-servicemanagement-customers-estuary-test"
     }
@@ -1231,6 +1555,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
       "groupId": "cef01a92-455d-4976-8346-69309a68a6aa",
       "name": "jira-software-users-estuary-test"
     }
@@ -1238,6 +1566,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
       "groupId": "d6d15bba-dd06-4538-bff7-e48fe6cb0dc4",
       "name": "jira-servicemanagement-stakeholders-estuary-test"
     }
@@ -1245,6 +1577,10 @@
   [
     "acmeCo/groups",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
       "groupId": "f1edec15-b4c2-4181-857e-a3251e84b9c2",
       "name": "jira-servicemanagement-users-estuary-test"
     }
@@ -1252,23 +1588,23 @@
   [
     "acmeCo/issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "changelog": {
         "histories": [],
         "maxResults": 0,
         "startAt": 0,
         "total": 0
       },
-      "created": "2024-03-22T18:17:28.309Z",
-      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,renderedFields",
+      "created": "2024-03-22T15:17:28.309000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
           "progress": 0,
           "total": 0
         },
-        "aggregatetimeestimate": null,
-        "aggregatetimeoriginalestimate": null,
-        "aggregatetimespent": null,
-        "assignee": null,
         "attachment": [],
         "comment": {
           "comments": [],
@@ -1278,7 +1614,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-03-22T18:17:28.309Z",
+        "created": "2024-03-22T15:17:28.309000-03:00",
         "creator": {
           "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "accountType": "atlassian",
@@ -1294,20 +1630,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "customfield_10001": null,
-        "customfield_10002": null,
-        "customfield_10003": null,
-        "customfield_10004": null,
-        "customfield_10005": null,
-        "customfield_10006": null,
-        "customfield_10007": null,
-        "customfield_10008": null,
-        "customfield_10009": null,
-        "customfield_10010": null,
-        "customfield_10014": null,
-        "customfield_10015": null,
-        "customfield_10016": null,
-        "customfield_10017": null,
         "customfield_10018": {
           "hasEpicLinkFieldDependency": false,
           "nonEditableReason": {
@@ -1317,24 +1639,7 @@
           "showField": false
         },
         "customfield_10019": "0|hzzzzz:",
-        "customfield_10020": null,
-        "customfield_10021": null,
-        "customfield_10022": null,
-        "customfield_10023": null,
-        "customfield_10024": null,
-        "customfield_10025": null,
-        "customfield_10026": null,
-        "customfield_10027": null,
-        "customfield_10028": null,
-        "customfield_10029": null,
-        "customfield_10030": null,
-        "customfield_10031": null,
         "customfield_10032": [],
-        "customfield_10033": null,
-        "customfield_10034": null,
-        "description": null,
-        "duedate": null,
-        "environment": null,
         "fixVersions": [],
         "issuelinks": [],
         "issuerestriction": {
@@ -1353,7 +1658,6 @@
           "subtask": false
         },
         "labels": [],
-        "lastViewed": null,
         "priority": {
           "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
           "id": "3",
@@ -1393,9 +1697,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "resolution": null,
-        "resolutiondate": null,
-        "security": null,
         "status": {
           "description": "",
           "iconUrl": "https://estuary-test.atlassian.net/",
@@ -1410,14 +1711,11 @@
             "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
           }
         },
-        "statuscategorychangedate": "2024-03-22T15:17:28.696-0300",
+        "statuscategorychangedate": "2024-03-22T15:17:28.696000-03:00",
         "subtasks": [],
         "summary": "Hello world",
-        "timeestimate": null,
-        "timeoriginalestimate": null,
-        "timespent": null,
         "timetracking": {},
-        "updated": "2024-03-22T18:17:28.358Z",
+        "updated": "2024-03-22T15:17:28.358000-03:00",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -1441,13 +1739,114 @@
       "key": "ETP-1",
       "projectId": "10000",
       "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10000/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:17 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "statuscategorychangedate": "Friday 3:17 PM",
+        "timetracking": {},
+        "updated": "Friday 3:17 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
       "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10000",
-      "updated": "2024-03-22T18:17:28.358Z"
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:17:28.358000-03:00"
     }
   ],
   [
     "acmeCo/issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "changelog": {
         "histories": [
           {
@@ -1524,17 +1923,13 @@
         "startAt": 0,
         "total": 2
       },
-      "created": "2024-03-22T18:17:45.561Z",
-      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,renderedFields",
+      "created": "2024-03-22T15:17:45.561000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
           "progress": 0,
           "total": 0
         },
-        "aggregatetimeestimate": null,
-        "aggregatetimeoriginalestimate": null,
-        "aggregatetimespent": null,
-        "assignee": null,
         "attachment": [],
         "comment": {
           "comments": [],
@@ -1544,7 +1939,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-03-22T18:17:45.561Z",
+        "created": "2024-03-22T15:17:45.561000-03:00",
         "creator": {
           "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "accountType": "atlassian",
@@ -1560,20 +1955,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "customfield_10001": null,
-        "customfield_10002": null,
-        "customfield_10003": null,
-        "customfield_10004": null,
-        "customfield_10005": null,
-        "customfield_10006": null,
-        "customfield_10007": null,
-        "customfield_10008": null,
-        "customfield_10009": null,
-        "customfield_10010": null,
-        "customfield_10014": null,
-        "customfield_10015": null,
-        "customfield_10016": null,
-        "customfield_10017": null,
         "customfield_10018": {
           "hasEpicLinkFieldDependency": false,
           "nonEditableReason": {
@@ -1583,24 +1964,8 @@
           "showField": false
         },
         "customfield_10019": "0|i00007:",
-        "customfield_10020": null,
-        "customfield_10021": null,
-        "customfield_10022": null,
-        "customfield_10023": null,
-        "customfield_10024": null,
         "customfield_10025": "10000_*:*_1_*:*_21115_*|*_10002_*:*_1_*:*_0_*|*_10001_*:*_1_*:*_12403",
-        "customfield_10026": null,
-        "customfield_10027": null,
-        "customfield_10028": null,
-        "customfield_10029": null,
-        "customfield_10030": null,
-        "customfield_10031": null,
         "customfield_10032": [],
-        "customfield_10033": null,
-        "customfield_10034": null,
-        "description": null,
-        "duedate": null,
-        "environment": null,
         "fixVersions": [],
         "issuelinks": [],
         "issuerestriction": {
@@ -1619,7 +1984,6 @@
           "subtask": false
         },
         "labels": [],
-        "lastViewed": null,
         "priority": {
           "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
           "id": "3",
@@ -1665,8 +2029,7 @@
           "name": "Done",
           "self": "https://estuary-test.atlassian.net/rest/api/3/resolution/10000"
         },
-        "resolutiondate": "2024-03-22T15:18:19.035-0300",
-        "security": null,
+        "resolutiondate": "2024-03-22T15:18:19.035000-03:00",
         "status": {
           "description": "",
           "iconUrl": "https://estuary-test.atlassian.net/",
@@ -1681,14 +2044,11 @@
             "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
           }
         },
-        "statuscategorychangedate": "2024-03-22T15:18:19.043-0300",
+        "statuscategorychangedate": "2024-03-22T15:18:19.043000-03:00",
         "subtasks": [],
         "summary": "Hello World 1",
-        "timeestimate": null,
-        "timeoriginalestimate": null,
-        "timespent": null,
         "timetracking": {},
-        "updated": "2024-03-22T18:18:19.042Z",
+        "updated": "2024-03-22T15:18:19.042000-03:00",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -1712,13 +2072,115 @@
       "key": "ETP-2",
       "projectId": "10000",
       "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10001/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:17 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "resolutiondate": "Friday 3:18 PM",
+        "statuscategorychangedate": "Friday 3:18 PM",
+        "timetracking": {},
+        "updated": "Friday 3:18 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
       "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10001",
-      "updated": "2024-03-22T18:18:19.042Z"
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:18:19.042000-03:00"
     }
   ],
   [
     "acmeCo/issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "changelog": {
         "histories": [
           {
@@ -1756,17 +2218,13 @@
         "startAt": 0,
         "total": 1
       },
-      "created": "2024-03-22T18:17:55.354Z",
-      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,renderedFields",
+      "created": "2024-03-22T15:17:55.354000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
           "progress": 0,
           "total": 0
         },
-        "aggregatetimeestimate": null,
-        "aggregatetimeoriginalestimate": null,
-        "aggregatetimespent": null,
-        "assignee": null,
         "attachment": [],
         "comment": {
           "comments": [],
@@ -1776,7 +2234,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-03-22T18:17:55.354Z",
+        "created": "2024-03-22T15:17:55.354000-03:00",
         "creator": {
           "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "accountType": "atlassian",
@@ -1792,20 +2250,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "customfield_10001": null,
-        "customfield_10002": null,
-        "customfield_10003": null,
-        "customfield_10004": null,
-        "customfield_10005": null,
-        "customfield_10006": null,
-        "customfield_10007": null,
-        "customfield_10008": null,
-        "customfield_10009": null,
-        "customfield_10010": null,
-        "customfield_10014": null,
-        "customfield_10015": null,
-        "customfield_10016": null,
-        "customfield_10017": null,
         "customfield_10018": {
           "hasEpicLinkFieldDependency": false,
           "nonEditableReason": {
@@ -1815,24 +2259,7 @@
           "showField": false
         },
         "customfield_10019": "0|i0000f:",
-        "customfield_10020": null,
-        "customfield_10021": null,
-        "customfield_10022": null,
-        "customfield_10023": null,
-        "customfield_10024": null,
-        "customfield_10025": null,
-        "customfield_10026": null,
-        "customfield_10027": null,
-        "customfield_10028": null,
-        "customfield_10029": null,
-        "customfield_10030": null,
-        "customfield_10031": null,
         "customfield_10032": [],
-        "customfield_10033": null,
-        "customfield_10034": null,
-        "description": null,
-        "duedate": null,
-        "environment": null,
         "fixVersions": [],
         "issuelinks": [],
         "issuerestriction": {
@@ -1851,7 +2278,6 @@
           "subtask": false
         },
         "labels": [],
-        "lastViewed": null,
         "priority": {
           "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
           "id": "3",
@@ -1891,9 +2317,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "resolution": null,
-        "resolutiondate": null,
-        "security": null,
         "status": {
           "description": "",
           "iconUrl": "https://estuary-test.atlassian.net/",
@@ -1908,14 +2331,11 @@
             "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
           }
         },
-        "statuscategorychangedate": "2024-03-22T15:18:16.711-0300",
+        "statuscategorychangedate": "2024-03-22T15:18:16.711000-03:00",
         "subtasks": [],
         "summary": "Hello World 2",
-        "timeestimate": null,
-        "timeoriginalestimate": null,
-        "timespent": null,
         "timetracking": {},
-        "updated": "2024-03-22T18:18:16.711Z",
+        "updated": "2024-03-22T15:18:16.711000-03:00",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -1939,30 +2359,127 @@
       "key": "ETP-3",
       "projectId": "10000",
       "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10002/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:17 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "statuscategorychangedate": "Friday 3:18 PM",
+        "timetracking": {},
+        "updated": "Friday 3:18 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
       "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10002",
-      "updated": "2024-03-22T18:18:16.711Z"
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:18:16.711000-03:00"
     }
   ],
   [
     "acmeCo/issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "changelog": {
         "histories": [],
         "maxResults": 0,
         "startAt": 0,
         "total": 0
       },
-      "created": "2024-03-22T18:18:01.351Z",
-      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,renderedFields",
+      "created": "2024-03-22T15:18:01.351000-03:00",
+      "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
           "progress": 0,
           "total": 0
         },
-        "aggregatetimeestimate": null,
-        "aggregatetimeoriginalestimate": null,
-        "aggregatetimespent": null,
-        "assignee": null,
         "attachment": [],
         "comment": {
           "comments": [],
@@ -1972,7 +2489,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-03-22T18:18:01.351Z",
+        "created": "2024-03-22T15:18:01.351000-03:00",
         "creator": {
           "accountId": "712020:e1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "accountType": "atlassian",
@@ -1988,20 +2505,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "customfield_10001": null,
-        "customfield_10002": null,
-        "customfield_10003": null,
-        "customfield_10004": null,
-        "customfield_10005": null,
-        "customfield_10006": null,
-        "customfield_10007": null,
-        "customfield_10008": null,
-        "customfield_10009": null,
-        "customfield_10010": null,
-        "customfield_10014": null,
-        "customfield_10015": null,
-        "customfield_10016": null,
-        "customfield_10017": null,
         "customfield_10018": {
           "hasEpicLinkFieldDependency": false,
           "nonEditableReason": {
@@ -2011,24 +2514,7 @@
           "showField": false
         },
         "customfield_10019": "0|i0000n:",
-        "customfield_10020": null,
-        "customfield_10021": null,
-        "customfield_10022": null,
-        "customfield_10023": null,
-        "customfield_10024": null,
-        "customfield_10025": null,
-        "customfield_10026": null,
-        "customfield_10027": null,
-        "customfield_10028": null,
-        "customfield_10029": null,
-        "customfield_10030": null,
-        "customfield_10031": null,
         "customfield_10032": [],
-        "customfield_10033": null,
-        "customfield_10034": null,
-        "description": null,
-        "duedate": null,
-        "environment": null,
         "fixVersions": [],
         "issuelinks": [],
         "issuerestriction": {
@@ -2047,7 +2533,6 @@
           "subtask": false
         },
         "labels": [],
-        "lastViewed": null,
         "priority": {
           "iconUrl": "https://estuary-test.atlassian.net/images/icons/priorities/medium.svg",
           "id": "3",
@@ -2087,9 +2572,6 @@
           "self": "https://estuary-test.atlassian.net/rest/api/3/user?accountId=712020%3Ae1849e34-0bc0-45cc-9afa-a6bcc316a021",
           "timeZone": "America/Bahia"
         },
-        "resolution": null,
-        "resolutiondate": null,
-        "security": null,
         "status": {
           "description": "",
           "iconUrl": "https://estuary-test.atlassian.net/",
@@ -2104,14 +2586,11 @@
             "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
           }
         },
-        "statuscategorychangedate": "2024-03-22T15:18:01.733-0300",
+        "statuscategorychangedate": "2024-03-22T15:18:01.733000-03:00",
         "subtasks": [],
         "summary": "Hello World 3",
-        "timeestimate": null,
-        "timeoriginalestimate": null,
-        "timespent": null,
         "timetracking": {},
-        "updated": "2024-03-22T18:18:01.418Z",
+        "updated": "2024-03-22T15:18:01.418000-03:00",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -2135,8 +2614,105 @@
       "key": "ETP-4",
       "projectId": "10000",
       "projectKey": "ETP",
+      "renderedFields": {
+        "attachment": [],
+        "comment": {
+          "comments": [],
+          "maxResults": 0,
+          "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10003/comment",
+          "startAt": 0,
+          "total": 0
+        },
+        "created": "Friday 3:18 PM",
+        "customfield_10017": "",
+        "description": "",
+        "environment": "",
+        "statuscategorychangedate": "Friday 3:18 PM",
+        "timetracking": {},
+        "updated": "Friday 3:18 PM",
+        "worklog": {
+          "maxResults": 20,
+          "startAt": 0,
+          "total": 0,
+          "worklogs": []
+        }
+      },
       "self": "https://estuary-test.atlassian.net/rest/api/3/issue/10003",
-      "updated": "2024-03-22T18:18:01.418Z"
+      "transitions": [
+        {
+          "hasScreen": false,
+          "id": "11",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "To Do",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10000",
+            "name": "To Do",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10000",
+            "statusCategory": {
+              "colorName": "blue-gray",
+              "id": 2,
+              "key": "new",
+              "name": "To Do",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/2"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "21",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "In Progress",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10001",
+            "name": "In Progress",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10001",
+            "statusCategory": {
+              "colorName": "yellow",
+              "id": 4,
+              "key": "indeterminate",
+              "name": "In Progress",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/4"
+            }
+          }
+        },
+        {
+          "hasScreen": false,
+          "id": "31",
+          "isAvailable": true,
+          "isConditional": false,
+          "isGlobal": true,
+          "isInitial": false,
+          "isLooped": false,
+          "name": "Done",
+          "to": {
+            "description": "",
+            "iconUrl": "https://estuary-test.atlassian.net/",
+            "id": "10002",
+            "name": "Done",
+            "self": "https://estuary-test.atlassian.net/rest/api/3/status/10002",
+            "statusCategory": {
+              "colorName": "green",
+              "id": 3,
+              "key": "done",
+              "name": "Done",
+              "self": "https://estuary-test.atlassian.net/rest/api/3/statuscategory/3"
+            }
+          }
+        }
+      ],
+      "updated": "2024-03-22T15:18:01.418000-03:00"
     }
   ]
 ]

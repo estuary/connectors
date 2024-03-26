@@ -60,10 +60,16 @@
       }
     },
     "scope": {
-      "type": ["null", "object"]
+      "type": [
+        "null",
+        "object"
+      ]
     },
     "untranslatedName": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     }
   },
   "additionalProperties": true,

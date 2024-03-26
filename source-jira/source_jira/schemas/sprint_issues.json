@@ -18,81 +18,150 @@
       "type": "object",
       "properties": {
         "flagged": {
-          "type": ["null", "boolean"]
+          "type": [
+            "null",
+            "boolean"
+          ]
         },
         "sprint": {
-          "type": ["null", "object"]
+          "type": [
+            "null",
+            "object"
+          ]
         },
         "closedSprints": {
-          "type": ["null", "object"]
+          "type": [
+            "null",
+            "object"
+          ]
         },
         "description": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "project": {
-          "type": ["null", "object"]
+          "type": [
+            "null",
+            "object"
+          ]
         },
         "comment": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
             "type": "object"
           }
         },
         "epic": {
-          "type": ["null", "object"]
+          "type": [
+            "null",
+            "object"
+          ]
         },
         "worklog": {
-          "type": ["null", "array"],
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
             "type": "object"
           }
         },
         "created": {
-          "type": ["null", "string"],
+          "type": [
+            "null",
+            "string"
+          ],
           "format": "date-time"
         },
         "updated": {
-          "type": ["null", "string"],
+          "type": [
+            "null",
+            "string"
+          ],
           "format": "date-time"
         },
         "timetracking": {
-          "type": ["null", "object"]
+          "type": [
+            "null",
+            "object"
+          ]
         },
         "status": {
-          "type": ["null", "object"],
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
             "description": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "iconUrl": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "id": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "name": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "self": {
-              "type": ["null", "string"]
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "statusCategory": {
-              "type": ["null", "object"],
+              "type": [
+                "null",
+                "object"
+              ],
               "properties": {
                 "colorName": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "id": {
-                  "type": ["null", "integer"]
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
                 },
                 "key": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "name": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "self": {
-                  "type": ["null", "string"]
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               }
             }
@@ -107,13 +176,19 @@
       "type": "integer"
     },
     "created": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time",
       "description": "This field transformed from fields attr",
       "readOnly": true
     },
     "updated": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "date-time",
       "description": "This field transformed from fields attr",
       "readOnly": true

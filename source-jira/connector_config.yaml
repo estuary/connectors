@@ -1,0 +1,22 @@
+api_token_sops: ENC[AES256_GCM,data:3Kf/RJOFPbEIqL/JeQ7jdQTKyr8OoWE/QHiJRcZvNxDdw8rcPJxUhHZpnjInLoMb+wDDiFGzCWoIko/clXi/N9gyYQIBRLKxpQpjCROrAXNTbj0eQ/9F9vw17tFxjun3n66KbW42x1+nyR6p9t9dkT0DQS+cAwX33eO+q+d32YARGmKFagCPOnuFXnt0B1CBIQHOV1inBnwlDLqV1fqx1nbcdYS242gIOpFx3rT5xneedri9cvojaXR661cHbBPg,iv:RiuE5Ua/qXs9fiI5Pdn+VVj4CLx+WB9HskqhYCbrwcg=,tag:K/4zAyZ+Et5UB1FPiK05Wg==,type:str]
+domain: estuary-test.atlassian.net
+email_sops: ENC[AES256_GCM,data:JQZhLRScvhi+mbg8wuVBRVl1oJzRaFwzH0A=,iv:JwmE2SLTvhJnKKi3K8wy5X1avIMubrc+AVjkFpkPEiI=,tag:v4vaX1DodE8hnh/ZitKdYg==,type:str]
+enable_experimental_streams: false
+expand_issue_changelog: true
+projects:
+  - ETP
+render_fields: false
+sops:
+  kms: []
+  gcp_kms:
+    - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+      created_at: "2024-03-22T21:13:39Z"
+      enc: CiQAdmEdwieh5HsYdWuyznqcUN8w2qwwki3se/wlj6svDH7LYPUSSQCSobQjaoK3ftxf35A5yiP1VHcgg98Pu+UWbCQP3hJZwNsPiFSSeiFklbXLjT+o2kTiRmxwq2K6gHAo0Dg3eNeOdWiLJRpIwzY=
+  azure_kv: []
+  hc_vault: []
+  age: []
+  lastmodified: "2024-03-22T21:13:41Z"
+  mac: ENC[AES256_GCM,data:XHQBjQa3o6dl1ggzkV1ho983YuYSFDWDrZVqjGP/433a8Bnd8zG+X2CudlZmeMeYxvUfTwjUchfu250zjr1zYDqDKVoCizIRfr1HUTD2m21er3n4Um22qpQs/GERTJFZylQo6560YWXPyMsSksrk6pWzONDKlJnfq+MbZYgb9EI=,iv:5gGKvfAd425LRDrAOSKiygPYvIvo9h5jfVwXqzfzRyI=,tag:7BhHurSYlOewffINg/7Dtw==,type:str]
+  pgp: []
+  encrypted_suffix: _sops
+  version: 3.8.1

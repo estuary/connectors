@@ -4,26 +4,44 @@
   "description": "Details of the custom field options for a context.",
   "properties": {
     "id": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "The ID of the custom field option."
     },
     "value": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "The value of the custom field option."
     },
     "optionId": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "For cascading options, the ID of the custom field option containing the cascading option."
     },
     "disabled": {
-      "type": ["null", "boolean"],
+      "type": [
+        "null",
+        "boolean"
+      ],
       "description": "Whether the option is disabled."
     },
     "fieldId": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "contextId": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     }
   }
 }
