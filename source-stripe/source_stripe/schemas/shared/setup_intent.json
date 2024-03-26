@@ -1,77 +1,148 @@
 {
-  "type": ["null", "object"],
+  "type": [
+    "object"
+  ],
   "properties": {
     "id": {
-      "type": ["string"]
+      "type": [
+        "string"
+      ]
     },
     "object": {
-      "type": ["string"],
-      "enum": ["setup_intent"]
+      "type": [
+        "string"
+      ],
+      "enum": [
+        "setup_intent"
+      ]
     },
     "application": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "cancellation_reason": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "created": {
-      "type": ["integer"]
+      "type": [
+        "integer"
+      ]
     },
     "customer": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "description": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "flow_directions": {
-      "type": ["null", "array"],
+      "type": [
+        "null",
+        "array"
+      ],
       "items": {
-        "type": ["null", "string"]
+        "type": [
+          "null",
+          "string"
+        ]
       }
     },
     "last_setup_error": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "latest_attempt": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "livemode": {
-      "type": ["null", "boolean"]
+      "type": [
+        "null",
+        "boolean"
+      ]
     },
     "mandate": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "metadata": {
-      "type": ["null", "object"]
+      "type": [
+        "null",
+        "object"
+      ]
     },
     "next_action": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "on_behalf_of": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "payment_method": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "payment_method_options": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "additionalProperties": true
     },
     "payment_method_types": {
-      "type": ["null", "array"],
+      "type": [
+        "null",
+        "array"
+      ],
       "items": {
-        "type": ["null", "string"]
+        "type": [
+          "null",
+          "string"
+        ]
       }
     },
     "single_use_mandate": {
-      "type": ["null", "string"]
+      "type": [
+        "null",
+        "string"
+      ]
     },
     "status": {
-      "type": ["string"]
+      "type": [
+        "string"
+      ]
     },
     "usage": {
-      "type": ["string"],
-      "enum": ["on_session", "off_session"]
+      "type": [
+        "string"
+      ],
+      "enum": [
+        "on_session",
+        "off_session"
+      ]
     }
   }
 }
