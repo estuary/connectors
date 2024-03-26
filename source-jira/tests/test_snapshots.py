@@ -3,7 +3,7 @@ import subprocess
 
 
 def test_capture(request, snapshot):
-    snapshot.snapshot_dir = "tests/snapshots"
+    snapshot.snapshot_dir = request.fspath.dirname + "/snapshots"
 
     result = subprocess.run(
         [
@@ -34,7 +34,7 @@ def test_capture(request, snapshot):
 
 
 def test_discover(request, snapshot):
-    snapshot.snapshot_dir = "tests/snapshots"
+    snapshot.snapshot_dir = request.fspath.dirname + "/snapshots"
 
     result = subprocess.run(
         [
@@ -63,7 +63,8 @@ def test_discover(request, snapshot):
 
 
 def test_spec(request, snapshot):
-    snapshot.snapshot_dir = "tests/snapshots"
+    snapshot.snapshot_dir = request.fspath.dirname + "/snapshots"
+
     result = subprocess.run(
         [
             "flowctl",
