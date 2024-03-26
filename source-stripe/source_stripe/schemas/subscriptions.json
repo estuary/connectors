@@ -1,7 +1,5 @@
 {
-  "type": [
-    "object"
-  ],
+  "type": "object",
   "properties": {
     "metadata": {
       "type": [
