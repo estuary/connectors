@@ -230,9 +230,10 @@ properties:
   payment_method_types:
     type: array
     items:
-      type:
-        - string
-        - "null"
+      card:
+        type:
+          - "null"
+          - string
   payment_status:
     type:
       - "null"
