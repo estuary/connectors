@@ -125,14 +125,13 @@ frozenlist = ">=1.1.0"
 
 [[package]]
 name = "airbyte-cdk"
-version = "0.52.10"
+version = "0.57.0"
 description = "A framework for writing Airbyte Connectors."
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "airbyte-cdk-0.52.10.tar.gz", hash = "sha256:0daee950fe0d4453e6ceea2633090fc1d2144224e6f170b3c6cb4c6392811b47"},
-    {file = "airbyte_cdk-0.52.10-py3-none-any.whl", hash = "sha256:366fd7bbbba317223edc1571d22b91c6f5bcff4ba65b3131e42f9b37e29932f4"},
+    {file = "airbyte-cdk-0.57.0.tar.gz", hash = "sha256:b163c0294ee4f1cd17776e9fafabfa1ec8f0c52796bb22e50288e84752f3cfd6"},
+    {file = "airbyte_cdk-0.57.0-py3-none-any.whl", hash = "sha256:cfd22e7a81bb4e9c57a3d9ea35e13752aeefbdc1632fc2aeb99a0c6b02c75eac"},
 ]
 
 [package.dependencies]
@@ -148,6 +147,7 @@ jsonref = ">=0.2,<1.0"
 jsonschema = ">=3.2.0,<3.3.0"
 pendulum = "*"
 pydantic = ">=1.10.8,<2.0.0"
+pyrate-limiter = ">=3.1.0,<3.2.0"
 python-dateutil = "*"
 PyYAML = ">=6.0.1"
 requests = "*"
@@ -155,8 +155,8 @@ requests-cache = "*"
 wcmatch = "8.4"
 
 [package.extras]
-dev = ["avro (>=1.11.2,<1.12.0)", "cohere (==4.21)", "fastavro (>=1.8.0,<1.9.0)", "freezegun", "langchain (==0.0.271)", "markdown", "mypy", "openai[embeddings] (==0.27.9)", "pandas (==2.0.3)", "pdf2image (==1.16.3)", "pdfminer.six (==20221105)", "pyarrow (==12.0.1)", "pytesseract (==0.3.10)", "pytest", "pytest-cov", "pytest-httpserver", "pytest-mock", "requests-mock", "tiktoken (==0.4.0)", "unstructured (==0.10.19)", "unstructured.pytesseract (>=0.3.12)", "unstructured[docx,pptx] (==0.10.19)"]
-file-based = ["avro (>=1.11.2,<1.12.0)", "fastavro (>=1.8.0,<1.9.0)", "markdown", "pdf2image (==1.16.3)", "pdfminer.six (==20221105)", "pyarrow (==12.0.1)", "pytesseract (==0.3.10)", "unstructured (==0.10.19)", "unstructured.pytesseract (>=0.3.12)", "unstructured[docx,pptx] (==0.10.19)"]
+dev = ["avro (>=1.11.2,<1.12.0)", "cohere (==4.21)", "fastavro (>=1.8.0,<1.9.0)", "freezegun", "langchain (==0.0.271)", "markdown", "mypy", "openai[embeddings] (==0.27.9)", "pandas (==2.0.3)", "pdf2image (==1.16.3)", "pdfminer.six (==20221105)", "pyarrow (==12.0.1)", "pytesseract (==0.3.10)", "pytest", "pytest-cov", "pytest-httpserver", "pytest-mock", "requests-mock", "tiktoken (==0.4.0)", "unstructured (==0.10.27)", "unstructured.pytesseract (>=0.3.12)", "unstructured[docx,pptx] (==0.10.27)"]
+file-based = ["avro (>=1.11.2,<1.12.0)", "fastavro (>=1.8.0,<1.9.0)", "markdown", "pdf2image (==1.16.3)", "pdfminer.six (==20221105)", "pyarrow (==12.0.1)", "pytesseract (==0.3.10)", "unstructured (==0.10.27)", "unstructured.pytesseract (>=0.3.12)", "unstructured[docx,pptx] (==0.10.27)"]
 sphinx-docs = ["Sphinx (>=4.2,<5.0)", "sphinx-rtd-theme (>=1.0,<2.0)"]
 vector-db-based = ["cohere (==4.21)", "langchain (==0.0.271)", "openai[embeddings] (==0.27.9)", "tiktoken (==0.4.0)"]
 
@@ -164,7 +164,6 @@ vector-db-based = ["cohere (==4.21)", "langchain (==0.0.271)", "openai[embedding
 name = "airbyte-protocol-models"
 version = "0.4.2"
 description = "Declares the Airbyte Protocol."
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -179,7 +178,6 @@ pydantic = ">=1.9.2,<2.0.0"
 name = "atomicwrites"
 version = "1.4.1"
 description = "Atomic file writes."
-category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
@@ -190,7 +188,6 @@ files = [
 name = "attrs"
 version = "23.2.0"
 description = "Classes Without Boilerplate"
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -210,7 +207,6 @@ tests-no-zope = ["attrs[tests-mypy]", "cloudpickle", "hypothesis", "pympler", "p
 name = "backoff"
 version = "2.2.1"
 description = "Function decoration for backoff and retry"
-category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
@@ -222,7 +218,6 @@ files = [
 name = "bracex"
 version = "2.4"
 description = "Bash style brace expander."
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -234,7 +229,6 @@ files = [
 name = "cachetools"
 version = "5.3.3"
 description = "Extensible memoizing collections and decorators"
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -246,7 +240,6 @@ files = [
 name = "cattrs"
 version = "23.2.3"
 description = "Composable complex class support for attrs and dataclasses."
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -270,7 +263,6 @@ ujson = ["ujson (>=5.7.0)"]
 name = "certifi"
 version = "2024.2.2"
 description = "Python package for providing Mozilla's CA Bundle."
-category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -346,7 +338,6 @@ pycparser = "*"
 name = "charset-normalizer"
 version = "3.3.2"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
-category = "main"
 optional = false
 python-versions = ">=3.7.0"
 files = [
@@ -446,7 +437,6 @@ files = [
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
-category = "dev"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 files = [
@@ -458,7 +448,6 @@ files = [
 name = "deprecated"
 version = "1.2.14"
 description = "Python @deprecated decorator to deprecate old python classes, functions or methods."
-category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 files = [
@@ -476,7 +465,6 @@ dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "sphinx (<2)", "tox"]
 name = "dpath"
 version = "2.0.8"
 description = "Filesystem-like pathing and searching for dictionaries"
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -594,7 +582,6 @@ files = [
 name = "genson"
 version = "1.2.2"
 description = "GenSON is a powerful, user-friendly JSON Schema generator."
-category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -605,7 +592,6 @@ files = [
 name = "idna"
 version = "3.6"
 description = "Internationalized Domain Names in Applications (IDNA)"
-category = "main"
 optional = false
 python-versions = ">=3.5"
 files = [
@@ -617,7 +603,6 @@ files = [
 name = "iniconfig"
 version = "2.0.0"
 description = "brain-dead simple config-ini parsing"
-category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -629,7 +614,6 @@ files = [
 name = "isodate"
 version = "0.6.1"
 description = "An ISO 8601 date/time/duration parser and formatter"
-category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -644,7 +628,6 @@ six = "*"
 name = "jinja2"
 version = "3.1.3"
 description = "A very fast and expressive template engine."
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -662,7 +645,6 @@ i18n = ["Babel (>=2.7)"]
 name = "jsonref"
 version = "0.3.0"
 description = "jsonref is a library for automatic dereferencing of JSON Reference objects for Python."
-category = "main"
 optional = false
 python-versions = ">=3.3,<4.0"
 files = [
@@ -674,7 +656,6 @@ files = [
 name = "jsonschema"
 version = "3.2.0"
 description = "An implementation of JSON Schema validation for Python"
-category = "main"
 optional = false
 python-versions = "*"
 files = [
@@ -696,7 +677,6 @@ format-nongpl = ["idna", "jsonpointer (>1.13)", "rfc3339-validator", "rfc3986-va
 name = "markupsafe"
 version = "2.1.5"
 description = "Safely add untrusted strings to HTML/XML markup."
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -924,7 +904,6 @@ files = [
 name = "packaging"
 version = "24.0"
 description = "Core utilities for Python packages"
-category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -936,7 +915,6 @@ files = [
 name = "pendulum"
 version = "3.0.0"
 description = "Python datetimes made easy"
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1036,7 +1014,6 @@ test = ["time-machine (>=2.6.0)"]
 name = "platformdirs"
 version = "4.2.0"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1052,7 +1029,6 @@ test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=7.4.3)", "pytest-
 name = "pluggy"
 version = "1.4.0"
 description = "plugin and hook calling mechanisms for python"
-category = "dev"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1068,7 +1044,6 @@ testing = ["pytest", "pytest-benchmark"]
 name = "py"
 version = "1.11.0"
 description = "library with cross-python path, ini-parsing, io, code, log facilities"
-category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 files = [
@@ -1157,7 +1132,6 @@ files = [
 name = "pydantic"
 version = "1.10.14"
 description = "Data validation and settings management using python type hints"
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -1207,10 +1181,24 @@ dotenv = ["python-dotenv (>=0.10.4)"]
 email = ["email-validator (>=1.0.3)"]
 
 [[package]]
+name = "pyrate-limiter"
+version = "3.1.1"
+description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "pyrate_limiter-3.1.1-py3-none-any.whl", hash = "sha256:c51906f1d51d56dc992ff6c26e8300e32151bc6cfa3e6559792e31971dfd4e2b"},
+    {file = "pyrate_limiter-3.1.1.tar.gz", hash = "sha256:2f57eda712687e6eccddf6afe8f8a15b409b97ed675fe64a626058f12863b7b7"},
+]
+
+[package.extras]
+all = ["filelock (>=3.0)", "redis (>=5.0.0,<6.0.0)"]
+docs = ["furo (>=2022.3.4,<2023.0.0)", "myst-parser (>=0.17)", "sphinx (>=4.3.0,<5.0.0)", "sphinx-autodoc-typehints (>=1.17,<2.0)", "sphinx-copybutton (>=0.5)", "sphinxcontrib-apidoc (>=0.3,<0.4)"]
+
+[[package]]
 name = "pyrsistent"
 version = "0.20.0"
 description = "Persistent/Functional/Immutable data structures"
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1252,7 +1240,6 @@ files = [
 name = "pytest"
 version = "6.2.5"
 description = "pytest: simple powerful testing with Python"
-category = "dev"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -1291,7 +1278,6 @@ pytest = ">=3.0.0"
 name = "python-dateutil"
 version = "2.9.0.post0"
 description = "Extensions to the standard Python datetime module"
-category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 files = [
@@ -1306,7 +1292,6 @@ six = ">=1.5"
 name = "pyyaml"
 version = "6.0.1"
 description = "YAML parser and emitter for Python"
-category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -1367,7 +1352,6 @@ files = [
 name = "requests"
 version = "2.31.0"
 description = "Python HTTP for Humans."
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -1389,7 +1373,6 @@ use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 name = "requests-cache"
 version = "1.2.0"
 description = "A persistent cache for python requests"
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1420,7 +1403,6 @@ yaml = ["pyyaml (>=6.0.1)"]
 name = "requests-mock"
 version = "1.11.0"
 description = "Mock out responses from the requests package"
-category = "dev"
 optional = false
 python-versions = "*"
 files = [
@@ -1440,7 +1422,6 @@ test = ["fixtures", "mock", "purl", "pytest", "requests-futures", "sphinx", "tes
 name = "responses"
 version = "0.25.0"
 description = "A utility library for mocking out the `requests` Python library."
-category = "dev"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1460,7 +1441,6 @@ tests = ["coverage (>=6.0.0)", "flake8", "mypy", "pytest (>=7.0.0)", "pytest-asy
 name = "setuptools"
 version = "69.2.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1477,7 +1457,6 @@ testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jar
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
-category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 files = [
@@ -1489,7 +1468,6 @@ files = [
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
-category = "dev"
 optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 files = [
@@ -1501,7 +1479,6 @@ files = [
 name = "typing-extensions"
 version = "4.10.0"
 description = "Backported and Experimental Type Hints for Python 3.8+"
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1524,7 +1501,6 @@ files = [
 name = "url-normalize"
 version = "1.4.3"
 description = "URL normalization for Python"
-category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 files = [
@@ -1539,7 +1515,6 @@ six = "*"
 name = "urllib3"
 version = "2.2.1"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -1557,7 +1532,6 @@ zstd = ["zstandard (>=0.18.0)"]
 name = "wcmatch"
 version = "8.4"
 description = "Wildcard/glob file name matcher."
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -1572,7 +1546,6 @@ bracex = ">=2.1.1"
 name = "wrapt"
 version = "1.16.0"
 description = "Module for decorators, wrappers and monkey patching."
-category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -1870,5 +1843,5 @@ multidict = ">=4.0"
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.11,<3.12"
-content-hash = "50c4fd0c539ca4d53ced8b2dd3a7e6324a7946b8cc38ea0177558f517696c878"
+python-versions = "^3.12"
+content-hash = "d964c3c5e3253ccf3506d89f536630ca288fa9051e1698dc5180de6d7dc81468"

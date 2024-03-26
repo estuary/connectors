@@ -15,8 +15,8 @@ repository = "https://github.com/estuary/connectors"
 include = "source_jira"
 
 [tool.poetry.dependencies]
-python = "^3.11,<3.12"
-airbyte-cdk = "==0.59.0"
+python = "^3.12"
+airbyte-cdk = "==0.57.0"
 estuary-cdk = { path = "../estuary-cdk", develop = true }
 
 [tool.poetry.scripts]
