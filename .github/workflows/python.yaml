@@ -13,6 +13,7 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+      - "source-jira/**"
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +26,7 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+      - "source-jira/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -72,6 +74,9 @@ jobs:
             type: capture
             version: v5
             usage_rate: "1.0"
+          - name: source-jira
+            type: capture
+            version: v1
 
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-jira:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_jira
+        config: connector_config.yaml
+    bindings: []

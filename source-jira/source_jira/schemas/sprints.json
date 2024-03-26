@@ -37,7 +37,10 @@
       "type": "string"
     },
     "createdDate": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date-time"
     }
   }

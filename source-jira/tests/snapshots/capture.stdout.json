@@ -1,0 +1,1016 @@
+[
+  [
+    "acmeCo/application_roles",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "defaultGroups": [
+        "jira-servicemanagement-users-estuary-test"
+      ],
+      "defaultGroupsDetails": [
+        {
+          "groupId": "f1edec15-b4c2-4181-857e-a3251e84b9c2",
+          "name": "jira-servicemanagement-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=f1edec15-b4c2-4181-857e-a3251e84b9c2"
+        }
+      ],
+      "defined": true,
+      "groupDetails": [
+        {
+          "groupId": "16c502ad-bd64-4f84-9180-e8857adee6b5",
+          "name": "atlassian-addons-admin",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=16c502ad-bd64-4f84-9180-e8857adee6b5"
+        },
+        {
+          "groupId": "f1edec15-b4c2-4181-857e-a3251e84b9c2",
+          "name": "jira-servicemanagement-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=f1edec15-b4c2-4181-857e-a3251e84b9c2"
+        },
+        {
+          "groupId": "4648856c-d0ff-4657-af05-6a6684db1e63",
+          "name": "org-admins",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=4648856c-d0ff-4657-af05-6a6684db1e63"
+        }
+      ],
+      "groups": [
+        "org-admins",
+        "atlassian-addons-admin",
+        "jira-servicemanagement-users-estuary-test"
+      ],
+      "hasUnlimitedSeats": false,
+      "key": "jira-servicedesk",
+      "name": "Jira Service Desk",
+      "numberOfSeats": 3,
+      "platform": false,
+      "remainingSeats": 2,
+      "selectedByDefault": false,
+      "userCount": 1,
+      "userCountDescription": "agent"
+    }
+  ],
+  [
+    "acmeCo/application_roles",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "defaultGroups": [
+        "jira-software-users-estuary-test"
+      ],
+      "defaultGroupsDetails": [
+        {
+          "groupId": "cef01a92-455d-4976-8346-69309a68a6aa",
+          "name": "jira-software-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=cef01a92-455d-4976-8346-69309a68a6aa"
+        }
+      ],
+      "defined": true,
+      "groupDetails": [
+        {
+          "groupId": "16c502ad-bd64-4f84-9180-e8857adee6b5",
+          "name": "atlassian-addons-admin",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=16c502ad-bd64-4f84-9180-e8857adee6b5"
+        },
+        {
+          "groupId": "4648856c-d0ff-4657-af05-6a6684db1e63",
+          "name": "org-admins",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=4648856c-d0ff-4657-af05-6a6684db1e63"
+        },
+        {
+          "groupId": "cef01a92-455d-4976-8346-69309a68a6aa",
+          "name": "jira-software-users-estuary-test",
+          "self": "https://estuary-test.atlassian.net/rest/api/3/group?groupId=cef01a92-455d-4976-8346-69309a68a6aa"
+        }
+      ],
+      "groups": [
+        "org-admins",
+        "jira-software-users-estuary-test",
+        "atlassian-addons-admin"
+      ],
+      "hasUnlimitedSeats": false,
+      "key": "jira-software",
+      "name": "Jira Software",
+      "numberOfSeats": 10,
+      "platform": false,
+      "remainingSeats": 9,
+      "selectedByDefault": false,
+      "userCount": 1,
+      "userCountDescription": "user"
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 45
+      },
+      "id": "10122",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10122",
+        "24x24": "/secure/useravatar?size=small&avatarId=10122",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10122",
+        "48x48": "/secure/useravatar?avatarId=10122"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "id": "10300",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10300",
+        "24x24": "/secure/useravatar?size=small&avatarId=10300",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10300",
+        "48x48": "/secure/useravatar?avatarId=10300"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "id": "10303",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10303",
+        "24x24": "/secure/useravatar?size=small&avatarId=10303",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10303",
+        "48x48": "/secure/useravatar?avatarId=10303"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "id": "10304",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10304",
+        "24x24": "/secure/useravatar?size=small&avatarId=10304",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10304",
+        "48x48": "/secure/useravatar?avatarId=10304"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "id": "10306",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10306",
+        "24x24": "/secure/useravatar?size=small&avatarId=10306",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10306",
+        "48x48": "/secure/useravatar?avatarId=10306"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "id": "10307",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10307",
+        "24x24": "/secure/useravatar?size=small&avatarId=10307",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10307",
+        "48x48": "/secure/useravatar?avatarId=10307"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
+      "id": "10308",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10308",
+        "24x24": "/secure/useravatar?size=small&avatarId=10308",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10308",
+        "48x48": "/secure/useravatar?avatarId=10308"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
+      "id": "10309",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10309",
+        "24x24": "/secure/useravatar?size=small&avatarId=10309",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10309",
+        "48x48": "/secure/useravatar?avatarId=10309"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
+      "id": "10310",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10310",
+        "24x24": "/secure/useravatar?size=small&avatarId=10310",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10310",
+        "48x48": "/secure/useravatar?avatarId=10310"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
+      "id": "10311",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10311",
+        "24x24": "/secure/useravatar?size=small&avatarId=10311",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10311",
+        "48x48": "/secure/useravatar?avatarId=10311"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
+      "id": "10312",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10312",
+        "24x24": "/secure/useravatar?size=small&avatarId=10312",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10312",
+        "48x48": "/secure/useravatar?avatarId=10312"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
+      "id": "10313",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10313",
+        "24x24": "/secure/useravatar?size=small&avatarId=10313",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10313",
+        "48x48": "/secure/useravatar?avatarId=10313"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 11
+      },
+      "id": "10314",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10314",
+        "24x24": "/secure/useravatar?size=small&avatarId=10314",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10314",
+        "48x48": "/secure/useravatar?avatarId=10314"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 12
+      },
+      "id": "10315",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10315",
+        "24x24": "/secure/useravatar?size=small&avatarId=10315",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10315",
+        "48x48": "/secure/useravatar?avatarId=10315"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 13
+      },
+      "id": "10316",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10316",
+        "24x24": "/secure/useravatar?size=small&avatarId=10316",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10316",
+        "48x48": "/secure/useravatar?avatarId=10316"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 14
+      },
+      "id": "10318",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10318",
+        "24x24": "/secure/useravatar?size=small&avatarId=10318",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10318",
+        "48x48": "/secure/useravatar?avatarId=10318"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 15
+      },
+      "id": "10320",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10320",
+        "24x24": "/secure/useravatar?size=small&avatarId=10320",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10320",
+        "48x48": "/secure/useravatar?avatarId=10320"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 16
+      },
+      "id": "10321",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10321",
+        "24x24": "/secure/useravatar?size=small&avatarId=10321",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10321",
+        "48x48": "/secure/useravatar?avatarId=10321"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 17
+      },
+      "id": "10322",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10322",
+        "24x24": "/secure/useravatar?size=small&avatarId=10322",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10322",
+        "48x48": "/secure/useravatar?avatarId=10322"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 18
+      },
+      "id": "10323",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10323",
+        "24x24": "/secure/useravatar?size=small&avatarId=10323",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10323",
+        "48x48": "/secure/useravatar?avatarId=10323"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 46
+      },
+      "id": "10334",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10334",
+        "24x24": "/secure/useravatar?size=small&avatarId=10334",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10334",
+        "48x48": "/secure/useravatar?avatarId=10334"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 47
+      },
+      "id": "10335",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10335",
+        "24x24": "/secure/useravatar?size=small&avatarId=10335",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10335",
+        "48x48": "/secure/useravatar?avatarId=10335"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 48
+      },
+      "id": "10336",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10336",
+        "24x24": "/secure/useravatar?size=small&avatarId=10336",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10336",
+        "48x48": "/secure/useravatar?avatarId=10336"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 49
+      },
+      "id": "10337",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10337",
+        "24x24": "/secure/useravatar?size=small&avatarId=10337",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10337",
+        "48x48": "/secure/useravatar?avatarId=10337"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 50
+      },
+      "id": "10338",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10338",
+        "24x24": "/secure/useravatar?size=small&avatarId=10338",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10338",
+        "48x48": "/secure/useravatar?avatarId=10338"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 51
+      },
+      "id": "10339",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10339",
+        "24x24": "/secure/useravatar?size=small&avatarId=10339",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10339",
+        "48x48": "/secure/useravatar?avatarId=10339"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 52
+      },
+      "id": "10340",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10340",
+        "24x24": "/secure/useravatar?size=small&avatarId=10340",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10340",
+        "48x48": "/secure/useravatar?avatarId=10340"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 53
+      },
+      "id": "10341",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10341",
+        "24x24": "/secure/useravatar?size=small&avatarId=10341",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10341",
+        "48x48": "/secure/useravatar?avatarId=10341"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 54
+      },
+      "id": "10342",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10342",
+        "24x24": "/secure/useravatar?size=small&avatarId=10342",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10342",
+        "48x48": "/secure/useravatar?avatarId=10342"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 55
+      },
+      "id": "10343",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10343",
+        "24x24": "/secure/useravatar?size=small&avatarId=10343",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10343",
+        "48x48": "/secure/useravatar?avatarId=10343"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 56
+      },
+      "id": "10344",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10344",
+        "24x24": "/secure/useravatar?size=small&avatarId=10344",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10344",
+        "48x48": "/secure/useravatar?avatarId=10344"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 57
+      },
+      "id": "10345",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10345",
+        "24x24": "/secure/useravatar?size=small&avatarId=10345",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10345",
+        "48x48": "/secure/useravatar?avatarId=10345"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 58
+      },
+      "id": "10346",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10346",
+        "24x24": "/secure/useravatar?size=small&avatarId=10346",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10346",
+        "48x48": "/secure/useravatar?avatarId=10346"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 59
+      },
+      "id": "10347",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10347",
+        "24x24": "/secure/useravatar?size=small&avatarId=10347",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10347",
+        "48x48": "/secure/useravatar?avatarId=10347"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 60
+      },
+      "id": "10348",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10348",
+        "24x24": "/secure/useravatar?size=small&avatarId=10348",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10348",
+        "48x48": "/secure/useravatar?avatarId=10348"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 61
+      },
+      "id": "10349",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10349",
+        "24x24": "/secure/useravatar?size=small&avatarId=10349",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10349",
+        "48x48": "/secure/useravatar?avatarId=10349"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 62
+      },
+      "id": "10350",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10350",
+        "24x24": "/secure/useravatar?size=small&avatarId=10350",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10350",
+        "48x48": "/secure/useravatar?avatarId=10350"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 63
+      },
+      "id": "10351",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10351",
+        "24x24": "/secure/useravatar?size=small&avatarId=10351",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10351",
+        "48x48": "/secure/useravatar?avatarId=10351"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 64
+      },
+      "id": "10352",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/useravatar?size=xsmall&avatarId=10352",
+        "24x24": "/secure/useravatar?size=small&avatarId=10352",
+        "32x32": "/secure/useravatar?size=medium&avatarId=10352",
+        "48x48": "/secure/useravatar?avatarId=10352"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 19
+      },
+      "id": "10400",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10400&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10400&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10400&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10400&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 20
+      },
+      "id": "10401",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10401&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10401&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10401&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10401&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 21
+      },
+      "id": "10402",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10402&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10402&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10402&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10402&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 22
+      },
+      "id": "10403",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10403&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10403&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10403&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10403&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 23
+      },
+      "id": "10404",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10404&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10404&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10404&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10404&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 24
+      },
+      "id": "10405",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10405&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10405&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10405&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10405&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 25
+      },
+      "id": "10406",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10406&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10406&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10406&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10406&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 26
+      },
+      "id": "10407",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10407&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10407&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10407&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10407&avatarType=project"
+      }
+    }
+  ],
+  [
+    "acmeCo/avatars",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 27
+      },
+      "id": "10408",
+      "isDeletable": false,
+      "isSelected": false,
+      "isSystemAvatar": true,
+      "urls": {
+        "16x16": "/secure/viewavatar?size=xsmall&avatarId=10408&avatarType=project",
+        "24x24": "/secure/viewavatar?size=small&avatarId=10408&avatarType=project",
+        "32x32": "/secure/viewavatar?size=medium&avatarId=10408&avatarType=project",
+        "48x48": "/secure/viewavatar?avatarId=10408&avatarType=project"
+      }
+    }
+  ]
+]

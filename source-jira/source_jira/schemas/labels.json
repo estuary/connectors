@@ -1,8 +1,11 @@
 {
-  "type": ["object", "null"],
+  "type": "object",
   "properties": {
     "label": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     }
   }
 }

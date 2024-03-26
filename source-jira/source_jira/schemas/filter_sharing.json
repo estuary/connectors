@@ -8,7 +8,10 @@
       "readOnly": true
     },
     "filterId": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Id of the related filter"
     },
     "type": {
@@ -31,10 +34,7 @@
         "expand": {
           "type": "string",
           "description": "Expand options that include additional project details in the response.",
-          "readOnly": true,
-          "xml": {
-            "attribute": true
-          }
+          "readOnly": true
         },
         "self": {
           "type": "string",
@@ -78,7 +78,12 @@
               "type": "string",
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
               "readOnly": true,
-              "enum": ["atlassian", "app", "customer", "unknown"]
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ]
             },
             "name": {
               "type": "string",
@@ -138,10 +143,7 @@
               "type": "object",
               "properties": {
                 "size": {
-                  "type": "integer",
-                  "xml": {
-                    "attribute": true
-                  }
+                  "type": "integer"
                 },
                 "items": {
                   "type": "array",
@@ -167,11 +169,7 @@
                   "type": "object"
                 },
                 "max-results": {
-                  "type": "integer",
-                  "xml": {
-                    "name": "max-results",
-                    "attribute": true
-                  }
+                  "type": "integer"
                 }
               }
             },
@@ -181,10 +179,7 @@
               "type": "object",
               "properties": {
                 "size": {
-                  "type": "integer",
-                  "xml": {
-                    "attribute": true
-                  }
+                  "type": "integer"
                 },
                 "items": {
                   "type": "array",
@@ -256,21 +251,14 @@
                   "type": "object"
                 },
                 "max-results": {
-                  "type": "integer",
-                  "xml": {
-                    "name": "max-results",
-                    "attribute": true
-                  }
+                  "type": "integer"
                 }
               }
             },
             "expand": {
               "type": "string",
               "description": "Expand options that include additional user details in the response.",
-              "readOnly": true,
-              "xml": {
-                "attribute": true
-              }
+              "readOnly": true
             }
           }
         },
@@ -322,7 +310,12 @@
                     "type": "string",
                     "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
                     "readOnly": true,
-                    "enum": ["atlassian", "app", "customer", "unknown"]
+                    "enum": [
+                      "atlassian",
+                      "app",
+                      "customer",
+                      "unknown"
+                    ]
                   },
                   "name": {
                     "type": "string",
@@ -382,10 +375,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -411,11 +401,7 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
@@ -425,10 +411,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -500,21 +483,14 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
                   "expand": {
                     "type": "string",
                     "description": "Expand options that include additional user details in the response.",
-                    "readOnly": true,
-                    "xml": {
-                      "attribute": true
-                    }
+                    "readOnly": true
                   }
                 }
               },
@@ -561,7 +537,12 @@
                     "type": "string",
                     "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
                     "readOnly": true,
-                    "enum": ["atlassian", "app", "customer", "unknown"]
+                    "enum": [
+                      "atlassian",
+                      "app",
+                      "customer",
+                      "unknown"
+                    ]
                   },
                   "name": {
                     "type": "string",
@@ -621,10 +602,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -650,11 +628,7 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
@@ -664,10 +638,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -739,21 +710,14 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
                   "expand": {
                     "type": "string",
                     "description": "Expand options that include additional user details in the response.",
-                    "readOnly": true,
-                    "xml": {
-                      "attribute": true
-                    }
+                    "readOnly": true
                   }
                 }
               },
@@ -791,7 +755,12 @@
                     "type": "string",
                     "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
                     "readOnly": true,
-                    "enum": ["atlassian", "app", "customer", "unknown"]
+                    "enum": [
+                      "atlassian",
+                      "app",
+                      "customer",
+                      "unknown"
+                    ]
                   },
                   "name": {
                     "type": "string",
@@ -851,10 +820,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -880,11 +846,7 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
@@ -894,10 +856,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -969,21 +928,14 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
                   "expand": {
                     "type": "string",
                     "description": "Expand options that include additional user details in the response.",
-                    "readOnly": true,
-                    "xml": {
-                      "attribute": true
-                    }
+                    "readOnly": true
                   }
                 }
               },
@@ -1065,7 +1017,10 @@
                     "type": "string",
                     "description": "The type of scope.",
                     "readOnly": true,
-                    "enum": ["PROJECT", "TEMPLATE"]
+                    "enum": [
+                      "PROJECT",
+                      "TEMPLATE"
+                    ]
                   },
                   "project": {
                     "description": "The project the item has scope in.",
@@ -1095,7 +1050,11 @@
                         "type": "string",
                         "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
                         "readOnly": true,
-                        "enum": ["software", "service_desk", "business"]
+                        "enum": [
+                          "software",
+                          "service_desk",
+                          "business"
+                        ]
                       },
                       "simplified": {
                         "type": "boolean",
@@ -1172,7 +1131,10 @@
           "type": "string",
           "description": "The default assignee when creating issues for this project.",
           "readOnly": true,
-          "enum": ["PROJECT_LEAD", "UNASSIGNED"]
+          "enum": [
+            "PROJECT_LEAD",
+            "UNASSIGNED"
+          ]
         },
         "versions": {
           "type": "array",
@@ -1183,10 +1145,7 @@
             "properties": {
               "expand": {
                 "type": "string",
-                "description": "Use [expand](em>#expansion) to include additional information about version in the response. This parameter accepts a comma-separated list. Expand options include:\n\n *  `operations` Returns the list of operations available for this version.\n *  `issuesstatus` Returns the count of issues in this version for each of the status categories *to do*, *in progress*, *done*, and *unmapped*. The *unmapped* property contains a count of issues with a status other than *to do*, *in progress*, and *done*.\n\nOptional for create and update.",
-                "xml": {
-                  "attribute": true
-                }
+                "description": "Use [expand](em>#expansion) to include additional information about version in the response. This parameter accepts a comma-separated list. Expand options include:\n\n *  `operations` Returns the list of operations available for this version.\n *  `issuesstatus` Returns the count of issues in this version for each of the status categories *to do*, *in progress*, *done*, and *unmapped*. The *unmapped* property contains a count of issues with a status other than *to do*, *in progress*, and *done*.\n\nOptional for create and update."
               },
               "self": {
                 "type": "string",
@@ -1375,7 +1334,11 @@
           "type": "string",
           "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
           "readOnly": true,
-          "enum": ["software", "service_desk", "business"]
+          "enum": [
+            "software",
+            "service_desk",
+            "business"
+          ]
         },
         "simplified": {
           "type": "boolean",
@@ -1386,7 +1349,10 @@
           "type": "string",
           "description": "The type of the project.",
           "readOnly": true,
-          "enum": ["classic", "next-gen"]
+          "enum": [
+            "classic",
+            "next-gen"
+          ]
         },
         "favourite": {
           "type": "boolean",
@@ -1436,7 +1402,11 @@
                   },
                   "globalHierarchyLevel": {
                     "type": "string",
-                    "enum": ["SUBTASK", "BASE", "EPIC"]
+                    "enum": [
+                      "SUBTASK",
+                      "BASE",
+                      "EPIC"
+                    ]
                   }
                 }
               }
@@ -1524,7 +1494,12 @@
               "type": "string",
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
               "readOnly": true,
-              "enum": ["atlassian", "app", "customer", "unknown"]
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ]
             },
             "name": {
               "type": "string",
@@ -1584,10 +1559,7 @@
               "type": "object",
               "properties": {
                 "size": {
-                  "type": "integer",
-                  "xml": {
-                    "attribute": true
-                  }
+                  "type": "integer"
                 },
                 "items": {
                   "type": "array",
@@ -1613,11 +1585,7 @@
                   "type": "object"
                 },
                 "max-results": {
-                  "type": "integer",
-                  "xml": {
-                    "name": "max-results",
-                    "attribute": true
-                  }
+                  "type": "integer"
                 }
               }
             },
@@ -1627,10 +1595,7 @@
               "type": "object",
               "properties": {
                 "size": {
-                  "type": "integer",
-                  "xml": {
-                    "attribute": true
-                  }
+                  "type": "integer"
                 },
                 "items": {
                   "type": "array",
@@ -1702,21 +1667,14 @@
                   "type": "object"
                 },
                 "max-results": {
-                  "type": "integer",
-                  "xml": {
-                    "name": "max-results",
-                    "attribute": true
-                  }
+                  "type": "integer"
                 }
               }
             },
             "expand": {
               "type": "string",
               "description": "Expand options that include additional user details in the response.",
-              "readOnly": true,
-              "xml": {
-                "attribute": true
-              }
+              "readOnly": true
             }
           }
         },
@@ -1754,7 +1712,12 @@
               "type": "string",
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
               "readOnly": true,
-              "enum": ["atlassian", "app", "customer", "unknown"]
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ]
             },
             "name": {
               "type": "string",
@@ -1814,10 +1777,7 @@
               "type": "object",
               "properties": {
                 "size": {
-                  "type": "integer",
-                  "xml": {
-                    "attribute": true
-                  }
+                  "type": "integer"
                 },
                 "items": {
                   "type": "array",
@@ -1843,11 +1803,7 @@
                   "type": "object"
                 },
                 "max-results": {
-                  "type": "integer",
-                  "xml": {
-                    "name": "max-results",
-                    "attribute": true
-                  }
+                  "type": "integer"
                 }
               }
             },
@@ -1857,10 +1813,7 @@
               "type": "object",
               "properties": {
                 "size": {
-                  "type": "integer",
-                  "xml": {
-                    "attribute": true
-                  }
+                  "type": "integer"
                 },
                 "items": {
                   "type": "array",
@@ -1932,21 +1885,14 @@
                   "type": "object"
                 },
                 "max-results": {
-                  "type": "integer",
-                  "xml": {
-                    "name": "max-results",
-                    "attribute": true
-                  }
+                  "type": "integer"
                 }
               }
             },
             "expand": {
               "type": "string",
               "description": "Expand options that include additional user details in the response.",
-              "readOnly": true,
-              "xml": {
-                "attribute": true
-              }
+              "readOnly": true
             }
           }
         }
@@ -2049,7 +1995,10 @@
               "type": "string",
               "description": "The type of scope.",
               "readOnly": true,
-              "enum": ["PROJECT", "TEMPLATE"]
+              "enum": [
+                "PROJECT",
+                "TEMPLATE"
+              ]
             },
             "project": {
               "description": "The project the item has scope in.",
@@ -2079,7 +2028,11 @@
                   "type": "string",
                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
                   "readOnly": true,
-                  "enum": ["software", "service_desk", "business"]
+                  "enum": [
+                    "software",
+                    "service_desk",
+                    "business"
+                  ]
                 },
                 "simplified": {
                   "type": "boolean",
@@ -2170,7 +2123,10 @@
       "type": "object",
       "properties": {
         "groupId": {
-          "type": ["null", "string"]
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
           "type": "string",
