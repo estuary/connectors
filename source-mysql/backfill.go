@@ -50,6 +50,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{state.BackfilledCount}
 	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
+		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -72,13 +73,13 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			for i := range resumeKey {
 				args = append(args, resumeKey[:i+1]...)
 			}
-			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table)
 		} else {
 			logrus.WithFields(logrus.Fields{
 				"stream":     streamID,
 				"keyColumns": keyColumns,
 			}).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
 		}
 	default:
 		return fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -168,12 +169,14 @@ func (db *mysqlDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schema
 	return query.String()
 }
 
-func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+func (db *mysqlDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	for _, colName := range keyColumns {
 		var quotedName = quoteColumnName(colName)
-		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
+		// If a precise backfill is requested *and* the column type requires binary ordering for precise
+		// backfill comparisons to work, add the 'BINARY' qualifier to the column name.
+		if colType, ok := columnTypes[colName].(string); ok && isPrecise && columnBinaryKeyComparison[colType] {
 			pkey = append(pkey, "BINARY "+quotedName)
 		} else {
 			pkey = append(pkey, quotedName)

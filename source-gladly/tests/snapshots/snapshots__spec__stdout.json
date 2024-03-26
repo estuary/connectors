@@ -2,6 +2,27 @@
   {
     "protocol": 3032023,
     "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "base_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Base URL to use for connecting to Gladly. May be useful if you are connecting to a sandbox account that does not use a URL in the form of 'https://{organization}.gladly.com'",
+              "title": "Base URL"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        }
+      },
       "properties": {
         "organization": {
           "description": "Organization to Request Data From",
@@ -18,6 +39,16 @@
           "secret": true,
           "title": "API Token",
           "type": "string"
+        },
+        "advanced": {
+          "advanced": true,
+          "allOf": [
+            {
+              "$ref": "#/$defs/Advanced"
+            }
+          ],
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

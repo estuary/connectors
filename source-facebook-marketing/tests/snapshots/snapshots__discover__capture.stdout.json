@@ -271,7 +271,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -518,7 +517,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -608,7 +610,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -3194,7 +3195,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -3333,7 +3337,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -6507,7 +6510,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -6541,7 +6547,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -12184,6 +12189,9 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "id"
       ]
     },
     "key": [
@@ -12209,9 +12217,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -12443,9 +12451,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -14007,7 +14015,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -15913,6 +15920,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -15940,9 +15952,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -16174,9 +16186,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -17738,7 +17750,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -19634,13 +19645,15 @@
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "gender": {
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -19656,6 +19669,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -19685,9 +19703,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -19919,9 +19937,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -21483,7 +21501,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -23379,7 +23396,8 @@
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -23395,6 +23413,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -23423,9 +23446,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -23657,9 +23680,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -25221,7 +25244,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -27117,7 +27139,8 @@
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -27133,6 +27156,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -27161,9 +27189,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -27395,9 +27423,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -28959,7 +28987,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -30855,7 +30882,8 @@
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -30871,6 +30899,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -30899,9 +30932,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -31133,9 +31166,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -32697,7 +32730,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -34593,19 +34625,22 @@
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "platform_position": {
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "impression_device": {
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -34621,6 +34656,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -34651,9 +34691,9 @@
         },
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -34885,9 +34925,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_impression_actions": {
           "type": [
@@ -36449,7 +36489,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38355,6 +38394,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [
@@ -38444,7 +38488,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38551,6 +38594,9 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "id"
       ]
     },
     "key": [
@@ -38567,7 +38613,6 @@
       "properties": {
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38713,7 +38758,6 @@
         },
         "id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38818,7 +38862,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -39029,7 +39076,10 @@
             "row_id"
           ]
         }
-      }
+      },
+      "required": [
+        "id"
+      ]
     },
     "key": [
       "/id"
@@ -39048,7 +39098,6 @@
       "properties": {
         "actor_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39060,7 +39109,6 @@
         },
         "application_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39081,7 +39129,6 @@
         },
         "event_type": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39093,7 +39140,6 @@
         },
         "object_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39129,6 +39175,12 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "actor_id",
+        "event_time",
+        "event_type",
+        "object_id"
       ]
     },
     "key": [
@@ -39152,9 +39204,9 @@
       "properties": {
         "account_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "account_name": {
           "type": [
@@ -39164,9 +39216,9 @@
         },
         "ad_id": {
           "type": [
-            "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "ad_name": {
           "type": [
@@ -39207,7 +39259,6 @@
         "date_start": {
           "format": "date",
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39314,7 +39365,8 @@
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "default": ""
         },
         "_meta": {
           "type": "object",
@@ -39330,6 +39382,11 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "account_id",
+        "ad_id",
+        "date_start"
       ]
     },
     "key": [

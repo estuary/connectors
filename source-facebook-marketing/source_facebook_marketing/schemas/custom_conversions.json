@@ -1,7 +1,7 @@
 {
   "properties": {
     "id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "account_id": {
       "type": ["null", "string"]

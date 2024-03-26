@@ -10,7 +10,7 @@
       "type": ["null", "string"]
     },
     "id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "account_id": {
       "type": ["null", "string"]
@@ -1375,5 +1375,6 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["id"]
 }

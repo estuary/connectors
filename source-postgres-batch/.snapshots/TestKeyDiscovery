@@ -1,0 +1,77 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "test_key_discovery_329932",
+      "template": "{{if .IsFirstQuery -}}\n  SELECT xmin AS txid, * FROM \"test\".\"key_discovery_329932\" ORDER BY xmin::text::bigint;\n{{- else -}}\n  SELECT xmin AS txid, * FROM \"test\".\"key_discovery_329932\" WHERE xmin::text::bigint \u003e $1 ORDER BY xmin::text::bigint;\n{{- end}}",
+      "cursor": [
+        "txid"
+      ]
+    },
+    "resource_path": [
+      "test_key_discovery_329932"
+    ],
+    "collection": {
+      "name": "acmeCo/test/test_key_discovery_329932",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "k_smallint",
+          "k_int",
+          "k_bigint",
+          "k_bool",
+          "k_str"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-postgres-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index"
+            ]
+          },
+          "k_bigint": {
+            "type": "integer"
+          },
+          "k_bool": {
+            "type": "boolean"
+          },
+          "k_int": {
+            "type": "integer"
+          },
+          "k_smallint": {
+            "type": "integer"
+          },
+          "k_str": {
+            "type": "string"
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/k_smallint",
+        "/k_int",
+        "/k_bigint",
+        "/k_bool",
+        "/k_str"
+      ],
+      "projections": null
+    },
+    "state_key": "test_key_discovery_329932"
+  }
+

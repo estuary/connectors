@@ -67,9 +67,15 @@ var bqDialect = func() sql.Dialect {
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("STRING"),
 			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.NewStaticMapper("BIGNUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
-				// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
-				"number":    sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("STRING"),
+					Delegate:   sql.NewStaticMapper("BIGNUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("STRING"),
+					// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
+					Delegate: sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
+				},
 				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
 				"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(sql.ClampDatetime())),
 			},

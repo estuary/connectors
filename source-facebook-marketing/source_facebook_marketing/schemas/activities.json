@@ -1,13 +1,13 @@
 {
   "properties": {
     "actor_id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "actor_name": {
       "type": ["null", "string"]
     },
     "application_id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "application_name": {
       "type": ["null", "string"]
@@ -19,13 +19,13 @@
       "type": "string"
     },
     "event_type": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "extra_data": {
       "type": ["null", "string"]
     },
     "object_id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "object_name": {
       "type": ["null", "string"]
@@ -37,5 +37,6 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["actor_id", "event_time", "event_type", "object_id"]
 }

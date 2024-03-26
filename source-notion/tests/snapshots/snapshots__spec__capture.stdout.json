@@ -1,0 +1,148 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notion Source Spec",
+      "type": "object",
+      "required": [
+        "credentials"
+      ],
+      "properties": {
+        "start_date": {
+          "title": "Start Date",
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SS.000Z. During incremental sync, any data generated before this date will not be replicated. If left blank, the start date will be set to 2 years before the present date.",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}Z$",
+          "pattern_descriptor": "YYYY-MM-DDTHH:MM:SS.000Z",
+          "examples": [
+            "2020-11-16T00:00:00.000Z"
+          ],
+          "type": "string",
+          "format": "date-time"
+        },
+        "credentials": {
+          "title": "Authentication Method",
+          "description": "Choose either OAuth or Access Token.",
+          "discriminator": {
+            "propertyName": "auth_type"
+          },
+          "type": "object",
+          "order": 1,
+          "oneOf": [
+            {
+              "type": "object",
+              "title": "OAuth2.0",
+              "x-oauth2-provider": "notion",
+              "required": [
+                "auth_type",
+                "client_id",
+                "client_secret",
+                "access_token"
+              ],
+              "properties": {
+                "auth_type": {
+                  "type": "string",
+                  "const": "OAuth2.0"
+                },
+                "client_id": {
+                  "title": "Client ID",
+                  "type": "string",
+                  "description": "The Client ID of your Notion integration.",
+                  "airbyte_secret": true
+                },
+                "client_secret": {
+                  "title": "Client Secret",
+                  "type": "string",
+                  "description": "The Client Secret of your Notion integration.",
+                  "airbyte_secret": true
+                },
+                "access_token": {
+                  "title": "Access Token",
+                  "type": "string",
+                  "description": "The Access Token received by completing the OAuth flow for your Notion integration.",
+                  "airbyte_secret": true
+                }
+              }
+            },
+            {
+              "type": "object",
+              "title": "Access Token",
+              "required": [
+                "auth_type",
+                "token"
+              ],
+              "properties": {
+                "auth_type": {
+                  "type": "string",
+                  "const": "token"
+                },
+                "token": {
+                  "title": "Access Token",
+                  "description": "The Access Token for your private Notion integration. See the docs for more information: https://go.estuary.dev/u5BKFR",
+                  "type": "string",
+                  "airbyte_secret": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "resourceConfigSchema": {
+      "title": "ResourceConfig",
+      "description": "ResourceConfig encodes a configured resource stream",
+      "type": "object",
+      "properties": {
+        "stream": {
+          "title": "Stream",
+          "description": "Name of this stream",
+          "type": "string"
+        },
+        "syncMode": {
+          "title": "Sync Mode",
+          "description": "Sync this resource incrementally, or fully refresh it every run",
+          "enum": [
+            "full_refresh",
+            "incremental"
+          ],
+          "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
+          "type": "string"
+        },
+        "cursorField": {
+          "title": "Cursor Field",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "additionalProperties": false
+    },
+    "documentationUrl": "https://go.estuary.dev/source-notion",
+    "oauth2": {
+      "provider": "notion",
+      "authUrlTemplate": "https://api.notion.com/v1/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&owner=user&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://api.notion.com/v1/oauth/token",
+      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
+      "accessTokenHeaders": {
+        "Authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{ client_secret }}}{{/basicauth}}",
+        "Content-Type": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

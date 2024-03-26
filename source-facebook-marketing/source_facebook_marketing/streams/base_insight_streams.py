@@ -220,7 +220,6 @@ class AdsInsights(FBMarketingIncrementalStream):
     def stream_slices(
         self, sync_mode: SyncMode, cursor_field: List[str] = None, stream_state: Mapping[str, Any] = None
     ) -> Iterable[Optional[Mapping[str, Any]]]:
-
         """Slice by date periods and schedule async job for each period, run at most MAX_ASYNC_JOBS jobs at the same time.
         This solution for Async was chosen because:
         1. we should commit state after each successful job
@@ -297,6 +296,16 @@ class AdsInsights(FBMarketingIncrementalStream):
         if self.breakdowns:
             breakdowns_properties = loader.get_schema("ads_insights_breakdowns")["properties"]
             schema["properties"].update({prop: breakdowns_properties[prop] for prop in self.breakdowns})
+
+        for k in self.primary_key:
+            if k not in schema["properties"]:
+                continue
+            
+            typ = schema["properties"][k]["type"]
+            if "string" in typ or typ == "string":
+                if "format" not in schema["properties"][k]:
+                    schema["properties"][k]["default"] = ""
+
         return schema
 
     @cached_property

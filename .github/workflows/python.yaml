@@ -14,6 +14,7 @@ on:
       - "source-hubspot-native/**"
       - "source-hubspot/**"
       - "source-jira/**"
+      - "source-notion/**"
   pull_request:
     branches: [main]
     paths:
@@ -27,6 +28,7 @@ on:
       - "source-hubspot-native/**"
       - "source-hubspot/**"
       - "source-jira/**"
+      - "source-notion/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -77,6 +79,10 @@ jobs:
           - name: source-jira
             type: capture
             version: v1
+          - name: source-notion
+            type: capture
+            version: v2
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4
