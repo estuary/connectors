@@ -94,7 +94,21 @@ class Names(StrEnum):
     line_items = auto()
     properties = auto()
     tickets = auto()
+    contact_lists = auto()
+    engagements_calls = auto()
+    engagements_emails = auto()
+    engagements_meetings = auto()
+    engagements_notes = auto()
+    engagements_tasks = auto()
 
+class PropertyNames(StrEnum):
+    emails = auto()
+    companies = auto()
+    calls = auto()
+    notes = auto()
+    tasks = auto()
+    meetings = auto()
+    contacts = auto()
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
 # attached to a HubSpot CRM object.
@@ -113,6 +127,7 @@ class Properties(BaseDocument, extra="forbid"):
 class BaseCRMObject(BaseDocument, extra="forbid"):
     # Class-scoped metadata attached to concrete subclasses.
     NAME: ClassVar[str]
+    PROPERTY_SEARCH_NAME: ClassVar[str]
     ASSOCIATED_ENTITIES: ClassVar[list[str]]
     CACHED_PROPERTIES: ClassVar[Properties]
 
@@ -206,7 +221,51 @@ class Ticket(BaseCRMObject):
     contacts: list[int] = []
     engagements: list[int] = []
     line_items: list[int] = []
+    
+class ContactLists(BaseCRMObject):
+    NAME = Names.contact_lists
+    ASSOCIATED_ENTITIES = []
 
+    lists: list[int] = []
+
+class EngagementEmails(BaseCRMObject):
+    NAME = Names.engagements_emails
+    PROPERTY_SEARCH_NAME = PropertyNames.emails
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    contacts: list[int] = []
+    deals: list[int] = []
+    companies: list[int] = []
+    tickets: list[int] = []
+    results: list[int] = []
+
+class EngagementCalls(BaseCRMObject):
+    NAME = Names.engagements_calls
+    PROPERTY_SEARCH_NAME = PropertyNames.calls
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    results: list[int] = []
+
+class EngagementMeetings(BaseCRMObject):
+    NAME = Names.engagements_meetings
+    PROPERTY_SEARCH_NAME = PropertyNames.meetings
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    results: list[int] = []
+
+class EngagementNotes(BaseCRMObject):
+    NAME = Names.engagements_notes
+    PROPERTY_SEARCH_NAME = PropertyNames.notes
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    results: list[int] = []
+
+class EngagementTasks(BaseCRMObject):
+    NAME = Names.engagements_tasks
+    PROPERTY_SEARCH_NAME = PropertyNames.tasks
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    results: list[int] = []
 
 # An Association, as returned by the v4 associations API.
 class Association(BaseModel, extra="forbid"):
@@ -351,3 +410,116 @@ class OldRecentEngagements(BaseModel):
 class OldRecentTicket(BaseModel):
     timestamp: int
     objectId: int
+
+class OldRecentCampaigns(BaseModel):
+    
+    class Item(BaseModel):
+
+        id: int
+        lastUpdatedTime: int
+
+    campaigns : list[Item]
+    hasMore: bool
+    offset: str
+
+class OldRecentContactLists(BaseModel):
+
+    class Item(BaseModel):
+        listId: int
+        updatedAt: int
+    
+    lists: list[Item]
+    hasMore: bool = Field(alias="has-more")
+    offset: int
+
+class OldRecentDealPipelines(BaseModel):
+
+    class Item(BaseModel):
+        pipelineId: int
+        updatedAt: int
+    
+    results: list[Item]
+
+class OldRecentTicketPipelines(BaseModel):
+
+    class Item(BaseModel):
+        pipelineId: int
+        updatedAt: int
+    
+    results: list[Item]
+
+class OldRecentEmailEvents(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        appId: int
+        created: int
+        
+
+    results: list[Item]
+    hasMore: bool
+    offset: str
+
+class OldRecentMarketingEmails(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        updated: int
+    
+    objects: list[Item]
+    offset: int
+
+class OldRecentSubscriptionChanges(BaseModel):
+
+    class Item(BaseModel):
+        timestamp: int
+        portalId: int
+
+    timeline: list[Item]
+    hasMore: bool
+    offset: str
+
+
+################################# v3
+
+
+
+
+class OldRecentEngagementsEmails(BaseModel):
+    class Item(BaseModel):
+        id: int
+        createdAt: datetime
+
+    results: list[Item]
+
+class OldRecentEngagementsTasks(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: datetime
+
+    results: list[Item]
+
+class OldRecentEngagementsNotes(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: datetime
+
+    results: list[Item]
+
+class OldRecentEngagementsCalls(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: datetime
+
+    results: list[Item]
+
+class OldRecentEngagementsMeetings(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: datetime
+
+    results: list[Item]
