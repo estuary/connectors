@@ -6,7 +6,7 @@ authors = ["Pedro Moreira <pedroantonionm@pm.me>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-airbyte-cdk = "^0.68.4"
+airbyte-cdk = "^0.52"
 estuary-cdk = { path = "../estuary-cdk", develop = true }
 types-requests = "^2.31"
 stripe = "^8.8.0"
