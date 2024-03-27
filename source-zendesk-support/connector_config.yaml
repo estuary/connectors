@@ -1,0 +1,20 @@
+start_date: 2024-03-11T16:54:49Z # %Y-%m-%dT%H:%M:%SZ
+subdomain: "" # ???
+active_features: {} # ???
+
+# Legacy auth
+# auth_method:
+#   auth_method: api_token
+#   email: john_doe@example.com
+#   api_token: abc123
+
+credentials:
+  email: john_doe@example.com
+
+  # For OAuth2
+  credentials: oauth2.0
+  access_token: abc123
+
+  # For API Token authentication
+  # credentials: api_token
+  # api_token: abc123

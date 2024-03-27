@@ -1,0 +1,70 @@
+---
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  brand_url:
+    type:
+      - "null"
+      - string
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  default:
+    type:
+      - "null"
+      - boolean
+  has_help_center:
+    type:
+      - "null"
+      - boolean
+  help_center_state:
+    type:
+      - "null"
+      - string
+  host_mapping:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  is_deleted:
+    type:
+      - "null"
+      - boolean
+  logo:
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  signature_template:
+    type:
+      - "null"
+      - string
+  subdomain:
+    type:
+      - "null"
+      - string
+  ticket_form_ids:
+    type:
+      - "null"
+      - array
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

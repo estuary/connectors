@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "source_zendesk_support"
+version = "0.1.0"
+description = ""
+authors = ["Pedro Moreira <pedro@z33dd.com>"]
+
+[tool.poetry.dependencies]
+airbyte-cdk = "^0.52"
+estuary-cdk = {path="../estuary-cdk", develop = true}
+python = "^3.11"
+types-requests = "^2.31"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+pytest = "^7.4.3"
+pytest-insta = "^0.3.0"
+requests-mock = "^1.11.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

@@ -1,0 +1,359 @@
+---
+collections:
+  acmeCo/audit_logs:
+    schema: audit_logs.schema.yaml
+    key:
+      - /id
+  acmeCo/brands:
+    schema: brands.schema.yaml
+    key:
+      - /id
+  acmeCo/custom_roles:
+    schema: custom_roles.schema.yaml
+    key:
+      - /id
+  acmeCo/group_memberships:
+    schema:
+      properties:
+        created_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        default:
+          type:
+            - "null"
+            - boolean
+        group_id:
+          type:
+            - "null"
+            - integer
+        id:
+          type: integer
+        updated_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        user_id:
+          type:
+            - "null"
+            - integer
+      required:
+        - id
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/groups:
+    schema:
+      properties:
+        created_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        deleted:
+          type:
+            - "null"
+            - boolean
+        id:
+          type: integer
+        name:
+          type:
+            - "null"
+            - string
+        updated_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+      required:
+        - id
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/macros:
+    schema: macros.schema.yaml
+    key:
+      - /id
+  acmeCo/organization_memberships:
+    schema:
+      properties:
+        created_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        default:
+          type:
+            - "null"
+            - boolean
+        id:
+          type: integer
+        organization_id:
+          type:
+            - "null"
+            - integer
+        organization_name:
+          type:
+            - "null"
+            - string
+        updated_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        user_id:
+          type:
+            - "null"
+            - integer
+        view_tickets:
+          type:
+            - "null"
+            - boolean
+      required:
+        - id
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/organizations:
+    schema: organizations.schema.yaml
+    key:
+      - /id
+  acmeCo/post_comment_votes:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      properties:
+        created_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        item_id:
+          type:
+            - "null"
+            - integer
+        item_type:
+          type:
+            - "null"
+            - string
+        updated_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        user_id:
+          type:
+            - "null"
+            - integer
+        value:
+          type:
+            - "null"
+            - integer
+      required:
+        - id
+      title: Votes
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/post_comments:
+    schema: post_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/post_votes:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      properties:
+        created_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        item_id:
+          type:
+            - "null"
+            - integer
+        item_type:
+          type:
+            - "null"
+            - string
+        updated_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        user_id:
+          type:
+            - "null"
+            - integer
+        value:
+          type:
+            - "null"
+            - integer
+      required:
+        - id
+      title: Votes
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/posts:
+    schema: posts.schema.yaml
+    key:
+      - /id
+  acmeCo/satisfaction_ratings:
+    schema: satisfaction_ratings.schema.yaml
+    key:
+      - /id
+  acmeCo/schedules:
+    schema:
+      properties:
+        created_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        intervals:
+          items:
+            properties:
+              end_time:
+                type:
+                  - "null"
+                  - integer
+              start_time:
+                type:
+                  - "null"
+                  - integer
+            type:
+              - "null"
+              - object
+          type:
+            - "null"
+            - array
+        name:
+          type:
+            - "null"
+            - string
+        time_zone:
+          type:
+            - "null"
+            - string
+        updated_at:
+          format: date-time
+          type:
+            - "null"
+            - string
+      required:
+        - id
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/sla_policies:
+    schema: sla_policies.schema.yaml
+    key:
+      - /id
+  acmeCo/tags:
+    schema:
+      properties:
+        count:
+          type:
+            - "null"
+            - integer
+        name:
+          type: string
+      required:
+        - name
+      type:
+        - object
+    key:
+      - /name
+  acmeCo/ticket_audits:
+    schema: ticket_audits.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_comments:
+    schema: ticket_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_fields:
+    schema: ticket_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_metric_events:
+    schema:
+      properties:
+        id:
+          type: integer
+        instance_id:
+          type:
+            - "null"
+            - integer
+        metric:
+          type:
+            - "null"
+            - string
+        ticket_id:
+          type:
+            - "null"
+            - integer
+        time:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      required:
+        - id
+      type:
+        - object
+    key:
+      - /id
+  acmeCo/ticket_metrics:
+    schema: ticket_metrics.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_skips:
+    schema: ticket_skips.schema.yaml
+    key:
+      - /id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id
