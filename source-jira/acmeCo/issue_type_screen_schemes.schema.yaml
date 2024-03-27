@@ -1,0 +1,23 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  id:
+    type: string
+    description: The ID of the issue type screen scheme.
+  name:
+    type: string
+    description: The name of the issue type screen scheme.
+  description:
+    type: string
+    description: The description of the issue type screen scheme.
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+additionalProperties: true
+description: Details of an issue type screen scheme.
+x-infer-schema: true
