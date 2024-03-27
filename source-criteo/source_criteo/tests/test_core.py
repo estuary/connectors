@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from singer_sdk.testing import SuiteConfig, get_tap_test_class
-
 from tap_criteo.tap import TapCriteo
 
 SAMPLE_CONFIG: dict[str, Any] = {
