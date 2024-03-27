@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from singer_sdk.streams import RESTStream
-
 from tap_criteo.auth import CriteoAuthenticator
 
 SCHEMAS_DIR = Path(__file__).parent / "./schemas"

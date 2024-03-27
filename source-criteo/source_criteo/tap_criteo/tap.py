@@ -4,7 +4,6 @@ from typing import Dict, List, Type
 
 from singer_sdk import Stream, Tap
 from singer_sdk import typing as th
-
 from tap_criteo.client import CriteoStream
 from tap_criteo.streams import v202007, v202104, v202107
 
