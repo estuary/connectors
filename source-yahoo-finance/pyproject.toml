@@ -14,6 +14,11 @@ tap-investing = {git = "https://gitlab.com/DouweM/tap-investing.git", rev = "1a1
 debugpy = "^1.8.0"
 flow-sdk = {path="../python", develop=true}
 
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.7.0"
+ruff = "^0.3.4"
+isort = "^5.13.2"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
