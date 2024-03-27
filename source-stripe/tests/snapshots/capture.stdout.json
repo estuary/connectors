@@ -2,6 +2,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -107,6 +111,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 51
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -210,6 +218,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 118
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -346,6 +358,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 276
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -447,6 +463,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1157
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -547,6 +567,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1756
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -655,6 +679,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 62
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -761,6 +789,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 220
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -889,6 +921,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 35
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -999,6 +1035,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 716
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1100,6 +1140,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1484
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1210,6 +1254,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 38
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1318,6 +1366,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 489
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1417,6 +1469,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 36
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1527,6 +1583,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 130
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1635,6 +1695,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1742,6 +1806,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 106
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1852,6 +1920,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 37
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -1958,6 +2030,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 265
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2065,6 +2141,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 370
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2175,6 +2255,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1142
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2283,6 +2367,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 12
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2407,6 +2495,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1505
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2518,6 +2610,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2074
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2621,6 +2717,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2744,6 +2844,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -2851,6 +2955,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3019,6 +3127,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 622
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3141,6 +3253,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2058
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3246,6 +3362,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 991
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3400,6 +3520,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 357
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3505,6 +3629,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 30
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3627,6 +3755,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1585
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3738,6 +3870,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3850,6 +3986,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 954
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -3967,6 +4107,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4090,6 +4234,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1281
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4189,6 +4337,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 25
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4315,6 +4467,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 575
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4422,6 +4578,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 116
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4548,6 +4708,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 194
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4658,6 +4822,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 824
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4780,6 +4948,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 390
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -4906,6 +5078,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 401
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5011,6 +5187,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 267
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5121,6 +5301,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 50
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5245,6 +5429,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 76
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5348,6 +5536,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 112
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5471,6 +5663,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 11
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5582,6 +5778,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 241
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5678,6 +5878,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 17
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5781,6 +5985,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 95
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5880,6 +6088,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -5987,6 +6199,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 84
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6090,6 +6306,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 782
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6200,6 +6420,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 794
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6299,6 +6523,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 274
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6421,6 +6649,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 27
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6518,6 +6750,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 48
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6648,6 +6884,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 46
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6758,6 +6998,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 360
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6875,6 +7119,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 738
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -6984,6 +7232,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 102
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7086,6 +7338,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 45
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7205,6 +7461,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 125
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7311,6 +7571,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 120
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7421,6 +7685,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 19
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7522,6 +7790,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 33
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7632,6 +7904,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1710
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7742,6 +8018,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 59
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7848,6 +8128,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 47
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -7959,6 +8243,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1061
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8064,6 +8352,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 83
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8172,6 +8464,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8284,6 +8580,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 780
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8390,6 +8690,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 66
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8489,6 +8793,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 389
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8598,6 +8906,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8705,6 +9017,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1504
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8815,6 +9131,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 667
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -8923,6 +9243,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 177
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9047,6 +9371,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 97
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9245,6 +9573,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 702
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9352,6 +9684,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 264
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9451,6 +9787,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 26
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9570,6 +9910,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 49
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9681,6 +10025,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2080
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9791,6 +10139,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1619
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -9901,6 +10253,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 113
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10011,6 +10367,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1190
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10121,6 +10481,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 82
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10230,6 +10594,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 233
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10339,6 +10707,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 918
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10452,6 +10824,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 428
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10578,6 +10954,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 44
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10701,6 +11081,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 105
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10801,6 +11185,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 74
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -10913,6 +11301,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 42
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11024,6 +11416,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 478
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11134,6 +11530,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 815
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11235,6 +11635,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1024
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11345,6 +11749,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 388
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11452,6 +11860,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 386
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11548,6 +11960,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 43
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11672,6 +12088,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 39
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11776,6 +12196,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1087
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -11882,6 +12306,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 121
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12001,6 +12429,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 22
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12135,6 +12567,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 41
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12268,6 +12704,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 127
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12394,6 +12834,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 40
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12518,6 +12962,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 613
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12644,6 +13092,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 15
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12752,6 +13204,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 988
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12862,6 +13318,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 13
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -12987,6 +13447,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 179
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13087,6 +13551,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 93
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13213,6 +13681,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 81
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13323,6 +13795,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 110
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13432,6 +13908,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 107
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13537,6 +14017,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 467
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13654,6 +14138,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 34
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13772,6 +14260,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 101
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -13884,6 +14376,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 70
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14004,6 +14500,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 312
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14111,6 +14611,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 494
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14212,6 +14716,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 32
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14343,6 +14851,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 31
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14453,6 +14965,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 28
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14565,6 +15081,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2120
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14665,6 +15185,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 746
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14775,6 +15299,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 78
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -14894,6 +15422,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 29
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15000,6 +15532,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 733
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15110,6 +15646,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 108
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15214,6 +15754,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 176
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15378,6 +15922,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1103
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15488,6 +16036,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1798
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15594,6 +16146,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 978
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15702,6 +16258,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 653
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15820,6 +16380,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 126
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -15944,6 +16508,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 119
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16076,6 +16644,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 188
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16186,6 +16758,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1534
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16292,6 +16868,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 537
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16400,6 +16980,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 381
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16498,6 +17082,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 24
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16599,6 +17187,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 18
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16705,6 +17297,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 23
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16819,6 +17415,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 726
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -16920,6 +17520,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 21
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17027,6 +17631,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 122
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17133,6 +17741,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 64
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17266,6 +17878,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 20
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17367,6 +17983,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 206
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17473,6 +18093,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 14
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17585,6 +18209,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 16
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17688,6 +18316,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1901
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17778,6 +18410,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 224
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17882,6 +18518,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1270
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -17981,6 +18621,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 691
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18087,6 +18731,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 917
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18196,6 +18844,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 100
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18307,6 +18959,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 128
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18418,6 +19074,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 736
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18521,6 +19181,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 526
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18627,6 +19291,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1753
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18737,6 +19405,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 154
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18859,6 +19531,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 124
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -18965,6 +19641,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 109
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19075,6 +19755,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 190
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19184,6 +19868,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 340
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19290,6 +19978,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 123
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19395,6 +20087,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 111
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19535,6 +20231,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 334
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19707,6 +20407,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1845
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19804,6 +20508,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 461
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -19914,6 +20622,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 99
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20024,6 +20736,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 851
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20121,6 +20837,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 577
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20223,6 +20943,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 619
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20330,6 +21054,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1395
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20485,6 +21213,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1401
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20595,6 +21327,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 207
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20720,6 +21456,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 146
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20826,6 +21566,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 117
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -20957,6 +21701,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 104
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21060,6 +21808,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 115
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21183,6 +21935,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 114
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21295,6 +22051,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 268
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21405,6 +22165,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1278
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21503,6 +22267,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1045
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21613,6 +22381,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 661
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21712,6 +22484,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 391
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21815,6 +22591,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1085
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -21921,6 +22701,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 493
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -22022,6 +22806,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 103
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -22128,6 +22916,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1066
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -22225,6 +23017,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 777
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -22324,6 +23120,10 @@
   [
     "acmeCo/accounts",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1112
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,

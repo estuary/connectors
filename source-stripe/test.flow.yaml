@@ -4,8 +4,11 @@ import:
 captures:
   acmeCo/source-stripe:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-stripe:v3"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_stripe
         config: connector_config.yaml
     bindings:
       - resource:
