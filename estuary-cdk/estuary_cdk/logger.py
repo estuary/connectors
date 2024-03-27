@@ -1,7 +1,8 @@
-from pydantic import BaseModel
-from typing import Any
 import logging.config
 import os
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class OpsLog(BaseModel, extra="forbid"):
@@ -11,7 +12,6 @@ class OpsLog(BaseModel, extra="forbid"):
 
 
 class LogFormatter(logging.Formatter):
-
     # Keys which are present in all LogRecord instances.
     # We use this set to identify _novel_ keys which should be included as structured, logged fields.
     LOGGING_RECORD_KEYS = logging.LogRecord(
@@ -37,7 +37,9 @@ class LogFormatter(logging.Formatter):
         elif record.stack_info:
             fields["stack"] = self.formatStack(record.stack_info).splitlines()
 
-        return OpsLog(level=record.levelname, msg=record.msg, fields=fields).model_dump_json()
+        return OpsLog(
+            level=record.levelname, msg=record.msg, fields=fields
+        ).model_dump_json()
 
 
 def init_logger():

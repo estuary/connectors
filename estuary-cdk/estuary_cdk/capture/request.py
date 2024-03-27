@@ -1,5 +1,6 @@
-from pydantic import BaseModel, NonNegativeInt
 from typing import Generic
+
+from pydantic import BaseModel, NonNegativeInt
 
 from ..flow import (
     CaptureSpec,

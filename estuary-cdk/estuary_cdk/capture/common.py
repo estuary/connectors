@@ -14,6 +14,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
@@ -25,7 +26,6 @@ from ..flow import (
 )
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
-
 
 LogCursor = AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -46,7 +46,6 @@ and "no pages remain" in a response context.
 
 
 class BaseDocument(BaseModel):
-
     class Meta(BaseModel):
         op: Literal["c", "u", "d"] = Field(
             description="Operation type (c: Create, u: Update, d: Delete)"
@@ -133,8 +132,7 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
             description="LogCursor at which incremental replication began"
         )
         next_page: PageCursor = Field(
-            description="PageCursor of the next page to fetch",
-            default=None
+            description="PageCursor of the next page to fetch", default=None
         )
 
     class Snapshot(BaseModel, extra="forbid"):
@@ -312,7 +310,6 @@ def resolve_bindings(
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
     resource_term="Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
-
     resolved: list[
         tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]
     ] = []
@@ -346,7 +343,6 @@ def validated(
         ]
     ],
 ) -> response.Validated:
-
     return response.Validated(
         bindings=[
             response.ValidatedBinding(resourcePath=b[0].resourceConfig.path())
@@ -364,7 +360,6 @@ def open(
         ]
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-
     async def _run(task: Task):
         for index, (binding, resource) in enumerate(resolved_bindings):
             state: _ResourceState | None = open.state.bindingStateV1.get(
@@ -546,7 +541,7 @@ async def _binding_backfill_task(
         await asyncio.sleep(0)
 
         # Track if fetch_page returns without having yielded a PageCursor.
-        done = True 
+        done = True
 
         async for item in fetch_page(task.log, state.next_page, state.cutoff):
             if isinstance(item, BaseDocument):
@@ -595,7 +590,6 @@ async def _binding_incremental_task(
                 task.captured(binding_index, item)
                 pending = True
             else:
-
                 # Ensure LogCursor types match and that they're strictly increasing.
                 is_larger = False
                 if isinstance(item, int) and isinstance(state.cursor, int):
@@ -622,14 +616,14 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for : timedelta = binding.resourceConfig.interval
+        sleep_for: timedelta = binding.resourceConfig.interval
 
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.
-            sleep_for = binding.resourceConfig.interval 
+            sleep_for = binding.resourceConfig.interval
 
         elif isinstance(state.cursor, datetime):
-            lag = (datetime.now(tz=UTC) - state.cursor)
+            lag = datetime.now(tz=UTC) - state.cursor
 
             if lag > binding.resourceConfig.interval:
                 # We're not idle. Attempt to fetch the next changes.
@@ -641,7 +635,9 @@ async def _binding_incremental_task(
             # We're not idle. Attempt to fetch the next changes.
             continue
 
-        task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
+        task.log.debug(
+            "incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor}
+        )
 
         # At this point we've fully caught up with the log and are idle.
         try:
