@@ -1,30 +1,29 @@
+import re
 from datetime import timedelta
 from logging import Logger
 from typing import AsyncGenerator
-import re
 
+from estuary_cdk.capture import Task, common
 from estuary_cdk.flow import CaptureBinding, ValidationError
-from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
+from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 
+from .api import fetch_rows, fetch_spreadsheet
 from .models import (
-    EndpointConfig,
     OAUTH2_SPEC,
+    EndpointConfig,
     ResourceConfig,
     ResourceState,
     Row,
     Sheet,
-)
-from .api import (
-    fetch_spreadsheet,
-    fetch_rows,
 )
 
 
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = TokenSource(
+        oauth_spec=OAUTH2_SPEC, credentials=config.credentials
+    )
     spreadsheet_id = get_spreadsheet_id(config.spreadsheet_url)
 
     spreadsheet = await fetch_spreadsheet(log, http, spreadsheet_id)
@@ -39,7 +38,6 @@ def get_spreadsheet_id(url: str):
 
 
 def sheet(http: HTTPSession, spreadsheet_id: str, sheet: Sheet):
-
     async def snapshot(log: Logger) -> AsyncGenerator[Row, None]:
         rows = await fetch_rows(log, http, spreadsheet_id, sheet)
         for row in rows:

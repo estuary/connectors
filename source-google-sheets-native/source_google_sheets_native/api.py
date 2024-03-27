@@ -1,16 +1,12 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
-from estuary_cdk.http import HTTPSession
 from logging import Logger
-from typing import Iterable, Any
+from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
-from .models import (
-    NumberType,
-    Row,
-    Sheet,
-    Spreadsheet,
-)
+from estuary_cdk.http import HTTPSession
+
+from .models import NumberType, Row, Sheet, Spreadsheet
 
 API = "https://sheets.googleapis.com"
 
@@ -31,7 +27,6 @@ async def fetch_rows(
     spreadsheet_id: str,
     sheet: Sheet,
 ) -> Iterable[Row]:
-
     url = f"{API}/v4/spreadsheets/{spreadsheet_id}"
     params = {
         "ranges": [sheet.properties.title],
