@@ -36,16 +36,22 @@ from .streams import (
 
 
 class SourceAsana(AbstractSource):
-    def check_connection(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> Tuple[bool, Any]:
+    def check_connection(
+        self, logger: AirbyteLogger, config: Mapping[str, Any]
+    ) -> Tuple[bool, Any]:
         try:
-            workspaces_stream = Workspaces(authenticator=self._get_authenticator(config))
+            workspaces_stream = Workspaces(
+                authenticator=self._get_authenticator(config)
+            )
             next(workspaces_stream.read_records(sync_mode=SyncMode.full_refresh))
             return True, None
         except Exception as e:
             return False, e
 
     @staticmethod
-    def _get_authenticator(config: dict) -> Union[TokenAuthenticator, AsanaOauth2Authenticator]:
+    def _get_authenticator(
+        config: dict,
+    ) -> Union[TokenAuthenticator, AsanaOauth2Authenticator]:
         if "access_token" in config:
             # Before Oauth we had Person Access Token stored under "access_token"
             # config field, this code here is for backward compatibility
@@ -62,7 +68,10 @@ class SourceAsana(AbstractSource):
             )
 
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
-        args = {"authenticator": self._get_authenticator(config), "test_mode": config.get("test_mode", False)}
+        args = {
+            "authenticator": self._get_authenticator(config),
+            "test_mode": config.get("test_mode", False),
+        }
         streams = [
             AttachmentsCompact(**args),
             Attachments(**args),
@@ -84,5 +93,10 @@ class SourceAsana(AbstractSource):
             Workspaces(**args),
         ]
         if "organization_export_ids" in config:
-            streams.append(OrganizationExports(organization_export_ids=config.get("organization_export_ids"), **args))
+            streams.append(
+                OrganizationExports(
+                    organization_export_ids=config.get("organization_export_ids"),
+                    **args,
+                )
+            )
         return streams

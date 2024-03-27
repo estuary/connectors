@@ -4,16 +4,16 @@
 
 
 from abc import ABC
+from functools import cache
+from http import HTTPStatus
 from itertools import islice
 from typing import Any, Iterable, Mapping, MutableMapping, Optional, Type, Union
-from functools import cache
 
 import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
 from requests.auth import AuthBase
-from http import HTTPStatus
 
 ASANA_ERRORS_MAPPING = {
     402: "This stream is available to premium organizations and workspaces only",
