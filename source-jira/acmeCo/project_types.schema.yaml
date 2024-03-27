@@ -1,0 +1,28 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+description: Details about a project type.
+properties:
+  color:
+    description: The color of the project type.
+    readOnly: true
+    type: string
+  descriptionI18nKey:
+    description: "The key of the project type's description."
+    readOnly: true
+    type: string
+  formattedKey:
+    description: The formatted key of the project type.
+    readOnly: true
+    type: string
+  icon:
+    description: The icon of the project type.
+    readOnly: true
+    type: string
+  key:
+    description: The key of the project type.
+    readOnly: true
+    type: string
+required:
+  - key
+type: object

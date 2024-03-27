@@ -1,0 +1,40 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+description: A screen scheme.
+properties:
+  description:
+    description: The description of the screen scheme.
+    type: string
+  id:
+    description: The ID of the screen scheme.
+    format: integer
+    type: integer
+  issueTypeScreenSchemes:
+    type: object
+  name:
+    description: The name of the screen scheme.
+    type: string
+  screens:
+    description: The IDs of the screens for the screen types of the screen scheme.
+    properties:
+      create:
+        description: The ID of the create screen.
+        format: integer
+        type: integer
+      default:
+        description: The ID of the default screen. Required when creating a screen scheme.
+        format: integer
+        type: integer
+      edit:
+        description: The ID of the edit screen.
+        format: integer
+        type: integer
+      view:
+        description: The ID of the view screen.
+        format: integer
+        type: integer
+    type: object
+required:
+  - id
+type: object

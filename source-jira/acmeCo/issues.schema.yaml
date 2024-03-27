@@ -1,0 +1,110 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  changelog:
+    description: Details of changelogs associated with the issue.
+    readOnly: true
+    type:
+      - object
+      - "null"
+  created:
+    description: This field transformed from fields attr
+    format: date-time
+    readOnly: true
+    type:
+      - string
+      - "null"
+  editmeta:
+    description: The metadata for the fields on the issue that can be amended.
+    readOnly: true
+    type:
+      - object
+      - "null"
+  expand:
+    description: Expand options that include additional issue details in the response.
+    readOnly: true
+    type: string
+  fields:
+    additionalProperties: true
+    properties:
+      created:
+        description: "This field is not shown in schema / swagger, but exists in records and we use it as cursor fiekd. Updated may be absent. Added to solve the #4341"
+        format: date-time
+        type:
+          - string
+          - "null"
+      updated:
+        description: "This field is not shown in schema / swagger, but exists in records and we use it as cursor fiekd. Updated may be absent. Added to solve the #4341"
+        format: date-time
+        type:
+          - string
+          - "null"
+    type: object
+  fieldsToInclude:
+    type: object
+  id:
+    description: The ID of the issue.
+    readOnly: true
+    type: string
+  key:
+    description: The key of the issue.
+    readOnly: true
+    type: string
+  names:
+    additionalProperties: true
+    description: The ID and name of each field present on the issue.
+    readOnly: true
+    type: object
+  operations:
+    description: The operations that can be performed on the issue.
+    readOnly: true
+    type:
+      - object
+      - "null"
+  projectId:
+    description: The ID of the project containing the issue.
+    readOnly: true
+    type: string
+  projectKey:
+    description: The key of the project containing the issue.
+    readOnly: true
+    type: string
+  properties:
+    additionalProperties: true
+    description: Details of the issue properties identified in the request.
+    readOnly: true
+    type: object
+  renderedFields:
+    additionalProperties: true
+    description: The rendered value of each field present on the issue.
+    readOnly: true
+    type: object
+  schema:
+    description: The schema describing each field present on the issue.
+    readOnly: true
+    type: object
+  self:
+    description: The URL of the issue details.
+    format: uri
+    readOnly: true
+    type: string
+  transitions:
+    description: The transitions that can be performed on the issue.
+    readOnly: true
+    type: array
+  updated:
+    description: This field transformed from fields attr
+    format: date-time
+    readOnly: true
+    type:
+      - string
+      - "null"
+  versionedRepresentations:
+    additionalProperties: true
+    description: The versions of each field on the issue.
+    readOnly: true
+    type: object
+required:
+  - id
+type: object
