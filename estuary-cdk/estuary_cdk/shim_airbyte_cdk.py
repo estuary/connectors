@@ -78,8 +78,15 @@ class ResourceState(common.BaseResourceState, extra="forbid"):
     """state is a dict encoding of AirbyteStateMessage"""
 
 
-ConnectorState = common.ConnectorState[ResourceState]
-"""Use the common.ConnectorState shape with ResourceState"""
+class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
+    """ConnectorState represents a number of ResourceStates, keyed by binding state key.
+    
+    Top-level fields other than bindingStateV1 are ignored, to allow for a lossy migration from
+    states that existed prior to adopting this convection. Connectors transitioning in this way will
+    effectively start over from the beginning.
+    """
+
+    bindingStateV1: dict[str, ResourceState] = {}
 
 
 class Document(common.BaseDocument, extra="allow"):
