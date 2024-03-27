@@ -79,8 +79,13 @@ class IURLPropertyRepresentation(abc.ABC):
         summary_length = 0
         local_properties = []
         for property_ in self.properties:
-            current_property_length = len(urllib.parse.quote(self._term_representation.format(property=property_)))
-            if current_property_length + summary_length >= self.PROPERTIES_PARAM_MAX_LENGTH:
+            current_property_length = len(
+                urllib.parse.quote(self._term_representation.format(property=property_))
+            )
+            if (
+                current_property_length + summary_length
+                >= self.PROPERTIES_PARAM_MAX_LENGTH
+            ):
                 yield type(self)(local_properties)
                 local_properties = []
                 summary_length = 0
