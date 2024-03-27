@@ -31,7 +31,7 @@ LogCursor = AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.
- b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal). 
+ b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal).
 
 Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
 """
