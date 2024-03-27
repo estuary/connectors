@@ -5411,5 +5411,160 @@
       "/ad_group.id",
       "/ad_group_criterion.criterion_id"
     ]
+  },
+  {
+    "recommendedName": "unhappytable",
+    "resourceConfig": {
+      "stream": "unhappytable",
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "segments.ad_destination_type": {
+          "type": "string",
+          "enum": [
+            "APP_DEEP_LINK",
+            "APP_STORE",
+            "LEAD_FORM",
+            "LOCATION_LISTING",
+            "MAP_DIRECTIONS",
+            "MESSAGE",
+            "NOT_APPLICABLE",
+            "PHONE_CALL",
+            "UNKNOWN",
+            "UNMODELED_FOR_CONVERSIONS",
+            "UNSPECIFIED",
+            "WEBSITE",
+            "YOUTUBE"
+          ]
+        },
+        "segments.ad_network_type": {
+          "type": "string",
+          "enum": [
+            "CONTENT",
+            "GOOGLE_TV",
+            "MIXED",
+            "SEARCH",
+            "SEARCH_PARTNERS",
+            "UNKNOWN",
+            "UNSPECIFIED",
+            "YOUTUBE"
+          ]
+        },
+        "segments.day_of_week": {
+          "type": "string",
+          "enum": [
+            "FRIDAY",
+            "MONDAY",
+            "SATURDAY",
+            "SUNDAY",
+            "THURSDAY",
+            "TUESDAY",
+            "UNKNOWN",
+            "UNSPECIFIED",
+            "WEDNESDAY"
+          ]
+        },
+        "customer.auto_tagging_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "customer.id": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "metrics.conversions": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "campaign.start_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "segments.date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/customer.id"
+    ]
+  },
+  {
+    "recommendedName": "ad_group_custom",
+    "resourceConfig": {
+      "stream": "ad_group_custom",
+      "syncMode": "incremental",
+      "cursorField": [
+        "segments.date"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "ad_group.targeting_setting.target_restrictions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "protobuf_message": true
+        },
+        "segments.date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/customer.id"
+    ]
   }
 ]
