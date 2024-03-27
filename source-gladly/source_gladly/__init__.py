@@ -1,9 +1,6 @@
 from logging import Logger
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
-from estuary_cdk.flow import (
-    ConnectorSpec,
-)
 from estuary_cdk.capture import (
     BaseCaptureConnector,
     Request,
@@ -12,14 +9,11 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.flow import ConnectorSpec
 from estuary_cdk.http import HTTPMixin
 
+from .models import ConnectorState, EndpointConfig, ResourceConfig
 from .resources import all_resources
-from .models import (
-    ConnectorState,
-    EndpointConfig,
-    ResourceConfig,
-)
 
 
 class Connector(
