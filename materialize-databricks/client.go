@@ -175,6 +175,8 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 
 	var httpPathSplit = strings.Split(c.cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
+	var warehouseStopped = true
+	var warehouseErr error
 	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
 		errs.Err(err)
 	} else {
@@ -184,23 +186,41 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 		case databricksSql.StateDeleting:
 			errs.Err(fmt.Errorf("The selected SQL Warehouse is being deleted, please use an active SQL warehouse."))
 		case databricksSql.StateStarting:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is starting, please wait a couple of minutes before trying again."))
+			warehouseErr = fmt.Errorf("The selected SQL Warehouse is starting, please wait a couple of minutes before trying again.")
 		case databricksSql.StateStopped:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopped, please start the SQL warehouse and try again."))
+			warehouseErr = fmt.Errorf("The selected SQL Warehouse is stopped, please start the SQL warehouse and try again.")
 		case databricksSql.StateStopping:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again."))
+			warehouseErr = fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again.")
+		case databricksSql.StateRunning:
+			warehouseStopped = false
 		}
 	}
 
-	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
-	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
-	// bail out well before then. Note that it is normal for Databricks warehouses to go offline
-	// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
-	// process however we don't want to wait 5 minutes as that does not create a good UX for the
-	// user in the UI
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
+	if errs.Len() > 0 {
+		return errs
+	}
 
+	if warehouseStopped {
+		// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
+		// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
+		// bail out well before then. Note that it is normal for Databricks warehouses to go offline
+		// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
+		// process however we don't want to wait 5 minutes as that does not create a good UX for the
+		// user in the UI
+		if r, err := wsClient.Warehouses.Start(ctx, databricksSql.StartRequest{Id: warehouseId}); err != nil {
+			errs.Err(fmt.Errorf("Could not start the warehouse: %w", err))
+		} else if _, err := r.GetWithTimeout(60 * time.Second); err != nil {
+			errs.Err(warehouseErr)
+		}
+
+		if errs.Len() > 0 {
+			return errs
+		}
+	}
+
+	// We avoid running this ping if the warehouse is not awake, see
+	// the issue below for more information on why:
+	// https://github.com/databricks/databricks-sql-go/issues/198
 	if err := c.db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var execErr dbsqlerr.DBExecutionError
