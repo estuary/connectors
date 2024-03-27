@@ -268,6 +268,12 @@ class CaptureShim(BaseCaptureConnector):
         ]
         airbyte_catalog = ConfiguredAirbyteCatalog(streams=airbyte_streams)
 
+        if "bindingStateV1" not in connector_state.__fields_set__:
+            # Initialize the top-level state object so that it is properly serialized if this is an
+            # "empty" state, which occurs for a brand new task that has never emitted any
+            # checkpoints.
+            connector_state.__setattr__("bindingStateV1", {})
+
         # Index of Airbyte (namespace, stream) => ResourceState.
         # Use `setdefault()` to initialize ResourceState if it's not already part of `connector_state`.
         index: dict[tuple[str | None, str], tuple[int, ResourceState]] = {
