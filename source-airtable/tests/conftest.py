@@ -136,7 +136,10 @@ def prepared_stream(table):
                 },
             },
             supported_sync_modes=[SyncMode.full_refresh],
-            supported_destination_sync_modes=[DestinationSyncMode.overwrite, DestinationSyncMode.append_dedup],
+            supported_destination_sync_modes=[
+                DestinationSyncMode.overwrite,
+                DestinationSyncMode.append_dedup,
+            ],
         ),
         "table_name": table,
     }
@@ -165,7 +168,10 @@ def make_stream(prepared_stream):
                 name=name,
                 json_schema=prepared_stream["stream"].json_schema,
                 supported_sync_modes=[SyncMode.full_refresh],
-                supported_destination_sync_modes=[DestinationSyncMode.overwrite, DestinationSyncMode.append_dedup],
+                supported_destination_sync_modes=[
+                    DestinationSyncMode.overwrite,
+                    DestinationSyncMode.append_dedup,
+                ],
             ),
             "sync_mode": SyncMode.full_refresh,
             "destination_sync_mode": DestinationSyncMode.overwrite,
