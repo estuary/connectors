@@ -1,0 +1,187 @@
+---
+collections:
+  acmeCo/meeting_poll_results:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        meeting_uuid:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        question_details:
+          type: array
+          items:
+            type: object
+            properties:
+              answer:
+                type: string
+              date_time:
+                type: string
+              polling_id:
+                type: string
+              question:
+                type: string
+            required: []
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required: []
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
+  acmeCo/meeting_polls:
+    schema: meeting_polls.schema.yaml
+    key:
+      - /id
+  acmeCo/meeting_registrants:
+    schema: meeting_registrants.schema.yaml
+    key:
+      - /id
+  acmeCo/meeting_registration_questions:
+    schema: meeting_registration_questions.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/meetings:
+    schema: meetings.schema.yaml
+    key:
+      - /id
+  acmeCo/report_meeting_participants:
+    schema: report_meeting_participants.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/report_meetings:
+    schema: report_meetings.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/report_webinar_participants:
+    schema: report_webinar_participants.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/report_webinars:
+    schema: report_webinars.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id
+  acmeCo/webinar_absentees:
+    schema: webinar_absentees.schema.yaml
+    key:
+      - /id
+  acmeCo/webinar_panelists:
+    schema: webinar_panelists.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/webinar_poll_results:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        webinar_uuid:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        question_details:
+          type: array
+          items:
+            type: object
+            properties:
+              answer:
+                type: string
+              date_time:
+                type: string
+              polling_id:
+                type: string
+              question:
+                type: string
+            required: []
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required: []
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
+  acmeCo/webinar_polls:
+    schema: webinar_polls.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/webinar_qna_results:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        webinar_uuid:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        question_details:
+          type: array
+          items:
+            type: object
+            properties:
+              answer:
+                type: string
+              question:
+                type: string
+            required: []
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required: []
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
+  acmeCo/webinar_registrants:
+    schema: webinar_registrants.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/webinar_registration_questions:
+    schema: webinar_registration_questions.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/webinar_tracking_sources:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      properties:
+        webinar_id:
+          type: string
+        id:
+          type: string
+        registration_count:
+          type: number
+        source_name:
+          type: string
+        tracking_url:
+          type: string
+        visitor_count:
+          type: number
+      required: []
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/webinars:
+    schema: webinars.schema.yaml
+    key:
+      - /id

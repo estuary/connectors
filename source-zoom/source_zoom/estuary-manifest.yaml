@@ -1,0 +1,313 @@
+version: "0.29.0"
+
+definitions:
+  url_base: "https://api.zoom.us/v2/"
+  url_refresh_token: "https://zoom.us/oauth/token"
+  grant_type: "refresh_token"
+  use_base64: true
+  use_body: true
+  content_type: "application/x-www-form-urlencoded"
+  refresh_token_fields:
+    - grant_type
+    - refresh_token
+
+paginator:
+  page_size: 30
+  opt_field_name: "page_size"
+  request_field_name: "next_page"
+
+check_stream: users
+streams:
+  users:
+    name: "users"
+    primary_key: "id"
+    schema_name: "users.json"
+    path: "users"
+    record_extractor: "users"
+    has_pagination: true
+
+  meetings_list_tmp:
+    name: "meetings_list_tmp"
+    primary_key: "id"
+    path: "users/{parent_id}/meetings"
+    record_extractor: "meetings"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "users",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  meetings:
+    name: "meetings"
+    primary_key: "id"
+    schema_name: "meetings.json"
+    path: "meetings/{parent_id}"
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  meeting_registrants:
+    name: "meeting_registrants"
+    primary_key: "id"
+    schema_name: "meeting_registrants.json"
+    path: "meetings/{parent_id}/registrants"
+    record_extractor: "registrants"
+    has_pagination: true
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+  
+  meeting_polls:
+    name: "meeting_polls"
+    primary_key: "id"
+    schema_name: "meeting_polls.json"
+    path: "meetings/{parent_id}/polls"
+    record_extractor: "polls"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+  
+  meeting_poll_results:
+    name: "meeting_poll_results"
+    schema_name: "meeting_poll_results.json"
+    path: "past_meetings/{parent_id}/polls"
+    record_extractor: "questions"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+
+  meeting_registration_questions:
+    name: "meeting_registration_questions"
+    schema_name: "meeting_registration_questions.json"
+    path: "past_meetings/{parent_id}/registrants/questions"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinars_list_tmp:
+    name: "webinars_list_tmp"
+    primary_key: "id"
+    path: "users/{parent_id}/webinars"
+    record_extractor: "webinars"
+    has_pagination: true
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "users",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinars:
+    name: "webinars"
+    primary_key: "id"
+    schema_name: "webinars.json"
+    path: "webinars/{parent_id}"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinar_panelists:
+    name: "webinar_panelists"
+    schema_name: "webinar_panelists.json"
+    path: "webinars/{parent_id}/panelists"
+    record_extractor: "panelists"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinar_registrants:
+    name: "webinar_registrants"
+    schema_name: "webinar_registrants.json"
+    path: "webinars/{parent_id}/registrants"
+    record_extractor: "registrants"
+    has_pagination: true
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinar_absentees:
+    name: "webinar_absentees"
+    primary_key: "id"
+    schema_name: "webinar_absentees.json"
+    path: "webinars/{parent_id}/absentees"
+    record_extractor: "registrants"
+    has_pagination: true
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+  
+  webinar_polls:
+    name: "webinar_polls"
+    schema_name: "webinar_polls.json"
+    path: "webinars/{parent_id}/polls"
+    record_extractor: "polls"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinar_poll_results:
+    name: "webinar_poll_results"
+    schema_name: "webinar_poll_results.json"
+    path: "past_webinars/{parent_id}/polls"
+    record_extractor: "polls"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+  
+  webinar_registration_questions:
+    name: "webinar_registration_questions"
+    schema_name: "webinar_registration_questions.json"
+    path: "webinars/{parent_id}/registrants/questions"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinar_tracking_sources:
+    name: "webinar_tracking_sources"
+    primary_key: "id"
+    schema_name: "webinar_tracking_sources.json"
+    path: "webinars/{parent_id}/tracking_sources"
+    record_extractor: "tracking_sources"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "id",
+        partition_field: "parent_id"
+      }
+    ]
+
+  webinar_qna_results:
+    name: "webinar_qna_results"
+    schema_name: "webinar_qna_results.json"
+    path: "past_webinars/{parent_id}/qa"
+    record_extractor: "questions"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+
+  report_meetings:
+    name: "report_meetings"
+    schema_name: "report_meetings.json"
+    path: "report/meetings/{parent_id}"
+    record_extractor: "tracking_sources"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+
+  report_meeting_participants:
+    name: "report_meeting_participants"
+    schema_name: "report_meeting_participants.json"
+    path: "report/meetings/{parent_id}/participants"
+    record_extractor: "participants"
+    has_pagination: true
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "meetings_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+
+  report_webinars:
+    name: "report_webinars"
+    schema_name: "report_webinars.json"
+    path: "report/webinars/{parent_id}"
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
+
+  report_webinar_participants:
+    name: "report_webinar_participants"
+    schema_name: "report_webinar_participants.json"
+    path: "report/webinars/{parent_id}/participants"
+    record_extractor: "participants"
+    has_pagination: true
+    ignore_error: true
+    parent_streams: [
+      {
+        name: "webinars_list_tmp",
+        parent_key: "uuid",
+        partition_field: "parent_id"
+      }
+    ]
