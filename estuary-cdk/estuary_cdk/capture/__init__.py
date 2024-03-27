@@ -1,16 +1,16 @@
-from dataclasses import dataclass
-from pydantic import Field
-from typing import Generic, Awaitable, Any, BinaryIO, Callable
-from logging import Logger
 import abc
 import asyncio
 import shutil
 import sys
 import tempfile
 import traceback
-import xxhash
+from dataclasses import dataclass
+from logging import Logger
+from typing import Any, Awaitable, BinaryIO, Callable, Generic
 
-from . import request, response
+import xxhash
+from pydantic import Field
+
 from .. import BaseConnector, Stopped
 from ..flow import (
     ConnectorSpec,
@@ -20,6 +20,7 @@ from ..flow import (
     ResourceConfig,
 )
 from ..pydantic_polyfill import GenericModel
+from . import request, response
 
 
 class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
@@ -234,7 +235,6 @@ class BaseCaptureConnector(
         log: Logger,
         request: Request[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> None:
-
         if spec := request.spec:
             response = await self.spec(log, spec)
             response.protocol = 3032023
@@ -265,7 +265,6 @@ class BaseCaptureConnector(
             asyncio.create_task(stop_on_elapsed_interval(open.capture.intervalSeconds))
 
             async with asyncio.TaskGroup() as tg:
-
                 task = Task(
                     log.getChild("capture"),
                     "capture",
