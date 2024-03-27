@@ -46,11 +46,13 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 	// through a single connection. This allows a driver to explicitly run
 	// `BEGIN;` and `COMMIT;` statements around a transactional operation.
 	var conn, err = db.Conn(ctx)
-	if err == nil {
-		err = conn.PingContext(ctx)
-	}
 	if err != nil {
 		return fmt.Errorf("connecting to DB: %w", err)
+	}
+	defer conn.Close()
+
+	if err = conn.PingContext(ctx); err != nil {
+		return fmt.Errorf("ping DB: %w", err)
 	}
 
 	for _, statement := range statements {
@@ -59,7 +61,8 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 		}
 		logrus.WithField("sql", statement).Debug("executed statement")
 	}
-	return conn.Close() // Release to pool.
+
+	return nil
 }
 
 // StdInstallFence is a convenience for Client implementations which
