@@ -49,7 +49,9 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 	if err != nil {
 		return fmt.Errorf("connecting to DB: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		err = conn.Close()
+	}()
 
 	if err = conn.PingContext(ctx); err != nil {
 		return fmt.Errorf("ping DB: %w", err)
@@ -62,7 +64,7 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 		logrus.WithField("sql", statement).Debug("executed statement")
 	}
 
-	return nil
+	return err
 }
 
 // StdInstallFence is a convenience for Client implementations which
