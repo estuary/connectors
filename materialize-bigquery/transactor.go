@@ -13,6 +13,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/UUID"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
@@ -35,6 +36,7 @@ type checkpointItem struct {
 	Table         string
 	TempTableName string
 	Query         string
+	JobID         string
 	EDC           *bigquery.ExternalDataConfig
 	Bucket        string
 	Files         []string
@@ -282,10 +284,20 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 
+		var query string
+		if b.target.DeltaUpdates {
+			query = b.storeInsertSQL
+		} else {
+			query = b.storeUpdateSQL
+		}
+
+		var jobId = uuid.NewString()
+
 		t.cp[b.target.StateKey] = &checkpointItem{
 			Table:         b.target.Identifier,
 			TempTableName: b.tempTableName,
-			Query:         b.storeUpdateSQL,
+			JobID:         jobId,
+			Query:         query,
 			EDC:           b.storeFile.edc(),
 			Bucket:        b.storeFile.bucket,
 			Files:         toCleanup,
