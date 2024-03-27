@@ -48,7 +48,10 @@ class InsightAsyncJobManager:
         self._update_api_throttle_limit()
         self._wait_throttle_limit_down()
         prev_jobs_count = len(self._running_jobs)
-        while self._get_current_throttle_value() < self.THROTTLE_LIMIT and len(self._running_jobs) < self.MAX_JOBS_IN_QUEUE:
+        while (
+            self._get_current_throttle_value() < self.THROTTLE_LIMIT
+            and len(self._running_jobs) < self.MAX_JOBS_IN_QUEUE
+        ):
             job = next(self._jobs, None)
             if not job:
                 self._empty = True
@@ -75,7 +78,9 @@ class InsightAsyncJobManager:
         while self._running_jobs:
             completed_jobs = self._check_jobs_status_and_restart()
             while not completed_jobs:
-                logger.info(f"No jobs ready to be consumed, wait for {self.JOB_STATUS_UPDATE_SLEEP_SECONDS} seconds")
+                logger.info(
+                    f"No jobs ready to be consumed, wait for {self.JOB_STATUS_UPDATE_SLEEP_SECONDS} seconds"
+                )
                 time.sleep(self.JOB_STATUS_UPDATE_SLEEP_SECONDS)
                 completed_jobs = self._check_jobs_status_and_restart()
             yield from completed_jobs
@@ -99,13 +104,21 @@ class InsightAsyncJobManager:
                     # we want to check that none of these nested jobs have exceeded MAX_NUMBER_OF_ATTEMPTS
                     for nested_job in job._jobs:
                         if nested_job.attempt_number >= self.MAX_NUMBER_OF_ATTEMPTS:
-                            raise JobException(f"{nested_job}: failed more than {self.MAX_NUMBER_OF_ATTEMPTS} times. Terminating...")
+                            raise JobException(
+                                f"{nested_job}: failed more than {self.MAX_NUMBER_OF_ATTEMPTS} times. Terminating..."
+                            )
                 if job.attempt_number >= self.MAX_NUMBER_OF_ATTEMPTS:
-                    raise JobException(f"{job}: failed more than {self.MAX_NUMBER_OF_ATTEMPTS} times. Terminating...")
+                    raise JobException(
+                        f"{job}: failed more than {self.MAX_NUMBER_OF_ATTEMPTS} times. Terminating..."
+                    )
                 elif job.attempt_number == 2:
-                    logger.info(f"{job}: failed second time, trying to split job into smaller jobs.")
+                    logger.info(
+                        f"{job}: failed second time, trying to split job into smaller jobs."
+                    )
                     smaller_jobs = job.split_job()
-                    grouped_jobs = ParentAsyncJob(api=self._api.api, jobs=smaller_jobs, interval=job.interval)
+                    grouped_jobs = ParentAsyncJob(
+                        api=self._api.api, jobs=smaller_jobs, interval=job.interval
+                    )
                     running_jobs.append(grouped_jobs)
                     grouped_jobs.start()
                 else:
@@ -119,13 +132,17 @@ class InsightAsyncJobManager:
                 running_jobs.append(job)
 
         self._running_jobs = running_jobs
-        logger.info(f"Completed jobs: {len(completed_jobs)}, Failed jobs: {failed_num}, Running jobs: {len(self._running_jobs)}")
+        logger.info(
+            f"Completed jobs: {len(completed_jobs)}, Failed jobs: {failed_num}, Running jobs: {len(self._running_jobs)}"
+        )
 
         return completed_jobs
 
     def _wait_throttle_limit_down(self):
         while self._get_current_throttle_value() > self.THROTTLE_LIMIT:
-            logger.info(f"Current throttle is {self._api.api.ads_insights_throttle}, wait {self.JOB_STATUS_UPDATE_SLEEP_SECONDS} seconds")
+            logger.info(
+                f"Current throttle is {self._api.api.ads_insights_throttle}, wait {self.JOB_STATUS_UPDATE_SLEEP_SECONDS} seconds"
+            )
             time.sleep(self.JOB_STATUS_UPDATE_SLEEP_SECONDS)
             self._update_api_throttle_limit()
 

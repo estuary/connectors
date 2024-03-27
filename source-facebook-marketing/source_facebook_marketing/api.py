@@ -23,7 +23,9 @@ class FacebookAPIException(Exception):
     """General class for all API errors"""
 
 
-backoff_policy = retry_pattern(backoff.expo, FacebookRequestError, max_tries=5, factor=5)
+backoff_policy = retry_pattern(
+    backoff.expo, FacebookRequestError, max_tries=5, factor=5
+)
 
 
 class MyFacebookAdsApi(FacebookAdsApi):
@@ -69,7 +71,6 @@ class MyFacebookAdsApi(FacebookAdsApi):
             )
 
         if usage_header_business:
-
             usage_header_business_loaded = json.loads(usage_header_business)
             for business_object_id in usage_header_business_loaded:
                 usage_limits = usage_header_business_loaded.get(business_object_id)[0]
@@ -81,7 +82,9 @@ class MyFacebookAdsApi(FacebookAdsApi):
                 )
                 pause_interval = max(
                     pause_interval,
-                    pendulum.duration(minutes=usage_limits.get("estimated_time_to_regain_access", 0)),
+                    pendulum.duration(
+                        minutes=usage_limits.get("estimated_time_to_regain_access", 0)
+                    ),
                 )
 
         return usage, pause_interval
@@ -103,8 +106,12 @@ class MyFacebookAdsApi(FacebookAdsApi):
             # in case it is failed inner request the headers might not be present
             if "headers" not in record:
                 continue
-            headers = {header["name"].lower(): header["value"] for header in record["headers"]}
-            usage_from_response, pause_interval_from_response = self._parse_call_rate_header(headers)
+            headers = {
+                header["name"].lower(): header["value"] for header in record["headers"]
+            }
+            usage_from_response, pause_interval_from_response = (
+                self._parse_call_rate_header(headers)
+            )
             usage = max(usage, usage_from_response)
             pause_interval = max(pause_interval_from_response, pause_interval)
         return usage, pause_interval
@@ -112,14 +119,20 @@ class MyFacebookAdsApi(FacebookAdsApi):
     def _handle_call_rate_limit(self, response, params):
         if "batch" in params:
             records = response.json()
-            usage, pause_interval = self._get_max_usage_pause_interval_from_batch(records)
+            usage, pause_interval = self._get_max_usage_pause_interval_from_batch(
+                records
+            )
         else:
             headers = response.headers()
             usage, pause_interval = self._parse_call_rate_header(headers)
 
         if usage >= self.MIN_RATE:
-            sleep_time = self._compute_pause_interval(usage=usage, pause_interval=pause_interval)
-            logger.warning(f"Utilization is too high ({usage})%, pausing for {sleep_time}")
+            sleep_time = self._compute_pause_interval(
+                usage=usage, pause_interval=pause_interval
+            )
+            logger.warning(
+                f"Utilization is too high ({usage})%, pausing for {sleep_time}"
+            )
             sleep(sleep_time.total_seconds())
 
     def _update_insights_throttle_limit(self, response: FacebookResponse):
@@ -149,7 +162,9 @@ class MyFacebookAdsApi(FacebookAdsApi):
         api_version=None,
     ):
         """Makes an API call, delegate actual work to parent class and handles call rates"""
-        response = super().call(method, path, params, headers, files, url_override, api_version)
+        response = super().call(
+            method, path, params, headers, files, url_override, api_version
+        )
         self._update_insights_throttle_limit(response)
         self._handle_call_rate_limit(response, params)
         return response
@@ -161,7 +176,9 @@ class API:
     def __init__(self, account_id: str, access_token: str):
         self._account_id = account_id
         # design flaw in MyFacebookAdsApi requires such strange set of new default api instance
-        self.api = MyFacebookAdsApi.init(access_token=access_token, crash_log=False, api_version="v17.0")
+        self.api = MyFacebookAdsApi.init(
+            access_token=access_token, crash_log=False, api_version="v17.0"
+        )
         FacebookAdsApi.set_default_api(self.api)
 
     @cached_property

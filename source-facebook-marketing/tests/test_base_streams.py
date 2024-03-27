@@ -15,7 +15,11 @@ from source_facebook_marketing.streams.base_streams import FBMarketingStream
 
 @pytest.fixture(name="mock_batch_responses")
 def mock_batch_responses_fixture(requests_mock):
-    return partial(requests_mock.register_uri, "POST", f"{FacebookSession.GRAPH}/{FacebookAdsApi.API_VERSION}/")
+    return partial(
+        requests_mock.register_uri,
+        "POST",
+        f"{FacebookSession.GRAPH}/{FacebookAdsApi.API_VERSION}/",
+    )
 
 
 @pytest.fixture(name="batch")
@@ -38,7 +42,14 @@ class TestBaseStream:
         mock_batch_responses(
             [
                 {
-                    "json": [{"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}}] * 3,
+                    "json": [
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        }
+                    ]
+                    * 3,
                 }
             ]
         )
@@ -52,12 +63,21 @@ class TestBaseStream:
         batch.execute.assert_called_once()
         assert len(result) == 3
 
-    def test_execute_in_batch_with_many_requests(self, api, batch, mock_batch_responses):
+    def test_execute_in_batch_with_many_requests(
+        self, api, batch, mock_batch_responses
+    ):
         """Should execute as many batches as needed if number of requests bigger than MAX_BATCH_SIZE."""
         mock_batch_responses(
             [
                 {
-                    "json": [{"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}}] * 5,
+                    "json": [
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        }
+                    ]
+                    * 5,
                 }
             ]
         )
@@ -80,18 +100,30 @@ class TestBaseStream:
                     "json": [
                         {},
                         {},
-                        {"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                     ],
                 },
                 {
                     "json": [
                         {},
-                        {"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                     ],
                 },
                 {
                     "json": [
-                        {"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                     ],
                 },
             ]
@@ -113,7 +145,11 @@ class TestBaseStream:
                 {
                     "json": [
                         {"body": "{}", "code": 500, "headers": {}},
-                        {"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                     ],
                 }
             ]
@@ -134,7 +170,11 @@ class TestBaseStream:
             [
                 {
                     "json": [
-                        {"body": json.dumps({"name": "creative 1"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 1"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                         {
                             "body": json.dumps(
                                 {
@@ -149,12 +189,20 @@ class TestBaseStream:
                             "code": 500,
                             "headers": {},
                         },
-                        {"body": json.dumps({"name": "creative 3"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 3"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                     ],
                 },
                 {
                     "json": [
-                        {"body": json.dumps({"name": "creative 2"}), "code": 200, "headers": {}},
+                        {
+                            "body": json.dumps({"name": "creative 2"}),
+                            "code": 200,
+                            "headers": {},
+                        },
                     ],
                 },
             ]

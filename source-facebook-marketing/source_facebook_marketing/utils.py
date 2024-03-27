@@ -31,9 +31,7 @@ def validate_start_date(start_date: DateTime) -> DateTime:
         logger.warning(message)
         return today
     elif start_date < retention_date:
-        message = (
-            f"The start date cannot be beyond {DATA_RETENTION_PERIOD} months from the current date. Set start date to {retention_date}."
-        )
+        message = f"The start date cannot be beyond {DATA_RETENTION_PERIOD} months from the current date. Set start date to {retention_date}."
         logger.warning(message)
         return retention_date
     return start_date
@@ -41,7 +39,9 @@ def validate_start_date(start_date: DateTime) -> DateTime:
 
 def validate_end_date(start_date: DateTime, end_date: DateTime) -> DateTime:
     if start_date > end_date:
-        message = f"The end date must be after start date. Set end date to {start_date}."
+        message = (
+            f"The end date must be after start date. Set end date to {start_date}."
+        )
         logger.warning(message)
         return start_date
     return end_date

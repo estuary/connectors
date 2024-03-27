@@ -49,7 +49,9 @@ class SourceFacebookMarketing(AbstractSource):
         config.end_date = pendulum.instance(config.end_date)
         return config
 
-    def check_connection(self, logger: logging.Logger, config: Mapping[str, Any]) -> Tuple[bool, Optional[Any]]:
+    def check_connection(
+        self, logger: logging.Logger, config: Mapping[str, Any]
+    ) -> Tuple[bool, Optional[Any]]:
         """Connection check to validate that the user-provided config can be used to connect to the underlying API
 
         :param logger: source logger
@@ -64,7 +66,10 @@ class SourceFacebookMarketing(AbstractSource):
             if config.end_date < config.start_date:
                 return False, "end_date must be equal or after start_date."
 
-            api = API(account_id=config.account_id, access_token=config.credentials.access_token)
+            api = API(
+                account_id=config.account_id,
+                access_token=config.credentials.access_token,
+            )
             logger.info(f"Select account {api.account}")
         except (requests.exceptions.RequestException, ValidationError) as e:
             return False, e
@@ -87,10 +92,15 @@ class SourceFacebookMarketing(AbstractSource):
         config.start_date = validate_start_date(config.start_date)
         config.end_date = validate_end_date(config.start_date, config.end_date)
 
-        api = API(account_id=config.account_id, access_token=config.credentials.access_token)
+        api = API(
+            account_id=config.account_id, access_token=config.credentials.access_token
+        )
 
         insights_args = dict(
-            api=api, start_date=config.start_date, end_date=config.end_date, insights_lookback_window=config.insights_lookback_window
+            api=api,
+            start_date=config.start_date,
+            end_date=config.end_date,
+            insights_lookback_window=config.insights_lookback_window,
         )
         streams = [
             AdAccount(
@@ -122,13 +132,48 @@ class SourceFacebookMarketing(AbstractSource):
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
             ),
-            AdsInsights(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsAgeAndGender(page_size=config.page_size, max_batch_size=config.max_batch_size,source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsCountry(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsRegion(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsDma(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsPlatformAndDevice(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsActionType(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
+            AdsInsights(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["date_start", "account_id", "ad_id"],
+                **insights_args,
+            ),
+            AdsInsightsAgeAndGender(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["id"],
+                **insights_args,
+            ),
+            AdsInsightsCountry(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["date_start", "account_id", "ad_id"],
+                **insights_args,
+            ),
+            AdsInsightsRegion(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["date_start", "account_id", "ad_id"],
+                **insights_args,
+            ),
+            AdsInsightsDma(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["date_start", "account_id", "ad_id"],
+                **insights_args,
+            ),
+            AdsInsightsPlatformAndDevice(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["date_start", "account_id", "ad_id"],
+                **insights_args,
+            ),
+            AdsInsightsActionType(
+                page_size=config.page_size,
+                max_batch_size=config.max_batch_size,
+                source_defined_primary_key=["id"],
+                **insights_args,
+            ),
             Campaigns(
                 api=api,
                 start_date=config.start_date,
@@ -170,7 +215,13 @@ class SourceFacebookMarketing(AbstractSource):
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
                 max_batch_size=config.max_batch_size,
-                source_defined_primary_key=["object_id", "actor_id", "application_id", "event_time", "event_type"],
+                source_defined_primary_key=[
+                    "object_id",
+                    "actor_id",
+                    "application_id",
+                    "event_time",
+                    "event_type",
+                ],
             ),
         ]
 
@@ -187,10 +238,12 @@ class SourceFacebookMarketing(AbstractSource):
             supportsIncremental=True,
             supported_destination_sync_modes=[DestinationSyncMode.append],
             connectionSpecification=ConnectorConfig.schema(),
-            authSpecification=None
+            authSpecification=None,
         )
 
-    def get_custom_insights_streams(self, api: API, config: ConnectorConfig) -> List[Type[Stream]]:
+    def get_custom_insights_streams(
+        self, api: API, config: ConnectorConfig
+    ) -> List[Type[Stream]]:
         """return custom insights streams"""
         streams = []
         for insight in config.custom_insights or []:
@@ -212,9 +265,10 @@ class SourceFacebookMarketing(AbstractSource):
                 time_increment=insight.time_increment,
                 start_date=insight.start_date or config.start_date,
                 end_date=insight.end_date or config.end_date,
-                insights_lookback_window=insight.insights_lookback_window or config.insights_lookback_window,
+                insights_lookback_window=insight.insights_lookback_window
+                or config.insights_lookback_window,
                 level=insight.level,
-                source_defined_primary_key=["ad_id"]
+                source_defined_primary_key=["ad_id"],
             )
             streams.append(stream)
         return streams
