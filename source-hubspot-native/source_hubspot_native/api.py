@@ -1,15 +1,12 @@
-from datetime import datetime, UTC
-from estuary_cdk.http import HTTPSession
-from logging import Logger
-from pydantic import TypeAdapter
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import asyncio
 import itertools
+from datetime import UTC, datetime
+from logging import Logger
+from typing import Any, AsyncGenerator, Awaitable, Callable, Iterable
 
-from estuary_cdk.capture.common import (
-    PageCursor,
-    LogCursor,
-)
+from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.http import HTTPSession
+from pydantic import TypeAdapter
 
 from .models import (
     Association,
@@ -50,7 +47,6 @@ async def fetch_page(
     page: str | None,
     cutoff: datetime,
 ) -> AsyncGenerator[CRMObject | str, None]:
-
     url = f"{HUB}/crm/v3/objects/{cls.NAME}"
     properties = await fetch_properties(log, cls, http)
     property_names = ",".join(p.name for p in properties.results if not p.calculated)
@@ -83,7 +79,6 @@ async def fetch_batch(
     http: HTTPSession,
     ids: Iterable[str],
 ) -> BatchResult[CRMObject]:
-
     url = f"{HUB}/crm/v3/objects/{cls.NAME}/batch/read"
     properties = await fetch_properties(log, cls, http)
     property_names = [p.name for p in properties.results if not p.calculated]
@@ -121,7 +116,6 @@ async def fetch_batch_with_associations(
     http: HTTPSession,
     ids: list[str],
 ) -> BatchResult[CRMObject]:
-
     batch, all_associated = await asyncio.gather(
         fetch_batch(log, cls, http, ids),
         asyncio.gather(
@@ -206,7 +200,6 @@ async def fetch_changes(
 async def fetch_recent_companies(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
     url = f"{HUB}/companies/v2/companies/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
@@ -222,7 +215,6 @@ async def fetch_recent_companies(
 async def fetch_recent_contacts(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
     url = f"{HUB}/contacts/v1/lists/recently_updated/contacts/recent"
     params = {"count": 100, "timeOffset": page} if page else {"count": 1}
 
@@ -238,7 +230,6 @@ async def fetch_recent_contacts(
 async def fetch_recent_deals(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
     url = f"{HUB}/deals/v1/deal/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
@@ -254,7 +245,6 @@ async def fetch_recent_deals(
 async def fetch_recent_engagements(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
     url = f"{HUB}/engagements/v1/engagements/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
@@ -270,7 +260,6 @@ async def fetch_recent_engagements(
 async def fetch_recent_tickets(
     log: Logger, http: HTTPSession, since: datetime, cursor: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
     url = f"{HUB}/crm-objects/v1/change-log/tickets"
     params = {"timestamp": int(since.timestamp() * 1000) - 1}
 
