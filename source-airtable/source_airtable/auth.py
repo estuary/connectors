@@ -24,7 +24,9 @@ class AirtableOAuth(SingleUseRefreshTokenOauth2Authenticator):
         https://airtable.com/developers/web/api/oauth-reference#token-refresh-request-headers
         """
         return {
-            "Authorization": BasicHttpAuthenticator(self.get_client_id(), self.get_client_secret()).token,
+            "Authorization": BasicHttpAuthenticator(
+                self.get_client_id(), self.get_client_secret()
+            ).token,
             "Content-Type": "application/x-www-form-urlencoded",
         }
 

@@ -36,15 +36,22 @@ class AirtableBases(HttpStream):
     def should_retry(self, response: requests.Response) -> bool:
         if (
             response.status_code == requests.codes.FORBIDDEN
-            and response.json().get("error", {}).get("type") == "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
+            and response.json().get("error", {}).get("type")
+            == "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND"
         ):
             if isinstance(self._session.auth, TokenAuthenticator):
                 error_message = "Personal Access Token has not enough permissions, please add all required permissions to existed one or create new PAT, see docs for more info: https://docs.airbyte.com/integrations/sources/airtable#step-1-set-up-airtable"
             else:
-                error_message = "Access Token has not enough permissions, please reauthenticate"
-            raise AirbyteTracedException(message=error_message, failure_type=FailureType.config_error)
+                error_message = (
+                    "Access Token has not enough permissions, please reauthenticate"
+                )
+            raise AirbyteTracedException(
+                message=error_message, failure_type=FailureType.config_error
+            )
         if response.status_code == 403 or response.status_code == 422:
-            self.logger.error(f"Stream {self.name}: permission denied or entity is unprocessable. Skipping.")
+            self.logger.error(
+                f"Stream {self.name}: permission denied or entity is unprocessable. Skipping."
+            )
             setattr(self, "raise_on_http_errors", False)
             return False
         return super().should_retry(response)
@@ -67,13 +74,17 @@ class AirtableBases(HttpStream):
             return next_page
         return None
 
-    def request_params(self, next_page_token: str = None, **kwargs) -> Mapping[str, Any]:
+    def request_params(
+        self, next_page_token: str = None, **kwargs
+    ) -> Mapping[str, Any]:
         params = {}
         if next_page_token:
             params["offset"] = next_page_token
         return params
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Mapping[str, Any]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Mapping[str, Any]:
         """
         Example output:
             {
@@ -112,7 +123,14 @@ class AirtableTables(AirtableBases):
 
 
 class AirtableStream(HttpStream, ABC):
-    def __init__(self, stream_path: str, stream_name: str, stream_schema, table_name: str, **kwargs):
+    def __init__(
+        self,
+        stream_path: str,
+        stream_name: str,
+        stream_schema,
+        table_name: str,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.stream_path = stream_path
         self.stream_name = stream_name
@@ -121,7 +139,9 @@ class AirtableStream(HttpStream, ABC):
 
     url_base = URL_BASE
     primary_key = "id"
-    transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
+    transformer: TypeTransformer = TypeTransformer(
+        TransformConfig.DefaultSchemaNormalization
+    )
     raise_on_http_errors = True
 
     @property
@@ -130,7 +150,9 @@ class AirtableStream(HttpStream, ABC):
 
     def should_retry(self, response: requests.Response) -> bool:
         if response.status_code == 403 or response.status_code == 422:
-            self.logger.error(f"Stream {self.name}: permission denied or entity is unprocessable. Skipping.")
+            self.logger.error(
+                f"Stream {self.name}: permission denied or entity is unprocessable. Skipping."
+            )
             setattr(self, "raise_on_http_errors", False)
             return False
         return super().should_retry(response)
@@ -148,13 +170,17 @@ class AirtableStream(HttpStream, ABC):
     def get_json_schema(self) -> Mapping[str, Any]:
         return self.stream_schema
 
-    def next_page_token(self, response: requests.Response, **kwargs) -> Optional[Mapping[str, Any]]:
+    def next_page_token(
+        self, response: requests.Response, **kwargs
+    ) -> Optional[Mapping[str, Any]]:
         next_page = response.json().get("offset")
         if next_page:
             return next_page
         return None
 
-    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         """
         All available params: https://airtable.com/developers/web/api/list-records#query
         """
@@ -165,10 +191,10 @@ class AirtableStream(HttpStream, ABC):
 
     def normalize_fields(self, fields):
         normalized_fields = deepcopy(fields)
-        
+
         for field, value in normalized_fields.items():
             if isinstance(value, dict) and "specialValue" in value:
-                normalized_fields.update({ field: value.get("specialValue") })
+                normalized_fields.update({field: value.get("specialValue")})
 
         return normalized_fields
 
@@ -181,10 +207,15 @@ class AirtableStream(HttpStream, ABC):
                     "_airtable_id": record.get("id"),
                     "_airtable_created_time": record.get("createdTime"),
                     "_airtable_table_name": self.table_name,
-                    **{SchemaHelpers.clean_name(k): v for k, v in self.normalize_fields(data).items()},
+                    **{
+                        SchemaHelpers.clean_name(k): v
+                        for k, v in self.normalize_fields(data).items()
+                    },
                 }
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         records = response.json().get("records", [])
         yield from self.process_records(records)
 
