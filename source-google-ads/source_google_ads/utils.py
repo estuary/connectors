@@ -84,12 +84,33 @@ class GAQL:
         return re.sub(r"\s+", " ", s)
 
     def set_where(self, value: str):
-        return self.__class__(self.fields, self.resource_name, value, self.order_by, self.limit, self.parameters)
+        return self.__class__(
+            self.fields,
+            self.resource_name,
+            value,
+            self.order_by,
+            self.limit,
+            self.parameters,
+        )
 
     def set_limit(self, value: int):
-        return self.__class__(self.fields, self.resource_name, self.where, self.order_by, value, self.parameters)
+        return self.__class__(
+            self.fields,
+            self.resource_name,
+            self.where,
+            self.order_by,
+            value,
+            self.parameters,
+        )
 
     def append_field(self, value):
         fields = list(self.fields)
         fields.append(value)
-        return self.__class__(tuple(fields), self.resource_name, self.where, self.order_by, self.limit, self.parameters)
+        return self.__class__(
+            tuple(fields),
+            self.resource_name,
+            self.where,
+            self.order_by,
+            self.limit,
+            self.parameters,
+        )

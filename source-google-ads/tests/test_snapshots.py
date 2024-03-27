@@ -1,7 +1,6 @@
 import json
 import subprocess
 
-
 # Disabled for now until we get a test account, don't want to check in
 # real data from our account here.
 # def test_capture(request, snapshot):
@@ -27,6 +26,7 @@ import subprocess
 
 #     assert snapshot("capture.stdout.json") == lines
 
+
 def test_discover(request, snapshot):
     result = subprocess.run(
         [
@@ -37,7 +37,7 @@ def test_discover(request, snapshot):
             request.fspath.dirname + "/../test.flow.yaml",
             "-o",
             "json",
-            "--emit-raw"
+            "--emit-raw",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -46,6 +46,7 @@ def test_discover(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     assert snapshot("capture.stdout.json") == lines
+
 
 def test_spec(request, snapshot):
     result = subprocess.run(
