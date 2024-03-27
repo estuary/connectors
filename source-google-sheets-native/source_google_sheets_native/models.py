@@ -1,18 +1,11 @@
 from decimal import Decimal
 from enum import StrEnum
-from pydantic import BaseModel, Field, model_validator
 from typing import TYPE_CHECKING
 
-from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-    AccessToken,
-    BaseDocument,
-    BaseOAuth2Credentials,
-    OAuth2Spec,
-    ResourceConfig,
-    ResourceState,
-)
-
+from estuary_cdk.capture.common import AccessToken, BaseDocument, BaseOAuth2Credentials
+from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
+from estuary_cdk.capture.common import OAuth2Spec, ResourceConfig, ResourceState
+from pydantic import BaseModel, Field, model_validator
 
 # TODO(johnny): Lift this string building into higher-order helpers.
 OAUTH2_SPEC = OAuth2Spec(

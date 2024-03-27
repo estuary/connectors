@@ -7,6 +7,7 @@ from airbyte_cdk.sources.streams.http import HttpStream
 
 from . import pokemon_list
 
+
 class SourcePokemon(AbstractSource):
     def check_connection(self, logger, config) -> Tuple[bool, Any]:
         logger.info("Checking Pokemon API connection...")
@@ -54,7 +55,7 @@ class Pokemon(HttpStream):
         self,
         response: requests.Response,
         stream_state: Mapping[str, Any],
-        stream_slice: Mapping[str, Any] | None  = None,
+        stream_slice: Mapping[str, Any] | None = None,
         next_page_token: Mapping[str, Any] | None = None,
     ) -> Iterable[Mapping]:
         # The response is a simple JSON whose schema matches our stream's schema exactly,

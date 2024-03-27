@@ -8,9 +8,18 @@ from unittest.mock import Mock
 import pytest
 from airbyte_cdk.models import SyncMode
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v15.errors.types.errors import ErrorCode, GoogleAdsError, GoogleAdsFailure
+from google.ads.googleads.v15.errors.types.errors import (
+    ErrorCode,
+    GoogleAdsError,
+    GoogleAdsFailure,
+)
 from google.ads.googleads.v15.errors.types.request_error import RequestErrorEnum
-from google.api_core.exceptions import DataLoss, InternalServerError, ResourceExhausted, TooManyRequests
+from google.api_core.exceptions import (
+    DataLoss,
+    InternalServerError,
+    ResourceExhausted,
+    TooManyRequests,
+)
 from grpc import RpcError
 from source_google_ads.google_ads import GoogleAds
 from source_google_ads.streams import ClickView, cyclic_sieve
@@ -21,13 +30,24 @@ from .common import MockGoogleAdsClient as MockGoogleAdsClient
 @pytest.fixture
 def mock_ads_client(mocker, config):
     """Mock google ads library method, so it returns mocked Client"""
-    mocker.patch("source_google_ads.google_ads.GoogleAdsClient.load_from_dict", return_value=MockGoogleAdsClient(config))
+    mocker.patch(
+        "source_google_ads.google_ads.GoogleAdsClient.load_from_dict",
+        return_value=MockGoogleAdsClient(config),
+    )
 
 
 # EXPIRED_PAGE_TOKEN exception will be raised when page token has expired.
 exception = GoogleAdsException(
     error=RpcError(),
-    failure=GoogleAdsFailure(errors=[GoogleAdsError(error_code=ErrorCode(request_error=RequestErrorEnum.RequestError.EXPIRED_PAGE_TOKEN))]),
+    failure=GoogleAdsFailure(
+        errors=[
+            GoogleAdsError(
+                error_code=ErrorCode(
+                    request_error=RequestErrorEnum.RequestError.EXPIRED_PAGE_TOKEN
+                )
+            )
+        ]
+    ),
     call=RpcError(),
     request_id="test",
 )
@@ -75,7 +95,11 @@ def test_page_token_expired_retry_succeeds(mock_ads_client, config, customers):
     It shouldn't read records on 2021-01-01, 2021-01-02
     """
     customer_id = next(iter(customers)).id
-    stream_slice = {"customer_id": customer_id, "start_date": "2021-01-01", "end_date": "2021-01-15"}
+    stream_slice = {
+        "customer_id": customer_id,
+        "start_date": "2021-01-01",
+        "end_date": "2021-01-15",
+    }
 
     google_api = MockGoogleAds(credentials=config["credentials"])
     incremental_stream_config = dict(
@@ -89,10 +113,22 @@ def test_page_token_expired_retry_succeeds(mock_ads_client, config, customers):
     stream.get_query = Mock()
     stream.get_query.return_value = "query"
 
-    result = list(stream.read_records(sync_mode=SyncMode.incremental, cursor_field=["segments.date"], stream_slice=stream_slice))
+    result = list(
+        stream.read_records(
+            sync_mode=SyncMode.incremental,
+            cursor_field=["segments.date"],
+            stream_slice=stream_slice,
+        )
+    )
     assert len(result) == 9
     assert stream.get_query.call_count == 2
-    stream.get_query.assert_called_with({"customer_id": customer_id, "start_date": "2021-01-03", "end_date": "2021-01-15"})
+    stream.get_query.assert_called_with(
+        {
+            "customer_id": customer_id,
+            "start_date": "2021-01-03",
+            "end_date": "2021-01-15",
+        }
+    )
 
 
 def mock_response_fails_1():
@@ -132,7 +168,11 @@ def test_page_token_expired_retry_fails(mock_ads_client, config, customers):
     because Google Ads API doesn't allow filter by datetime.
     """
     customer_id = next(iter(customers)).id
-    stream_slice = {"customer_id": customer_id, "start_date": "2021-01-01", "end_date": "2021-01-15"}
+    stream_slice = {
+        "customer_id": customer_id,
+        "start_date": "2021-01-01",
+        "end_date": "2021-01-15",
+    }
 
     google_api = MockGoogleAdsFails(credentials=config["credentials"])
     incremental_stream_config = dict(
@@ -147,9 +187,21 @@ def test_page_token_expired_retry_fails(mock_ads_client, config, customers):
     stream.get_query.return_value = "query"
 
     with pytest.raises(GoogleAdsException):
-        list(stream.read_records(sync_mode=SyncMode.incremental, cursor_field=["segments.date"], stream_slice=stream_slice))
+        list(
+            stream.read_records(
+                sync_mode=SyncMode.incremental,
+                cursor_field=["segments.date"],
+                stream_slice=stream_slice,
+            )
+        )
 
-    stream.get_query.assert_called_with({"customer_id": customer_id, "start_date": "2021-01-03", "end_date": "2021-01-15"})
+    stream.get_query.assert_called_with(
+        {
+            "customer_id": customer_id,
+            "start_date": "2021-01-03",
+            "end_date": "2021-01-15",
+        }
+    )
     assert stream.get_query.call_count == 2
 
 
@@ -169,14 +221,20 @@ class MockGoogleAdsFailsOneDate(MockGoogleAds):
         return mock_response_fails_one_date()
 
 
-def test_page_token_expired_it_should_fail_date_range_1_day(mock_ads_client, config, customers):
+def test_page_token_expired_it_should_fail_date_range_1_day(
+    mock_ads_client, config, customers
+):
     """
     Page token has expired while reading records within date "2021-01-03",
     it should raise error, because Google Ads API doesn't allow filter by datetime.
     Minimum date range is 1 day.
     """
     customer_id = next(iter(customers)).id
-    stream_slice = {"customer_id": customer_id, "start_date": "2021-01-03", "end_date": "2021-01-04"}
+    stream_slice = {
+        "customer_id": customer_id,
+        "start_date": "2021-01-03",
+        "end_date": "2021-01-04",
+    }
 
     google_api = MockGoogleAdsFailsOneDate(credentials=config["credentials"])
     incremental_stream_config = dict(
@@ -191,19 +249,35 @@ def test_page_token_expired_it_should_fail_date_range_1_day(mock_ads_client, con
     stream.get_query.return_value = "query"
 
     with pytest.raises(GoogleAdsException):
-        list(stream.read_records(sync_mode=SyncMode.incremental, cursor_field=["segments.date"], stream_slice=stream_slice))
+        list(
+            stream.read_records(
+                sync_mode=SyncMode.incremental,
+                cursor_field=["segments.date"],
+                stream_slice=stream_slice,
+            )
+        )
 
-    stream.get_query.assert_called_with({"customer_id": customer_id, "start_date": "2021-01-03", "end_date": "2021-01-04"})
+    stream.get_query.assert_called_with(
+        {
+            "customer_id": customer_id,
+            "start_date": "2021-01-03",
+            "end_date": "2021-01-04",
+        }
+    )
     assert stream.get_query.call_count == 1
 
 
-@pytest.mark.parametrize("error_cls", (ResourceExhausted, TooManyRequests, InternalServerError, DataLoss))
+@pytest.mark.parametrize(
+    "error_cls", (ResourceExhausted, TooManyRequests, InternalServerError, DataLoss)
+)
 def test_retry_transient_errors(mocker, config, customers, error_cls):
     mocker.patch("time.sleep")
     credentials = config["credentials"]
     credentials.update(use_proto_plus=True)
     api = GoogleAds(credentials=credentials)
-    mocked_search = mocker.patch.object(api.ga_service, "search", side_effect=error_cls("Error message"))
+    mocked_search = mocker.patch.object(
+        api.ga_service, "search", side_effect=error_cls("Error message")
+    )
     incremental_stream_config = dict(
         api=api,
         conversion_window_days=config["conversion_window_days"],
@@ -213,10 +287,20 @@ def test_retry_transient_errors(mocker, config, customers, error_cls):
     )
     stream = ClickView(**incremental_stream_config)
     customer_id = next(iter(customers)).id
-    stream_slice = {"customer_id": customer_id, "start_date": "2021-01-03", "end_date": "2021-01-04"}
+    stream_slice = {
+        "customer_id": customer_id,
+        "start_date": "2021-01-03",
+        "end_date": "2021-01-04",
+    }
     records = []
     with pytest.raises(error_cls):
-        records = list(stream.read_records(sync_mode=SyncMode.incremental, cursor_field=["segments.date"], stream_slice=stream_slice))
+        records = list(
+            stream.read_records(
+                sync_mode=SyncMode.incremental,
+                cursor_field=["segments.date"],
+                stream_slice=stream_slice,
+            )
+        )
     assert mocked_search.call_count == 5
     assert records == []
 

@@ -12,7 +12,7 @@ def test_capture(request, snapshot):
             "--sessions",
             "1",
             "--delay",
-            "10s"
+            "10s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -26,6 +26,7 @@ def test_capture(request, snapshot):
 
     assert snapshot("capture.stdout.json") == lines
 
+
 def test_discover(request, snapshot):
     result = subprocess.run(
         [
@@ -36,7 +37,7 @@ def test_discover(request, snapshot):
             request.config.rootdir + "/source-criteo/test.flow.yaml",
             "-o",
             "json",
-            "--emit-raw"
+            "--emit-raw",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -46,6 +47,7 @@ def test_discover(request, snapshot):
 
     assert snapshot("capture.stdout.json") == lines
 
+
 def test_spec(request, snapshot):
     result = subprocess.run(
         [
@@ -53,7 +55,7 @@ def test_spec(request, snapshot):
             "raw",
             "spec",
             "--source",
-            request.config.rootdir + "/source-criteo/test.flow.yaml"
+            request.config.rootdir + "/source-criteo/test.flow.yaml",
         ],
         stdout=subprocess.PIPE,
         text=True,

@@ -77,7 +77,10 @@ class CustomQueryMixin:
                     output_type = ["string", "null"]
                 field_value = {"type": output_type, "protobuf_message": True}
             else:
-                output_type = [google_datatype_mapping.get(google_data_type, "string"), "null"]
+                output_type = [
+                    google_datatype_mapping.get(google_data_type, "string"),
+                    "null",
+                ]
                 field_value = {"type": output_type}
                 if google_data_type == "DATE":
                     field_value["format"] = "date"
@@ -90,7 +93,9 @@ class CustomQueryMixin:
 class IncrementalCustomQuery(CustomQueryMixin, IncrementalGoogleAdsStream):
     def get_query(self, stream_slice: Mapping[str, Any] = None) -> str:
         start_date, end_date = stream_slice["start_date"], stream_slice["end_date"]
-        query = self.insert_segments_date_expr(self.config["query"], start_date, end_date)
+        query = self.insert_segments_date_expr(
+            self.config["query"], start_date, end_date
+        )
         return str(query)
 
     @staticmethod

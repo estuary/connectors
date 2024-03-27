@@ -15,7 +15,9 @@ def test_time_zone():
 
 @pytest.mark.parametrize("is_manager_account", (True, False))
 def test_manager_account(is_manager_account):
-    mock_account_info = [[{"customer.manager": is_manager_account, "customer.id": "8765"}]]
+    mock_account_info = [
+        [{"customer.manager": is_manager_account, "customer.id": "8765"}]
+    ]
     customers = Customer.from_accounts(mock_account_info)
     for customer in customers:
         assert customer.is_manager_account is is_manager_account

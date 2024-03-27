@@ -1,15 +1,16 @@
-from dataclasses import dataclass
-from logging import Logger
-from pydantic import BaseModel
-from typing import AsyncGenerator, Any
 import abc
-import aiohttp
 import asyncio
 import base64
 import time
+from dataclasses import dataclass
+from logging import Logger
+from typing import Any, AsyncGenerator
+
+import aiohttp
+from pydantic import BaseModel
 
 from . import Mixin
-from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
+from .flow import AccessToken, BaseOAuth2Credentials, BasicAuth, OAuth2Spec
 
 
 class HTTPSession(abc.ABC):
@@ -99,7 +100,6 @@ class HTTPSession(abc.ABC):
 
 @dataclass
 class TokenSource:
-
     class AccessTokenResponse(BaseModel):
         access_token: str
         token_type: str
@@ -207,7 +207,6 @@ class RateLimiter:
 
 # HTTPMixin is an opinionated implementation of HTTPSession.
 class HTTPMixin(Mixin, HTTPSession):
-
     inner: aiohttp.ClientSession
     rate_limiter: RateLimiter
     token_source: TokenSource | None = None
@@ -232,7 +231,6 @@ class HTTPMixin(Mixin, HTTPSession):
         _with_token: bool,
     ) -> AsyncGenerator[bytes, None]:
         while True:
-
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
 
@@ -249,7 +247,6 @@ class HTTPMixin(Mixin, HTTPSession):
                 params=params,
                 url=url,
             ) as resp:
-
                 self.rate_limiter.update(cur_delay, resp.status == 429)
 
                 if resp.status == 429:

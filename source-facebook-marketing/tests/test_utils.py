@@ -5,7 +5,11 @@
 import freezegun
 import pendulum
 import pytest
-from source_facebook_marketing.utils import DATA_RETENTION_PERIOD, validate_end_date, validate_start_date
+from source_facebook_marketing.utils import (
+    DATA_RETENTION_PERIOD,
+    validate_end_date,
+    validate_start_date,
+)
 
 TODAY = pendulum.local(2023, 3, 31)
 
@@ -26,13 +30,15 @@ TODAY = pendulum.local(2023, 3, 31)
             [
                 f"The start date cannot be beyond 37 months from the current date. "
                 f"Set start date to {pendulum.local(2020, 3, 1)}."
-            ]
+            ],
         ),
         (
             "start_date",
             TODAY + pendulum.duration(months=1),
             TODAY,
-            [f"The start date cannot be in the future. Set start date to today's date - {TODAY}."],
+            [
+                f"The start date cannot be in the future. Set start date to today's date - {TODAY}."
+            ],
         ),
         (
             "end_date",

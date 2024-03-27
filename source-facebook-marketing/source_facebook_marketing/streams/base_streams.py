@@ -32,7 +32,9 @@ class FBMarketingStream(Stream, ABC):
     """Base stream class"""
 
     primary_key = "id"
-    transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
+    transformer: TypeTransformer = TypeTransformer(
+        TransformConfig.DefaultSchemaNormalization
+    )
 
     # use batch API to retrieve details for each record in a stream
     use_batch = True
@@ -45,13 +47,25 @@ class FBMarketingStream(Stream, ABC):
     def availability_strategy(self) -> Optional["AvailabilityStrategy"]:
         return None
 
-    def __init__(self, api: "API", include_deleted: bool = False, page_size: int = 100, max_batch_size: int = 50, source_defined_primary_key: list | None = None, **kwargs):
+    def __init__(
+        self,
+        api: "API",
+        include_deleted: bool = False,
+        page_size: int = 100,
+        max_batch_size: int = 50,
+        source_defined_primary_key: list | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self._api = api
         self.page_size = page_size if page_size is not None else 100
         self._include_deleted = include_deleted if self.enable_deleted else False
         self.max_batch_size = max_batch_size if max_batch_size is not None else 50
-        self.source_defined_primary_key = source_defined_primary_key if source_defined_primary_key is not None else ["id"]
+        self.source_defined_primary_key = (
+            source_defined_primary_key
+            if source_defined_primary_key is not None
+            else ["id"]
+        )
 
     @cached_property
     def fields(self) -> List[str]:
@@ -65,7 +79,9 @@ class FBMarketingStream(Stream, ABC):
             if batch:
                 logger.info("Retry failed requests in batch")
 
-    def execute_in_batch(self, pending_requests: Iterable[FacebookRequest]) -> Iterable[MutableMapping[str, Any]]:
+    def execute_in_batch(
+        self, pending_requests: Iterable[FacebookRequest]
+    ) -> Iterable[MutableMapping[str, Any]]:
         """Execute list of requests in batches"""
         requests_q = Queue()
         records = []
@@ -75,11 +91,16 @@ class FBMarketingStream(Stream, ABC):
         def success(response: FacebookResponse):
             records.append(response.json())
 
-        def failure(response: FacebookResponse, request: Optional[FacebookRequest] = None):
+        def failure(
+            response: FacebookResponse, request: Optional[FacebookRequest] = None
+        ):
             # although it is Optional in the signature for compatibility, we need it always
             assert request, "Missing a request object"
             resp_body = response.json()
-            if not isinstance(resp_body, dict) or resp_body.get("error", {}).get("code") != FACEBOOK_BATCH_ERROR_CODE:
+            if (
+                not isinstance(resp_body, dict)
+                or resp_body.get("error", {}).get("code") != FACEBOOK_BATCH_ERROR_CODE
+            ):
                 # response body is not a json object or the error code is different
                 raise RuntimeError(f"Batch request failed with response: {resp_body}")
             requests_q.put(request)
@@ -88,7 +109,9 @@ class FBMarketingStream(Stream, ABC):
 
         while not requests_q.empty():
             request = requests_q.get()
-            api_batch.add_request(request, success=success, failure=partial(failure, request=request))
+            api_batch.add_request(
+                request, success=success, failure=partial(failure, request=request)
+            )
             if len(api_batch) == self.max_batch_size or requests_q.empty():
                 # make a call for every max_batch_size items or less if it is the last call
                 self._execute_batch(api_batch)
@@ -106,8 +129,13 @@ class FBMarketingStream(Stream, ABC):
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
         """Main read method used by CDK"""
-        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state))
-        loaded_records_iter = (record.api_get(fields=self.fields, pending=self.use_batch) for record in records_iter)
+        records_iter = self.list_objects(
+            params=self.request_params(stream_state=stream_state)
+        )
+        loaded_records_iter = (
+            record.api_get(fields=self.fields, pending=self.use_batch)
+            for record in records_iter
+        )
         if self.use_batch:
             loaded_records_iter = self.execute_in_batch(loaded_records_iter)
 
@@ -155,7 +183,11 @@ class FBMarketingStream(Stream, ABC):
 
         return {
             "filtering": [
-                {"field": f"{self.entity_prefix}.delivery_info", "operator": "IN", "value": filt_values},
+                {
+                    "field": f"{self.entity_prefix}.delivery_info",
+                    "operator": "IN",
+                    "value": filt_values,
+                },
             ],
         }
 
@@ -173,9 +205,16 @@ class FBMarketingIncrementalStream(FBMarketingStream, ABC):
         if self._end_date < self._start_date:
             logger.error("The end_date must be after start_date.")
 
-    def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]):
+    def get_updated_state(
+        self,
+        current_stream_state: MutableMapping[str, Any],
+        latest_record: Mapping[str, Any],
+    ):
         """Update stream state from latest record"""
-        potentially_new_records_in_the_past = self._include_deleted and not current_stream_state.get("include_deleted", False)
+        potentially_new_records_in_the_past = (
+            self._include_deleted
+            and not current_stream_state.get("include_deleted", False)
+        )
         record_value = latest_record[self.cursor_field]
         state_value = current_stream_state.get(self.cursor_field) or record_value
         max_cursor = max(pendulum.parse(state_value), pendulum.parse(record_value))
@@ -187,7 +226,9 @@ class FBMarketingIncrementalStream(FBMarketingStream, ABC):
             "include_deleted": self._include_deleted,
         }
 
-    def request_params(self, stream_state: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, stream_state: Mapping[str, Any], **kwargs
+    ) -> MutableMapping[str, Any]:
         """Include state filter"""
         params = super().request_params(**kwargs)
         params = deep_merge(params, self._state_filter(stream_state=stream_state or {}))
@@ -196,11 +237,17 @@ class FBMarketingIncrementalStream(FBMarketingStream, ABC):
     def _state_filter(self, stream_state: Mapping[str, Any]) -> Mapping[str, Any]:
         """Additional filters associated with state if any set"""
         state_value = stream_state.get(self.cursor_field)
-        filter_value = self._start_date if not state_value else pendulum.parse(state_value)
+        filter_value = (
+            self._start_date if not state_value else pendulum.parse(state_value)
+        )
 
-        potentially_new_records_in_the_past = self._include_deleted and not stream_state.get("include_deleted", False)
+        potentially_new_records_in_the_past = (
+            self._include_deleted and not stream_state.get("include_deleted", False)
+        )
         if potentially_new_records_in_the_past:
-            self.logger.info(f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option")
+            self.logger.info(
+                f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option"
+            )
             filter_value = self._start_date
 
         return {
@@ -217,7 +264,9 @@ class FBMarketingIncrementalStream(FBMarketingStream, ABC):
 class FBMarketingReversedIncrementalStream(FBMarketingIncrementalStream, ABC):
     """The base class for streams that don't support filtering and return records sorted desc by cursor_value"""
 
-    enable_deleted = False  # API don't have any filtering, so implement include_deleted in code
+    enable_deleted = (
+        False  # API don't have any filtering, so implement include_deleted in code
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -239,7 +288,9 @@ class FBMarketingReversedIncrementalStream(FBMarketingIncrementalStream, ABC):
     def state(self, value: Mapping[str, Any]):
         """State setter, ignore state if current settings mismatch saved state"""
         if self._include_deleted and not value.get("include_deleted"):
-            logger.info(f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option")
+            logger.info(
+                f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option"
+            )
             return
 
         self._cursor_value = pendulum.parse(value[self.cursor_field])
@@ -264,7 +315,9 @@ class FBMarketingReversedIncrementalStream(FBMarketingIncrementalStream, ABC):
         - update state only when we reach the end
         - stop reading when we reached the end
         """
-        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state))
+        records_iter = self.list_objects(
+            params=self.request_params(stream_state=stream_state)
+        )
         for record in records_iter:
             record_cursor_value = pendulum.parse(record[self.cursor_field])
             if self._cursor_value and record_cursor_value < self._cursor_value:

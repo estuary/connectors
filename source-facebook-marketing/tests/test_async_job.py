@@ -16,7 +16,12 @@ from facebook_business.adobjects.adsinsights import AdsInsights
 from facebook_business.adobjects.campaign import Campaign
 from facebook_business.api import FacebookAdsApiBatch, FacebookBadObjectError
 from source_facebook_marketing.api import MyFacebookAdsApi
-from source_facebook_marketing.streams.async_job import InsightAsyncJob, ParentAsyncJob, Status, update_in_batch
+from source_facebook_marketing.streams.async_job import (
+    InsightAsyncJob,
+    ParentAsyncJob,
+    Status,
+    update_in_batch,
+)
 
 
 @pytest.fixture(name="adreport")
@@ -47,12 +52,23 @@ def job_fixture(api, account):
     }
     interval = pendulum.Interval(pendulum.Date(2019, 1, 1), pendulum.Date(2019, 1, 1))
 
-    return InsightAsyncJob(edge_object=account, api=api, interval=interval, params=params)
+    return InsightAsyncJob(
+        edge_object=account, api=api, interval=interval, params=params
+    )
 
 
 @pytest.fixture(name="grouped_jobs")
 def grouped_jobs_fixture(mocker):
-    return [mocker.Mock(spec=InsightAsyncJob, attempt_number=1, failed=False, completed=False, elapsed_time=None) for _ in range(10)]
+    return [
+        mocker.Mock(
+            spec=InsightAsyncJob,
+            attempt_number=1,
+            failed=False,
+            completed=False,
+            elapsed_time=None,
+        )
+        for _ in range(10)
+    ]
 
 
 @pytest.fixture(name="parent_job")
@@ -168,7 +184,10 @@ class TestInsightAsyncJob:
     def test_start_already_started(self, job):
         job.start()
 
-        with pytest.raises(RuntimeError, match=r": Incorrect usage of start - the job already started, use restart instead"):
+        with pytest.raises(
+            RuntimeError,
+            match=r": Incorrect usage of start - the job already started, use restart instead",
+        ):
             job.start()
 
     def test_restart(self, failed_job, api, adreport):
@@ -183,15 +202,24 @@ class TestInsightAsyncJob:
         job.start()
         assert not job.failed
 
-        with pytest.raises(RuntimeError, match=r": Incorrect usage of restart - only failed jobs can be restarted"):
+        with pytest.raises(
+            RuntimeError,
+            match=r": Incorrect usage of restart - only failed jobs can be restarted",
+        ):
             job.restart()
 
     def test_restart_when_job_not_started(self, job):
-        with pytest.raises(RuntimeError, match=r": Incorrect usage of restart - only failed jobs can be restarted"):
+        with pytest.raises(
+            RuntimeError,
+            match=r": Incorrect usage of restart - only failed jobs can be restarted",
+        ):
             job.restart()
 
     def test_update_job_not_started(self, job):
-        with pytest.raises(RuntimeError, match=r": Incorrect usage of the method - the job is not started"):
+        with pytest.raises(
+            RuntimeError,
+            match=r": Incorrect usage of the method - the job is not started",
+        ):
             job.update_job()
 
     def test_update_job_on_completed_job(self, completed_job, adreport):
@@ -238,7 +266,9 @@ class TestInsightAsyncJob:
         kwargs["failure"](response)
 
     def test_elapsed_time(self, job, api, adreport):
-        assert job.elapsed_time is None, "should be None for the job that is not started"
+        assert (
+            job.elapsed_time is None
+        ), "should be None for the job that is not started"
 
         job.start()
         adreport["async_status"] = Status.COMPLETED.value
@@ -277,7 +307,9 @@ class TestInsightAsyncJob:
         assert failed_job.failed, "should return True if the job previously failed"
 
     def test_str(self, api, account):
-        interval = pendulum.Interval(pendulum.Date(2010, 1, 1), pendulum.Date(2011, 1, 1))
+        interval = pendulum.Interval(
+            pendulum.Date(2010, 1, 1), pendulum.Date(2011, 1, 1)
+        )
         job = InsightAsyncJob(
             edge_object=account,
             api=api,
@@ -285,7 +317,10 @@ class TestInsightAsyncJob:
             interval=interval,
         )
 
-        assert str(job) == f"InsightAsyncJob(id=<None>, {account}, time_range=<Interval [2010-01-01 -> 2011-01-01]>, breakdowns=[10, 20])"
+        assert (
+            str(job)
+            == f"InsightAsyncJob(id=<None>, {account}, time_range=<Interval [2010-01-01 -> 2011-01-01]>, breakdowns=[10, 20])"
+        )
 
     def test_get_result(self, job, adreport, api):
         job.start()
@@ -306,17 +341,26 @@ class TestInsightAsyncJob:
         ads_insights._set_data({"items": [{"some_data": 123}, {"some_data": 77}]})
         with mocker.patch(
             "facebook_business.adobjects.objectparser.ObjectParser.parse_multiple",
-            side_effect=[FacebookBadObjectError("Bad data to set object data"), ads_insights],
+            side_effect=[
+                FacebookBadObjectError("Bad data to set object data"),
+                ads_insights,
+            ],
         ):
             # in case this is not retried, an error will be raised
             job.get_result()
 
     def test_get_result_when_job_is_not_started(self, job):
-        with pytest.raises(RuntimeError, match=r"Incorrect usage of get_result - the job is not started or failed"):
+        with pytest.raises(
+            RuntimeError,
+            match=r"Incorrect usage of get_result - the job is not started or failed",
+        ):
             job.get_result()
 
     def test_get_result_when_job_is_failed(self, failed_job):
-        with pytest.raises(RuntimeError, match=r"Incorrect usage of get_result - the job is not started or failed"):
+        with pytest.raises(
+            RuntimeError,
+            match=r"Incorrect usage of get_result - the job is not started or failed",
+        ):
             failed_job.get_result()
 
     @pytest.mark.parametrize(
@@ -330,10 +374,22 @@ class TestInsightAsyncJob:
     def test_split_job(self, mocker, api, edge_class, next_edge_class, id_field):
         """Test that split will correctly downsize edge_object"""
         today = pendulum.today().date()
-        start, end = today - pendulum.duration(days=365 * 3 + 20), today - pendulum.duration(days=365 * 3 + 10)
+        start, end = (
+            today - pendulum.duration(days=365 * 3 + 20),
+            today - pendulum.duration(days=365 * 3 + 10),
+        )
         params = {"time_increment": 1, "breakdowns": []}
-        job = InsightAsyncJob(api=api, edge_object=edge_class(1), interval=pendulum.Interval(start, end), params=params)
-        mocker.patch.object(edge_class, "get_insights", return_value=[{id_field: 1}, {id_field: 2}, {id_field: 3}])
+        job = InsightAsyncJob(
+            api=api,
+            edge_object=edge_class(1),
+            interval=pendulum.Interval(start, end),
+            params=params,
+        )
+        mocker.patch.object(
+            edge_class,
+            "get_insights",
+            return_value=[{id_field: 1}, {id_field: 2}, {id_field: 3}],
+        )
 
         small_jobs = job.split_job()
 
@@ -342,22 +398,34 @@ class TestInsightAsyncJob:
                 "breakdowns": [],
                 "fields": [id_field],
                 "level": next_edge_class.__name__.lower(),
-                "time_range": {"since": (today - pendulum.duration(months=37)).to_date_string(), "until": end.to_date_string()},
+                "time_range": {
+                    "since": (today - pendulum.duration(months=37)).to_date_string(),
+                    "until": end.to_date_string(),
+                },
             }
         )
         assert len(small_jobs) == 3
         assert all(j.interval == job.interval for j in small_jobs)
         for i, small_job in enumerate(small_jobs, start=1):
             assert small_job._params["time_range"] == job._params["time_range"]
-            assert str(small_job) == f"InsightAsyncJob(id=<None>, {next_edge_class(i)}, time_range={job.interval}, breakdowns={[]})"
+            assert (
+                str(small_job)
+                == f"InsightAsyncJob(id=<None>, {next_edge_class(i)}, time_range={job.interval}, breakdowns={[]})"
+            )
 
     def test_split_job_smallest(self, mocker, api):
         """Test that split will correctly downsize edge_object"""
-        interval = pendulum.Interval(pendulum.Date(2010, 1, 1), pendulum.Date(2010, 1, 10))
+        interval = pendulum.Interval(
+            pendulum.Date(2010, 1, 1), pendulum.Date(2010, 1, 10)
+        )
         params = {"time_increment": 1, "breakdowns": []}
-        job = InsightAsyncJob(api=api, edge_object=Ad(1), interval=interval, params=params)
+        job = InsightAsyncJob(
+            api=api, edge_object=Ad(1), interval=interval, params=params
+        )
 
-        with pytest.raises(ValueError, match="The job is already splitted to the smallest size."):
+        with pytest.raises(
+            ValueError, match="The job is already splitted to the smallest size."
+        ):
             job.split_job()
 
 
@@ -419,7 +487,10 @@ class TestParentAsyncJob:
 
     def test_split_job(self, parent_job, grouped_jobs, mocker):
         grouped_jobs[0].failed = True
-        grouped_jobs[0].split_job.return_value = [mocker.Mock(spec=InsightAsyncJob), mocker.Mock(spec=InsightAsyncJob)]
+        grouped_jobs[0].split_job.return_value = [
+            mocker.Mock(spec=InsightAsyncJob),
+            mocker.Mock(spec=InsightAsyncJob),
+        ]
         grouped_jobs[5].failed = True
         grouped_jobs[5].split_job.return_value = [
             mocker.Mock(spec=InsightAsyncJob),
@@ -429,7 +500,9 @@ class TestParentAsyncJob:
 
         small_jobs = parent_job.split_job()
 
-        assert len(small_jobs) == len(grouped_jobs) + 5 - 2, "each failed job must be replaced with its split"
+        assert (
+            len(small_jobs) == len(grouped_jobs) + 5 - 2
+        ), "each failed job must be replaced with its split"
         for i, job in enumerate(grouped_jobs):
             if i in (0, 5):
                 job.split_job.assert_called_once()
@@ -444,11 +517,14 @@ class TestParentAsyncJob:
         count = 0
         while count < 10:
             split_jobs = parent_job.split_job()
-            assert len(split_jobs) == len(
-                grouped_jobs
+            assert (
+                len(split_jobs) == len(grouped_jobs)
             ), "attempted to split job at smallest size so should just restart job meaning same no. of jobs"
             grouped_jobs[0].attempt_number += 1
             count += 1
 
     def test_str(self, parent_job, grouped_jobs):
-        assert str(parent_job) == f"ParentAsyncJob({grouped_jobs[0]} ... {len(grouped_jobs) - 1} jobs more)"
+        assert (
+            str(parent_job)
+            == f"ParentAsyncJob({grouped_jobs[0]} ... {len(grouped_jobs) - 1} jobs more)"
+        )

@@ -5,18 +5,20 @@
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Annotated, Union
+from typing import Annotated, Any, Dict, List, Optional, Type, Union
 
 from airbyte_cdk.sources.config import BaseConfig
 from facebook_business.adobjects.adsinsights import AdsInsights
-from pydantic import BaseModel, Field, PositiveInt, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
 logger = logging.getLogger("airbyte")
 
 
 ValidFields = Enum("ValidEnums", AdsInsights.Field.__dict__)
 ValidBreakdowns = Enum("ValidBreakdowns", AdsInsights.Breakdowns.__dict__)
-ValidActionBreakdowns = Enum("ValidActionBreakdowns", AdsInsights.ActionBreakdowns.__dict__)
+ValidActionBreakdowns = Enum(
+    "ValidActionBreakdowns", AdsInsights.ActionBreakdowns.__dict__
+)
 DATE_TIME_PATTERN = "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
 EMPTY_PATTERN = "^$"
 
@@ -32,7 +34,12 @@ class InsightConfig(BaseModel):
         description="The name value of insight",
     )
 
-    level: str = Field(title="Level", description="Chosen level for API", default="ad", enum=["ad", "adset", "campaign", "account"])
+    level: str = Field(
+        title="Level",
+        description="Chosen level for API",
+        default="ad",
+        enum=["ad", "adset", "campaign", "account"],
+    )
 
     fields: Optional[List[ValidFields]] = Field(
         title="Fields",
@@ -87,6 +94,7 @@ class InsightConfig(BaseModel):
         default=28,
     )
 
+
 class AccessToken(BaseModel):
     access_token: str = Field(
         title="Access Token",
@@ -100,26 +108,20 @@ class AccessToken(BaseModel):
         airbyte_secret=True,
     )
 
+
 class OAuthCredentials(BaseModel):
-    access_token: str = Field(
-        airbyte_secret=True
-    )
+    access_token: str = Field(airbyte_secret=True)
 
     auth_type: str = Field(
         default="OAuth Credentials",
         order=0,
     )
-    client_id: str = Field(
-        airbyte_secret=True
-    )
-    client_secret: str = Field(
-        airbyte_secret=True
-    )
+    client_id: str = Field(airbyte_secret=True)
+    client_secret: str = Field(airbyte_secret=True)
 
     class Config:
-        schema_extra = {
-            "x-oauth2-provider": "facebook"
-        }
+        schema_extra = {"x-oauth2-provider": "facebook"}
+
 
 class ConnectorConfig(BaseConfig):
     """Connector config"""
@@ -128,7 +130,9 @@ class ConnectorConfig(BaseConfig):
         title = "Source Facebook Marketing"
 
         @staticmethod
-        def schema_extra(schema: Dict[str, Any], model: Type["ConnectorConfig"]) -> None:
+        def schema_extra(
+            schema: Dict[str, Any], model: Type["ConnectorConfig"]
+        ) -> None:
             schema["properties"]["end_date"].pop("format")
 
     account_id: str = Field(
@@ -153,7 +157,6 @@ class ConnectorConfig(BaseConfig):
         examples=["2017-01-25T00:00:00Z"],
     )
 
-
     end_date: Optional[datetime] = Field(
         title="End Date",
         order=2,
@@ -166,7 +169,6 @@ class ConnectorConfig(BaseConfig):
         examples=["2017-01-26T00:00:00Z"],
         default_factory=lambda: datetime.now(tz=timezone.utc),
     )
-
 
     include_deleted: bool = Field(
         title="Include Deleted Campaigns, Ads, and AdSets",
@@ -225,11 +227,10 @@ class ConnectorConfig(BaseConfig):
         default=50,
     )
 
-    credentials: OAuthCredentials# Annotated[Union[OAuthCredentials], Field(discriminator="auth_type")]
+    credentials: OAuthCredentials  # Annotated[Union[OAuthCredentials], Field(discriminator="auth_type")]
 
     action_breakdowns_allow_empty: bool = Field(
         description="Allows action_breakdowns to be an empty list",
         default=True,
         # airbyte_hidden=True,
     )
-

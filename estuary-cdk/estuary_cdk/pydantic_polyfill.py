@@ -10,9 +10,10 @@ This polyfill thus exports a GenericModel class which is simply BaseModel
 when pydantic v2 is active.
 """
 
-from typing import TypeVar, TypeAlias
-import pydantic
 import datetime
+from typing import TypeAlias, TypeVar
+
+import pydantic
 
 try:
     import pydantic.v1
@@ -20,7 +21,7 @@ try:
     VERSION = "v2"
 
     # GenericModel was removed. It's just BaseModel now.
-    GenericModel : TypeAlias = pydantic.BaseModel
+    GenericModel: TypeAlias = pydantic.BaseModel
 
 except ImportError:
     VERSION = "v1"

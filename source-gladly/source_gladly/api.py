@@ -23,7 +23,11 @@ async def fetch_events(
 ) -> AsyncGenerator[Event | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    base = config.advanced.base_url if config.advanced.base_url else f"https://{config.organization}.gladly.com"
+    base = (
+        config.advanced.base_url
+        if config.advanced.base_url
+        else f"https://{config.organization}.gladly.com"
+    )
     url = urljoin(base, "api/v1/events")
 
     params = {

@@ -1,7 +1,8 @@
 import abc
 from dataclasses import dataclass
+from typing import Any, Generic, Literal, TypeVar
+
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
-from typing import Any, Literal, TypeVar, Generic, Literal
 
 from .pydantic_polyfill import GenericModel
 
