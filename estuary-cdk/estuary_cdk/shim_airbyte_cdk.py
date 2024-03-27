@@ -78,8 +78,15 @@ class ResourceState(common.BaseResourceState, extra="forbid"):
     """state is a dict encoding of AirbyteStateMessage"""
 
 
-ConnectorState = common.ConnectorState[ResourceState]
-"""Use the common.ConnectorState shape with ResourceState"""
+class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
+    """ConnectorState represents a number of ResourceStates, keyed by binding state key.
+    
+    Top-level fields other than bindingStateV1 are ignored, to allow for a lossy migration from
+    states that existed prior to adopting this convection. Connectors transitioning in this way will
+    effectively start over from the beginning.
+    """
+
+    bindingStateV1: dict[str, ResourceState] = {}
 
 
 class Document(common.BaseDocument, extra="allow"):
@@ -267,6 +274,12 @@ class CaptureShim(BaseCaptureConnector):
             for binding, resource in resolved
         ]
         airbyte_catalog = ConfiguredAirbyteCatalog(streams=airbyte_streams)
+
+        if "bindingStateV1" not in connector_state.__fields_set__:
+            # Initialize the top-level state object so that it is properly serialized if this is an
+            # "empty" state, which occurs for a brand new task that has never emitted any
+            # checkpoints.
+            connector_state.__setattr__("bindingStateV1", {})
 
         # Index of Airbyte (namespace, stream) => ResourceState.
         # Use `setdefault()` to initialize ResourceState if it's not already part of `connector_state`.
