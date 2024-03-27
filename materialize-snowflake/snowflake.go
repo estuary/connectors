@@ -145,8 +145,7 @@ type transactor struct {
 	}
 	// Variables exclusively used by Store.
 	store struct {
-		conn  *stdsql.Conn
-		fence *sql.Fence
+		conn *stdsql.Conn
 	}
 	templates   templates
 	bindings    []*binding
@@ -180,7 +179,7 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 func newTransactor(
 	ctx context.Context,
 	ep *sql.Endpoint,
-	fence sql.Fence,
+	_ sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 ) (_ m.Transactor, err error) {
@@ -217,8 +216,6 @@ func newTransactor(
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
 	}
-
-	d.store.fence = &fence
 
 	// Establish connections.
 	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {

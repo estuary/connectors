@@ -13,6 +13,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/UUID"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
@@ -21,20 +22,32 @@ import (
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
-	fence *sql.Fence
-
 	client     *client
 	bucketPath string
 	bucket     string
+
+	cp checkpoint
 
 	bindings    []*binding
 	updateDelay time.Duration
 }
 
+type checkpointItem struct {
+	Table         string
+	TempTableName string
+	Query         string
+	JobID         string
+	EDC           *bigquery.ExternalDataConfig
+	Bucket        string
+	Files         []string
+}
+
+type checkpoint = map[string]*checkpointItem
+
 func newTransactor(
 	ctx context.Context,
 	ep *sql.Endpoint,
-	fence sql.Fence,
+	_ sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 ) (_ m.Transactor, err error) {
@@ -46,7 +59,6 @@ func newTransactor(
 	}
 
 	t := &transactor{
-		fence:      &fence,
 		client:     client,
 		bucketPath: cfg.BucketPath,
 		bucket:     cfg.Bucket,
@@ -156,9 +168,6 @@ func (t *transactor) AckDelay() time.Duration {
 	return t.updateDelay
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
-
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
@@ -184,6 +193,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries []string
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
+	var toCleanup []string
 
 	for idx, b := range t.bindings {
 		if !b.loadFile.started {
@@ -193,11 +203,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		subqueries = append(subqueries, b.loadQuerySQL)
 
-		delete, err := b.loadFile.flush(ctx)
+		var err error
+		toCleanup, err = b.loadFile.flush(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-		defer delete(ctx)
 
 		edcTableDefs[b.tempTableName] = b.loadFile.edc()
 	}
@@ -234,6 +244,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
+	for _, f := range toCleanup {
+		deleteFile(ctx, t.client.cloudStorageClient, t.bucket, f)
+	}
+
 	log.Info("load: finished loading")
 
 	return nil
@@ -243,6 +257,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
 	log.Info("store: starting encoding and uploading of files")
+
+	// Build the slice of transactions required for a commit.
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		b.storeFile.start()
@@ -257,76 +273,112 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		log.Info("store: starting commit phase")
-		var err error
-		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
-		}
-
-		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
-	}, nil
-}
-
-func (t *transactor) commit(ctx context.Context) error {
-	// Build the slice of transactions required for a commit.
-	var subqueries []string
-
-	subqueries = append(subqueries, `
-	BEGIN
-	BEGIN TRANSACTION;
-	`)
-
-	// First we must validate the fence has not been modified.
-	var fenceUpdate strings.Builder
-	if err := tplUpdateFence.Execute(&fenceUpdate, t.fence); err != nil {
-		return fmt.Errorf("evaluating fence template: %w", err)
-	}
-	subqueries = append(subqueries, fenceUpdate.String())
-
-	// This is the map of external table references we will populate. Loop through the bindings and
-	// append the SQL for that table.
-	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	for idx, b := range t.bindings {
 		if !b.storeFile.started {
 			// No stores for this binding.
 			continue
 		}
 
-		delete, err := b.storeFile.flush(ctx)
+		toCleanup, err := b.storeFile.flush(ctx)
 		if err != nil {
-			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
-		defer delete(ctx)
 
-		edcTableDefs[b.tempTableName] = b.storeFile.edc()
-
+		var query string
 		if b.target.DeltaUpdates {
-			subqueries = append(subqueries, b.storeInsertSQL)
+			query = b.storeInsertSQL
 		} else {
-			subqueries = append(subqueries, b.storeUpdateSQL)
+			query = b.storeUpdateSQL
+		}
+
+		var jobId = uuid.NewString()
+
+		t.cp[b.target.StateKey] = &checkpointItem{
+			Table:         b.target.Identifier,
+			TempTableName: b.tempTableName,
+			JobID:         jobId,
+			Query:         query,
+			EDC:           b.storeFile.edc(),
+			Bucket:        b.storeFile.bucket,
+			Files:         toCleanup,
 		}
 	}
 
-	log.Info("store: finished encoding and uploading of files")
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		var checkpointJSON, err = json.Marshal(t.cp)
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+		}
 
-	// Complete the transaction and return the appropriate error.
-	subqueries = append(subqueries, `
-	COMMIT TRANSACTION;
-    END;
-	`)
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
+	}, nil
+}
 
-	// Build the bigquery query of the combined subqueries.
-	query := t.client.newQuery(strings.Join(subqueries, "\n"))
-	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
-
-	// This returns a single row with the error status of the query.
-	if _, err := t.client.runQuery(ctx, query); err != nil {
-		return fmt.Errorf("commit query: %w", err)
+func (d *transactor) UnmarshalState(state json.RawMessage) error {
+	if err := json.Unmarshal(state, &d.cp); err != nil {
+		return err
 	}
-	log.Info("store: finished commit")
 
 	return nil
+}
+
+func (d *transactor) hasStateKey(stateKey string) bool {
+	for _, b := range d.bindings {
+		if b.target.StateKey == stateKey {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	log.Info("store: starting committing changes")
+
+	for stateKey, item := range t.cp {
+		// we skip queries that belong to tables which do not have a binding anymore
+		// since these tables might be deleted already
+		if !t.hasStateKey(stateKey) {
+			continue
+		}
+
+		var query = t.client.newQuery(item.Query)
+		var edcs = make(map[string]bigquery.ExternalData)
+		edcs[item.TempTableName] = item.EDC
+		query.TableDefinitions = edcs
+
+		log.WithField("table", item.Table).Info("store: starting query")
+		if _, err := t.client.runQuery(ctx, query); err != nil {
+			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+		}
+		log.WithField("table", item.Table).Info("store: finished query")
+
+		for _, f := range item.Files {
+			deleteFile(ctx, t.client.cloudStorageClient, item.Bucket, f)
+		}
+	}
+
+	log.Info("store: finished commit")
+
+	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
+	// so that a restart of the connector does not need to run the same queries again
+	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
+	// can actually be committed
+	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
+	// that have been committed in this transaction. The reason is that it may be the case that a binding
+	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
+	// the binding and running the queries that are pending for its last transaction.
+	var checkpointClear = make(checkpoint)
+	for _, b := range t.bindings {
+		checkpointClear[b.target.StateKey] = nil
+		delete(t.cp, b.target.StateKey)
+	}
+	var checkpointJSON, err = json.Marshal(checkpointClear)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
 func (t *transactor) Destroy() {

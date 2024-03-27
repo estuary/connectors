@@ -106,7 +106,7 @@ func (f *stagedFile) fileKey(file string) string {
 	return path.Join(f.prefix, file)
 }
 
-func (f *stagedFile) flush(ctx context.Context) (func(context.Context), error) {
+func (f *stagedFile) flush(ctx context.Context) ([]string, error) {
 	if err := f.flushFile(); err != nil {
 		return nil, err
 	}
@@ -114,16 +114,20 @@ func (f *stagedFile) flush(ctx context.Context) (func(context.Context), error) {
 	// Reset for next round.
 	f.started = false
 
-	return func(ctx context.Context) {
-		for _, fName := range f.uploaded {
-			if err := f.client.Bucket(f.bucket).Object(f.fileKey(fName)).Delete(ctx); err != nil {
-				log.WithFields(log.Fields{
-					"key": f.fileKey(fName),
-					"err": err,
-				}).Warn("failed to delete staged object file")
-			}
-		}
-	}, nil
+	var toCleanup []string
+	for _, fName := range f.uploaded {
+		toCleanup = append(toCleanup, f.fileKey(fName))
+	}
+	return toCleanup, nil
+}
+
+func deleteFile(ctx context.Context, client *storage.Client, bucket, filePath string) {
+	if err := client.Bucket(bucket).Object(filePath).Delete(ctx); err != nil {
+		log.WithFields(log.Fields{
+			"key": filePath,
+			"err": err,
+		}).Warn("failed to delete staged object file")
+	}
 }
 
 func (f *stagedFile) edc() *bigquery.ExternalDataConfig {
