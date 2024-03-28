@@ -4,19 +4,29 @@
 
 
 from abc import ABC
-from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Tuple
-
+from typing import (
+    Any,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Tuple,
+)
+import urllib.parse
 import requests
 from airbyte_cdk import AirbyteLogger
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources import AbstractSource
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http import HttpStream
-from airbyte_cdk.sources.streams.http.auth import Oauth2Authenticator, TokenAuthenticator
+from airbyte_cdk.sources.streams.http.auth import (
+    Oauth2Authenticator,
+    TokenAuthenticator,
+)
 
 
 class LinkedinPagesStream(HttpStream, ABC):
-
     url_base = "https://api.linkedin.com/v2/"
     primary_key = None
 
@@ -33,11 +43,16 @@ class LinkedinPagesStream(HttpStream, ABC):
         """Returns the API endpoint path for stream, from `endpoint` class attribute."""
         return self.endpoint
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+    def next_page_token(
+        self, response: requests.Response
+    ) -> Optional[Mapping[str, Any]]:
         return None
 
     def parse_response(
-        self, response: requests.Response, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None
+        self,
+        response: requests.Response,
+        stream_state: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
     ) -> Iterable[Mapping]:
         return [response.json()]
 
@@ -55,40 +70,67 @@ class LinkedinPagesStream(HttpStream, ABC):
 
 
 class OrganizationLookup(LinkedinPagesStream):
-    def path(self, stream_state: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
-
+    def path(
+        self, stream_state: Mapping[str, Any], **kwargs
+    ) -> MutableMapping[str, Any]:
         path = f"organizations/{self.org}"
         return path
 
 
 class FollowerStatistics(LinkedinPagesStream):
-    def path(self, stream_state: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
-
-        path = f"organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{self.org}"
+    def path(
+        self, stream_state: Mapping[str, Any], **kwargs
+    ) -> MutableMapping[str, Any]:
+        base_path = "organizationalEntityFollowerStatistics?"
+        path = base_path + urllib.parse.urlencode(
+            {
+                "q": "organizationalEntity",
+                "organizationalEntity": f"urn:li:organization:{self.org}",
+            }
+        )
         return path
 
     def parse_response(
-        self, response: requests.Response, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None
+        self,
+        response: requests.Response,
+        stream_state: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
     ) -> Iterable[Mapping]:
         yield from response.json().get("elements")
 
 
 class ShareStatistics(LinkedinPagesStream):
-    def path(self, stream_state: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
-
-        path = f"organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn%3Ali%3Aorganization%3A{self.org}"
+    def path(
+        self, stream_state: Mapping[str, Any], **kwargs
+    ) -> MutableMapping[str, Any]:
+        base_path = "organizationalEntityShareStatistics?"
+        path = base_path + urllib.parse.urlencode(
+            {
+                "q": "organizationalEntity",
+                "organizationalEntity": f"urn:li:organization:{self.org}",
+            }
+        )
         return path
 
     def parse_response(
-        self, response: requests.Response, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None
+        self,
+        response: requests.Response,
+        stream_state: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
     ) -> Iterable[Mapping]:
         yield from response.json().get("elements")
 
 
 class TotalFollowerCount(LinkedinPagesStream):
-    def path(self, stream_state: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
-
-        path = f"networkSizes/urn:li:organization:{self.org}?edgeType=CompanyFollowedByMember"
+    def path(
+        self, stream_state: Mapping[str, Any], **kwargs
+    ) -> MutableMapping[str, Any]:
+        base_path = f"networkSizes/urn:li:organization:{self.org}?"
+        path = base_path + urllib.parse.urlencode(
+            {
+                "edgeType": "CompanyFollowedByMember",
+            }
+        )
         return path
 
 
@@ -111,7 +153,11 @@ class SourceLinkedinPages(AbstractSource):
         auth_method = config.get("credentials", {}).get("auth_method")
         if not auth_method or auth_method == "access_token":
             # support of backward compatibility with old exists configs
-            access_token = config["credentials"]["access_token"] if auth_method else config["access_token"]
+            access_token = (
+                config["credentials"]["access_token"]
+                if auth_method
+                else config["access_token"]
+            )
             return TokenAuthenticator(token=access_token)
         elif auth_method == "oAuth2.0":
             return Oauth2Authenticator(
@@ -122,7 +168,9 @@ class SourceLinkedinPages(AbstractSource):
             )
         raise Exception("incorrect input parameters")
 
-    def check_connection(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> Tuple[bool, any]:
+    def check_connection(
+        self, logger: AirbyteLogger, config: Mapping[str, Any]
+    ) -> Tuple[bool, any]:
         # RUN $ python main.py check --config secrets/config.json
 
         """
