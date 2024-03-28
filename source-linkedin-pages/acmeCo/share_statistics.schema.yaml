@@ -2,7 +2,16 @@
 $schema: "http://json-schema.org/draft-04/schema#"
 type: object
 additionalProperties: true
+required:
+  - _meta
 properties:
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
   totalShareStatistics:
     type:
       - "null"
@@ -48,11 +57,4 @@ properties:
     type:
       - "null"
       - string
-  _meta:
-    type: object
-    properties:
-      row_id:
-        type: integer
-    required:
-      - row_id
 x-infer-schema: true
