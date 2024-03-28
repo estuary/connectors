@@ -17,6 +17,8 @@ collections:
       $schema: "http://json-schema.org/draft-04/schema#"
       additionalProperties: true
       type: object
+      required:
+        - _meta
       properties:
         firstDegreeSize:
           type:

@@ -2,7 +2,18 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
   "additionalProperties": true,
+  "required": [
+    "_meta"
+  ],
   "properties": {
+    "_meta": {
+      "type": "object",
+      "properties": {
+        "row_id": {
+          "type": "integer"
+        }
+      }
+    },
     "followerCountsByStaffCountRange": {
       "type": [
         "null",

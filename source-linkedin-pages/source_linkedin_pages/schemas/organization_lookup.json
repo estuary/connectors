@@ -2,7 +2,19 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
   "additionalProperties": true,
   "type": "object",
+  "required": [
+    "_meta"
+  ],
   "properties": {
+    "_meta": {
+      "type": "object",
+      "properties": {
+        "row_id": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": true
+    },
     "vanityName": {
       "type": [
         "null",
