@@ -4,37 +4,72 @@
   "additionalProperties": true,
   "properties": {
     "totalShareStatistics": {
-      "type": ["null", "object"],
+      "type": [
+        "null",
+        "object"
+      ],
       "properties": {
         "uniqueImpressionsCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "clickCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "engagement": {
-          "type": ["null", "number"]
+          "type": [
+            "null",
+            "number"
+          ]
         },
         "likeCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "commentCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "shareCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "commentMentionsCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "impressionCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "shareMentionsCount": {
-          "type": ["null", "integer"]
+          "type": [
+            "null",
+            "integer"
+          ]
         }
       }
     },
-    "organizationalEntity": { "type": ["null", "string"] }
+    "organizationalEntity": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
   }
 }

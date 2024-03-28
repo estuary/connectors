@@ -30,9 +30,11 @@ def get_parent_stream_values(record: Dict, key_value_map: Dict) -> Dict:
 
 
 def transform_change_audit_stamps(
-    record: Dict, dict_key: str = "changeAuditStamps", props: List = ["created", "lastModified"], fields: List = ["time"]
+    record: Dict,
+    dict_key: str = "changeAuditStamps",
+    props: List = ["created", "lastModified"],
+    fields: List = ["time"],
 ) -> Mapping[str, Any]:
-
     """
     :: EXAMPLE `changeAuditStamps` input structure:
         {
@@ -53,7 +55,9 @@ def transform_change_audit_stamps(
     for prop in props:
         # Update dict with flatten key:value
         for field in fields:
-            record[prop] = pdm.from_timestamp(target_dict.get(prop).get(field) / 1000).to_datetime_string()
+            record[prop] = pdm.from_timestamp(
+                target_dict.get(prop).get(field) / 1000
+            ).to_datetime_string()
     record.pop(dict_key)
 
     return record
@@ -90,7 +94,6 @@ def transform_date_range(
     props: List = ["start", "end"],
     fields: List = ["year", "month", "day"],
 ) -> Mapping[str, Any]:
-
     """
     :: EXAMPLE `dateRange` input structure in Analytics streams:
         {
@@ -106,7 +109,17 @@ def transform_date_range(
         }
     """
     # define list of tmp keys for cleanup.
-    keys_to_remove = [dict_key, "start.day", "start.month", "start.year", "end.day", "end.month", "end.year", "start", "end"]
+    keys_to_remove = [
+        dict_key,
+        "start.day",
+        "start.month",
+        "start.year",
+        "end.day",
+        "end.month",
+        "end.year",
+        "start",
+        "end",
+    ]
 
     target_dict: Dict = record.get(dict_key)
     for prop in props:
@@ -114,7 +127,12 @@ def transform_date_range(
         for field in fields:
             record.update(**{f"{prop}.{field}": target_dict.get(prop).get(field)})
     # We build `start_date` & `end_date` fields from nested structure.
-    record.update(**{"start_date": date_str_from_date_range(record, "start"), "end_date": date_str_from_date_range(record, "end")})
+    record.update(
+        **{
+            "start_date": date_str_from_date_range(record, "start"),
+            "end_date": date_str_from_date_range(record, "end"),
+        }
+    )
     # Cleanup tmp fields & nested used parts
     for key in keys_to_remove:
         if key in record:
@@ -126,7 +144,6 @@ def transform_targeting_criteria(
     record: Dict,
     dict_key: str = "targetingCriteria",
 ) -> Mapping[str, Any]:
-
     """
     :: EXAMPLE `targetingCriteria` input structure:
         {
@@ -262,7 +279,6 @@ def transform_variables(
     record: Dict,
     dict_key: str = "variables",
 ) -> Mapping[str, Any]:
-
     """
     :: EXAMPLE `variables` input:
     {
@@ -296,7 +312,9 @@ def transform_variables(
         record["variables"]["values"] = []
         for key, value in params.items():
             # convert various datatypes of values into the string
-            record["variables"]["values"].append({"key": key, "value": json.dumps(value, ensure_ascii=True)})
+            record["variables"]["values"].append(
+                {"key": key, "value": json.dumps(value, ensure_ascii=True)}
+            )
         # Clean the nested structure
         record["variables"].pop("data")
     return record
@@ -308,7 +326,6 @@ def transform_data(records: List) -> Iterable[Mapping]:
     to be properly normalised in the destination.
     """
     for record in records:
-
         if "changeAuditStamps" in record:
             record = transform_change_audit_stamps(record)
 
