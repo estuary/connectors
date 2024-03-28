@@ -3,12 +3,11 @@ name = "source-linkedin-pages"
 version = "0.1.0"
 description = ""
 authors = ["Pedro <pedro@z33dd.com>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
 estuary-cdk = { path = "../estuary-cdk", develop = true }
-airbyte-cdk = "^0.77.2"
+airbyte-cdk = "^0.52"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"
