@@ -13,7 +13,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/UUID"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
@@ -346,6 +346,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		var edcs = make(map[string]bigquery.ExternalData)
 		edcs[item.TempTableName] = item.EDC
 		query.TableDefinitions = edcs
+		query.JobID = item.JobID
 
 		log.WithField("table", item.Table).Info("store: starting query")
 		if _, err := t.client.runQuery(ctx, query); err != nil {

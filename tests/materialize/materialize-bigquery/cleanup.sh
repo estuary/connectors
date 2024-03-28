@@ -8,7 +8,9 @@ function dropTable() {
 
 # Remove materialized tables.
 dropTable "simple"
-dropTable "duplicate_keys"
+dropTable "duplicate_keys_standard"
+dropTable "duplicate_keys_delta"
+dropTable "duplicate_keys_delta_exclude_flow_doc"
 dropTable "multiple_types"
 dropTable "formatted_strings"
 

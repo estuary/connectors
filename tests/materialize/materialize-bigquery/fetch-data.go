@@ -99,7 +99,8 @@ func main() {
 		log.Fatal(fmt.Errorf("bigquery job read: %w", err))
 	}
 
-	rows := [][]bigquery.Value{}
+	rows := []map[string]bigquery.Value{}
+	var keys []string = nil
 
 	for {
 		var values []bigquery.Value
@@ -111,16 +112,34 @@ func main() {
 			log.Fatal(fmt.Errorf("bigquery job iterator next: %w", err))
 		}
 
-		rows = append(rows, values)
+		if keys == nil {
+			for _, field := range it.Schema {
+				keys = append(keys, field.Name)
+			}
+		}
+
+		var row = make(map[string]bigquery.Value)
+		for i, key := range keys {
+			row[key] = values[i]
+		}
+
+		rows = append(rows, row)
+	}
+
+	var key = fmt.Sprintf("%s.%s.%s", projectID, dataset, tables[0])
+	var out = map[string][]interface{}{
+		key: make([]interface{}, len(rows)),
 	}
 
 	// Sort by ID
 	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0].(int64) < rows[j][0].(int64)
+		return rows[i][keys[0]].(int64) < rows[j][keys[0]].(int64)
 	})
 
 	var enc = json.NewEncoder(os.Stdout)
-	for _, row := range rows {
-		enc.Encode(row)
+	for i, row := range rows {
+		out[key][i] = row
 	}
+
+	enc.Encode(out)
 }
