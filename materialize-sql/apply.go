@@ -146,6 +146,7 @@ func (a *sqlApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 		panic(err) // Cannot fail to marshal.
 	}
 
+	var description string
 	var specUpdate MetaSpecsUpdate
 	if a.endpoint.MetaSpecs != nil {
 		// Insert or update the materialization specification. Both parameterized queries and
@@ -168,6 +169,12 @@ func (a *sqlApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 			a.endpoint.Literal(params[1].(string)),
 			a.endpoint.Literal(params[2].(string)),
 		}
+		var descriptionArgs = []interface{}{
+			paramArgs[0],
+			a.endpoint.Literal(params[0].(string)),
+			a.endpoint.Literal("(a-base64-encoded-value)"),
+			a.endpoint.Literal(params[2].(string)),
+		}
 
 		var q string
 		if exists {
@@ -179,9 +186,10 @@ func (a *sqlApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 		specUpdate.ParameterizedQuery = fmt.Sprintf(q, paramArgs...)
 		specUpdate.Parameters = params
 		specUpdate.QueryString = fmt.Sprintf(q, queryStringArgs...)
+		description = fmt.Sprintf(q, descriptionArgs...)
 	}
 
-	return specUpdate.QueryString, func(ctx context.Context) error {
+	return description, func(ctx context.Context) error {
 		return a.client.PutSpec(ctx, specUpdate)
 	}, nil
 }
