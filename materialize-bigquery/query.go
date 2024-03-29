@@ -52,7 +52,7 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		job, err = query.Run(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("run: %w", err)
+			return nil, err
 		}
 
 		// Weirdness ahead: if `err != nil`, then `status` might be nil. But if `err == nil`, then

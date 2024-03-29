@@ -23,6 +23,7 @@ import (
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
+	cfg        *config
 	client     *client
 	bucketPath string
 	bucket     string
@@ -31,13 +32,10 @@ type transactor struct {
 
 	bindings    []*binding
 	updateDelay time.Duration
-
-	needsRestart bool
 }
 
 type checkpointItem struct {
 	Table         string
-	StateKey      string
 	TempTableName string
 	Query         string
 	JobID         string
@@ -64,6 +62,7 @@ func newTransactor(
 
 	t := &transactor{
 		client:     client,
+		cfg:        cfg,
 		bucketPath: cfg.BucketPath,
 		bucket:     cfg.Bucket,
 	}
@@ -173,10 +172,6 @@ func (t *transactor) AckDelay() time.Duration {
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	if t.needsRestart {
-		return fmt.Errorf("one or more queries failed during commit phase, restarting the connector to retry them")
-	}
-
 	var ctx = it.Context()
 
 	log.Info("load: starting encoding and uploading of files")
@@ -304,7 +299,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		t.cp[b.target.StateKey] = &checkpointItem{
 			Table:         b.target.Identifier,
 			TempTableName: b.tempTableName,
-			StateKey:      b.target.StateKey,
 			JobID:         jobId,
 			Query:         query,
 			EDC:           b.storeFile.edc(),
@@ -342,21 +336,7 @@ func (d *transactor) hasStateKey(stateKey string) bool {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	log.Info("store: starting committing changes")
-
-	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
-	// so that a restart of the connector does not need to run the same queries again
-	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
-	// can actually be committed
-	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
-	// that have been committed in this transaction. The reason is that it may be the case that a binding
-	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
-	// the binding and running the queries that are pending for its last transaction.
-	var checkpointUpdate = make(checkpoint)
-	for _, b := range t.bindings {
-		checkpointUpdate[b.target.StateKey] = nil
-		delete(t.cp, b.target.StateKey)
-	}
+	log.WithField("cp", t.cp).Info("store: starting committing changes")
 
 	for stateKey, item := range t.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
@@ -371,54 +351,66 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		query.TableDefinitions = edcs
 		query.JobID = item.JobID
 
-		log.WithField("table", item.Table).WithField("JobID", item.JobID).Info("store: starting query")
-		if _, err := t.client.runQuery(ctx, query); err != nil {
-			if e, ok := err.(*googleapi.Error); ok {
-				log.WithField("e.Message", e.Message).WithField("Errors", e.Errors).WithField("Message", e.Message).Info("google api error")
-				// 409 means "Already Exists", meaning the job already exists
-				// in this case we retry the same job
-				if e.Code == 409 {
-					job, err := t.client.bigqueryClient.JobFromID(ctx, item.JobID)
-					if err != nil {
-						return nil, fmt.Errorf("finding job %q failed: %w", item.JobID, err)
-					}
+		log.WithFields(log.Fields{
+			"table": item.Table,
+			"jobID": item.JobID,
+		}).Info("store: starting query")
+		_, err := t.client.runQuery(ctx, query)
 
-					status, err := job.Wait(ctx)
-					if err != nil {
-						return nil, fmt.Errorf("fetching job %q status: %w", item.JobID, err)
-					}
-					log.WithField("status", status).WithField("JobID", item.JobID).Info("job status")
-
-					// If the job failed, we need to retry by re-running the same query with a different
-					// JobID. However, we can't do that here as we can't then record the JobID to track it
-					// in further runs of Acknowledge. So instead we update the checkpoint here and restart the connector
-					// to pick up the new checkpoint and retry.
-					// See https://issuetracker.google.com/issues/35905399 for a discussion on retrying bq jobs
-					err = status.Err()
-					if err != nil {
-						item.JobID = uuid.NewString()
-						checkpointUpdate[item.StateKey] = item
-						t.needsRestart = true
-					}
+		if err != nil {
+			// 409 Already Exists means the job has already been inserted
+			if e, ok := err.(*googleapi.Error); ok && e.Code == 409 {
+				job, err := t.client.bigqueryClient.JobFromProject(ctx, t.cfg.ProjectID, item.JobID, t.cfg.Region)
+				if err != nil {
+					return nil, fmt.Errorf("finding job %q failed: %w", item.JobID, err)
 				}
-			}
-			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-		} else {
-			for _, f := range item.Files {
-				deleteFile(ctx, t.client.cloudStorageClient, item.Bucket, f)
+
+				status, err := job.Wait(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("fetching job %q status: %w", item.JobID, err)
+				}
+
+				err = status.Err()
+				if err != nil {
+					return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+				}
+			} else {
+				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
 			}
 		}
 
-		log.WithField("table", item.Table).Info("store: finished query")
+		for _, f := range item.Files {
+			deleteFile(ctx, t.client.cloudStorageClient, item.Bucket, f)
+		}
+
+		log.WithFields(log.Fields{
+			"table": item.Table,
+			"jobID": item.JobID,
+		}).Info("store: finished query")
 	}
 
-	log.WithField("needsRestart", t.needsRestart).Info("store: finished commit")
-
-	if len(t.cp) > 0 && !t.needsRestart {
+	/*if len(t.cp) > 0 {
 		return nil, fmt.Errorf("artificial error")
-	}
+	}*/
 
-	var checkpointJSON, err = json.Marshal(checkpointUpdate)
+	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
+	// so that a restart of the connector does not need to run the same queries again
+	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
+	// can actually be committed
+	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
+	// that have been committed in this transaction. The reason is that it may be the case that a binding
+	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
+	// the binding and running the queries that are pending for its last transaction.
+	var checkpointClear = make(checkpoint)
+
+	for _, b := range t.bindings {
+		if _, ok := checkpointClear[b.target.StateKey]; ok {
+			continue
+		}
+		checkpointClear[b.target.StateKey] = nil
+		delete(t.cp, b.target.StateKey)
+	}
+	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
