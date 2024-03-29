@@ -2,9 +2,12 @@ import json
 import subprocess
 
 
-def test_capture(request, snapshot):
-    snapshot.snapshot_dir = request.fspath.dirname + "/snapshots"
-
+def test_capture(request):
+    """
+    This test doesn't have a snapshot
+    because the output data changes too frequently.
+    Almost all field values changes between test executions.
+    """
     result = subprocess.run(
         [
             "flowctl",
@@ -22,15 +25,6 @@ def test_capture(request, snapshot):
         text=True,
     )
     assert result.returncode == 0
-
-    stdout = []
-    for line in result.stdout.splitlines():
-        stdout.append(json.loads(line))
-
-    snapshot.assert_match(
-        json.dumps(stdout, indent=2),
-        "capture.stdout.json",
-    )
 
 
 def test_discover(request, snapshot):
