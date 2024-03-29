@@ -851,6 +851,17 @@ pytest = ">=7.2.0,<9.0.0"
 wrapt = ">=1.14.1,<2.0.0"
 
 [[package]]
+name = "pytz"
+version = "2024.1"
+description = "World timezone definitions, modern and historical"
+optional = false
+python-versions = "*"
+files = [
+    {file = "pytz-2024.1-py2.py3-none-any.whl", hash = "sha256:328171f4e3623139da4983451950b28e95ac706e13f3f2630a879749e7a8b319"},
+    {file = "pytz-2024.1.tar.gz", hash = "sha256:2a29735ea9c18baf14b448846bde5a48030ed267578472d8955cd0e7443a9812"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.10.0"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -1163,4 +1174,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "793b63109c205399f057c5819ac4876d16c51337c2a14207565347f24b2f0468"
+content-hash = "cc806af8036356ab7479522d464dc3cc2b553da9a80889f3a6bc5227877c6da0"

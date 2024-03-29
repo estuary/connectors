@@ -28,17 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  listId:
-    title: Listid
+  portalId:
+    title: Portalid
     type: string
-  lists:
+  subscriptionDefinitions:
     default: []
     items:
       type: integer
-    title: Lists
+    title: Subscriptiondefinitions
     type: array
 required:
-  - listId
-title: ContactLists
+  - portalId
+title: EmailSubscriptions
 type: object
 x-infer-schema: true

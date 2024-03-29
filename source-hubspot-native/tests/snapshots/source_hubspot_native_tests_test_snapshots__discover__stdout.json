@@ -2,7 +2,8 @@
   {
     "recommendedName": "companies",
     "resourceConfig": {
-      "name": "companies"
+      "name": "companies",
+      "interval": "PT420S"
     },
     "documentSchema": {
       "$defs": {
@@ -191,7 +192,8 @@
   {
     "recommendedName": "contacts",
     "resourceConfig": {
-      "name": "contacts"
+      "name": "contacts",
+      "interval": "PT420S"
     },
     "documentSchema": {
       "$defs": {
@@ -372,7 +374,8 @@
   {
     "recommendedName": "deals",
     "resourceConfig": {
-      "name": "deals"
+      "name": "deals",
+      "interval": "PT420S"
     },
     "documentSchema": {
       "$defs": {
@@ -569,7 +572,8 @@
   {
     "recommendedName": "engagements",
     "resourceConfig": {
-      "name": "engagements"
+      "name": "engagements",
+      "interval": "PT420S"
     },
     "documentSchema": {
       "$defs": {
@@ -748,9 +752,2427 @@
     ]
   },
   {
+    "recommendedName": "contact_lists",
+    "resourceConfig": {
+      "name": "contact_lists",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "listId": {
+          "title": "Listid",
+          "type": "string"
+        },
+        "lists": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Lists",
+          "type": "array"
+        }
+      },
+      "required": [
+        "listId"
+      ],
+      "title": "ContactLists",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/listId"
+    ]
+  },
+  {
+    "recommendedName": "contacts_lists_subscription",
+    "resourceConfig": {
+      "name": "contacts_lists_subscription",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "vid": {
+          "title": "Vid",
+          "type": "string"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "vid"
+      ],
+      "title": "ContactSubscription",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/vid"
+    ]
+  },
+  {
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "name": "campaigns",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "timeline": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Timeline",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Campaigns",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "subscription_changes",
+    "resourceConfig": {
+      "name": "subscription_changes",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "portalId": {
+          "title": "Portalid",
+          "type": "string"
+        },
+        "timeline": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Timeline",
+          "type": "array"
+        }
+      },
+      "required": [
+        "portalId"
+      ],
+      "title": "SubscriptionChanges",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/portalId"
+    ]
+  },
+  {
+    "recommendedName": "email_events",
+    "resourceConfig": {
+      "name": "email_events",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "events": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "EmailEvents",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "ticket_pipelines",
+    "resourceConfig": {
+      "name": "ticket_pipelines",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "pipelineId": {
+          "title": "Pipelineid",
+          "type": "string"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties",
+        "pipelineId"
+      ],
+      "title": "TicketPipelines",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/pipelineId"
+    ]
+  },
+  {
+    "recommendedName": "deal_pipelines",
+    "resourceConfig": {
+      "name": "deal_pipelines",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "pipelineId": {
+          "title": "Pipelineid",
+          "type": "string"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "pipelineId"
+      ],
+      "title": "DealPipelines",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/pipelineId"
+    ]
+  },
+  {
+    "recommendedName": "engagements_calls",
+    "resourceConfig": {
+      "name": "engagements_calls",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        },
+        "companies": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Companies",
+          "type": "array"
+        },
+        "tickets": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tickets",
+          "type": "array"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "EngagementCalls",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "engagements_emails",
+    "resourceConfig": {
+      "name": "engagements_emails",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        },
+        "companies": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Companies",
+          "type": "array"
+        },
+        "tickets": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tickets",
+          "type": "array"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "EngagementEmails",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "engagements_meetings",
+    "resourceConfig": {
+      "name": "engagements_meetings",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        },
+        "companies": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Companies",
+          "type": "array"
+        },
+        "tickets": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tickets",
+          "type": "array"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "EngagementMeetings",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "engagements_notes",
+    "resourceConfig": {
+      "name": "engagements_notes",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        },
+        "companies": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Companies",
+          "type": "array"
+        },
+        "tickets": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tickets",
+          "type": "array"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "EngagementNotes",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "engagements_tasks",
+    "resourceConfig": {
+      "name": "engagements_tasks",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "contacts": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Contacts",
+          "type": "array"
+        },
+        "deals": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Deals",
+          "type": "array"
+        },
+        "companies": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Companies",
+          "type": "array"
+        },
+        "tickets": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tickets",
+          "type": "array"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "EngagementTasks",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "goal_targets",
+    "resourceConfig": {
+      "name": "goal_targets",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Goals",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "feedback_submissions",
+    "resourceConfig": {
+      "name": "feedback_submissions",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "FeedbackSubmissions",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "line_items",
+    "resourceConfig": {
+      "name": "line_items",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "LineItems",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "products",
+    "resourceConfig": {
+      "name": "products",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Meta"
+                }
+              ],
+              "default": {
+                "op": "u",
+                "row_id": -1
+              },
+              "description": "Document metadata"
+            },
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "archived": {
+          "title": "Archived",
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/History"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "title": "Propertieswithhistory",
+          "type": "object"
+        },
+        "associations": {
+          "additionalProperties": false,
+          "default": {},
+          "title": "Associations",
+          "type": "object"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "archived",
+        "properties"
+      ],
+      "title": "Products",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
     "recommendedName": "tickets",
     "resourceConfig": {
-      "name": "tickets"
+      "name": "tickets",
+      "interval": "PT420S"
     },
     "documentSchema": {
       "$defs": {
@@ -945,10 +3367,388 @@
     ]
   },
   {
+    "recommendedName": "marketing_emails",
+    "resourceConfig": {
+      "name": "marketing_emails",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "updatedAt"
+      ],
+      "title": "MarketingEmails",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "email_subscriptions",
+    "resourceConfig": {
+      "name": "email_subscriptions",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "portalId": {
+          "title": "Portalid",
+          "type": "string"
+        },
+        "subscriptionDefinitions": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Subscriptiondefinitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "portalId"
+      ],
+      "title": "EmailSubscriptions",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/portalId"
+    ]
+  },
+  {
+    "recommendedName": "marketing_forms",
+    "resourceConfig": {
+      "name": "marketing_forms",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MarketingForms",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "owners",
+    "resourceConfig": {
+      "name": "owners",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Results",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "updatedAt"
+      ],
+      "title": "Owners",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "workflows",
+    "resourceConfig": {
+      "name": "workflows",
+      "interval": "PT420S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "workflows": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Workflows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "updatedAt"
+      ],
+      "title": "Workflows",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
     "recommendedName": "properties",
     "resourceConfig": {
       "name": "properties",
-      "interval": "P1D"
+      "interval": "PT420S"
     },
     "documentSchema": {
       "$defs": {

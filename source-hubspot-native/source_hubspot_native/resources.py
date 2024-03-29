@@ -12,6 +12,7 @@ from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 from .models import (
     BaseCRMObject,
     CRMObject,
+    V1CRMObject,
     Company,
     Contact,
     Deal,
@@ -29,12 +30,30 @@ from .models import (
     EngagementMeetings,
     EngagementNotes,
     EngagementTasks,
+    TicketPipelines,
+    DealPipelines,
+    EmailEvents,
+    SubscriptionChanges,
+    MarketingEmails,
+    MarketingForms,
+    Owners,
+    LineItems,
+    Campaigns,
+    Products,
+    Workflows,
+    Goals,
+    FeedbackSubmissions,
+    EmailSubscriptions,
+    ContactSubscription,
 )
 from .api import (
     FetchRecentFn,
     fetch_page,
+    fetch_page_custom,
+    fetch_page_workflow,
     fetch_properties,
     fetch_changes,
+    fetch_changes_no_batch,
     fetch_recent_companies,
     fetch_recent_contacts,
     fetch_recent_deals,
@@ -46,6 +65,21 @@ from .api import (
     fetch_engagements_notes,
     fetch_engagements_tasks,
     fetch_engagements_meetings,
+    fetch_recent_ticket_pipelines,
+    fetch_recent_deal_pipelines,
+    fetch_recent_email_events,
+    fetch_recent_subscription_changes,
+    fetch_recent_marketing_emails,
+    fetch_campaigns,
+    fetch_marketing_forms,
+    fetch_owners,
+    fetch_line_items,
+    fetch_products,
+    fetch_workflows,
+    fetch_goals,
+    fetch_feedback_submissions,
+    fetch_email_subscriptions,
+    fetch_contacts_lists_subscription,
 )
 
 
@@ -54,25 +88,49 @@ async def all_resources(
 ) -> list[common.Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     return [
-        crm_object_no_page(Company, http, fetch_recent_companies),
-        crm_object_no_page(Contact, http, fetch_recent_contacts),
-        crm_object_no_page(Deal, http, fetch_recent_deals),
-        crm_object_no_page(Engagement, http, fetch_recent_engagements),
-        crm_object_no_page(Ticket, http, fetch_recent_tickets),
-        crm_object_no_changes(EngagementCalls, http, fetch_engagements_calls),
-        crm_object_no_changes(EngagementEmails, http, fetch_engagements_emails),
-        crm_object_no_changes(EngagementMeetings, http, fetch_engagements_meetings),
-        crm_object_no_changes(EngagementNotes, http, fetch_engagements_notes),
-        crm_object_no_changes(EngagementTasks, http, fetch_engagements_tasks),
-        crm_object_no_page(ContactLists, http, fetch_recent_contacts_lists),
+        crm_object_streamed(Company, http, fetch_recent_companies),
+        crm_object_streamed(Contact, http, fetch_recent_contacts),
+        crm_object_streamed(Deal, http, fetch_recent_deals),
+        crm_object_streamed(Engagement, http, fetch_recent_engagements),
+        crm_object_streamed_no_batch(ContactLists, http, fetch_recent_contacts_lists),
+        crm_object_streamed_no_batch(ContactSubscription, http, fetch_contacts_lists_subscription),
+        crm_object_streamed_no_batch(Campaigns, http, fetch_campaigns),
+        crm_object_streamed_no_batch(SubscriptionChanges, http, fetch_recent_subscription_changes),
+        crm_object_streamed_no_batch(EmailEvents, http, fetch_recent_email_events),
+        crm_object_streamed_no_batch(TicketPipelines, http, fetch_recent_ticket_pipelines),
+        crm_object_streamed_no_batch(DealPipelines, http, fetch_recent_deal_pipelines),
+        crm_object_paginated(EngagementCalls, http, fetch_engagements_calls),
+        crm_object_paginated(EngagementEmails, http, fetch_engagements_emails),
+        crm_object_paginated(EngagementMeetings, http, fetch_engagements_meetings),
+        crm_object_paginated(EngagementNotes, http, fetch_engagements_notes),
+        crm_object_paginated(EngagementTasks, http, fetch_engagements_tasks),
+        crm_object_paginated(Goals, http, fetch_goals),
+        crm_object_paginated(FeedbackSubmissions, http, fetch_feedback_submissions),
+        crm_object_paginated(LineItems, http, fetch_line_items),
+        crm_object_paginated(Products, http, fetch_products),
+        crm_object_paginated(Ticket, http, fetch_recent_tickets),
+        crm_object_custom(MarketingEmails, http, fetch_recent_marketing_emails),
+        crm_object_custom(EmailSubscriptions, http, fetch_email_subscriptions),
+        crm_object_custom(MarketingForms, http, fetch_marketing_forms),
+        crm_object_custom(Owners, http, fetch_owners),
+        workflow_object(Workflows, http, fetch_workflows),
         properties(http),
     ]
 
 
-def crm_object_no_changes(
+def crm_object_paginated(
     cls: type[CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
 ) -> common.Resource:
+    """Base Resource to run V3 API objects using pagination
 
+    Args:
+        cls (type[CRMObject]): _description_
+        http (HTTPSession): _description_
+        fetch_recent (FetchRecentFn): _description_
+
+    Returns:
+        common.Resource: _description_
+    """
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -91,21 +149,80 @@ def crm_object_no_changes(
 
     return common.Resource(
         name=cls.NAME,
-        key=["/id"],
+        key=cls.PRIMARY_KEY,
         model=cls,
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
         schema_inference=True,
     )
 
-def crm_object_no_page(
+def crm_object_custom(
+    cls: type[V1CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
+) -> common.Resource:
+    """Custom Resource to run V3 objects using pagination
+    This endpoint allows for different URL objects from the V3 API
+    and handle some data formatting. It works very similar to 
+    'crm_object_paginated'
+
+    Args:
+        cls (type[V1CRMObject]): _description_
+        http (HTTPSession): _description_
+        fetch_recent (FetchRecentFn): _description_
+
+    Returns:
+        common.Resource: _description_
+    """
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_page=functools.partial(fetch_page_custom, cls, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return common.Resource(
+        name=cls.NAME,
+        key=cls.PRIMARY_KEY,
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
+        schema_inference=True,
+    )
+
+
+def crm_object_streamed(
     cls: type[CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
 ) -> common.Resource:
+    """Base Resource to run V1 API objects using stream
+    This resource uses an batch endpoint from Hubspot. It works
+    by getting the Ids and last_updated data from fetch_recent 
+    and passing it to the batch endpoint later on.
 
+    Args:
+        cls (type[CRMObject]): _description_
+        http (HTTPSession): _description_
+        fetch_recent (FetchRecentFn): _description_
+
+    Returns:
+        common.Resource: _description_
+    """
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -124,6 +241,90 @@ def crm_object_no_page(
 
     return common.Resource(
         name=cls.NAME,
+        key=cls.PRIMARY_KEY,
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
+        schema_inference=True,
+    )
+
+
+
+def crm_object_streamed_no_batch(
+    cls: type[V1CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
+) -> common.Resource:
+    """Custom Resource to run V1 API objects using stream
+    This resource does not use the batch function from "crm_object_streamed"
+    Allowing for a more broad usage.
+
+    Args:
+        cls (type[V1CRMObject]): _description_
+        http (HTTPSession): _description_
+        fetch_recent (FetchRecentFn): _description_
+
+    Returns:
+        common.Resource: _description_
+    """
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_changes_no_batch, cls, fetch_recent, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return common.Resource(
+        name=cls.NAME,
+        key=cls.PRIMARY_KEY,
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
+        schema_inference=True,
+    )
+
+def workflow_object(
+    cls: type[V1CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
+) -> common.Resource:
+
+    """Custom Resource to run specifically workflow stream objects
+    Workflow objects do not have pagination neither a usual schema, 
+    so this resource was created to handle this specific case.
+    """
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_page=functools.partial(fetch_page_workflow, cls, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return common.Resource(
+        name=cls.NAME,
         key=["/id"],
         model=cls,
         open=open,
@@ -131,9 +332,11 @@ def crm_object_no_page(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
         schema_inference=True,
     )
+
+
 
 
 def properties(http: HTTPSession) -> common.Resource:
@@ -173,7 +376,7 @@ def properties(http: HTTPSession) -> common.Resource:
         open=open,
         initial_state=ResourceState(),
         initial_config=ResourceConfig(
-            name=Names.properties, interval=timedelta(days=1)
+            name=Names.properties, interval=timedelta(minutes=7)
         ),
         schema_inference=True,
     )
