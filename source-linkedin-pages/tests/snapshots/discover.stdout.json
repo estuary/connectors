@@ -9,7 +9,22 @@
       "$schema": "http://json-schema.org/draft-04/schema#",
       "additionalProperties": true,
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "properties": {
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "row_id"
+          ]
+        },
         "vanityName": {
           "type": [
             "null",
@@ -499,17 +514,6 @@
               }
             }
           }
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
         }
       },
       "x-infer-schema": true
@@ -528,7 +532,21 @@
       "$schema": "http://json-schema.org/draft-04/schema#",
       "type": "object",
       "additionalProperties": true,
+      "required": [
+        "_meta"
+      ],
       "properties": {
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        },
         "followerCountsByStaffCountRange": {
           "type": [
             "null",
@@ -625,17 +643,6 @@
             ],
             "additionalProperties": true
           }
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
         }
       },
       "x-infer-schema": true
@@ -654,7 +661,21 @@
       "$schema": "http://json-schema.org/draft-04/schema#",
       "type": "object",
       "additionalProperties": true,
+      "required": [
+        "_meta"
+      ],
       "properties": {
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        },
         "totalShareStatistics": {
           "type": [
             "null",
@@ -722,17 +743,6 @@
             "null",
             "string"
           ]
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
         }
       },
       "x-infer-schema": true
@@ -751,6 +761,9 @@
       "$schema": "http://json-schema.org/draft-04/schema#",
       "additionalProperties": true,
       "type": "object",
+      "required": [
+        "_meta"
+      ],
       "properties": {
         "firstDegreeSize": {
           "type": [
