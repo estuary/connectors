@@ -100,6 +100,30 @@ properties:
     default: {}
     title: Associations
     type: object
+  contacts:
+    default: []
+    items:
+      type: integer
+    title: Contacts
+    type: array
+  deals:
+    default: []
+    items:
+      type: integer
+    title: Deals
+    type: array
+  companies:
+    default: []
+    items:
+      type: integer
+    title: Companies
+    type: array
+  tickets:
+    default: []
+    items:
+      type: integer
+    title: Tickets
+    type: array
   results:
     default: []
     items:

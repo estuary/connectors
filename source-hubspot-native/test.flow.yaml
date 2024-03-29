@@ -13,63 +13,112 @@ captures:
     bindings:
       - resource:
           name: companies
-          interval: PT300S
+          interval: PT420S
         target: acmeCo/companies
-        disable: true
       - resource:
           name: contacts
-          interval: PT300S
+          interval: PT420S
         target: acmeCo/contacts
-        disable: true
       - resource:
           name: deals
-          interval: PT300S
+          interval: PT420S
         target: acmeCo/deals
-        disable: true
       - resource:
           name: engagements
-          interval: PT300S
+          interval: PT420S
         target: acmeCo/engagements
-        disable: true
       - resource:
-          name: tickets
-          interval: PT300S
-        target: acmeCo/tickets
-        disable: true
+          name: contact_lists
+          interval: PT420S
+        target: acmeCo/contact_lists
+      - resource:
+          name: contacts_lists_subscription
+          interval: PT420S
+        target: acmeCo/contacts_lists_subscription
+      - resource:
+          name: campaigns
+          interval: PT420S
+        target: acmeCo/campaigns
+      - resource:
+          name: subscription_changes
+          interval: PT420S
+        target: acmeCo/subscription_changes
+      - resource:
+          name: email_events
+          interval: PT420S
+        target: acmeCo/email_events
+      - resource:
+          name: ticket_pipelines
+          interval: PT420S
+        target: acmeCo/ticket_pipelines
+      - resource:
+          name: deal_pipelines
+          interval: PT420S
+        target: acmeCo/deal_pipelines
       - resource:
           name: engagements_calls
-          interval: PT10S
+          interval: PT420S
         target: acmeCo/engagements_calls
-        disable: true
       - resource:
           name: engagements_emails
-          interval: PT10S
+          interval: PT420S
         target: acmeCo/engagements_emails
       - resource:
           name: engagements_meetings
-          interval: PT10S
+          interval: PT420S
         target: acmeCo/engagements_meetings
-        disable: true
       - resource:
           name: engagements_notes
-          interval: PT10S
+          interval: PT420S
         target: acmeCo/engagements_notes
-        disable: true
       - resource:
           name: engagements_tasks
-          interval: PT10S
+          interval: PT420S
         target: acmeCo/engagements_tasks
-        disable: true
       - resource:
-          name: contact_lists
-          interval: PT10S
-        target: acmeCo/contact_lists
-        disable: true
+          name: goal_targets
+          interval: PT420S
+        target: acmeCo/goal_targets
+      - resource:
+          name: feedback_submissions
+          interval: PT420S
+        target: acmeCo/feedback_submissions
+      - resource:
+          name: line_items
+          interval: PT420S
+        target: acmeCo/line_items
+      - resource:
+          name: products
+          interval: PT420S
+        target: acmeCo/products
+      - resource:
+          name: tickets
+          interval: PT420S
+        target: acmeCo/tickets
+      - resource:
+          name: marketing_emails
+          interval: PT420S
+        target: acmeCo/marketing_emails
+      - resource:
+          name: email_subscriptions
+          interval: PT420S
+        target: acmeCo/email_subscriptions
+      - resource:
+          name: marketing_forms
+          interval: PT420S
+        target: acmeCo/marketing_forms
+      - resource:
+          name: owners
+          interval: PT420S
+        target: acmeCo/owners
+      - resource:
+          name: workflows
+          interval: PT420S
+        target: acmeCo/workflows
       - resource:
           name: properties
-          interval: P1D
+          interval: PT420S
         target: acmeCo/properties
-        disable: true
     interval: 3m
     shards:
       logLevel: debug

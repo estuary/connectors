@@ -28,17 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  listId:
-    title: Listid
+  id:
+    title: Id
     type: string
-  lists:
+  timeline:
     default: []
     items:
       type: integer
-    title: Lists
+    title: Timeline
     type: array
 required:
-  - listId
-title: ContactLists
+  - id
+title: Campaigns
 type: object
 x-infer-schema: true

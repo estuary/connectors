@@ -2,9 +2,12 @@ from datetime import datetime, UTC
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
+import json
+import pytz
 from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import asyncio
 import itertools
+from copy import deepcopy
 
 from estuary_cdk.capture.common import (
     PageCursor,
@@ -15,17 +18,29 @@ from .models import (
     Association,
     BatchResult,
     CRMObject,
+    WorkflowResult,
+    V1CustomCRMObject,
+    V1CustomCRMObject2,
+    V1CRMObject,
     OldRecentCompanies,
     OldRecentContacts,
     OldRecentDeals,
     OldRecentEngagements,
     OldRecentTicket,
-    OldRecentContactLists,
     OldRecentEngagementsCalls,
     OldRecentEngagementsEmails,
     OldRecentEngagementsMeetings,
     OldRecentEngagementsNotes,
     OldRecentEngagementsTasks,
+    OldRecentMarketingEmails,
+    OldRecentMarketingForms,
+    OldRecentOwners,
+    OldRecentLineItems,
+    OldRecentProducts,
+    OldRecentWorkflows,
+    OldRecentGoals,
+    OldRecentFeedbackSubmissions,
+    OldRecentEmailSubscriptions,
     PageResult,
     Properties,
 )
@@ -58,15 +73,26 @@ async def fetch_page(
 ) -> AsyncGenerator[CRMObject | str, None]:
 
     url = f"{HUB}/crm/v3/objects/{cls.PROPERTY_SEARCH_NAME}"
-    properties = await fetch_properties(log, cls, http)
-    property_names = ",".join(p.name for p in properties.results if not p.calculated)
 
-    input = {
+    if cls.IGNORE_PROPERTY_SEARCH is True:
+        input = {
         "associations": ",".join(cls.ASSOCIATED_ENTITIES),
         "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
-        "properties": property_names,
-        "propertiesWithHistory": property_names,
-    }
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations']
+    else: 
+        properties = await fetch_properties(log, cls, http)
+        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+
+        input = {
+            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+            "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+            "properties": property_names,
+            "propertiesWithHistory": property_names,
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations']
     if page:
         input["after"] = page
 
@@ -81,6 +107,97 @@ async def fetch_page(
 
     if result.paging:
         yield result.paging.next.after
+
+
+async def fetch_page_custom(
+    # Closed over via functools.partial:
+    cls: type[V1CRMObject],
+    http: HTTPSession,
+    # Remainder is common.FetchPageFn:
+    log: Logger,
+    page: str | None,
+    cutoff: datetime,
+) -> AsyncGenerator[CRMObject | str, None]:
+
+    url = f"{HUB}{cls.ENFORCE_URL}"
+
+    if cls.IGNORE_PROPERTY_SEARCH is True:
+        input = {
+        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations'] 
+    else: 
+        properties = await fetch_properties(log, cls, http)
+        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+
+        input = {
+            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+            "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+            "properties": property_names,
+            "propertiesWithHistory": property_names,
+        }
+    if page:
+        input["after"] = page
+
+
+    data = json.loads(await http.request(log, url, method="GET", params=input))
+    if data.get('total') is not None:
+        del data['total']
+    _cls: Any = cls  # Silence mypy false-positive.
+    result: PageResult[V1CRMObject] = PageResult[_cls].model_validate_json(
+        json.dumps(data)
+    )
+
+
+    for doc in result.results:
+        if doc.updatedAt < cutoff:
+            yield doc
+
+    if result.paging:
+        yield result.paging.next.after
+
+async def fetch_page_workflow(
+    # Closed over via functools.partial:
+    cls: type[V1CRMObject],
+    http: HTTPSession,
+    # Remainder is common.FetchPageFn:
+    log: Logger,
+    page: str | None,
+    cutoff: datetime,
+) -> AsyncGenerator[CRMObject | str, None]:
+
+    url = f"{HUB}{cls.ENFORCE_URL}"
+
+    if cls.IGNORE_PROPERTY_SEARCH is True:
+        input = {
+        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations'] 
+    else: 
+        properties = await fetch_properties(log, cls, http)
+        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+
+        input = {
+            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+            "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+            "properties": property_names,
+            "propertiesWithHistory": property_names,
+        }
+    if page:
+        input["after"] = page
+
+    _cls: Any = cls  # Silence mypy false-positive.
+    result: WorkflowResult[V1CRMObject] = WorkflowResult[_cls].model_validate_json(
+        await http.request(log, url, method="GET", params=input)
+    )
+
+    for doc in result.workflows:
+        if doc.updatedAt < cutoff:
+            yield doc
 
 
 async def fetch_batch(
@@ -185,7 +302,6 @@ async def fetch_changes(
     while True:
         iter, next_page = await fetch_recent(log, http, log_cursor, next_page)
 
-        log.debug(f"NEXT PAGE IS {next_page}")
         for ts, id in iter:
             if ts > log_cursor:
                 recent.append((ts, id))
@@ -193,7 +309,6 @@ async def fetch_changes(
                 next_page = None
 
         if not next_page:
-            log.debug(f"NEXT PAGE BROKE")
             break
 
     recent.sort()  # Oldest updates first.
@@ -209,6 +324,41 @@ async def fetch_changes(
 
     if recent:
         yield recent[-1][0]
+    else:
+        return
+
+
+async def fetch_changes_no_batch(
+    # Closed over via functools.partial:
+    cls: type[CRMObject],
+    fetch_recent: FetchRecentFn,
+    http: HTTPSession,
+    # Remainder is common.FetchChangesFn:
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[CRMObject | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    recent: list[tuple[datetime, str]] = []
+    next_page: PageCursor = None
+    _cls = cls
+
+    while True:
+        iter, next_page = await fetch_recent(log, http, log_cursor, next_page)
+        
+        for ts, id, result in iter:
+            recent.append((ts, id)) # Used later to update log_cursor value
+            yield V1CRMObject.model_validate_json(json.dumps(result)) 
+
+
+        if not next_page:
+            break
+
+    if recent:
+        recent.sort() # Oldest updates first.
+        yield recent[-1][0] # Updates log_cursor value
+    else:
+        return
 
 
 async def fetch_recent_companies(
@@ -279,110 +429,215 @@ async def fetch_recent_tickets(
     log: Logger, http: HTTPSession, since: datetime, cursor: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
-    url = f"{HUB}/crm-objects/v1/change-log/tickets"
-    params = {"timestamp": int(since.timestamp() * 1000) - 1}
-
-    result = TypeAdapter(list[OldRecentTicket]).validate_json(
-        await http.request(log, url, params=params)
+    url = f"{HUB}/crm/v3/objects/tickets"
+    
+    result = OldRecentTicket.model_validate_json(
+        await http.request(log, url, params=None)
     )
-    return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
+
+    return (
+        (r.updatedAt, str(r.id))
+        for r in result.results
+    ), None and None
 
 async def fetch_recent_contacts_lists(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
 
-    log.debug("FUNCTION STARTED")
     url = f"{HUB}/contacts/v1/lists"
     params = {"count": 100, "offset": page} if page else {"count": 250}
 
-    result = OldRecentContactLists.model_validate_json(
-        await http.request(log, url, params=params)
+    data = await http.request(log, url, params=params)
+
+
+    result = V1CustomCRMObject2.model_validate_json(
+        data
     )
-    #log.debug(f"RESULT IS {result}")
-    log.debug(f"HAS MORE IS {result.hasMore}")
-    return (
-        (_ms_to_dt(r.updatedAt), str(r.listId))
-        for r in result.lists
-    ), result.hasMore and result.offset
+
+    for item in result.lists:
+        item['listId'] = str(item['listId'])
+
+    if result.hasMore is False:
+        return (
+            (_ms_to_dt(r['updatedAt']), str(r['listId']), r)
+            for r in result.lists if _ms_to_dt(r['updatedAt']) > since
+        ), None
+    else: 
+        return (
+            (_ms_to_dt(r['updatedAt']), str(r['listId']), r)
+            for r in result.lists if _ms_to_dt(r['updatedAt']) > since
+        ), result.offset
 
 #same as the ticket_pipeline
 async def fetch_recent_deal_pipelines(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
 
     url = f"{HUB}/crm-pipelines/v1/pipelines/deals"
 
-    result = OldRecentDealPipelines.model_validate_json(
+    result = V1CRMObject.model_validate_json(
         await http.request(log, url, params=None)
     )
 
+    # we want new deals
+    # plus updatedAt can be null
+    # and can compromise selection
     return (
-        (_ms_to_dt(r.updatedAt), str(r.pipelineId))
-        for r in result.results
-    ), None and None
+        (_ms_to_dt(r['createdAt']), str(r["pipelineId"]), r)
+        for r in result.results if _ms_to_dt(r['createdAt']) > since
+    ), None
 
 async def fetch_recent_ticket_pipelines(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
 
     url = f"{HUB}/crm-pipelines/v1/pipelines/tickets"
 
-    result = OldRecentTicketPipelines.model_validate_json(
+    result = V1CRMObject.model_validate_json(
         await http.request(log, url, params=None)
     )
-    print(result)
 
+    # we want new tickets
+    # plus updatedAt can be null
+    # and can compromise selection
     return (
-        (_ms_to_dt(r.updatedAt), str(r.pipelineId))
-        for r in result.results
-    ), None and None
+        (_ms_to_dt(r['createdAt']), str(r["pipelineId"]), r) 
+        for r in result.results if _ms_to_dt(r['createdAt']) > since
+    ), None
 
 async def fetch_recent_email_events(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
 
     url = f"{HUB}/email/public/v1/events"
-    params = {"limit": 100, "offset": page} if page else {"limit": 1}
+    params = {"offset": page} if page else None
 
-    result = OldRecentEmailEvents.model_json_schema(
+    result = V1CRMObject.model_validate_json(
         await http.request(log, url, params=params)
     )
+    
+    if result.hasMore is False:
+        return (
+            (_ms_to_dt(r["created"]), str(r["id"]), r) 
+            for r in result.events if _ms_to_dt(r["created"]) > since), None
 
-    return (
-        (_ms_to_dt(r.created), str(r.id))
-        for r in result.events
-    ), result.hasMore and result.offset
+    else:
+        return (
+            (_ms_to_dt(r['created']), str(r['id']), r)
+            for r in result.events if _ms_to_dt(r["created"]) > since), result.offset
 
 async def fetch_recent_marketing_emails(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
-    url = f"{HUB}/marketing-emails/v1/emails/with-statistics"
-    params = {"limit": 300}
+    url = f"{HUB}/marketing/v3/emails/"
 
-    result = OldRecentMarketingEmails.model_json_schema(
-        await http.request(log, url, params=params)
+    result = OldRecentMarketingEmails.model_validate_json(
+        await http.request(log, url, params=None)
     )
     
     return (
-        (_ms_to_dt(r.updated), str(r.id))
-        for r in result.objects
+        ((r.updatedAt), str(r.id))
+        for r in result.results
     ), None and None # This endpoint does not have pagination.
 
 async def fetch_recent_subscription_changes(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
 
     url = f"{HUB}/email/public/v1/subscriptions/timeline"
+    params = {"limit": 100, "offset": page} if page else {"limit": 1}
 
-    result = OldRecentSubscriptionChanges.model_json_schema(
-        await http.request(log, url, params=params)
+    data = await http.request(log, url, params=params)
+
+    result = V1CRMObject.model_validate_json(
+        data
+    )
+
+    for item in result.timeline:
+        item["portalId"] = str(item["portalId"])
+
+    if result.hasMore is False:
+        return (
+            (_ms_to_dt(r["timestamp"]), str(r["portalId"]), r)
+            for r in result.timeline if _ms_to_dt(r["timestamp"]) > since
+    ), None
+
+    else:
+        return (
+            (_ms_to_dt(r["timestamp"]), str(r["portalId"]), r)
+            for r in result.timeline if _ms_to_dt(r["timestamp"]) > since
+        ), result.offset
+
+async def fetch_email_subscriptions(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+
+    url = f"{HUB}/communication-preferences/v3/definitions"
+    
+
+    result = OldRecentEmailSubscriptions.model_validate_json(
+        await http.request(log, url, params=None)
     )
 
     return (
-        (_ms_to_dt(r.timestamp), str(r.portalId))
-        for r in result.timelines
-    ), result.hasMore and result.offset
+        ((r.updatedAt), str(r.id))
+        for r in result.subscriptionDefinitions
+    ), None and None # This endpoint does not have pagination.
+
+async def fetch_contacts_lists_subscription(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
+
+    url = f"{HUB}/contacts/v1/lists/all/contacts/all"
+    params = {"count": 100, "offset": page,"showListMemberships": "true"} if page else {"count": 1, "showListMemberships": "true"}
+
+    data = await http.request(log, url, params=params)
+
+    result = V1CustomCRMObject.model_validate_json(
+        data
+    )
+
+    for item in result.contacts:
+        item["vid"] = str(item["vid"])
+
+
+    if result.hasMore is False:
+        return (
+        (_ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])), str(r["vid"]), r)
+        for r in result.contacts if _ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])) > since
+    ), None
+    
+    else:
+        return (
+            (_ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])), str(r["vid"]), r)
+            for r in result.contacts if _ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])) > since
+        ), result.offset
+
+async def fetch_campaigns(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+    ) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
+
+    url = f"{HUB}/email/public/v1/campaigns"
+    params = {"offset": page} if page else None
+
+    data = await http.request(log, url, params=params)
+
+    result = V1CRMObject.model_validate_json(
+        data
+    )
+
+    if result.hasMore is False:
+        return (
+        (_ms_to_dt(int(r["lastUpdatedTime"])), str(r["id"]), r)
+        for r in result.campaigns if _ms_to_dt(int(r["lastUpdatedTime"])) > since
+    ), None
+    
+    else:
+        return (
+            (_ms_to_dt(int(r["lastUpdatedTime"])), str(r["id"]), r)
+            for r in result.campaigns if _ms_to_dt(int(r["lastUpdatedTime"])) > since
+        ), result.offset
 
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
@@ -399,7 +654,7 @@ async def fetch_engagements_calls(
     result = OldRecentEngagementsCalls.model_validate_json(
         await http.request(log, url, params=None)
     )
-    log.debug(result)
+
     return (
         (r.createdAt, str(r.id))
         for r in result.results
@@ -414,7 +669,6 @@ async def fetch_engagements_emails(
     result = OldRecentEngagementsEmails.model_validate_json(
         await http.request(log, url, params=None)
     )
-    log.debug(f"{result}")
     return (
         (r.createdAt, str(r.id))
         for r in result.results
@@ -439,14 +693,11 @@ async def fetch_engagements_tasks(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     
     url = f"{HUB}/crm/v3/objects/tasks"
-    params = {"properties": "paging"}
 
     result = OldRecentEngagementsTasks.model_validate_json(
-        await http.request(log, url, params=params)
+        await http.request(log, url, params=None)
     )
 
-    test2 = await http.request(log, url, params=params)
-    log.info(f"{test2}")
     return (
         (r.createdAt, str(r.id))
         for r in result.results
@@ -466,16 +717,103 @@ async def fetch_engagements_notes(
         for r in result.results
     ), None and None
 
-async def fetch_engagements_calls(
+
+async def fetch_marketing_forms(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     
-    url = f"{HUB}/crm/v3/objects/calls"
+    url = f"{HUB}/marketing/v3/forms"
 
-    result = OldRecentEngagementsCalls.model_validate_json(
-        await http.request(log, url, params=None)
+    result = OldRecentMarketingForms.model_validate_json(
+         await http.request(log, url, params=None)
+    )
+    return (
+        (r.updatedAt, str(r.id))
+        for r in result.results
+    ), None and None
+
+async def fetch_owners(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/crm/v3/owners"
+
+    result = OldRecentOwners.model_validate_json(
+         await http.request(log, url, params=None)
+    )
+    return (
+        (r.updatedAt, str(r.id))
+        for r in result.results
+    ), None and None
+
+async def fetch_line_items(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/crm/v3/objects/line_items" # seems to be offline
+
+    result = OldRecentLineItems.model_validate_json(
+         await http.request(log, url, params=None)
     )
     return (
         (r.createdAt, str(r.id))
+        for r in result.results
+    ), None and None
+
+async def fetch_products(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/crm/v3/objects/products"
+
+    result = OldRecentProducts.model_validate_json(
+         await http.request(log, url, params=None)
+    )
+    return (
+        (r.createdAt, str(r.id))
+        for r in result.results
+    ), None and None
+
+async def fetch_workflows(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/automation/v3/workflows"
+
+    result = OldRecentWorkflows.model_validate_json(
+         await http.request(log, url, params=None)
+    )
+    return (
+        (r.updatedAt, str(r.id))
+        for r in result.workflows
+    ), None and None
+
+
+async def fetch_goals(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/crm/v3/objects/goal_targets"
+
+    result = OldRecentGoals.model_validate_json(
+         await http.request(log, url, params=None)
+    )
+    return (
+        (r.updatedAt, str(r.id))
+        for r in result.results
+    ), None and None
+
+
+async def fetch_feedback_submissions(
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/crm/v3/objects/feedback_submissions"
+
+    result = OldRecentFeedbackSubmissions.model_validate_json(
+         await http.request(log, url, params=None)
+    )
+    return (
+        (r.updatedAt, str(r.id))
         for r in result.results
     ), None and None

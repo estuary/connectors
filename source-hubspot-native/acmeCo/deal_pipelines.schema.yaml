@@ -28,17 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  listId:
-    title: Listid
+  pipelineId:
+    title: Pipelineid
     type: string
-  lists:
+  results:
     default: []
     items:
       type: integer
-    title: Lists
+    title: Results
     type: array
 required:
-  - listId
-title: ContactLists
+  - pipelineId
+title: DealPipelines
 type: object
 x-infer-schema: true

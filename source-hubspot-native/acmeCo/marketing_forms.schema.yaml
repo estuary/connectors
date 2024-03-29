@@ -28,17 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  listId:
-    title: Listid
-    type: string
-  lists:
+  id:
+    title: Id
+    type: integer
+  results:
     default: []
     items:
       type: integer
-    title: Lists
+    title: Results
     type: array
 required:
-  - listId
-title: ContactLists
+  - id
+title: MarketingForms
 type: object
 x-infer-schema: true
