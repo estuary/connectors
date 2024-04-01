@@ -1,5 +1,5 @@
 from datetime import datetime, UTC, timedelta
-from typing import AsyncGenerator, Awaitable, Iterable
+from typing import AsyncGenerator, Awaitable, Iterable, Dict
 from logging import Logger
 import functools
 
@@ -13,6 +13,7 @@ from .models import (
     BaseCRMObject,
     CRMObject,
     V1CRMObject,
+    CustomObject,
     Company,
     Contact,
     Deal,
@@ -70,6 +71,7 @@ from .api import (
     fetch_workflows,
     fetch_email_subscriptions,
     fetch_contacts_lists_subscription,
+    fetch_custom_objects,
 )
 
 
@@ -77,7 +79,8 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
-    return [
+
+    resources_list = [
         crm_object_streamed(Company, http, fetch_recent_companies),
         crm_object_streamed(Contact, http, fetch_recent_contacts),
         crm_object_streamed(Deal, http, fetch_recent_deals),
@@ -106,6 +109,18 @@ async def all_resources(
         workflow_object(Workflows, http, fetch_workflows),
         properties(http),
     ]
+
+    all_custom_objects = await fetch_custom_objects(log, http)
+    if len(all_custom_objects["results"]) != 0:
+        for objects in all_custom_objects["results"]:
+            BaseCRMObject.NAME = objects["labels"]["plural"].lower()
+            BaseCRMObject.PRIMARY_KEY = ["/id"]
+            BaseCRMObject.PROPERTY_SEARCH_NAME = objects["labels"]["plural"].lower()
+            BaseCRMObject.ASSOCIATED_ENTITIES = []
+
+            resources_list.append(custom_objects(BaseCRMObject, http))
+
+    return resources_list
 
 
 def crm_object_paginated(
@@ -369,4 +384,37 @@ def properties(http: HTTPSession) -> common.Resource:
             name=Names.properties, interval=timedelta(minutes=7)
         ),
         schema_inference=True,
+    )
+
+def custom_objects(
+    cls: type[CRMObject], http: HTTPSession
+) -> common.Resource:
+    
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_page=functools.partial(fetch_page, cls, http),
+        )
+    
+
+    started_at = datetime.now(tz=UTC)
+    return common.Resource(
+        name=cls.NAME,
+        key=cls.PRIMARY_KEY,
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
+        schema_inference=False,
     )
