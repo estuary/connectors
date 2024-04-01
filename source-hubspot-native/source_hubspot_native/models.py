@@ -261,6 +261,17 @@ CustomCRMObject = TypeVar("CustomCRMObject", bound=V1CRMObject)
 CustomCRMObject2 = TypeVar("CustomCRMObject2", bound=V1CustomCRMObject2)
 CustomCRMObjectV1 = TypeVar("CustomCRMObjectV1", bound=V1CustomCRMObject)
 
+class CustomObject(BaseDocument, extra="allow"):
+
+    NAME: ClassVar[str]
+    PRIMARY_KEY: ClassVar[list[str]]
+    PROPERTY_SEARCH_NAME: ClassVar[str]
+    IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
+    ASSOCIATED_ENTITIES: ClassVar[list[str]] = []
+
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
 class Company(BaseCRMObject):
     NAME = Names.companies
     PROPERTY_SEARCH_NAME = PropertyNames.companies
