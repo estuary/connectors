@@ -99,16 +99,16 @@ async def all_resources(
         crm_object_streamed_no_batch(EmailEvents, http, fetch_recent_email_events),
         crm_object_streamed_no_batch(TicketPipelines, http, fetch_recent_ticket_pipelines),
         crm_object_streamed_no_batch(DealPipelines, http, fetch_recent_deal_pipelines),
-        crm_object_paginated(EngagementCalls, http, fetch_engagements_calls),
-        crm_object_paginated(EngagementEmails, http, fetch_engagements_emails),
-        crm_object_paginated(EngagementMeetings, http, fetch_engagements_meetings),
-        crm_object_paginated(EngagementNotes, http, fetch_engagements_notes),
-        crm_object_paginated(EngagementTasks, http, fetch_engagements_tasks),
-        crm_object_paginated(Goals, http, fetch_goals),
-        crm_object_paginated(FeedbackSubmissions, http, fetch_feedback_submissions),
-        crm_object_paginated(LineItems, http, fetch_line_items),
-        crm_object_paginated(Products, http, fetch_products),
-        crm_object_paginated(Ticket, http, fetch_recent_tickets),
+        crm_object_paginated(EngagementCalls, http),
+        crm_object_paginated(EngagementEmails, http),
+        crm_object_paginated(EngagementMeetings, http),
+        crm_object_paginated(EngagementNotes, http),
+        crm_object_paginated(EngagementTasks, http),
+        crm_object_paginated(Goals, http),
+        crm_object_paginated(FeedbackSubmissions, http),
+        crm_object_paginated(LineItems, http),
+        crm_object_paginated(Products, http),
+        crm_object_paginated(Ticket, http),
         crm_object_custom(MarketingEmails, http, fetch_recent_marketing_emails),
         crm_object_custom(EmailSubscriptions, http, fetch_email_subscriptions),
         crm_object_custom(MarketingForms, http, fetch_marketing_forms),
@@ -119,7 +119,7 @@ async def all_resources(
 
 
 def crm_object_paginated(
-    cls: type[CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
+    cls: type[CRMObject], http: HTTPSession
 ) -> common.Resource:
     """Base Resource to run V3 API objects using pagination
 

@@ -13,6 +13,7 @@ from estuary_cdk.capture import (
 from estuary_cdk.http import HTTPMixin
 
 from .resources import all_resources
+from .custom_resources import all_custom_resources
 from .models import (
     ConnectorState,
     EndpointConfig,
@@ -41,6 +42,10 @@ class Connector(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
         resources = await all_resources(log, self, discover.config)
+        custom_resources = await all_custom_resources(log, self, discover.config)
+        log.debug(f"{custom_resources}")
+        if custom_resources is not None:
+            resources += custom_resources
         return common.discovered(resources)
 
     async def validate(
