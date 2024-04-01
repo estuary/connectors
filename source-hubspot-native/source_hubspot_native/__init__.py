@@ -43,7 +43,6 @@ class Connector(
     ) -> response.Discovered[ResourceConfig]:
         resources = await all_resources(log, self, discover.config)
         custom_resources = await all_custom_resources(log, self, discover.config)
-        log.debug(f"{custom_resources}")
         if custom_resources is not None:
             resources += custom_resources
         return common.discovered(resources)
