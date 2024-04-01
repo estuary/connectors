@@ -4,7 +4,7 @@ from logging import Logger
 from pydantic import TypeAdapter
 import json
 import pytz
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
+from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict
 import asyncio
 import itertools
 from copy import deepcopy
@@ -60,6 +60,15 @@ async def fetch_properties(
         p.hubspotObject = cls.NAME
 
     return cls.CACHED_PROPERTIES
+
+async def fetch_custom_objects(
+    log: Logger, http: HTTPSession
+) -> Dict:
+
+    url = f"{HUB}/crm/v3/schemas"
+    result = await http.request(log, url)
+
+    return json.loads(result)
 
 
 async def fetch_page(
@@ -645,79 +654,6 @@ def _ms_to_dt(ms: int) -> datetime:
 
 ## V3
 
-async def fetch_engagements_calls(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/calls"
-
-    result = OldRecentEngagementsCalls.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_engagements_emails(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/emails"
-
-    result = OldRecentEngagementsEmails.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_engagements_meetings(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/meetings"
-
-    result = OldRecentEngagementsMeetings.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_engagements_tasks(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/tasks"
-
-    result = OldRecentEngagementsTasks.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_engagements_notes(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/notes"
-
-    result = OldRecentEngagementsNotes.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-
 async def fetch_marketing_forms(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
@@ -746,34 +682,6 @@ async def fetch_owners(
         for r in result.results
     ), None and None
 
-async def fetch_line_items(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/line_items" # seems to be offline
-
-    result = OldRecentLineItems.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_products(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/products"
-
-    result = OldRecentProducts.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.createdAt, str(r.id))
-        for r in result.results
-    ), None and None
-
 async def fetch_workflows(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
@@ -786,34 +694,4 @@ async def fetch_workflows(
     return (
         (r.updatedAt, str(r.id))
         for r in result.workflows
-    ), None and None
-
-
-async def fetch_goals(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/goal_targets"
-
-    result = OldRecentGoals.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.updatedAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-
-async def fetch_feedback_submissions(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/objects/feedback_submissions"
-
-    result = OldRecentFeedbackSubmissions.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.updatedAt, str(r.id))
-        for r in result.results
     ), None and None
