@@ -433,14 +433,20 @@ func (c *capture) Run(ctx context.Context) error {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
 		eg.Go(func() error {
-			return c.StreamChanges(ctx, rpcClient, collectionID, startTime)
+			if err := c.StreamChanges(ctx, rpcClient, collectionID, startTime); err != nil {
+				return fmt.Errorf("error streaming changes for collection %q: %w", collectionID, err)
+			}
+			return nil
 		})
 	}
 	for collectionID, resumeState := range backfillCollections {
 		var collectionID, resumeState = collectionID, resumeState // Copy loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting backfill worker")
 		eg.Go(func() error {
-			return c.BackfillAsync(ctx, libraryClient, collectionID, resumeState)
+			if err := c.BackfillAsync(ctx, libraryClient, collectionID, resumeState); err != nil {
+				return fmt.Errorf("error backfilling collection %q: %w", collectionID, err)
+			}
+			return nil
 		})
 	}
 	defer log.Info("capture terminating")
