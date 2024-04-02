@@ -758,6 +758,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					return fmt.Errorf("unexpected target ID %d", tc.TargetIds[0])
 				}
 			case firestore_pb.TargetChange_REMOVE:
+				listenClient = nil
 				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
 					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, skipping to latest changes (go.estuary.dev/YRDsKd)")
 					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
@@ -769,11 +770,10 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						logEntry.Fatal("forcing connector restart to establish consistency")
 					})
 					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
-					listenClient = nil
 				} else if tc.Cause != nil {
-					return fmt.Errorf("unexpected TargetChange.REMOVE: %v", tc.Cause.Message)
+					logEntry.WithField("cause", tc.Cause.Message).Warn("unexpected TargetChange.REMOVE")
 				} else {
-					return fmt.Errorf("unexpected TargetChange.REMOVE")
+					logEntry.Warn("unexpected TargetChange.REMOVE")
 				}
 			case firestore_pb.TargetChange_CURRENT:
 				if log.IsLevelEnabled(log.TraceLevel) {
