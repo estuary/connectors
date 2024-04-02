@@ -35,7 +35,7 @@ collections:
   acmeCo/email_subscriptions:
     schema: email_subscriptions.schema.yaml
     key:
-      - /portalId
+      - /id
   acmeCo/engagements:
     schema: engagements.schema.yaml
     key:

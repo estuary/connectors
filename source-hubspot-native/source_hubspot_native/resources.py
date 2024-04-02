@@ -52,6 +52,7 @@ from .api import (
     fetch_page,
     fetch_page_custom,
     fetch_page_workflow,
+    fetch_page_subscriptions,
     fetch_properties,
     fetch_changes,
     fetch_changes_no_batch,
@@ -103,7 +104,7 @@ async def all_resources(
         crm_object_paginated(Products, http),
         crm_object_paginated(Ticket, http),
         crm_object_custom(MarketingEmails, http, fetch_recent_marketing_emails),
-        crm_object_custom(EmailSubscriptions, http, fetch_email_subscriptions),
+        subscription_object(EmailSubscriptions, http, fetch_email_subscriptions),
         crm_object_custom(MarketingForms, http, fetch_marketing_forms),
         crm_object_custom(Owners, http, fetch_owners),
         workflow_object(Workflows, http, fetch_workflows),
@@ -242,7 +243,7 @@ def crm_object_streamed(
             fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    started_at = datetime.now(tz=UTC) - timedelta(days=1825)
 
     return common.Resource(
         name=cls.NAME,
@@ -289,7 +290,7 @@ def crm_object_streamed_no_batch(
             fetch_changes=functools.partial(fetch_changes_no_batch, cls, fetch_recent, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    started_at = datetime.now(tz=UTC) -  timedelta(days=1825)
 
     return common.Resource(
         name=cls.NAME,
@@ -326,7 +327,7 @@ def workflow_object(
             fetch_page=functools.partial(fetch_page_workflow, cls, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    started_at = datetime.now(tz=UTC) - timedelta(days=1825)
 
     return common.Resource(
         name=cls.NAME,
@@ -341,7 +342,38 @@ def workflow_object(
         schema_inference=True,
     )
 
+def subscription_object(
+    cls: type[V1CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
+) -> common.Resource:
 
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_page=functools.partial(fetch_page_subscriptions, cls, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return common.Resource(
+        name=cls.NAME,
+        key=["/id"],
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=7)),
+        schema_inference=True,
+    )
 
 
 def properties(http: HTTPSession) -> common.Resource:

@@ -28,10 +28,9 @@ scopes = [
     "files.ui_hidden.read",
     "forms",
     "forms-uploaded-files",
-    "service-feedback-access",
     "sales-email-read",
     "communication_preferences.read",
-    "workflows-access-public-api",
+    "communication_preferences.read_write",
     "tickets",
 ]
 
@@ -271,6 +270,7 @@ class CustomObject(BaseDocument, extra="allow"):
 
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
+    results: list[int] = []
 
 class Company(BaseCRMObject):
     NAME = Names.companies
@@ -502,12 +502,14 @@ class FeedbackSubmissions(BaseCRMObject):
 
 class EmailSubscriptions(V1CRMObject):
     NAME = Names.email_subscriptions
-    PRIMARY_KEY = ['/portalId']
+    PRIMARY_KEY = ['/id']
     ASSOCIATED_ENTITIES = []
     ENFORCE_URL = EnforceUrl.email_subscriptions
     IGNORE_PROPERTY_SEARCH = True
 
-    portalId: str
+    id: str
+    updatedAt: AwareDatetime
+    createdAt: AwareDatetime
     subscriptionDefinitions: list[int] = []
 
 # An Association, as returned by the v4 associations API.
@@ -575,6 +577,9 @@ class BatchResult(BaseModel, Generic[Item], extra="forbid"):
 
 class WorkflowResult(BaseModel, Generic[Item], extra="forbid"):
     workflows: list[Item]
+
+class SubscriptionResult(BaseModel, Generic[Item], extra="forbid"):
+    subscriptionDefinitions: list[Item]
 
 
 # The following are models for HubSpot's "legacy" APIs for fetching

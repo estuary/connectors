@@ -28,8 +28,16 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  portalId:
-    title: Portalid
+  id:
+    title: Id
+    type: string
+  updatedAt:
+    format: date-time
+    title: Updatedat
+    type: string
+  createdAt:
+    format: date-time
+    title: Createdat
     type: string
   subscriptionDefinitions:
     default: []
@@ -38,7 +46,9 @@ properties:
     title: Subscriptiondefinitions
     type: array
 required:
-  - portalId
+  - id
+  - updatedAt
+  - createdAt
 title: EmailSubscriptions
 type: object
 x-infer-schema: true

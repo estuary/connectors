@@ -79,10 +79,12 @@ captures:
           name: goal_targets
           interval: PT420S
         target: acmeCo/goal_targets
+        disable: true
       - resource:
           name: feedback_submissions
           interval: PT420S
         target: acmeCo/feedback_submissions
+        disable: true
       - resource:
           name: line_items
           interval: PT420S
@@ -115,6 +117,7 @@ captures:
           name: workflows
           interval: PT420S
         target: acmeCo/workflows
+        disable: true
       - resource:
           name: properties
           interval: PT420S
