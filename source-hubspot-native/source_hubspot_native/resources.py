@@ -243,7 +243,7 @@ def crm_object_streamed(
             fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http),
         )
 
-    started_at = datetime.now(tz=UTC) - timedelta(days=1825)
+    started_at = datetime.now(tz=UTC)
 
     return common.Resource(
         name=cls.NAME,
@@ -290,7 +290,7 @@ def crm_object_streamed_no_batch(
             fetch_changes=functools.partial(fetch_changes_no_batch, cls, fetch_recent, http),
         )
 
-    started_at = datetime.now(tz=UTC) -  timedelta(days=1825)
+    started_at = datetime.now(tz=UTC)
 
     return common.Resource(
         name=cls.NAME,
@@ -327,7 +327,7 @@ def workflow_object(
             fetch_page=functools.partial(fetch_page_workflow, cls, http),
         )
 
-    started_at = datetime.now(tz=UTC) - timedelta(days=1825)
+    started_at = datetime.now(tz=UTC)
 
     return common.Resource(
         name=cls.NAME,
