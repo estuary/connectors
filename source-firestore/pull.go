@@ -368,7 +368,15 @@ func (c *capture) Run(ctx context.Context) error {
 		}
 		if resourceState.Backfill == nil || resourceState.Backfill.Completed {
 			// Do nothing when no backfill is required
-		} else if resumeState, ok := backfillCollections[collectionID]; !ok {
+			continue
+		}
+		log.WithFields(log.Fields{
+			"resource":   resourceState.path,
+			"collection": collectionID,
+			"startAfter": resourceState.Backfill.StartAfter,
+			"cursor":     resourceState.Backfill.Cursor,
+		}).Debug("backfill required for binding")
+		if resumeState, ok := backfillCollections[collectionID]; !ok {
 			backfillCollections[collectionID] = resourceState.Backfill
 		} else if !resumeState.Equal(resourceState.Backfill) {
 			return fmt.Errorf("internal error: backfill state mismatch for resource %q with collection ID %q", resourceState.path, collectionID)
