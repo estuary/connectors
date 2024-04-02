@@ -379,7 +379,18 @@ func (c *capture) Run(ctx context.Context) error {
 		if resumeState, ok := backfillCollections[collectionID]; !ok {
 			backfillCollections[collectionID] = resourceState.Backfill
 		} else if !resumeState.Equal(resourceState.Backfill) {
-			return fmt.Errorf("internal error: backfill state mismatch for resource %q with collection ID %q", resourceState.path, collectionID)
+			log.WithFields(log.Fields{
+				"resource":   resourceState.path,
+				"collection": collectionID,
+			}).Warn("backfill state mismatch, restarting all impacted collections")
+
+			resumeState.Cursor = ""
+			resumeState.MTime = time.Time{}
+			if resumeState.StartAfter.After(resourceState.Backfill.StartAfter) {
+				// Take the minimum StartAfter time across all collections so that we begin
+				// backfilling the new one as soon as possible.
+				resumeState.StartAfter = resourceState.Backfill.StartAfter
+			}
 		}
 	}
 
