@@ -18,6 +18,8 @@ from .models import (
     Association,
     BatchResult,
     CRMObject,
+    SubscriptionResult,
+    EmailSubscriptions,
     WorkflowResult,
     V1CustomCRMObject,
     V1CustomCRMObject2,
@@ -205,6 +207,26 @@ async def fetch_page_workflow(
     )
 
     for doc in result.workflows:
+        if doc.updatedAt < cutoff:
+            yield doc
+
+async def fetch_page_subscriptions(
+    # Closed over via functools.partial:
+    cls: type[V1CRMObject],
+    http: HTTPSession,
+    # Remainder is common.FetchPageFn:
+    log: Logger,
+    page: str | None,
+    cutoff: datetime,
+) -> AsyncGenerator[CRMObject | str, None]:
+
+    url = f"{HUB}{cls.ENFORCE_URL}"
+    _cls: Any = cls  # Silence mypy false-positive.
+    result: SubscriptionResult[EmailSubscriptions] = SubscriptionResult[_cls].model_validate_json(
+        await http.request(log, url, method="GET", params=None)
+    )
+
+    for doc in result.subscriptionDefinitions:
         if doc.updatedAt < cutoff:
             yield doc
 
