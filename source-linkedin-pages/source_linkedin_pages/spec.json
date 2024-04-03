@@ -1,10 +1,12 @@
 {
-  "documentationUrl": "https://docs.airbyte.com/integrations/sources/linkedin-pages/",
+  "documentationUrl": "https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
   "connectionSpecification": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Linkedin Pages Spec",
     "type": "object",
-    "required": ["org_id"],
+    "required": [
+      "org_id"
+    ],
     "additionalProperties": true,
     "properties": {
       "org_id": {
@@ -12,7 +14,9 @@
         "type": "string",
         "airbyte_secret": true,
         "description": "Specify the Organization ID",
-        "examples": ["123456789"]
+        "examples": [
+          "123456789"
+        ]
       },
       "credentials": {
         "title": "Authentication",
@@ -21,7 +25,11 @@
           {
             "type": "object",
             "title": "OAuth2.0",
-            "required": ["client_id", "client_secret", "refresh_token"],
+            "required": [
+              "client_id",
+              "client_secret",
+              "refresh_token"
+            ],
             "properties": {
               "auth_method": {
                 "type": "string",
@@ -42,7 +50,7 @@
               "refresh_token": {
                 "type": "string",
                 "title": "Refresh token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the <a href=\"https://docs.airbyte.com/integrations/sources/linkedin-pages/\">docs</a> to obtain yours.",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/.",
                 "airbyte_secret": true
               }
             }
@@ -50,7 +58,9 @@
           {
             "title": "Access token",
             "type": "object",
-            "required": ["access_token"],
+            "required": [
+              "access_token"
+            ],
             "properties": {
               "auth_method": {
                 "type": "string",
@@ -59,7 +69,7 @@
               "access_token": {
                 "type": "string",
                 "title": "Access token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the <a href=\"https://docs.airbyte.com/integrations/sources/linkedin-pages/\">docs</a> to obtain yours.",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
                 "airbyte_secret": true
               }
             }

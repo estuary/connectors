@@ -50,7 +50,7 @@
               "refresh_token": {
                 "type": "string",
                 "title": "Refresh token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the <a href=\"https://docs.airbyte.com/integrations/sources/linkedin-pages/\">docs</a> to obtain yours.",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://.com/integrations/sources/linkedin-pages/",
                 "airbyte_secret": true
               }
             }
@@ -69,7 +69,7 @@
               "access_token": {
                 "type": "string",
                 "title": "Access token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the <a href=\"https://docs.airbyte.com/integrations/sources/linkedin-pages/\">docs</a> to obtain yours.",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
                 "airbyte_secret": true
               }
             }
@@ -116,7 +116,7 @@
     ],
     "additionalProperties": false
   },
-  "documentationUrl": "https://docs.airbyte.com/integrations/sources/linkedin-pages/",
+  "documentationUrl": "https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
   "oauth2": {
     "provider": "linkedin",
     "authUrlTemplate": "https://www.linkedin.com/oauth/v2/authorization?client_id=%7B%7B%7Bclient_id%7D%7D%7D&redirect_uri=%7B%7B%23urlencode%7D%7D%7B%7B%7Bredirect_uri%7D%7D%7D%7B%7B%2Furlencode%7D%7D&response_type=code&state=%7B%7B%23urlencode%7D%7D%7B%7B%7Bstate%7D%7D%7D%7B%7B%2Furlencode%7D%7D&scope=r_organization_followers+r_organization_social+rw_organization_admin+r_organization_social_feed+w_member_social+w_organization_social+r_basicprofile+w_organization_social_feed+w_member_social_feed+r_1st_connections_size",
