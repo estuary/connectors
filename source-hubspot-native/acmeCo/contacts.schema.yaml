@@ -49,12 +49,12 @@ $defs:
         title: Op
         type: string
       row_id:
-        default: -1
         description: "Row ID of the Document, counting up from zero, or -1 if not known"
         title: Row Id
         type: integer
     required:
       - op
+      - row_id
     title: Meta
     type: object
 additionalProperties: false

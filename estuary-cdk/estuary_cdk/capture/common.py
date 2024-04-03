@@ -52,12 +52,11 @@ class BaseDocument(BaseModel):
             description="Operation type (c: Create, u: Update, d: Delete)"
         )
         row_id: int = Field(
-            default=-1,
             description="Row ID of the Document, counting up from zero, or -1 if not known",
         )
 
     meta_: Meta = Field(
-        default=Meta(op="u"), alias="_meta", description="Document metadata"
+        default=Meta(op="u",row_id=-1), alias="_meta", description="Document metadata"
     )
 
 
