@@ -9,14 +9,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/bigquery/storage/managedwriter"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
 
@@ -35,10 +34,14 @@ type transactor struct {
 }
 
 type checkpointItem struct {
+	// will have WriteStream for delta updates bindings
+	WriteStream string
+
+	// will have query for other bindings
+	Query string
+
 	Table         string
 	TempTableName string
-	Query         string
-	JobID         string
 	EDC           *bigquery.ExternalDataConfig
 	Bucket        string
 	Files         []string
@@ -288,19 +291,34 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var query string
+		var writeStream string
 		if b.target.DeltaUpdates {
-			query = b.storeInsertSQL
+			var tableName = fmt.Sprintf("projects/%s/datasets/%s/tables/%s", t.cfg.ProjectID, t.cfg.Dataset, b.target.Identifier)
+			var descriptorProto = getTableDescriptorProto(b.target)
+
+			c, err := managedwriter.NewClient(ctx, t.cfg.ProjectID)
+			if err != nil {
+				return nil, fmt.Errorf("creating storage write api client: %w", err)
+			}
+			managedStream, err := c.NewManagedStream(ctx,
+				managedwriter.WithDestinationTable(tableName),
+				managedwriter.WithType(managedwriter.BufferedStream),
+				managedwriter.WithSchemaDescriptor(&descriptorProto))
+
+			if err != nil {
+				return nil, fmt.Errorf("creating write stream for %q: %w", b.target.Identifier, err)
+			}
+
+			writeStream = managedStream.StreamName()
 		} else {
 			query = b.storeUpdateSQL
 		}
 
-		var jobId = uuid.NewString()
-
 		t.cp[b.target.StateKey] = &checkpointItem{
+			WriteStream:   writeStream,
+			Query:         query,
 			Table:         b.target.Identifier,
 			TempTableName: b.tempTableName,
-			JobID:         jobId,
-			Query:         query,
 			EDC:           b.storeFile.edc(),
 			Bucket:        b.storeFile.bucket,
 			Files:         files,
@@ -345,48 +363,27 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		var query = t.client.newQuery(item.Query)
-		var edcs = make(map[string]bigquery.ExternalData)
-		edcs[item.TempTableName] = item.EDC
-		query.TableDefinitions = edcs
-		query.JobID = item.JobID
+		if len(item.Query) > 0 {
+			var query = t.client.newQuery(item.Query)
+			var edcs = make(map[string]bigquery.ExternalData)
+			edcs[item.TempTableName] = item.EDC
+			query.TableDefinitions = edcs
 
-		log.WithFields(log.Fields{
-			"table": item.Table,
-			"jobID": item.JobID,
-		}).Info("store: starting query")
-		_, err := t.client.runQuery(ctx, query)
+			log.WithField("table", item.Table).Info("store: starting query")
+			_, err := t.client.runQuery(ctx, query)
 
-		if err != nil {
-			// 409 Already Exists means the job has already been inserted
-			if e, ok := err.(*googleapi.Error); ok && e.Code == 409 {
-				job, err := t.client.bigqueryClient.JobFromProject(ctx, t.cfg.ProjectID, item.JobID, t.cfg.Region)
-				if err != nil {
-					return nil, fmt.Errorf("finding job %q failed: %w", item.JobID, err)
-				}
-
-				status, err := job.Wait(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("fetching job %q status: %w", item.JobID, err)
-				}
-
-				err = status.Err()
-				if err != nil {
-					return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-				}
-			} else {
+			if err != nil {
 				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
 			}
-		}
 
-		for _, f := range item.Files {
-			deleteFile(ctx, t.client.cloudStorageClient, item.Bucket, f)
-		}
+			for _, f := range item.Files {
+				deleteFile(ctx, t.client.cloudStorageClient, item.Bucket, f)
+			}
 
-		log.WithFields(log.Fields{
-			"table": item.Table,
-			"jobID": item.JobID,
-		}).Info("store: finished query")
+			log.WithField("table", item.Table).Info("store: finished query")
+		} else if len(item.WriteStream) > 0 {
+
+		}
 	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
