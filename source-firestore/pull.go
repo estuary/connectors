@@ -678,7 +678,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 	var listenClient firestore_pb.Firestore_ListenClient
 	var numRestarts, numDocuments int
 	var isCurrent, catchupStreaming bool
-	var catchupStarted time.Time
 	for {
 		if listenClient == nil {
 			var err error
@@ -708,7 +707,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					}
 				}()
 			}
-			catchupStarted = time.Now()
 		}
 
 		resp, err := listenClient.Recv()
@@ -770,8 +768,8 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 				}
 			case firestore_pb.TargetChange_REMOVE:
 				listenClient = nil
-				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
-					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, skipping to latest changes (go.estuary.dev/YRDsKd)")
+				if catchupStreaming {
+					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up, skipping to latest changes (go.estuary.dev/YRDsKd)")
 					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
