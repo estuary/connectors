@@ -408,7 +408,7 @@ def properties(http: HTTPSession) -> common.Resource:
             state,
             task,
             fetch_snapshot=snapshot,
-            tombstone=Property(_meta=Property.Meta(op="d")),
+            tombstone=Property(_meta=Property.Meta(op="d",row_id=-1)),
         )
 
     return common.Resource(
