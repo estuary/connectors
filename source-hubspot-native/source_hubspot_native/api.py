@@ -88,7 +88,7 @@ async def fetch_page(
     if cls.IGNORE_PROPERTY_SEARCH is True:
         input = {
         "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
         }
         if len(cls.ASSOCIATED_ENTITIES) == 0:
             del input['associations']
@@ -98,7 +98,7 @@ async def fetch_page(
 
         input = {
             "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
             "properties": property_names,
             "propertiesWithHistory": property_names,
         }
@@ -135,7 +135,7 @@ async def fetch_page_custom(
     if cls.IGNORE_PROPERTY_SEARCH is True:
         input = {
         "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
         }
         if len(cls.ASSOCIATED_ENTITIES) == 0:
             del input['associations'] 
@@ -145,7 +145,7 @@ async def fetch_page_custom(
 
         input = {
             "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
             "properties": property_names,
             "propertiesWithHistory": property_names,
         }
@@ -184,7 +184,7 @@ async def fetch_page_workflow(
     if cls.IGNORE_PROPERTY_SEARCH is True:
         input = {
         "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
         }
         if len(cls.ASSOCIATED_ENTITIES) == 0:
             del input['associations'] 
@@ -194,7 +194,7 @@ async def fetch_page_workflow(
 
         input = {
             "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
             "properties": property_names,
             "propertiesWithHistory": property_names,
         }
