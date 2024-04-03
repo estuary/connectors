@@ -5,7 +5,6 @@ import functools
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
-#from estuary_cdk.capture.common import Resource, LogCursor, PageCursor, open_binding
 from estuary_cdk.capture import common
 from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 
@@ -346,6 +345,12 @@ def subscription_object(
     cls: type[V1CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
 ) -> common.Resource:
 
+    """
+    Custom Resource to run specifically subscription stream objects
+    subscription objects do not have pagination neither a usual schema, 
+    so this resource was created to handle this specific case.
+    """
+
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -421,6 +426,13 @@ def properties(http: HTTPSession) -> common.Resource:
 def custom_objects(
     cls: type[CRMObject], http: HTTPSession
 ) -> common.Resource:
+
+    """
+    Custom Resource to run user-created objects. It works by 
+    reading the v3/schema endpoint, in which returns all
+    user-created objects in a list. All user-created objects are
+    v3 objects, so we parse then using the base fetch_page function.
+    """
     
     def open(
         binding: CaptureBinding[ResourceConfig],
