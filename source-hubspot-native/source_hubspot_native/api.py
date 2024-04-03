@@ -468,21 +468,6 @@ async def fetch_recent_engagements(
     ), result.hasMore and result.offset
 
 
-async def fetch_recent_tickets(
-    log: Logger, http: HTTPSession, since: datetime, cursor: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/crm/v3/objects/tickets"
-    
-    result = OldRecentTicket.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-
-    return (
-        (r.updatedAt, str(r.id))
-        for r in result.results
-    ), None and None
-
 async def fetch_recent_contacts_lists(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor
 ) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
