@@ -370,6 +370,18 @@ async def fetch_changes_no_batch(
 ) -> AsyncGenerator[CRMObject | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
+    """
+    This functions differs of the base 'fetch_changes' function
+    by not using batch_result. (This is required because some
+    API endpoints do have a similar pagination, but do not have
+    a batch query endpoint ).
+    It works by getting the fetch_recent_X function defined in resources. 
+    This function will return the actual API result within its 'iter'
+    This result is then passed on the V1CRMObject model as a json
+    to be validated
+
+    """
+
     recent: list[tuple[datetime, str]] = []
     next_page: PageCursor = None
     _cls = cls
