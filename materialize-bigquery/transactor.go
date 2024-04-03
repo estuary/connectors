@@ -206,11 +206,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		subqueries = append(subqueries, b.loadQuerySQL)
 
-		var err error
-		toCleanup, err = b.loadFile.flush(ctx)
+		var files, err = b.loadFile.flush(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
+		toCleanup = append(toCleanup, files...)
 
 		edcTableDefs[b.tempTableName] = b.loadFile.edc()
 	}
@@ -282,7 +282,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			continue
 		}
 
-		toCleanup, err := b.storeFile.flush(ctx)
+		files, err := b.storeFile.flush(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
@@ -303,7 +303,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			Query:         query,
 			EDC:           b.storeFile.edc(),
 			Bucket:        b.storeFile.bucket,
-			Files:         toCleanup,
+			Files:         files,
 		}
 	}
 
@@ -336,7 +336,7 @@ func (d *transactor) hasStateKey(stateKey string) bool {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	log.WithField("cp", t.cp).Info("store: starting committing changes")
+	log.Info("store: starting committing changes")
 
 	for stateKey, item := range t.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
@@ -404,9 +404,6 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var checkpointClear = make(checkpoint)
 
 	for _, b := range t.bindings {
-		if _, ok := checkpointClear[b.target.StateKey]; ok {
-			continue
-		}
 		checkpointClear[b.target.StateKey] = nil
 		delete(t.cp, b.target.StateKey)
 	}

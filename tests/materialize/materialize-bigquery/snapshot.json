@@ -1827,22 +1827,16 @@
 {
   "estuary-theatre.testing.duplicate_keys_delta_exclude_flow_doc": [
     {
-      "flow_published_at": "2023-07-12T18:18:11.537199Z",
-      "id": 1,
-      "int": 1,
-      "str": "str 1"
-    },
-    {
       "flow_published_at": "2023-07-12T18:26:01.560712Z",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
-      "flow_published_at": "2023-07-12T18:18:24.946758Z",
-      "id": 2,
-      "int": 2,
-      "str": "str 2"
+      "flow_published_at": "2023-07-12T18:18:11.537199Z",
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
     },
     {
       "flow_published_at": "2023-07-12T18:26:14.215494Z",
@@ -1851,10 +1845,10 @@
       "str": "str 7"
     },
     {
-      "flow_published_at": "2023-07-12T18:18:48.441281Z",
-      "id": 3,
-      "int": 3,
-      "str": "str 3"
+      "flow_published_at": "2023-07-12T18:18:24.946758Z",
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
     },
     {
       "flow_published_at": "2023-07-12T18:26:23.495167Z",
@@ -1863,10 +1857,10 @@
       "str": "str 8"
     },
     {
-      "flow_published_at": "2023-07-12T18:19:15.034186Z",
-      "id": 4,
-      "int": 4,
-      "str": "str 4"
+      "flow_published_at": "2023-07-12T18:18:48.441281Z",
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
     },
     {
       "flow_published_at": "2023-07-12T18:26:33.697752Z",
@@ -1875,16 +1869,22 @@
       "str": "str 9"
     },
     {
-      "flow_published_at": "2023-07-12T18:20:10.962631Z",
-      "id": 5,
-      "int": 5,
-      "str": "str 5"
+      "flow_published_at": "2023-07-12T18:19:15.034186Z",
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
     },
     {
       "flow_published_at": "2023-07-12T18:26:42.518724Z",
       "id": 5,
       "int": 10,
       "str": "str 10"
+    },
+    {
+      "flow_published_at": "2023-07-12T18:20:10.962631Z",
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
     }
   ]
 }
