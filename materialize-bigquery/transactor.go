@@ -389,10 +389,6 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}).Info("store: finished query")
 	}
 
-	/*if len(t.cp) > 0 {
-		return nil, fmt.Errorf("artificial error")
-	}*/
-
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
 	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
@@ -411,6 +407,8 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
+
+	log.Info("store: finished committing changes")
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
