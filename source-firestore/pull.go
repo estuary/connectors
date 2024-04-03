@@ -783,8 +783,10 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
 				} else if tc.Cause != nil {
 					logEntry.WithField("cause", tc.Cause.Message).Warn("unexpected TargetChange.REMOVE")
+					time.Sleep(retryInterval)
 				} else {
 					logEntry.Warn("unexpected TargetChange.REMOVE")
+					time.Sleep(retryInterval)
 				}
 			case firestore_pb.TargetChange_CURRENT:
 				if log.IsLevelEnabled(log.TraceLevel) {
