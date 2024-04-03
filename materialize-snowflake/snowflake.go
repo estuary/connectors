@@ -619,8 +619,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// until they have all been successful, or an error has been thrown
 
 	// If we see no results from the REST API for `maxTries` iterations, then we
-	// fallback to asking the `COPY_HISTORY` table.
-	var maxTries = 10
+	// fallback to asking the `COPY_HISTORY` table. We allow up to 5 minutes for results to show up in the REST API.
+	var maxTries = 60
+	var retryDelaySeconds = 5 * time.Second
 	for pipeName, pipe := range pipes {
 		for tries := 0; tries < maxTries; tries++ {
 			// We first try to check the status of pipes using the REST API's insertReport
@@ -652,7 +653,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// We try `maxTries` times since it may take some time for the REST API
 				// to reflect the new pipe requests
 				if tries < maxTries-1 {
-					time.Sleep(5 * time.Second)
+					time.Sleep(retryDelaySeconds)
 					continue
 				}
 
@@ -688,7 +689,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
 					tries--
-					time.Sleep(2 * time.Second)
+					time.Sleep(retryDelaySeconds)
 					continue
 				}
 
@@ -719,7 +720,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				d.deleteFiles(ctx, []string{pipe.dir})
 				break
 			} else {
-				time.Sleep(5 * time.Second)
+				time.Sleep(retryDelaySeconds)
 			}
 		}
 	}
