@@ -36,7 +36,7 @@ The two predominant strategies for accessing logs are:
 Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
 """
 
-PageCursor = str | NonNegativeInt | None
+PageCursor = str | int | None
 """PageCursor is a cursor into a paged result set.
 These cursors are predominantly an opaque string or an internal offset integer.
 
