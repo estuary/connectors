@@ -1,0 +1,69 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "S3 Source",
+    "type": "object",
+    "required": [
+        "bucket",
+        "region"
+    ],
+    "properties": {
+        "awsAccessKeyId": {
+            "type": "string",
+            "title": "AWS Access Key ID",
+            "description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
+            "order": 0
+        },
+        "awsSecretAccessKey": {
+            "type": "string",
+            "title": "AWS Secret Access Key",
+            "description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
+            "secret": true,
+            "order": 1
+        },
+        "region": {
+            "type": "string",
+            "title": "AWS Region",
+            "description": "The name of the AWS region where the S3 bucket is located.",
+            "order": 2
+        },
+        "bucket": {
+            "type": "string",
+            "title": "Bucket",
+            "description": "Name of the S3 bucket",
+            "order": 3
+        },
+        "prefix": {
+            "type": "string",
+            "title": "Prefix",
+            "description": "Prefix within the bucket to capture from.",
+            "order": 4
+        },
+        "matchKeys": {
+            "type": "string",
+            "title": "Match Keys",
+            "format": "regex",
+            "description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
+            "order": 5
+        },
+        "advanced": {
+            "properties": {
+                "ascendingKeys": {
+                    "type": "boolean",
+                    "title": "Ascending Keys",
+                    "description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo.",
+                    "default": false
+                },
+                "endpoint": {
+                    "type": "string",
+                    "title": "AWS Endpoint",
+                    "description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS"
+                }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "description": "Options for advanced users. You should not typically need to modify these.",
+            "advanced": true
+        },
+        "parser": ` + string(parserSchema) + `
+    }
+}
