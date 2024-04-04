@@ -26,6 +26,7 @@ docker buildx build \
   --platform linux/amd64 \
   --build-arg CONNECTOR_NAME="$1" \
   --build-arg CONNECTOR_TYPE="$CONNECTOR_TYPE" \
+  --build-arg="USAGE_RATE=1.0" \
   --load \
   -t ghcr.io/estuary/"$1":local \
   -f "$DOCKERFILE" \
