@@ -1,5 +1,5 @@
 {
-  "documentationUrl": "https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
+  "documentationUrl": "https://go.estuary.dev/source-linkedin-pages",
   "connectionSpecification": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Linkedin Pages Spec",
@@ -50,7 +50,7 @@
               "refresh_token": {
                 "type": "string",
                 "title": "Refresh token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/.",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://go.estuary.dev/source-linkedin-pages.",
                 "airbyte_secret": true
               }
             }
@@ -69,7 +69,7 @@
               "access_token": {
                 "type": "string",
                 "title": "Access token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://go.estuary.dev/source-linkedin-pages",
                 "airbyte_secret": true
               }
             }

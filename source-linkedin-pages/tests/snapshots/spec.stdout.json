@@ -50,7 +50,7 @@
               "refresh_token": {
                 "type": "string",
                 "title": "Refresh token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://.com/integrations/sources/linkedin-pages/",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://go.estuary.dev/source-linkedin-pages.",
                 "airbyte_secret": true
               }
             }
@@ -69,7 +69,7 @@
               "access_token": {
                 "type": "string",
                 "title": "Access token",
-                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
+                "description": "The token value generated using the LinkedIn Developers OAuth Token Tools. See the docs to obtain yours: https://go.estuary.dev/source-linkedin-pages",
                 "airbyte_secret": true
               }
             }
@@ -116,11 +116,11 @@
     ],
     "additionalProperties": false
   },
-  "documentationUrl": "https://docs.estuary.dev/reference/Connectors/capture-connectors/linkedin-pages/",
+  "documentationUrl": "https://go.estuary.dev/source-linkedin-pages",
   "oauth2": {
     "provider": "linkedin",
-    "authUrlTemplate": "https://www.linkedin.com/oauth/v2/authorization?client_id=%7B%7B%7Bclient_id%7D%7D%7D&redirect_uri=%7B%7B%23urlencode%7D%7D%7B%7B%7Bredirect_uri%7D%7D%7D%7B%7B%2Furlencode%7D%7D&response_type=code&state=%7B%7B%23urlencode%7D%7D%7B%7B%7Bstate%7D%7D%7D%7B%7B%2Furlencode%7D%7D&scope=r_organization_followers+r_organization_social+rw_organization_admin+r_organization_social_feed+w_member_social+w_organization_social+r_basicprofile+w_organization_social_feed+w_member_social_feed+r_1st_connections_size",
-    "accessTokenUrlTemplate": "https://www.linkedin.com/oauth/v2/accessToken?grant_type=authorization_code&code=%7B%7B%23urlencode%7D%7D%7B%7B%7Bcode%7D%7D%7D%7B%7B%2Furlencode%7D%7D&client_id=%7B%7B%7Bclient_id%7D%7D%7D&client_secret=%7B%7B%7Bclient_secret%7D%7D%7D&redirect_uri=%7B%7B%23urlencode%7D%7D%7B%7B%7Bredirect_uri%7D%7D%7D%7B%7B%2Furlencode%7D%7D",
+    "authUrlTemplate": "https://www.linkedin.com/oauth/v2/authorization?client_id={{{client_id}}}&redirect_uri={{#urlencode}}{{{redirect_uri}}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{state}}}{{/urlencode}}&scope={r_organization_followers%20r_organization_social%20rw_organization_admin%20r_organization_social_feed%20w_member_social%20w_organization_social%20r_basicprofile%20w_organization_social_feed%20w_member_social_feed%20r_1st_connections_size}",
+    "accessTokenUrlTemplate": "https://www.linkedin.com/oauth/v2/accessToken?grant_type=authorization_code&code={{#urlencode}}{{{code}}}{{/urlencode}}&client_id={{{client_id}}}&client_secret={{{client_secret}}}&redirect_uri={{#urlencode}}{{{redirect_uri}}}{{/urlencode}}",
     "accessTokenResponseMap": {
       "access_token": "/access_token",
       "refresh_token": "/refresh_token"

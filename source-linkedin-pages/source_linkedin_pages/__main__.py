@@ -35,15 +35,16 @@ def build_auth_url_template() -> str:
             "r_1st_connections_size",
         ]
     )
-    query = urllib.parse.urlencode(
-        {
-            "client_id": wrap_with_braces("client_id", 3),
-            "redirect_uri": urlencode_field("redirect_uri"),
-            "response_type": "code",
-            "state": urlencode_field("state"),
-            "scope": scopes,
-        }
-    )
+    scopes = urllib.parse.quote(scopes)
+    params = {
+        "client_id": wrap_with_braces("client_id", 3),
+        "redirect_uri": urlencode_field("redirect_uri"),
+        "response_type": "code",
+        "state": urlencode_field("state"),
+        "scope": "{" + scopes + "}",
+    }
+
+    query = "&".join([f"{k}={v}" for k, v in params.items()])
     url = urllib.parse.urlunsplit(
         [
             "https",  # scheme
@@ -57,15 +58,14 @@ def build_auth_url_template() -> str:
 
 
 def build_access_token_url_template() -> str:
-    query = urllib.parse.urlencode(
-        {
-            "grant_type": "authorization_code",
-            "code": urlencode_field("code"),
-            "client_id": wrap_with_braces("client_id", 3),
-            "client_secret": wrap_with_braces("client_secret", 3),
-            "redirect_uri": urlencode_field("redirect_uri"),
-        }
-    )
+    params = {
+        "grant_type": "authorization_code",
+        "code": urlencode_field("code"),
+        "client_id": wrap_with_braces("client_id", 3),
+        "client_secret": wrap_with_braces("client_secret", 3),
+        "redirect_uri": urlencode_field("redirect_uri"),
+    }
+    query = "&".join([f"{k}={v}" for k, v in params.items()])
     url = urllib.parse.urlunsplit(
         [
             "https",  # scheme
