@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test_altertable_addenumcolumn_30213486": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:0"}},"data":"aaa","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:1"}},"data":"bbb","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FAlterTable_AddEnumColumn_30213486":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
