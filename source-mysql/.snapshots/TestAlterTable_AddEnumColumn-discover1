@@ -1,0 +1,130 @@
+Binding 0:
+{
+    "recommended_name": "test_altertable_addenumcolumn_30213486",
+    "resource_config_json": {
+      "namespace": "test",
+      "stream": "AlterTable_AddEnumColumn_30213486"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "TestAlterTable_AddEnumColumn_30213486": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "$anchor": "TestAlterTable_AddEnumColumn_30213486",
+          "properties": {
+            "data": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#TestAlterTable_AddEnumColumn_30213486",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-mysql/mysql-source-info",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "description": "Cursor value representing the current position in the binlog."
+                    },
+                    "txid": {
+                      "type": "string",
+                      "description": "The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table",
+                    "cursor"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#TestAlterTable_AddEnumColumn_30213486"
+        }
+      ]
+    },
+    "key": [
+      "/id"
+    ]
+  }
+

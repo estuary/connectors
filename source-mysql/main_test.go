@@ -435,6 +435,30 @@ func TestAlterTable_DropColumn(t *testing.T) {
 	t.Run("restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestAlterTable_AddEnumColumn(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "30213486"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
+
+	t.Run("discover1", func(t *testing.T) { tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN enumcol ENUM('sm', 'med','lg');", table))
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{3, "eee", "med"},
+		{4, "fff", "lg"},
+		{5, "ggg", "sm"},
+	})
+	t.Run("modified", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	t.Run("discover2", func(t *testing.T) { tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+	cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("rebackfilled", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 // TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"
 // sanity check is working as intended.
 func TestBinlogExpirySanityCheck(t *testing.T) {
