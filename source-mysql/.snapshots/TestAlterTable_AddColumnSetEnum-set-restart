@@ -1,10 +1,10 @@
 # ================================
 # Collection "acmeCo/test/test_altertable_addcolumnsetenum_set_14622082": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnSetEnum_set_14622082","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"eee","id":5,"setCol":"'a','c'"}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnSetEnum_set_14622082","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"fff","id":6,"setCol":"'b','c'"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnSetEnum_set_14622082","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"eee","id":5,"setCol":"a,c"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnSetEnum_set_14622082","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"fff","id":6,"setCol":"b,c"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FAlterTable_AddColumnSetEnum_set_14622082":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","setCol"],"types":{"data":"text","id":"int","setCol":{"enum":["'a'","'b'","'c'"],"type":"set"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FAlterTable_AddColumnSetEnum_set_14622082":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","setCol"],"types":{"data":"text","id":"int","setCol":{"enum":["a","b","c"],"type":"set"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

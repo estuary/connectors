@@ -463,7 +463,7 @@ var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
 
 // enumValueReplacements contains the complete list of MySQL string escapes from
 // https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
-// plus the `”` repeated-single-quote mechanism.
+// plus the `'​'` repeated-single-quote mechanism.
 var enumValueReplacements = map[string]string{
 	`''`: "'",
 	`\0`: "\x00",
@@ -492,13 +492,22 @@ func parseEnumValues(details string) []string {
 	// and take submatch #1 which is the body of each string.
 	var opts []string
 	for _, match := range enumValuesRegexp.FindAllStringSubmatch(details, -1) {
-		var opt = match[1]
-		for old, new := range enumValueReplacements {
-			opt = strings.ReplaceAll(opt, old, new)
-		}
-		opts = append(opts, opt)
+		opts = append(opts, decodeMySQLString(match[1]))
 	}
 	return opts
+}
+
+// decodeStringMySQL decodes a MySQL-format single-quoted string (including
+// possible backslash escapes) and returns it in unquoted, unescaped form.
+func decodeMySQLString(qstr string) string {
+	if strings.HasPrefix(qstr, "'") && strings.HasSuffix(qstr, "'") {
+		qstr = strings.TrimPrefix(qstr, "'")
+		qstr = strings.TrimSuffix(qstr, "'")
+		for old, new := range enumValueReplacements {
+			qstr = strings.ReplaceAll(qstr, old, new)
+		}
+	}
+	return qstr
 }
 
 const queryDiscoverPrimaryKeys = `
