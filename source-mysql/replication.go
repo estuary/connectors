@@ -682,11 +682,30 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 func translateDataType(t sqlparser.ColumnType) any {
 	var typeName = strings.ToLower(t.Type)
 	if typeName == "enum" {
-		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, t.EnumValues...)}
+		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
 	} else if typeName == "set" {
-		return &mysqlColumnType{Type: typeName, EnumValues: t.EnumValues}
+		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
 	}
 	return typeName
+}
+
+// unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted
+// escaped string values such as the EnumValues list returned by the Vitess SQL Parser
+// package when parsing a DDL query involving enum/set values.
+//
+// The single-quote wrapping and escaping of these strings is clearly deliberate, as
+// under the hood the package actually tokenizes the strings to raw values and then
+// explicitly calls `encodeSQLString()` to re-wrap them when building the AST. The
+// actual reason for doing this is unknown however, and it makes very little sense.
+//
+// So whatever, here's a helper function to undo that escaping and get back down to
+// the raw strings again.
+func unquoteEnumValues(values []string) []string {
+	var unquoted []string
+	for _, qval := range values {
+		unquoted = append(unquoted, decodeMySQLString(qval))
+	}
+	return unquoted
 }
 
 func findStr(needle string, cols []string) int {
