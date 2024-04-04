@@ -4,6 +4,15 @@ import asyncio
 import urllib
 from estuary_cdk import shim_airbyte_cdk, flow
 from source_google_analytics_data_api import SourceGoogleAnalyticsDataApi
+import json
+
+accessTokenBody = {
+    "grant_type": "authorization_code",
+    "client_id": "{{{ client_id }}}",
+    "client_secret": "{{{ client_secret }}}",
+    "redirect_uri": "{{{ redirect_uri }}}",
+    "code": "{{{ code }}}",
+}
 
 asyncio.run(
     shim_airbyte_cdk.CaptureShim(
@@ -20,13 +29,7 @@ asyncio.run(
             ),
             accessTokenUrlTemplate="https://oauth2.googleapis.com/token",
             accessTokenHeaders={},
-            accessTokenBody=(
-                "grant_type=authorization_code"
-                r"&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-                r"&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}"
-                r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
-                r"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
-            ),
+            accessTokenBody=json.dumps(accessTokenBody),
             accessTokenResponseMap={
                 "refresh_token": "/refresh_token",
             },

@@ -84,7 +84,7 @@ def string_to_date(d: str, f: str = DATE_FORMAT, old_format=None) -> datetime.da
             return datetime.datetime.strptime(d, old_format).date()
         except ValueError:
             pass
-    return datetime.datetime.strptime(d, f).date()
+    return d
 
 
 def date_to_string(d: datetime.date, f: str = DATE_FORMAT) -> str:
