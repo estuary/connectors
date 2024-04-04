@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"time"
 
@@ -20,12 +19,6 @@ import (
 
 //go:embed schema.json
 var schema string
-
-func handleError(err error) {
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-}
 
 type config struct {
 	AzureClientID       string         `json:"azureClientID"`
@@ -96,16 +89,29 @@ func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 
 	// For this to work, we need to have the azure client installed
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
-	handleError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	client, err := azblob.NewClient(blobUrl, credential, nil)
-	return &azureBlobStore{client: client, cfg: &cfg}, err
+	if err != nil {
+		return nil, err
+	}
+
+	store := &azureBlobStore{client: client, cfg: &cfg}
+
+	err = store.check(context.Background(), cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return store, err
 }
 
-// validateBucket verifies that we can list objects in the bucket and potentially read an object in
+// check verifies that we can list objects in the bucket and potentially read an object in
 // the bucket. This is done in a way that requires only s3:ListBucket and s3:GetObject permissions,
 // since these are the permissions required by the connector.
-func (az *azureBlobStore) validateBucket(ctx context.Context, cfg config) error {
+func (az *azureBlobStore) check(ctx context.Context, cfg config) error {
 	// All we care about is a successful listing rather than iterating on all objects
 
 	maxResults := int32(1)
@@ -128,7 +134,9 @@ func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (fil
 		Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
 	})
 	page, err := pager.NextPage(ctx)
-	handleError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	return &azureBlobListing{
 		ctx:               ctx,
@@ -155,7 +163,11 @@ type azureBlobListing struct {
 }
 
 func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
-	page := l.getPage()
+	page, err := l.getPage()
+
+	if err != nil {
+		return filesource.ObjectInfo{}, err
+	}
 
 	if page == nil {
 		return filesource.ObjectInfo{}, io.EOF
@@ -170,19 +182,22 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 	return filesource.ObjectInfo{Path: *blob.Name, Size: *blob.Properties.ContentLength}, nil
 }
 
-func (l *azureBlobListing) getPage() *azblob.ListBlobsFlatResponse {
+func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 	if l.index < l.currentPageLength {
-		return l.page
+		return l.page, nil
 	}
 	if !l.pager.More() {
-		return nil
+		return nil, nil
 	}
 	page, err := l.pager.NextPage(l.ctx)
-	handleError(err)
+	if err != nil {
+		return nil, err
+	}
+
 	l.page = &page
 	l.currentPageLength = len(page.Segment.BlobItems)
 
-	return &page
+	return &page, nil
 }
 
 func main() {
