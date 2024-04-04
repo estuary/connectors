@@ -21,6 +21,16 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		return nil, err
 	}
 
+	var metaOpReductionStrategy = make(map[string]interface{})
+	if db.HistoryModeEnabled() {
+		metaOpReductionStrategy = map[string]interface{}{
+			"reduce": map[string]interface{}{
+				"strategy":    "lastWriteWins",
+				"associative": false,
+			},
+		}
+	}
+
 	// If there are zero tables (or there's one table but it's the watermarks table) log a warning.
 	var _, watermarksPresent = tables[db.WatermarksTable()]
 	if len(tables) == 0 || len(tables) == 1 && watermarksPresent {
@@ -108,6 +118,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 										"op": {
 											Enum:        []interface{}{"c", "d", "u"},
 											Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+											Extras:      metaOpReductionStrategy,
 										},
 										"source": sourceSchema,
 										"before": {

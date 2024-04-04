@@ -88,11 +88,12 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Address     string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database    string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	HistoryMode bool           `json:"historyMode" jsonschema:"default=true,description=Capture each change event as a separate document, retaining full history of events." jsonschema_extras:"order=4"`
+	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -257,6 +258,10 @@ func (db *postgresDatabase) Close(ctx context.Context) error {
 
 func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &postgresSource{}
+}
+
+func (db *postgresDatabase) HistoryModeEnabled() bool {
+	return db.config.HistoryMode
 }
 
 func (db *postgresDatabase) FallbackCollectionKey() []string {

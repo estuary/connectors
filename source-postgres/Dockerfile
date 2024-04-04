@@ -26,9 +26,10 @@ ENV CI_BUILD=yes
 # RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
 
 # Build the connector.
-RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
-    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
-    go build -o ./connector -v ./source-postgres/...
+#RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
+#    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+#    go build -o ./connector -v ./source-postgres/...
+COPY ./connector ./
 
 
 # Runtime Stage

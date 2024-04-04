@@ -124,6 +124,9 @@ type Database interface {
 	WatermarksTable() string
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) error
+	// HistoryModeEnabled signifies whether the discovered schema should include non-associative parts
+	// to prevent reductions of documents, emulating a "history mode"
+	HistoryModeEnabled() bool
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
