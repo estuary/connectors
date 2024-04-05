@@ -20,15 +20,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
-)
-
-const (
-	// Minimum oplog time difference: see the comment on OplogTimeDifference in
-	// oplog.go
-	minOplogTimediffHours   = 24
-	minOplogTimediffSeconds = minOplogTimediffHours * 60 * 60 // 24 hours, in seconds
 )
 
 type resource struct {
@@ -59,17 +53,7 @@ type config struct {
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the instance." jsonschema_extras:"order=3"`
 
-	// We still don't have any exposed advanced configurations
-	Advanced      advancedConfig `json:"advanced" jsonschema:"-"`
-	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
-}
-
-type advancedConfig struct {
-	// The default value of -5m is useful for production use cases, but when
-	// running our test suite we don't want to wait 5 minutes, so we use this
-	// configuration in our test suite to disable oplog safety buffer. Note that
-	// this is not exposed to users using the `jsonschema:"-"` stanza.
-	OplogSafetyBuffer string `json:"oplogSafetyBuffer" jsonschema:"-"`
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 func (c *config) Validate() error {
@@ -150,8 +134,12 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		}
 	}
 
-	// Create a new client and connect to the server
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd", "zlib", "snappy"})
+	// Create a new client and connect to the server. "Majority" read concern is set to avoid
+	// reading data during backfills that may be rolled back in uncommon situations. This matches
+	// the behavior of change streams, which only represent data that has been majority committed.
+	// This read concern will overwrite any that is set in the connection string parameter
+	// "readConcernLevel".
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd", "zlib", "snappy"}).SetReadConcern(readconcern.Majority())
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -226,10 +214,6 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		}
 	}()
 
-	if _, err = checkOplog(ctx, client); err != nil {
-		return nil, err
-	}
-
 	existingDatabases, err := client.ListDatabaseNames(ctx, bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("getting list of databases: %w", err)
@@ -279,7 +263,6 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	return &pc.Response_Validated{Bindings: bindings}, nil
 }
 
-// ApplyUpsert applies a new or updated capture to the store.
 func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
