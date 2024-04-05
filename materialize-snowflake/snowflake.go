@@ -620,10 +620,16 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	// If we see no results from the REST API for `maxTries` iterations, then we
 	// fallback to asking the `COPY_HISTORY` table. We allow up to 5 minutes for results to show up in the REST API.
-	var maxTries = 60
-	var retryDelaySeconds = 5 * time.Second
-	for pipeName, pipe := range pipes {
-		for tries := 0; tries < maxTries; tries++ {
+	var maxTries = 20
+	var retryDelaySeconds = 3 * time.Second
+	for tries := 0; tries < maxTries; tries++ {
+		for pipeName, pipe := range pipes {
+			// if the pipe has no files to begin with, just skip it
+			// we might have processed all files of this pipe previously
+			if len(pipe.files) == 0 {
+				continue
+			}
+
 			// We first try to check the status of pipes using the REST API's insertReport
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is not the most ergonomic and sometimes does not yield
@@ -637,7 +643,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// which is ahead, and some results have not been seen by us and will not be
 			// seen with the given cursor. So we reset the cursor in this case and try again.
 			if !report.CompleteResult {
-				tries--
 				d.pipeMarkers[pipeName] = ""
 			} else {
 				d.pipeMarkers[pipeName] = report.NextBeginMark
@@ -699,7 +704,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 				// All files have been processed for this pipe, we can skip to the next pipe
 				d.deleteFiles(ctx, []string{pipe.dir})
-				break
+				continue
 			}
 
 			// So long as we are able to get some results from the REST API, we do not
@@ -718,7 +723,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			if len(pipe.files) == 0 {
 				d.deleteFiles(ctx, []string{pipe.dir})
-				break
+				continue
 			} else {
 				time.Sleep(retryDelaySeconds)
 			}
