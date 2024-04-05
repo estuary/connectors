@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "source-oracle"
+version = "0.1.0"
+description = ""
+authors = ["Mahdi <mahdi@estuary.dev>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+flow-sdk = "^0.1.8"
+oracledb = "^2.1.1"
+# pyodbc = "^5.0.1"
+pyodbc = { git = "https://github.com/iloveitaly/pyodbc.git", branch = "custom" }
+python-decouple = "^3.8"
+pendulum = "^3.0.0"
+cachetools = "^5.3.2"
+singer-sdk = "^0.33.1"
+backoff = "^2.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pyright = "^1.1.351"
+pytest = "^7.4.4"
+isort = "^5.13.2"
+debugpy = "^1.8.0"
+pylint-pytest = "^1.1.7"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+exclude = '''
+/(
+  playground
+)/
+'''
+
+[tool.isort]
+profile = "black"
+float_to_top = true
+skip = []
+
