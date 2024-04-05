@@ -1,0 +1,15 @@
+---
+captures:
+  acmeCo/source-oracle:
+    endpoint:
+      local:
+        command:
+          - poetry
+          - run
+          - python
+          - "-m"
+          - source_oracle
+        config: config.yaml
+        env:
+          LOG_LEVEL: debug
+    bindings: []
