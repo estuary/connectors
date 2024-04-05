@@ -1,0 +1,20 @@
+credentials:
+  auth_method: oAuth2.0
+  client_id: 782dm89v4dijz4
+  client_secret_sops: ENC[AES256_GCM,data:NgPttBowFqzdyAuZlRl5Fg==,iv:7By8FHimHGpYXCA57vqTiFH++uVLFaqo/ymMK+H7+mE=,tag:naHF50oMbPsduEr1jiXkRA==,type:str]
+  refresh_token: AQXMroM7SCExt3p0WRkcgGdZawBk9eZgIOao84vEB6W7d--73g-XyjZMdAqbbc0hwZIThulSW0ZsSTykHm85vvlO1TOlFzN6IG_Zaa6AjhRzVSe9Eo2YFG15Ip7keUH8htHlWfGtVc67C2OlNH9UFB_zNR56FPKf8nDEZCGPN65G_CP2NxTXxiqAY8rzhD4L69Xo-HV7bwuRLuM6JY20o9HAVmzgyjbUorvv2w_jwSN5IW_KTiqiw0jWjXsldIM9KTQpmIEHfC6hzFkxe39dVr6XSWfYNRNMUg85v3YJ3imwXcwWkQARbTPNOyFBSJg4jRBsVbaIVmVFDO8AXHe2TRv9Yc8J2Q
+org_id: "65266256"
+sops:
+  kms: []
+  gcp_kms:
+    - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+      created_at: "2024-01-03T20:18:13Z"
+      enc: CiQAdmEdwg//2BiM2VRfoml0CiaFrzldf9Rw0F0k1eVzXUyOqZkSSQCVvC1z1UacMnOFeY14RV/T1kf6C1XsJ3GslDgpq4Is8fo/cfg9STPjfPEq7ZYgWzMwMvWgZUOJHI0BagsAYEcRo0noe4aW5GM=
+  azure_kv: []
+  hc_vault: []
+  age: []
+  lastmodified: "2024-03-15T16:40:36Z"
+  mac: ENC[AES256_GCM,data:wTwsj5Ku2XxwPMNFg1/G+Tz83SD8hXIEBIUu227qKJvaJl9vcTXz9Vtvw2AQmhYV7hrf3TW+3nz7i0v0Z5F0kpvqzBXeYF+YcCraJmtWmWxlCJdZrMmyvzH9RQd4+Ys71D0JMDt7HV3rpMPiCW4WgQFiSldmw9kFSZ2JCxI3URI=,iv:owKyAuGA45Gs9RwDQKmKv3ykILZAkZ5qXE/b9gP2BKw=,tag:S69uEmvd7/2K6RdwIYc4og==,type:str]
+  pgp: []
+  encrypted_suffix: _sops
+  version: 3.8.1
