@@ -1,0 +1,21 @@
+# suiteanalytics token based auth config
+account_sops: ENC[AES256_GCM,data:MZCjSnCFZvKXdNA=,iv:Zkl9c2NlVNSMSM5LiWD0StiUMzJXO1PSIovm/eUx5ao=,tag:DVvHpEtekNCT4rX+LNUZ7A==,type:str]
+consumer_key_sops: null
+consumer_secret_sops: null
+token_id_sops: null
+token_secret_sops: null
+initial_start_date: "2024-01-25T00:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-kms/locations/us-central1/keyRings/test-creds/cryptoKeys/netsuite
+          created_at: "2023-10-11T21:11:12Z"
+          enc: CiQA6Fs2EH/kveoZtkuxodz1VLVX49ObWUV99IzIufXBHzWHchUSSQC8X3F2L6oeWDDxlXJu0CnBMenFWLTVkXXf+MZh/T5w5Leb9DmbHesC++ibeINUztaqmaQcNtns+LcJpDMPH38/ESTnvJi3rW0=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-03-04T15:39:36Z"
+    mac: ENC[AES256_GCM,data:b4H8Dxt2Q1DXh1T4tz8FL46ONQFThtlX5QkUpXJ87OhbS27NbBDAT/GbnH+cRpY2siV44vTLjp5mO43pECimR+OYLHxhyuUCHRBpbKL0lR6tIxAUPNPymaAvM2xG6aPp0MmhqR21qqipaEZVGCl+jveOBbza6thk0ng+TxMt29Y=,iv:Jq5vGgwG4wn4kiAOOKFRWuyDJJxKubGWPL/71eP4a0w=,tag:fEVKY9f2Pk5S1xNfmoflFA==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.0
