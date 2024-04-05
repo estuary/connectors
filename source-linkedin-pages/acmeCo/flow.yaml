@@ -1,0 +1,36 @@
+---
+collections:
+  acmeCo/follower_statistics:
+    schema: follower_statistics.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/organization_lookup:
+    schema: organization_lookup.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/share_statistics:
+    schema: share_statistics.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/total_follower_count:
+    schema:
+      $schema: "http://json-schema.org/draft-04/schema#"
+      additionalProperties: true
+      type: object
+      required:
+        - _meta
+      properties:
+        firstDegreeSize:
+          type:
+            - "null"
+            - integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
