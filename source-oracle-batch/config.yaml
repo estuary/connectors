@@ -1,0 +1,21 @@
+#ENC[AES256_GCM,data:HYjGdhp4tvqA7rSNoVK6eo6KQ5m3cJh6Sw==,iv:GTYU137wn3reOYkBiBV5M0x8r7AmMs7SmSKT4rkNUBU=,tag:pYAs2duPLoHolY2J5AzxTw==,type:comment]
+account: ENC[AES256_GCM,data:QDCqJiZ1mA==,iv:icbcEwr+uudCLvS3Yk3vt3MTgcW7GtgbjbvnxxXWsP4=,tag:6uX642WuUEBbuz/01JQrDg==,type:str]
+connection_type: ENC[AES256_GCM,data:CZOIpJi6FTM3DbgOD0g=,iv:Hd8K1yffjX4pRdHqSBdgy46pEtagkXuqMkbWDOzxLu4=,tag:gK/CpYfZ55grjKH3MUem4Q==,type:str]
+username: ENC[AES256_GCM,data:cCY8nmtzz45SWCwSsRWFkOBN5Q+/Eg==,iv:TTTC3gbUnH82oEBmkEKEPlTIY9cg7ZXBI2xNbwV/Mb8=,tag:k2HrzS2mDl4nl5s6wp2U9w==,type:str]
+password: ENC[AES256_GCM,data:kJZ0Trd3NUcIKu6UALQiwA==,iv:5Q/SYwtSy2ugiFfMg4l8BuRagrbZIpZh0+YEEURThtM=,tag:go9jmWvtjiu+QPFUZIPYtg==,type:str]
+start_date: ENC[AES256_GCM,data:bEnOldehNwLBLA==,iv:UPwzda3XtFh71+LVsO1EN8PthDyQsmYYBPq3CW5BKl8=,tag:h0YUt/+FJxBrkRr5WMtb7g==,type:str]
+suiteanalytics_data_source: ENC[AES256_GCM,data:cB2x3MS9+NE9Pf7L,iv:VFhlx7K0OoiT1ECod1BqOoycrwg4Imsa6mFlmynafmI=,tag:x8lM4YsOU/aKKLTAyiXEmg==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-kms/locations/us-central1/keyRings/test-creds/cryptoKeys/netsuite
+          created_at: "2024-02-29T03:53:09Z"
+          enc: CiQA6Fs2EHbm19HRONeY2C84M/WuFu/jqyJ56nkMsWiS5Ddn7PUSSQA95PQS+XpiNcP41PvZQ+VR1dO6dVoXnEoGelT+kYRg40WiMqzVIHIi6WrdsD9zZL2nUycVB2hfeUQ6o6R2rxcTwg/1yMnL6F4=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-03-04T15:39:20Z"
+    mac: ENC[AES256_GCM,data:PbQtFjqIcEs9XG7utB0VOc+xQNVitQWRRimBKaeEQbWSGbtA9CcVZ9ZRr2vhw7l8v8NBj3/Q1bFBK3USn2bT7arhvCcjhovzLNI38EniUD8rXnnuZFRZSo3lz5BE94j6z9yMBYVO2Oa4XGq8kvWfZKvIPerHtYEBUlE+v9HxDDc=,iv:xtq8/12p4LFRx7IiaDKonL04iKSn3EV9BTE7ac5CXzk=,tag:n8jIC11BLiT3+V0O83kDfg==,type:str]
+    pgp: []
+    unencrypted_suffix: _unencrypted
+    version: 3.8.0
