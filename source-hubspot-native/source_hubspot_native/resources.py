@@ -185,6 +185,7 @@ def crm_object_custom(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         common.open_binding(
             binding,
@@ -393,6 +394,7 @@ def properties(http: HTTPSession) -> common.Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         common.open_binding(
             binding,
