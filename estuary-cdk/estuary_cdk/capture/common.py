@@ -276,6 +276,12 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
             int,
             ResourceState,
             Task,
+            list[
+                tuple[
+                    CaptureBinding[_ResourceConfig],
+                    "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
+                ]
+            ]
         ],
         None,
     ]
@@ -394,6 +400,7 @@ def open(
                 index,
                 state,
                 task,
+                resolved_bindings
             )
 
     return (response.Opened(explicitAcknowledgements=False), _run)
