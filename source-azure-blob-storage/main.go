@@ -21,7 +21,7 @@ import (
 )
 
 //go:embed schema.json
-var schema string
+var jsonSchema string
 
 type config struct {
 	AzureClientID       string         `json:"azureClientID"`
@@ -76,11 +76,6 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
-type azureBlobStore struct {
-	client *azblob.Client
-	cfg    *config
-}
-
 // TODO: Test this
 func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 	os.Setenv("AZURE_CLIENT_ID", cfg.AzureClientID)
@@ -108,6 +103,11 @@ func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 	}
 
 	return store, err
+}
+
+type azureBlobStore struct {
+	client *azblob.Client
+	cfg    *config
 }
 
 // check verifies that we can list objects in the bucket and potentially read an object in
@@ -241,8 +241,48 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 	return &page, nil
 }
 
-func main() {
+type property struct {
+	JsonType    string `json:"type"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Order       int    `json:"order"`
+	Secret      bool   `json:"secret"`
+}
 
+type schema struct {
+	SchemaType string   `json:"$schema"`
+	Title      string   `json:"title"`
+	JsonType   string   `json:"type"`
+	Required   []string `json:"required"`
+	Properties map[string]property
+}
+
+func getConfigSchema(parserJsonSchema json.RawMessage) json.RawMessage {
+	schema := schema{}
+	err := json.Unmarshal([]byte(jsonSchema), &schema)
+	if err != nil {
+		log.Fatalf("Error unmarshalling schema: %v", err)
+		return nil
+	}
+	parserSchema := property{}
+
+	err = json.Unmarshal(parserJsonSchema, &parserSchema)
+	if err != nil {
+		log.Fatalf("Error unmarshalling schema: %v", err)
+		return nil
+	}
+	schema.Properties["parser"] = parserSchema
+
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		log.Fatalf("Error marshalling schema: %v", err)
+		return nil
+	}
+
+	return json.RawMessage(schemaJSON)
+}
+
+func main() {
 	var src = filesource.Source{
 		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
 			var cfg config
@@ -254,10 +294,7 @@ func main() {
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
 			return newAzureBlobStore(cfg.(config))
 		},
-		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
-			jsonSchema := json.RawMessage(schema)
-			return jsonSchema
-		},
+		ConfigSchema:     getConfigSchema,
 		DocumentationURL: "https://go.estuary.dev/source-azure-blob-storage",
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
