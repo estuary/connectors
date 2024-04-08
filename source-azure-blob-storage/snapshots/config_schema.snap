@@ -1,0 +1,69 @@
+
+[TestGetConfigSchema - 1]
+{
+ "$schema": "http://json-schema.org/draft-07/schema#",
+ "Properties": {
+  "credentials": {
+   "credentials": {
+    "azureClientID": "",
+    "azureClientSecret": "",
+    "azureSubscriptionID": "",
+    "azureTenantID": ""
+   },
+   "description": "Azure credentials used to authenticate with Azure Blob Storage.",
+   "order": 0,
+   "secret": false,
+   "title": "Credentials",
+   "type": "object"
+  },
+  "matchKeys": {
+   "credentials": {
+    "azureClientID": "",
+    "azureClientSecret": "",
+    "azureSubscriptionID": "",
+    "azureTenantID": ""
+   },
+   "description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
+   "order": 5,
+   "secret": false,
+   "title": "Match Keys",
+   "type": "string"
+  },
+  "parser": {
+   "credentials": {
+    "azureClientID": "",
+    "azureClientSecret": "",
+    "azureSubscriptionID": "",
+    "azureTenantID": ""
+   },
+   "description": "",
+   "order": 0,
+   "secret": false,
+   "title": "",
+   "type": "object"
+  },
+  "storageAccountName": {
+   "credentials": {
+    "azureClientID": "",
+    "azureClientSecret": "",
+    "azureSubscriptionID": "",
+    "azureTenantID": ""
+   },
+   "description": "The name of the Azure Blob Storage account.",
+   "order": 4,
+   "secret": false,
+   "title": "Storage Account Name",
+   "type": "string"
+  }
+ },
+ "required": [
+  "AzureClientID",
+  "AzureClientSecret",
+  "AzureTenantID",
+  "AzureSubscriptionID",
+  "StorageAccountName"
+ ],
+ "title": "S3 Source",
+ "type": "object"
+}
+---
