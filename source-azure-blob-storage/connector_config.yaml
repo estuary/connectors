@@ -1,0 +1,21 @@
+credentials:
+  azureClientID_sops: ENC[AES256_GCM,data:9gu8IDbwXuFwH7bccQNOLcwyAJ8gd2LnuGBMOL+5R2s5c0Te,iv:vu36V2ilQK0aJZfJYPJiYdV1kQZh0UZE0sMGfmbS2Bc=,tag:ucOQCZCYGwJOgPFVdTxrEw==,type:str]
+  azureClientSecret_sops: ENC[AES256_GCM,data:XiOyj6agRSfJICGNOwtM5C6Y4UF6W8aQU/vLyQv1/hDMhTJigyzRUQ==,iv:WTewaesgNlzISa0hSRSSK60T2Jbq7AbWNFzQ65iRg0o=,tag:M4uUZB0HWDWaMMpMBv5vig==,type:str]
+  azureTenantID_sops: ENC[AES256_GCM,data:5pXY0swfjsZsyu8INa0DmlMTSGRDLyk+pVP4+x8qPC33qiJj,iv:hof7ZtT4gxfci3nQrxPZsxtJqu8iJPCIPzcdtSY1Yzg=,tag:RkVZgocgmUhrz6Slirfc6A==,type:str]
+  azureSubscriptionID_sops: ENC[AES256_GCM,data:ZJ7V9/U/eGg4gZejnMhx73iicoj4nZPtpbzxpMFH9tf/wE0l,iv:mFEquQjK9FfD3hoeL5N1RTOyfaoQk8OmnfJ61VIuE6Y=,tag:b3Jn93E4+6JznFQ4G0azFA==,type:str]
+storageAccountName: ENC[AES256_GCM,data:lzbvQ73BtH3yYA==,iv:yJNsxVas1Pf9Z2+UsHmctaIgNUo2KoRqioUhyfUMr0g=,tag:AowIg7lSP/MUiZqr5TEyxA==,type:str]
+containerName: ENC[AES256_GCM,data:5Fk7tGxovA==,iv:VuBDfEwaG4LaiwOqGcEEwiFNRYTztnG34IOsAP9LMBo=,tag:YMOMGlbHWMfHcycPYgxHlA==,type:str]
+sops:
+  kms: []
+  gcp_kms:
+    - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+      created_at: "2024-04-08T20:49:51Z"
+      enc: CiQAdmEdwjzqHmqCHk4TjN7ifMehaZMiQHHPAn8is89zd1NUTI8SSQCSobQjoTs7si3Mt3Jowl2C8iRDELvOl/owj+N8NJALgfaDBscjZgfLrzWGV+mx6Ds1J32M9d7+f4fgNP5wGKSNHWFaMBsY9ic=
+  azure_kv: []
+  hc_vault: []
+  age: []
+  lastmodified: "2024-04-08T20:49:53Z"
+  mac: ENC[AES256_GCM,data:XK8JyG3201InCV0ysH5d0CQ81WTsgCNPGGVTV479jDHAGCvCFCMv71lLGzvcfpj0uzMjCMEblAQTuBG+F3i/wqzYBabfYULFEyKU+O6AiF7DyrBmC2KAo12x3hfjnUoYoxl258Hy+LCqRER2oe0Rouhr5VxixpsBiw60QCH58+8=,iv:jzi8eNFvo8/z7KUvXqQVt4DgjfZXXcqTZGP1r2e4LCM=,tag:/dR60rCF7bCviTrhB4ECdA==,type:str]
+  pgp: []
+  unencrypted_suffix: _unencrypted
+  version: 3.8.1

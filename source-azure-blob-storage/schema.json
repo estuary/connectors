@@ -10,32 +10,49 @@
         "StorageAccountName"
     ],
     "properties": {
-        "AzureClientID": {
-            "type": "string",
-            "title": "Azure Client ID",
-            "description": "The client ID used to authenticate with Azure Blob Storage.",
-            "order": 0
+        "credentials": {
+            "type": "object",
+            "anyOf": [
+                {
+                    "required": [
+                        "azureClientID",
+                        "azureClientSecret",
+                        "azureTenantID",
+                        "azureSubscriptionID"
+                    ],
+                    "properties": {
+                        "azureClientID": {
+                            "type": "string",
+                            "title": "Azure Client ID",
+                            "description": "The client ID used to authenticate with Azure Blob Storage.",
+                            "order": 0
+                        },
+                        "azureClientSecret": {
+                            "type": "string",
+                            "title": "Azure Client Secret",
+                            "description": "The client secret used to authenticate with Azure Blob Storage.",
+                            "secret": true,
+                            "order": 1
+                        },
+                        "azureTenantID": {
+                            "type": "string",
+                            "title": "Azure Tenant ID",
+                            "description": "The ID of the Azure tenant where the Azure Blob Storage account is located.",
+                            "order": 2
+                        },
+                        "azureSubscriptionID": {
+                            "type": "string",
+                            "title": "Azure Subscription ID",
+                            "description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
+                            "order": 3
+                        }
+                    }
+                }
+            ],
+            "title": "Credentials",
+            "description": "Azure credentials used to authenticate with Azure Blob Storage."
         },
-        "AzureClientSecret": {
-            "type": "string",
-            "title": "Azure Client Secret",
-            "description": "The client secret used to authenticate with Azure Blob Storage.",
-            "secret": true,
-            "order": 1
-        },
-        "AzureTenantID": {
-            "type": "string",
-            "title": "Azure Tenant ID",
-            "description": "The ID of the Azure tenant where the Azure Blob Storage account is located.",
-            "order": 2
-        },
-        "AzureSubscriptionID": {
-            "type": "string",
-            "title": "Azure Subscription ID",
-            "description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
-            "order": 3
-        },
-        "StorageAccountName": {
+        "storageAccountName": {
             "type": "string",
             "title": "Storage Account Name",
             "description": "The name of the Azure Blob Storage account.",

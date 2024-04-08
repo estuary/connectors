@@ -24,14 +24,18 @@ import (
 var jsonSchema string
 
 type config struct {
-	AzureClientID       string         `json:"azureClientID"`
-	AzureClientSecret   string         `json:"azureClientSecret"`
-	AzureTenantID       string         `json:"azureTenantID"`
-	AzureSubscriptionID string         `json:"azureSubscriptionID"`
-	StorageAccountName  string         `json:"storageAccountName"`
-	ContainerName       string         `json:"containerName"`
-	Parser              *parser.Config `json:"parser"`
-	MatchKeys           string         `json:"matchKeys"`
+	Credentials        *credentials   `json:"credentials"`
+	StorageAccountName string         `json:"storageAccountName"`
+	ContainerName      string         `json:"containerName"`
+	Parser             *parser.Config `json:"parser"`
+	MatchKeys          string         `json:"matchKeys"`
+}
+
+type credentials struct {
+	AzureClientID       string `json:"azureClientID"`
+	AzureClientSecret   string `json:"azureClientSecret"`
+	AzureTenantID       string `json:"azureTenantID"`
+	AzureSubscriptionID string `json:"azureSubscriptionID"`
 }
 
 func (c config) Validate() error {
@@ -78,10 +82,10 @@ func (c config) PathRegex() string {
 
 // TODO: Test this
 func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
-	os.Setenv("AZURE_CLIENT_ID", cfg.AzureClientID)
-	os.Setenv("AZURE_CLIENT_SECRET", cfg.AzureClientSecret)
-	os.Setenv("AZURE_TENANT_ID", cfg.AzureTenantID)
-	os.Setenv("AZURE_SUBSCRIPTION_ID", cfg.AzureSubscriptionID)
+	os.Setenv("AZURE_CLIENT_ID", cfg.Credentials.AzureClientID)
+	os.Setenv("AZURE_CLIENT_SECRET", cfg.Credentials.AzureClientSecret)
+	os.Setenv("AZURE_TENANT_ID", cfg.Credentials.AzureTenantID)
+	os.Setenv("AZURE_SUBSCRIPTION_ID", cfg.Credentials.AzureSubscriptionID)
 	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.StorageAccountName)
 
 	// For this to work, we need to have the azure client installed
@@ -242,11 +246,12 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 }
 
 type property struct {
-	JsonType    string `json:"type"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Order       int    `json:"order"`
-	Secret      bool   `json:"secret"`
+	JsonType    string      `json:"type"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Order       int         `json:"order"`
+	Secret      bool        `json:"secret"`
+	Credentials credentials `json:"credentials"`
 }
 
 type schema struct {
