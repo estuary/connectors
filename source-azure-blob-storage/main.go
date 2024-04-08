@@ -80,11 +80,6 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
-type azureBlobStore struct {
-	client *azblob.Client
-	cfg    *config
-}
-
 // TODO: Test this
 func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 	os.Setenv("AZURE_CLIENT_ID", cfg.AzureClientID)
@@ -112,6 +107,11 @@ func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 	}
 
 	return store, err
+}
+
+type azureBlobStore struct {
+	client *azblob.Client
+	cfg    *config
 }
 
 // check verifies that we can list objects in the bucket and potentially read an object in
