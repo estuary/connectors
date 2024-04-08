@@ -453,7 +453,8 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
 var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|# [^\n]*)$`)
-var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
+var createDefinerRegex = `CREATE\s*(OR REPLACE){0,1}\s*(ALGORITHM\s*=\s*[^ ]+)*\s*DEFINER`
+var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
 
 func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
 	// There are basically three types of query events we might receive:
