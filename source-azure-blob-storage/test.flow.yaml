@@ -6,6 +6,6 @@ captures:
         command:
           - "go"
           - "run"
-          - "main.go"
-        config:
+          - "source-azure-blob-storage/main.go"
+        config: connector_config.yaml
     bindings: []

@@ -9,6 +9,8 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
+ENV CGO_ENABLED=0
+ENV GOOS=linux
 RUN go mod download
 
 COPY go         ./go
