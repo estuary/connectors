@@ -29,7 +29,10 @@ func TestCapture(t *testing.T) {
 	stdout, err := cmd.Output()
 	assert.NoError(t, err)
 
-	snaps.MatchSnapshot(t, string(stdout))
+	snaps.WithConfig(
+		snaps.Dir("snapshots"),
+		snaps.Filename("config_schema"),
+	).MatchSnapshot(t, string(stdout))
 }
 
 func TestDiscover(t *testing.T) {
@@ -50,7 +53,10 @@ func TestDiscover(t *testing.T) {
 	stdout, err := cmd.Output()
 	assert.NoError(t, err)
 
-	snaps.MatchJSON(t, string(stdout))
+	snaps.WithConfig(
+		snaps.Dir("snapshots"),
+		snaps.Filename("config_schema"),
+	).MatchJSON(t, string(stdout))
 }
 
 func TestSpec(t *testing.T) {
@@ -68,5 +74,8 @@ func TestSpec(t *testing.T) {
 	stdout, err := cmd.Output()
 	assert.NoError(t, err)
 
-	snaps.MatchJSON(t, string(stdout))
+	snaps.WithConfig(
+		snaps.Dir("snapshots"),
+		snaps.Filename("config_schema"),
+	).MatchJSON(t, string(stdout))
 }

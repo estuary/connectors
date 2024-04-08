@@ -3,39 +3,42 @@
     "title": "S3 Source",
     "type": "object",
     "required": [
-        "bucket",
-        "region"
+        "AzureClientID",
+        "AzureClientSecret",
+        "AzureTenantID",
+        "AzureSubscriptionID",
+        "StorageAccountName"
     ],
     "properties": {
-        "awsAccessKeyId": {
+        "AzureClientID": {
             "type": "string",
-            "title": "AWS Access Key ID",
-            "description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
+            "title": "Azure Client ID",
+            "description": "The client ID used to authenticate with Azure Blob Storage.",
             "order": 0
         },
-        "awsSecretAccessKey": {
+        "AzureClientSecret": {
             "type": "string",
-            "title": "AWS Secret Access Key",
-            "description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
+            "title": "Azure Client Secret",
+            "description": "The client secret used to authenticate with Azure Blob Storage.",
             "secret": true,
             "order": 1
         },
-        "region": {
+        "AzureTenantID": {
             "type": "string",
-            "title": "AWS Region",
-            "description": "The name of the AWS region where the S3 bucket is located.",
+            "title": "Azure Tenant ID",
+            "description": "The ID of the Azure tenant where the Azure Blob Storage account is located.",
             "order": 2
         },
-        "bucket": {
+        "AzureSubscriptionID": {
             "type": "string",
-            "title": "Bucket",
-            "description": "Name of the S3 bucket",
+            "title": "Azure Subscription ID",
+            "description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
             "order": 3
         },
-        "prefix": {
+        "StorageAccountName": {
             "type": "string",
-            "title": "Prefix",
-            "description": "Prefix within the bucket to capture from.",
+            "title": "Storage Account Name",
+            "description": "The name of the Azure Blob Storage account.",
             "order": 4
         },
         "matchKeys": {
@@ -44,26 +47,6 @@
             "format": "regex",
             "description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
             "order": 5
-        },
-        "advanced": {
-            "properties": {
-                "ascendingKeys": {
-                    "type": "boolean",
-                    "title": "Ascending Keys",
-                    "description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo.",
-                    "default": false
-                },
-                "endpoint": {
-                    "type": "string",
-                    "title": "AWS Endpoint",
-                    "description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS"
-                }
-            },
-            "additionalProperties": false,
-            "type": "object",
-            "description": "Options for advanced users. You should not typically need to modify these.",
-            "advanced": true
-        },
-        "parser": ` + string(parserSchema) + `
+        }
     }
 }

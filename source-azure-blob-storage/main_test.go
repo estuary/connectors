@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,4 +28,14 @@ func TestAzureBlobStore_Read(t *testing.T) {
 	az, err := newAzureBlobStore(cfg) // Pass cfg directly instead of its address
 	assert.NoError(t, err)
 	assert.NotNil(t, az)
+}
+func TestGetConfigSchema(t *testing.T) {
+	parserJsonSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
+
+	result := getConfigSchema(parserJsonSchema)
+
+	snaps.WithConfig(
+		snaps.Dir("snapshots"),
+		snaps.Filename("config_schema"),
+	).MatchJSON(t, string(result))
 }
