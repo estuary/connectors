@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-azure-blob-storage:
+    endpoint:
+      local:
+        command:
+          - "go"
+          - "run"
+          - "main.go"
+        config:
+    bindings: []
