@@ -23,6 +23,7 @@ on:
       - "source-zendesk-support/**"
       - "source-iterable/**"
       - "source-pendo/**"
+      - "source-twilio/**"
   pull_request:
     branches: [main]
     paths:
@@ -47,6 +48,7 @@ on:
       - "source-zendesk-support/**"
       - "source-iterable/**"
       - "source-pendo/**"
+      - "source-twilio/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -133,6 +135,10 @@ jobs:
           - name: source-pendo
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-twilio
+            type: capture
+            version: v2
             usage_rate: "1.0"
 
     steps:

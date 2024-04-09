@@ -1,11 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Roles Schema",
+  "required": ["sid"],
   "additionalProperties": true,
-  "type": ["null", "object"],
+  "type": "object",
   "properties": {
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "account_sid": {
       "type": ["null", "string"]
