@@ -104,10 +104,6 @@ collections:
     schema: tickets.schema.yaml
     key:
       - /id
-  acmeCo/venues:
-    schema: venues.schema.yaml
-    key:
-      - /id
   acmeCo/workflows:
     schema: workflows.schema.yaml
     key:

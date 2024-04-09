@@ -4,6 +4,7 @@ credentials:
     credentials_title: OAuth Credentials
     refresh_token_sops: ENC[AES256_GCM,data:kTUyVUuNvofeZxm6+DgSAphLlHXWq5WKiloQz3Og6PHMtkPM,iv:M1xSJpdr5JC8hPF4LNkpXS1B8xkX0pCBNT6FkIYdIcU=,tag:GRd1uvS9JMREAZeSyqixRg==,type:str]
     token_expiry_date: "2024-02-01T17:01:21.703Z"
+start_date: "2024-04-09T12:12:34.898765Z"
 sops:
     kms: []
     gcp_kms:
@@ -13,8 +14,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-04-02T19:03:51Z"
-    mac: ENC[AES256_GCM,data:8zgxwCO13ILg+xRWW1CVP+vtEfazwKZOYvZHo6NHyVxw4xUNzjRQuWcw+y9tcHig46OsY4db1pXc9R7tkj5pyZf7OZ2omCHfy9/r46ylYVAlCAsU9UXUSfrXcCHviWqIGkSuHAtfVNTSFXTVUAX9I066w6oGD/iAIQt1Ac4EXSE=,iv:vZW3taXXEwpnLcmtJ7aAlmBjAoeLyd9BdueHrQHEOck=,tag:nMXHQKwMJmmR21VtTmGtBA==,type:str]
+    lastmodified: "2024-04-09T12:13:21Z"
+    mac: ENC[AES256_GCM,data:5NdZ3gQI+wPijmW6CxkZ+txTskMqn8VJB2YTA4hEMmUCgpkM71tRGh4ZLV9f0nwVSYRcVOnYiqaQrvi5Fi3sACwMvmQxmSMIvR88Hi1THFYWfTs6040WteNXXGCKOr81puUBHl+DzAKx5nb5ov1UO38Utxnl39jeHotG2ngBtdE=,iv:wX+2pRYXIXnosiAv4Hi5st1U1rJttSPp9oXhGuww0Ro=,tag:iKlD7LdQrKtcHsDFR46bqA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
