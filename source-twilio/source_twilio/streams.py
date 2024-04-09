@@ -10,12 +10,14 @@ from urllib.parse import parse_qsl, urlparse
 
 import pendulum
 import requests
+from requests.exceptions import HTTPError
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams import IncrementalMixin
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
 from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
+from airbyte_cdk.exception_handler import AirbyteTracedException
 from pendulum.datetime import DateTime
 from requests.auth import AuthBase
 
@@ -227,14 +229,24 @@ class IncrementalTwilioStream(TwilioStream, IncrementalMixin):
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
         unsorted_records = []
-        for record in super().read_records(sync_mode, cursor_field, stream_slice, stream_state):
-            record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
-            unsorted_records.append(record)
-        sorted_records = sorted(unsorted_records, key=lambda x: x[self.cursor_field])
-        for record in sorted_records:
-            if record[self.cursor_field] >= self.state.get(self.cursor_field, self._start_date):
-                self._cursor_value = record[self.cursor_field]
-                yield record
+        # When slicing dates to search UsageRecords streams
+        # Twilio API will simply return a (20)404 error when not finding any data
+        # in the given slice. read_records will simply raise and break the stream.
+        # To prevent this, one can remove the upper_bound limit and allow the stream to search since the start_date
+        # i choose to maintain the stream behaviour to allow for faster searches before 2020 and simply catch and pass raises.
+        try:
+            for record in super().read_records(sync_mode, cursor_field, stream_slice, stream_state):
+                record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
+                unsorted_records.append(record)
+            sorted_records = sorted(unsorted_records, key=lambda x: x[self.cursor_field])
+            for record in sorted_records:
+                if record[self.cursor_field] >= self.state.get(self.cursor_field, self._start_date):
+                    self._cursor_value = record[self.cursor_field]
+                    yield record
+        except HTTPError:
+            # Catching errors similar to
+            # {"code": 20404, "message": "The requested resource /2010-04-01/Accounts/XXX/Usage/Records.json was not found"}
+            pass
 
 
 class TwilioNestedStream(TwilioStream):
