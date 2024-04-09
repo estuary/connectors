@@ -238,3 +238,23 @@ func TestBackfillModes(t *testing.T) {
 
 	tests.VerifiedCapture(ctx, t, cs)
 }
+
+func TestEmptyBlobs(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "11214558"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a_varchar VARCHAR(32) NOT NULL, a_varbinary VARBINARY(32) NOT NULL)")
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{1, "A", []byte{0xAA, 0xAA, 0xAA, 0xAA}},
+		{2, "B", []byte{}},
+		{3, "", []byte{0xCC, 0xCC, 0xCC, 0xCC}},
+	})
+
+	t.Run("Discovery", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	t.Run("Capture", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+		tests.VerifiedCapture(ctx, t, cs)
+	})
+}
