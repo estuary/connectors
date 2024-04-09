@@ -1,8 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Services Schema",
+  "required": ["sid"],
   "additionalProperties": true,
-  "type": ["null", "object"],
+  "type": "object",
   "properties": {
     "account_sid": {
       "type": ["null", "string"]
@@ -85,7 +86,7 @@
       "type": ["null", "boolean"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "typing_indicator_timeout": {
       "type": ["null", "number"]
