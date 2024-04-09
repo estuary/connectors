@@ -329,7 +329,7 @@ class AvailablePhoneNumberCountries(TwilioNestedStream):
     parent_stream = Accounts
     data_field = "countries"
     subresource_uri_key = "available_phone_numbers"
-    primary_key = None
+    primary_key = "country"
 
 
 class AvailablePhoneNumbersLocal(TwilioNestedStream):
@@ -338,7 +338,7 @@ class AvailablePhoneNumbersLocal(TwilioNestedStream):
     parent_stream = AvailablePhoneNumberCountries
     data_field = "available_phone_numbers"
     subresource_uri_key = "local"
-    primary_key = None
+    primary_key = "phone_number"
 
 
 class AvailablePhoneNumbersMobile(TwilioNestedStream):
@@ -347,7 +347,7 @@ class AvailablePhoneNumbersMobile(TwilioNestedStream):
     parent_stream = AvailablePhoneNumberCountries
     data_field = "available_phone_numbers"
     subresource_uri_key = "mobile"
-    primary_key = None
+    primary_key = "phone_number"
 
 
 class AvailablePhoneNumbersTollFree(TwilioNestedStream):
@@ -356,7 +356,7 @@ class AvailablePhoneNumbersTollFree(TwilioNestedStream):
     parent_stream = AvailablePhoneNumberCountries
     data_field = "available_phone_numbers"
     subresource_uri_key = "toll_free"
-    primary_key = None
+    primary_key = "phone_number"
 
 
 class IncomingPhoneNumbers(TwilioNestedStream):

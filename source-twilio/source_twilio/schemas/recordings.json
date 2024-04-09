@@ -28,7 +28,7 @@
       "type": ["null", "integer"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "price": {
       "type": ["null", "number"]
@@ -47,9 +47,6 @@
     },
     "error_code": {
       "type": ["null", "integer"]
-    },
-    "media_url": {
-      "type": ["null", "string"]
     },
     "uri": {
       "type": ["null", "string"]
@@ -89,5 +86,6 @@
     }
   },
   "type": "object",
+  "required": ["sid"],
   "additionalProperties": true
 }
