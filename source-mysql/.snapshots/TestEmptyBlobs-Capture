@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/test_emptyblobs_11214558": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:0"}},"a_varbinary":"qqqqqg==","a_varchar":"A","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:1"}},"a_varbinary":null,"a_varchar":"B","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:2"}},"a_varbinary":"zMzMzA==","a_varchar":"","id":3}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FEmptyBlobs_11214558":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","a_varchar","a_varbinary"],"types":{"a_varbinary":"varbinary","a_varchar":"varchar","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
