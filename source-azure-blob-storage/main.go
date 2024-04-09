@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -82,14 +81,9 @@ func (c config) PathRegex() string {
 
 // TODO: Test this
 func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
-	os.Setenv("AZURE_CLIENT_ID", cfg.Credentials.AzureClientID)
-	os.Setenv("AZURE_CLIENT_SECRET", cfg.Credentials.AzureClientSecret)
-	os.Setenv("AZURE_TENANT_ID", cfg.Credentials.AzureTenantID)
-	os.Setenv("AZURE_SUBSCRIPTION_ID", cfg.Credentials.AzureSubscriptionID)
 	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.StorageAccountName)
 
-	// For this to work, we need to have the azure client installed
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := azidentity.NewClientSecretCredential(cfg.Credentials.AzureTenantID, cfg.Credentials.AzureClientID, cfg.Credentials.AzureClientSecret, nil)
 	if err != nil {
 		return nil, err
 	}
