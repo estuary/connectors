@@ -3,7 +3,7 @@
     "recommendedName": "companies",
     "resourceConfig": {
       "name": "companies",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -81,14 +81,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -193,7 +193,7 @@
     "recommendedName": "contacts",
     "resourceConfig": {
       "name": "contacts",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -271,14 +271,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -375,7 +375,7 @@
     "recommendedName": "deals",
     "resourceConfig": {
       "name": "deals",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -453,14 +453,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -573,7 +573,7 @@
     "recommendedName": "engagements",
     "resourceConfig": {
       "name": "engagements",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -651,14 +651,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -755,7 +755,7 @@
     "recommendedName": "contact_lists",
     "resourceConfig": {
       "name": "contact_lists",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -772,14 +772,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -827,7 +827,7 @@
     "recommendedName": "contacts_lists_subscription",
     "resourceConfig": {
       "name": "contacts_lists_subscription",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -844,14 +844,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -899,7 +899,7 @@
     "recommendedName": "campaigns",
     "resourceConfig": {
       "name": "campaigns",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -916,14 +916,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -971,7 +971,7 @@
     "recommendedName": "subscription_changes",
     "resourceConfig": {
       "name": "subscription_changes",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -988,14 +988,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -1043,7 +1043,7 @@
     "recommendedName": "email_events",
     "resourceConfig": {
       "name": "email_events",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -1060,14 +1060,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -1115,7 +1115,7 @@
     "recommendedName": "ticket_pipelines",
     "resourceConfig": {
       "name": "ticket_pipelines",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -1193,14 +1193,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -1302,7 +1302,7 @@
     "recommendedName": "deal_pipelines",
     "resourceConfig": {
       "name": "deal_pipelines",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -1319,14 +1319,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -1374,7 +1374,7 @@
     "recommendedName": "engagements_calls",
     "resourceConfig": {
       "name": "engagements_calls",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -1452,14 +1452,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -1588,7 +1588,7 @@
     "recommendedName": "engagements_emails",
     "resourceConfig": {
       "name": "engagements_emails",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -1666,14 +1666,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -1802,7 +1802,7 @@
     "recommendedName": "engagements_meetings",
     "resourceConfig": {
       "name": "engagements_meetings",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -1880,14 +1880,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -2016,7 +2016,7 @@
     "recommendedName": "engagements_notes",
     "resourceConfig": {
       "name": "engagements_notes",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -2094,14 +2094,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -2230,7 +2230,7 @@
     "recommendedName": "engagements_tasks",
     "resourceConfig": {
       "name": "engagements_tasks",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -2308,14 +2308,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -2444,7 +2444,7 @@
     "recommendedName": "goal_targets",
     "resourceConfig": {
       "name": "goal_targets",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -2522,14 +2522,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -2626,7 +2626,7 @@
     "recommendedName": "feedback_submissions",
     "resourceConfig": {
       "name": "feedback_submissions",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -2704,14 +2704,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -2808,7 +2808,7 @@
     "recommendedName": "line_items",
     "resourceConfig": {
       "name": "line_items",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -2886,14 +2886,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -2990,7 +2990,7 @@
     "recommendedName": "products",
     "resourceConfig": {
       "name": "products",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3068,14 +3068,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3172,7 +3172,7 @@
     "recommendedName": "tickets",
     "resourceConfig": {
       "name": "tickets",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3250,14 +3250,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3370,7 +3370,7 @@
     "recommendedName": "marketing_emails",
     "resourceConfig": {
       "name": "marketing_emails",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3387,14 +3387,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3448,7 +3448,7 @@
     "recommendedName": "email_subscriptions",
     "resourceConfig": {
       "name": "email_subscriptions",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3465,14 +3465,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3532,7 +3532,7 @@
     "recommendedName": "marketing_forms",
     "resourceConfig": {
       "name": "marketing_forms",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3549,14 +3549,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3604,7 +3604,7 @@
     "recommendedName": "owners",
     "resourceConfig": {
       "name": "owners",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3621,14 +3621,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3682,7 +3682,7 @@
     "recommendedName": "workflows",
     "resourceConfig": {
       "name": "workflows",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3699,14 +3699,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3760,7 +3760,7 @@
     "recommendedName": "properties",
     "resourceConfig": {
       "name": "properties",
-      "interval": "PT420S"
+      "interval": "PT30S"
     },
     "documentSchema": {
       "$defs": {
@@ -3777,14 +3777,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
@@ -3832,7 +3832,7 @@
     "recommendedName": "venues",
     "resourceConfig": {
       "name": "venues",
-      "interval": "PT420S"
+      "interval": "PT60S"
     },
     "documentSchema": {
       "$defs": {
@@ -3910,14 +3910,14 @@
               "type": "string"
             },
             "row_id": {
+              "default": -1,
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
             }
           },
           "required": [
-            "op",
-            "row_id"
+            "op"
           ],
           "title": "Meta",
           "type": "object"
