@@ -2,7 +2,7 @@
 # Collection "acmeCo/test/test_emptyblobs_11214558": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:0"}},"a_varbinary":"qqqqqg==","a_varchar":"A","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:1"}},"a_varbinary":null,"a_varchar":"B","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:1"}},"a_varbinary":"","a_varchar":"B","id":2}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:2"}},"a_varbinary":"zMzMzA==","a_varchar":"","id":3}
 # ================================
 # Final State Checkpoint
