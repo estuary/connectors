@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-twilio:
+    autoDiscover:
+      addNewBindings: true
+      evolveIncompatibleCollections: true
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-twilio:dev"
+        config: config.yaml
+    bindings: []
