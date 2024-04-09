@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"testing"
 
@@ -377,15 +376,4 @@ func TestPopulateDatabaseResumeTokens(t *testing.T) {
 
 		cupaloy.SnapshotT(t, capture.Summary())
 	})
-}
-
-func makeBinding(t *testing.T, database string, collection string) *flow.CaptureSpec_Binding {
-	t.Helper()
-
-	return &flow.CaptureSpec_Binding{
-		ResourceConfigJson: resourceSpecJson(t, resource{Collection: collection, Database: database}),
-		ResourcePath:       []string{database, collection},
-		Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", collection))},
-		StateKey:           url.QueryEscape(database + "/" + collection),
-	}
 }
