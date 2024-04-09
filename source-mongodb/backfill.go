@@ -130,7 +130,7 @@ func (c *capture) doBackfill(
 	var opts = options.Find().SetHint(bson.M{"_id": 1})
 
 	var filter = bson.D{}
-	if state.Backfill.LastId.Validate() == nil {
+	if !state.Backfill.LastId.IsZero() {
 		var v interface{}
 		if err := state.Backfill.LastId.Unmarshal(&v); err != nil {
 			return fmt.Errorf("unmarshalling last_id: %w", err)
@@ -147,15 +147,10 @@ func (c *capture) doBackfill(
 	lastId := state.Backfill.LastId
 	var docs []primitive.M
 	for cursor.Next(ctx) {
-		// We decode once into a map of RawValues so we can keep the _id as a RawValue. This allows
-		// us to marshal it as an encoded byte array along with its type code in the checkpoint, and
-		// unmarshal it when we want to use it to resume the backfill, ensuring the type of the _id
-		// is consistent through this process
-		var rawDoc map[string]bson.RawValue
-		if err = cursor.Decode(&rawDoc); err != nil {
-			return fmt.Errorf("backfill decoding document raw: %w", err)
+		var err error
+		if lastId, err = cursor.Current.LookupErr(idProperty); err != nil {
+			return fmt.Errorf("looking up idProperty: %w", err)
 		}
-		lastId = rawDoc[idProperty]
 
 		var doc bson.M
 		if err = cursor.Decode(&doc); err != nil {
