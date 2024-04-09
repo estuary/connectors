@@ -81,6 +81,9 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
+    start_date: AwareDatetime = Field(
+        title="start_date",
+    )
 
 
 # We use ResourceState directly, without extending it.
