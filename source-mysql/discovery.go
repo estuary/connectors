@@ -225,7 +225,7 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 		// This can be removed after the backfill buffering changes of August 2023
 		// are complete, since once that's done results should be fully processed
 		// as soon as they're received.
-		val = append([]byte(nil), val...)
+		val = append(make([]byte, 0, len(val)), val...)
 		if typeName, ok := columnType.(string); ok {
 			switch typeName {
 			case "bit":
