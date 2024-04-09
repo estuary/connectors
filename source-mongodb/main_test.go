@@ -102,7 +102,7 @@ func TestCapture(t *testing.T) {
 
 func commonSanitizers() map[string]*regexp.Regexp {
 	sanitizers := make(map[string]*regexp.Regexp)
-	sanitizers[`"globalResumeToken":"<TOKEN>"`] = regexp.MustCompile(`"globalResumeToken":"[^"]*"`)
+	sanitizers[`"<TOKEN>"`] = regexp.MustCompile(`"[A-Za-z0-9+/=]{32,}"`)
 
 	return sanitizers
 }
