@@ -49,7 +49,7 @@
       "type": ["null", "number"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "status": {
       "type": ["null", "string"]
@@ -74,5 +74,6 @@
     }
   },
   "type": "object",
+  "required": ["sid"],
   "additionalProperties": true
 }

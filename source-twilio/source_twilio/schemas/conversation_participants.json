@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": true,
+  "required": ["sid"],
   "properties": {
     "account_sid": {
       "type": ["null", "string"]
@@ -10,7 +11,7 @@
       "type": ["null", "string"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "identity": {
       "type": ["null", "string"]
