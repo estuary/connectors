@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"time"
 	"flag"
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	address   = flag.String("address", "mongodb://localhost?authSource=admin", "MongoDB instance address")
-	user      = flag.String("user", "flow", "Username")
-	password  = flag.String("password", "flow", "Password")
-	database  = flag.String("database", "test", "Database name")
+	address  = flag.String("address", "mongodb://localhost?authSource=admin", "MongoDB instance address")
+	user     = flag.String("user", "flow", "Username")
+	password = flag.String("password", "flow", "Password")
+	database = flag.String("database", "test", "Database name")
 )
 
 func testClient(t *testing.T) (*mongo.Client, config) {
@@ -30,13 +30,10 @@ func testClient(t *testing.T) (*mongo.Client, config) {
 	ctx := context.Background()
 
 	config := config{
-		Address: *address,
-		User: *user,
+		Address:  *address,
+		User:     *user,
 		Password: *password,
 		Database: *database,
-		Advanced: advancedConfig{
-			OplogSafetyBuffer: "0",
-		},
 	}
 
 	var d = driver{}
@@ -76,12 +73,12 @@ func addTestTableData(
 
 		for _, col := range cols {
 			item[col] = map[string]interface{}{
-				"str": fmt.Sprintf("%s val %d", col, idx),
-				"array": []string{"a", "b", "c"},
-				"int": 1,
-				"float": 1.23,
-				"date-max": time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC),
-				"date-min": time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC),
+				"str":         fmt.Sprintf("%s val %d", col, idx),
+				"array":       []string{"a", "b", "c"},
+				"int":         1,
+				"float":       1.23,
+				"date-max":    time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC),
+				"date-min":    time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC),
 				"date-normal": time.Date(2023, 11, 7, 16, 57, 0, 0, time.UTC),
 			}
 		}
@@ -125,7 +122,7 @@ func updateData(
 		item[col] = fmt.Sprintf("%s val %d", col, 0)
 	}
 
-	_, err := col.UpdateOne(ctx, map[string]any{"_id": id}, map[string]any{ "$set": item })
+	_, err := col.UpdateOne(ctx, map[string]any{"_id": id}, map[string]any{"$set": item})
 
 	require.NoError(t, err)
 }
