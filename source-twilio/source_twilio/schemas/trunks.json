@@ -9,7 +9,7 @@
       "type": "string"
     },
     "account_sid": {
-      "type": "string"
+      "type": ["null", "string"]
     },
     "domain_name": {
       "type": ["null", "string"]
@@ -52,8 +52,12 @@
     "auth_type_set": {
       "type": ["null", "array"],
       "items": {
-        "auth_type": {
-          "type": ["null", "string"]
+        "type": ["null", "object"],
+        "additionalProperties": true,
+        "properties": {
+          "auth_type": {
+            "type": ["null", "string"]
+          }
         }
       }
     },

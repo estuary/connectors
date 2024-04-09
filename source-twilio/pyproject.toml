@@ -5,7 +5,7 @@ description = ""
 authors = ["Luis Salomao <luish1980@hotmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<=3.12.2"
+python = ">=3.11,^3.12.1"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 airbyte-cdk = "^0.52"
 pydantic = "1.10.14"
@@ -20,6 +20,7 @@ pytest-insta = "^0.3.0"
 requests-mock = "^1.11.0"
 pytest-mock = "^3.12.0"
 mock = "^5.1.0"
+freezegun = "^1.4.0"
 
 [build-system]
 requires = ["poetry-core"]
