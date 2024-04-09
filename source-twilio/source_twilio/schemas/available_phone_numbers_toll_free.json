@@ -4,7 +4,7 @@
       "type": ["null", "string"]
     },
     "phone_number": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "lata": {
       "type": ["null", "string"]
@@ -55,6 +55,7 @@
       "additionalProperties": true
     }
   },
+  "required": ["phone_number"],
   "type": "object",
   "additionalProperties": true
 }

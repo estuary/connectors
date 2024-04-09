@@ -5,7 +5,10 @@ captures:
       addNewBindings: true
       evolveIncompatibleCollections: true
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-twilio:dev"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_twilio
         config: config.yaml
     bindings: []

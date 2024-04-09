@@ -3,9 +3,10 @@
   "title": "Executions",
   "type": "object",
   "additionalProperties": true,
+  "required": ["sid"],
   "properties": {
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "account_sid": {
       "type": ["null", "string"]

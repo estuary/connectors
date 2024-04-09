@@ -27,7 +27,7 @@
       "type": ["null", "string"]
     },
     "sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "current_value": {
       "type": ["null", "number"]
@@ -53,5 +53,6 @@
     }
   },
   "type": "object",
+  "required": ["sid"],
   "additionalProperties": true
 }
