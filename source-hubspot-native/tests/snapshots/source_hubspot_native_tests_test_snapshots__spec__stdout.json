@@ -69,10 +69,16 @@
             }
           ],
           "title": "Authentication"
+        },
+        "start_date": {
+          "format": "date-time",
+          "title": "start_date",
+          "type": "string"
         }
       },
       "required": [
-        "credentials"
+        "credentials",
+        "start_date"
       ],
       "title": "EndpointConfig",
       "type": "object"
