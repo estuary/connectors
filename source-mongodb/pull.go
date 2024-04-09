@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"math"
-	"reflect"
-	"slices"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -68,14 +66,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}).Info("buildInfo")
 	}
 
-	globalStream, err := globalStream(ctx, client)
+	// TODO(whb): Remove this migration stuff when all migrations are complete - see comment on
+	// `decodeState`.
+	global, err := globalStream(ctx, client)
 	if err != nil {
 		return err
 	}
-
-	// TODO(whb): Replace this with a simple json.Unmarshal when all migrations are complete - see
-	// comment on `decodeState`.
-	prevState, err := decodeState(globalStream, open.StateJson, bindings)
+	prevState, globalToken, err := decodeState(global, open.StateJson, bindings)
 	if err != nil {
 		return fmt.Errorf("decoding state: %w", err)
 	}
@@ -85,6 +82,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("updating resource states: %w", err)
 	}
 
+	if prevState.Resources == nil {
+		prevState.Resources = make(map[boilerplate.StateKey]resourceState)
+	}
+	if prevState.DatabaseResumeTokens == nil {
+		prevState.DatabaseResumeTokens = make(map[string]bson.Raw)
+	}
+
 	var c = capture{
 		client:                 client,
 		output:                 stream,
@@ -92,10 +96,20 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		collectionBindingIndex: collectionBindingIndex,
 	}
 
+	// Get ready to emit documents and checkpoints.
 	c.startEmitter(ctx)
 
 	if err := c.output.Ready(false); err != nil {
 		return err
+	}
+
+	// TODO(whb): More migration stuff to be removed when migrations are complete. A call to
+	// populateDatabaseResumeTokens may emit documents but will not emit a checkpoint. A full
+	// checkpoint will be emitted immediately after this though.
+	if globalToken != nil {
+		if err := c.populateDatabaseResumeTokens(ctx, *globalToken); err != nil {
+			return fmt.Errorf("populating database-specific tokens from global resume token: %w", err)
+		}
 	}
 
 	// Persist the checkpoint in full, which may have been updated in updateResourceStates to remove
@@ -119,7 +133,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
 		// and streamCatchup catches up the streams to the present and closes the cursors out while
 		// the backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, globalStream, bindings); err != nil {
+		if streams, err := c.initializeStreams(ctx, bindings); err != nil {
 			return err
 		} else if err := c.streamCatchup(ctx, streams); err != nil {
 			return err
@@ -135,7 +149,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	streams, err := c.initializeStreams(ctx, globalStream, bindings)
+	streams, err := c.initializeStreams(ctx, bindings)
 	if err != nil {
 		return err
 	}
@@ -175,104 +189,22 @@ type bindingInfo struct {
 type captureState struct {
 	Resources map[boilerplate.StateKey]resourceState `json:"bindingStateV1,omitempty"`
 
-	// GlobalResumeToken is used when the capture user has permissiosn to read all database of the
+	// GlobalResumeToken is used when the capture user has permissions to read all database of the
 	// deployment, and a deployment-wide change stream can be used.
-	GlobalResumeToken bson.Raw `json:"globalResumeToken,omitempty"`
+	// GlobalResumeToken bson.Raw `json:"globalResumeToken,omitempty"`
 
 	// DatabaseResumeTokens is a mapping of database names to their respective change stream resume
 	// token. Database-specific change streams are used when a deployment-wide one can't be.
 	DatabaseResumeTokens map[string]bson.Raw `json:"databaseResumeTokens,omitempty"`
 }
 
-// decodeState is mostly a pile of gnarly code to deal with migrating from `oldCaptureState` to
-// `captureState`. It does a partial unmarshalling of the provided `stateJson` to determine if the
-// checkpoint is from a prior structure, and arranges pre-existing data into the new checkpoint
-// structure, if applicable. We should get rid of this when all existing tasks have migrated to the
-// new checkpoints.
-func decodeState(
-	globalStream bool,
-	stateJson json.RawMessage,
-	bindings []bindingInfo,
-) (captureState, error) {
-	if stateJson == nil || reflect.DeepEqual(stateJson, json.RawMessage("{}")) {
-		return captureState{
-			Resources:            make(map[boilerplate.StateKey]resourceState),
-			DatabaseResumeTokens: make(map[string]bson.Raw),
-		}, nil
-	}
-
-	// Is this an old form the capture state? If so it needs to be migrated.
-	var initialState map[string]json.RawMessage
-	if err := json.Unmarshal(stateJson, &initialState); err != nil {
-		return captureState{}, fmt.Errorf("initial decode of stateJson: %w", err)
-	}
-
-	var resources map[boilerplate.StateKey]resourceState
-	if res, ok := initialState["bindingStateV1"]; ok {
-		if err := json.Unmarshal(res, &resources); err != nil {
-			return captureState{}, fmt.Errorf("unmarshal res into resources: %w", err)
-		}
-	} else {
-		resources = make(map[boilerplate.StateKey]resourceState)
-	}
-
-	tokJson, ok := initialState["stream_resume_token"]
-	if !ok {
-		// This is a new state checkpoint which does not have to be migrated.
-		var out captureState
-		if err := json.Unmarshal(stateJson, &out); err != nil {
-			return captureState{}, fmt.Errorf("unmarshal stateJson: %w", err)
-		}
-
-		return out, nil
-	}
-
-	// Otherwise, this is an old state that must be migrated.
-	out := captureState{
-		Resources: resources,
-	}
-
-	var tok bson.Raw
-	if err := json.Unmarshal(tokJson, &tok); err != nil {
-		return captureState{}, fmt.Errorf("unmarshal tokJson into tok: %w", err)
-	}
-
-	if globalStream {
-		log.WithFields(log.Fields{
-			"resumeToken": tok.String(),
-		}).Info("migrated state with global change stream")
-
-		out.GlobalResumeToken = tok
-	} else {
-		// This is for a database-level stream. Previous versions of the connector only
-		// allowed for a database-level stream if there was a single database, so it
-		// must be for that one.
-		var db string
-		for _, b := range bindings {
-			if db != "" && b.resource.Database != db {
-				// Sanity check.
-				return captureState{}, fmt.Errorf("found multiple databases with a database-level change stream")
-			}
-			db = b.resource.Database
-		}
-
-		log.WithFields(log.Fields{
-			"db":          db,
-			"resumeToken": tok.String(),
-		}).Info("migrated state with database-level change stream")
-
-		out.DatabaseResumeTokens = map[string]bson.Raw{db: tok}
-	}
-
-	return out, nil
-}
-
 func updateResourceStates(prevState captureState, bindings []bindingInfo) (captureState, error) {
 	var newState = captureState{
 		Resources:            make(map[boilerplate.StateKey]resourceState),
-		GlobalResumeToken:    prevState.GlobalResumeToken,
-		DatabaseResumeTokens: prevState.DatabaseResumeTokens,
+		DatabaseResumeTokens: make(map[string]bson.Raw),
 	}
+
+	trackedDatabases := make(map[string]struct{})
 
 	// Only include bindings in the state that are currently active bindings. This is necessary
 	// because the Flow runtime does not yet automatically prune stateKeys that are no longer
@@ -283,24 +215,21 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 		var sk = binding.stateKey
 		if resState, ok := prevState.Resources[sk]; ok {
 			newState.Resources[sk] = resState
+			trackedDatabases[binding.resource.Database] = struct{}{}
 		}
 	}
 
-	// Reset the global resume token if there are no active resources, and also the
-	// database-specific resume tokens if there are no active resources for that database.
-	if len(newState.Resources) == 0 && newState.GlobalResumeToken != nil {
-		log.WithField("priorToken", newState.GlobalResumeToken).Info("resetting global change stream resume token")
-		newState.GlobalResumeToken = nil
-	}
-
-	for db, tok := range newState.DatabaseResumeTokens {
-		if !slices.ContainsFunc(bindings, func(b bindingInfo) bool { return b.resource.Database == db }) {
+	// Reset the database resume tokens if there are no active bindings for a given database.
+	for db, tok := range prevState.DatabaseResumeTokens {
+		if _, ok := trackedDatabases[db]; !ok {
 			log.WithFields(log.Fields{
 				"database":   db,
-				"priorToken": tok.String(),
+				"priorToken": tok,
 			}).Info("reseting change stream resume token for database")
-			delete(newState.DatabaseResumeTokens, db)
+			continue
 		}
+
+		newState.DatabaseResumeTokens[db] = tok
 	}
 
 	return newState, nil

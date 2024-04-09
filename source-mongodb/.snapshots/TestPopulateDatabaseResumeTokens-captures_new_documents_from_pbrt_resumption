@@ -1,0 +1,17 @@
+# ================================
+# Collection "acmeCo/test/collectionOne": 1 Documents
+# ================================
+{"_id":"collection_one_second_value","_meta":{"op":"c"}}
+# ================================
+# Collection "acmeCo/test/collectionThree": 1 Documents
+# ================================
+{"_id":"collection_three_second_value","_meta":{"op":"c"}}
+# ================================
+# Collection "acmeCo/test/collectionTwo": 1 Documents
+# ================================
+{"_id":"collection_two_second_value","_meta":{"op":"c"}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_db_1%2FcollectionOne":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}},"test_db_2%2FcollectionTwo":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}},"test_db_3%2FcollectionThree":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}}},"databaseResumeTokens":{"test_db_1":"<TOKEN>","test_db_2":"<TOKEN>","test_db_3":"<TOKEN>"}}
+

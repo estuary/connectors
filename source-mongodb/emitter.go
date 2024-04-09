@@ -8,6 +8,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/segmentio/encoding/json"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/exp/maps"
 )
 
 // emitter provides synchronization for emitted documents and checkpoints, as well as updating the
@@ -114,16 +115,12 @@ func (c *capture) emitEvent(ctx context.Context, e emitEvent) error {
 }
 
 func (c *capture) handleStreamEvent(event streamEvent) error {
-	if event.stateUpdate.GlobalResumeToken != nil && event.stateUpdate.DatabaseResumeTokens != nil {
-		return fmt.Errorf("application error: global resume token and database-specific resume token were both set")
-	} else if event.stateUpdate.GlobalResumeToken != nil {
-		c.state.GlobalResumeToken = event.stateUpdate.GlobalResumeToken
-	} else if event.stateUpdate.DatabaseResumeTokens != nil {
-		for db, tok := range event.stateUpdate.DatabaseResumeTokens {
-			c.state.DatabaseResumeTokens[db] = tok
-		}
-	} else {
-		return fmt.Errorf("application error: must set either GlobalResumeToken or DatabaseResumeTokens")
+	if l := len(maps.Keys(event.stateUpdate.DatabaseResumeTokens)); l != 1 {
+		return fmt.Errorf("application error: must set a single resume token for handleStreamEvent, got %d key/value pairs", l)
+	}
+
+	for db, tok := range event.stateUpdate.DatabaseResumeTokens {
+		c.state.DatabaseResumeTokens[db] = tok
 	}
 
 	if event.doc != nil {

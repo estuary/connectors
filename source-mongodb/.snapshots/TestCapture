@@ -46,5 +46,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FcollectionOne":{"backfill":{"done":true,"last_id":{"Type":2,"Value":"CQAAAHBrIHZhbCA0AA=="}}},"test%2FcollectionThree":{"backfill":{"done":true,"last_id":{"Type":5,"Value":"CAAAAABwayB2YWwgNA=="}}},"test%2FcollectionTwo":{"backfill":{"done":true,"last_id":{"Type":16,"Value":"BAAAAA=="}}}},"globalResumeToken":"<TOKEN>"}
+{"bindingStateV1":{"test%2FcollectionOne":{"backfill":{"done":true,"last_id":{"Type":2,"Value":"CQAAAHBrIHZhbCA0AA=="}}},"test%2FcollectionThree":{"backfill":{"done":true,"last_id":{"Type":5,"Value":"CAAAAABwayB2YWwgNA=="}}},"test%2FcollectionTwo":{"backfill":{"done":true,"last_id":{"Type":16,"Value":"BAAAAA=="}}}},"databaseResumeTokens":{"test":"<TOKEN>"}}
 

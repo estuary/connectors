@@ -12,12 +12,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// changeStream associates a *mongo.ChangeStream with metadata about which database it is for and if
-// it is a global change stream for checkpointing.
+// changeStream associates a *mongo.ChangeStream with metadata about which database it is for.
 type changeStream struct {
-	ms       *mongo.ChangeStream
-	database string
-	isGlobal bool
+	ms *mongo.ChangeStream
+	db string
 }
 
 // makeStreamEvent produces an appropriate streamEvent for a provided changeEvent decoded from this
@@ -29,11 +27,8 @@ func (cs *changeStream) makeStreamEvent(ev *changeEvent, collectionBindingIndex 
 		return streamEvent{}, fmt.Errorf("application error: got a nil resume token")
 	}
 
-	stateUpdate := captureState{}
-	if cs.isGlobal {
-		stateUpdate.GlobalResumeToken = tok
-	} else {
-		stateUpdate.DatabaseResumeTokens = map[string]bson.Raw{cs.database: tok}
+	stateUpdate := captureState{
+		DatabaseResumeTokens: map[string]bson.Raw{cs.db: tok},
 	}
 
 	out := streamEvent{
@@ -47,49 +42,54 @@ func (cs *changeStream) makeStreamEvent(ev *changeEvent, collectionBindingIndex 
 
 	binding, ok := collectionBindingIndex[eventResourceId(*ev)]
 	if ok {
+		// Event is for a monitored collection.
 		out.binding = binding
-
-		switch ev.OperationType {
-		case "insert", "update", "replace":
-			if ev.FullDocument == nil {
-				// FullDocument can be "null" for these operations if another operation has deleted
-				// the document. This happens because update change events do not hold a copy of the
-				// full document, but rather it is at query time that the full document is looked
-				// up, and in these cases, the FullDocument can end up being null (if deleted) or
-				// different from the deltas in the update event. We ignore events where
-				// FullDocument is null. Another change event of type delete will eventually come
-				// and delete the document.
-				return out, nil
-			}
-
-			doc := sanitizeDocument(ev.FullDocument)
-
-			var op string
-			if ev.OperationType == "update" || ev.OperationType == "replace" {
-				op = "u"
-			} else if ev.OperationType == "insert" {
-				op = "c"
-			}
-			doc[metaProperty] = map[string]any{
-				opProperty: op,
-			}
-
-			out.doc = doc
-		case "delete":
-			var doc = map[string]any{
-				idProperty: ev.DocumentKey.Id,
-				metaProperty: map[string]any{
-					opProperty: "d",
-				},
-			}
-
-			out.doc = sanitizeDocument(doc)
-		default:
-			// Event is of an operation type that we don't care about.
-		}
+		out.doc = makeEventDocument(ev)
 	}
 
 	return out, nil
+}
+
+func makeEventDocument(ev *changeEvent) map[string]any {
+	switch ev.OperationType {
+	case "insert", "update", "replace":
+		if ev.FullDocument == nil {
+			// FullDocument can be "null" for these operations if another operation has deleted
+			// the document. This happens because update change events do not hold a copy of the
+			// full document, but rather it is at query time that the full document is looked
+			// up, and in these cases, the FullDocument can end up being null (if deleted) or
+			// different from the deltas in the update event. We ignore events where
+			// FullDocument is null. Another change event of type delete will eventually come
+			// and delete the document.
+			return nil
+		}
+
+		doc := sanitizeDocument(ev.FullDocument)
+
+		var op string
+		if ev.OperationType == "update" || ev.OperationType == "replace" {
+			op = "u"
+		} else if ev.OperationType == "insert" {
+			op = "c"
+		}
+		doc[metaProperty] = map[string]any{
+			opProperty: op,
+		}
+
+		return doc
+	case "delete":
+		var doc = map[string]any{
+			idProperty: ev.DocumentKey.Id,
+			metaProperty: map[string]any{
+				opProperty: "d",
+			},
+		}
+
+		return sanitizeDocument(doc)
+	default:
+		// Event is of an operation type that we don't care about.
+		return nil
+	}
 }
 
 type docKey struct {
@@ -121,91 +121,42 @@ var (
 			"operationType": 1,
 			"fullDocument":  1,
 			"ns":            1,
+			"clusterTime":   1,
 		}}},
 	}
 )
 
-func globalStream(
-	ctx context.Context,
-	client *mongo.Client,
-) (bool, error) {
-	cs, err := client.Watch(ctx, mongo.Pipeline{})
-	if err != nil {
-		if e, ok := err.(mongo.ServerError); ok {
-			if e.HasErrorMessage("not authorized on admin to execute command") || e.HasErrorMessage("user is not allowed to do action [changeStream] on [admin.]") {
-				log.Info("will use database-level streams since user is not authorized for a global stream")
-				return false, nil
-			}
-		}
-		return false, fmt.Errorf("checking for global stream permissions: %w", err)
-	}
-	if err := cs.Close(ctx); err != nil {
-		return false, fmt.Errorf("closing global stream test cursor: %w", err)
-	}
-
-	log.Info("using global change stream")
-	return true, nil
-}
-
-// initializeStreams starts change streams for the capture; either a single global stream if
-// `global` is true, or a database-level change stream for each unique database. Streams are started
-// from any prior resume tokens stored in the capture's state.
+// initializeStreams starts change streams for the capture. Streams are started from any prior
+// resume tokens stored in the capture's state.
 func (c *capture) initializeStreams(
 	ctx context.Context,
-	global bool,
 	bindings []bindingInfo,
 ) ([]changeStream, error) {
 	var out []changeStream
 
-	// Initialize a separate set of options for each stream, so that I don't have to figure out if
-	// it is OK to re-use the options object for creating multiple streams when changing the resume
-	// token after each stream is initialized.
-	makeOpts := func() *options.ChangeStreamOptions {
-		return options.ChangeStream().SetFullDocument(options.UpdateLookup)
-	}
+	started := make(map[string]bool)
+	for _, b := range bindings {
+		var db = b.resource.Database
 
-	if global {
-		opts := makeOpts()
-		if c.state.GlobalResumeToken != nil {
-			opts = opts.SetResumeAfter(c.state.GlobalResumeToken)
+		if started[db] {
+			continue
+		}
+		started[db] = true
+
+		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
+			opts = opts.SetResumeAfter(t)
 		}
 
-		cs, err := c.client.Watch(ctx, pl, opts)
+		ms, err := c.client.Database(db).Watch(ctx, pl, opts)
 		if err != nil {
-			return nil, fmt.Errorf("initializing global change stream: %w", err)
+			return nil, fmt.Errorf("initializing change stream on database %q: %w", db, err)
 		}
 
 		out = append(out, changeStream{
-			ms:       cs,
-			database: "",
-			isGlobal: true,
+			ms: ms,
+			db: db,
 		})
-	} else {
-		started := make(map[string]bool)
-		for _, b := range bindings {
-			var db = b.resource.Database
-
-			if started[db] {
-				continue
-			}
-			started[db] = true
-
-			opts := makeOpts()
-			if t, ok := c.state.DatabaseResumeTokens[db]; ok {
-				opts = opts.SetResumeAfter(t)
-			}
-
-			cs, err := c.client.Database(db).Watch(ctx, &pl, opts)
-			if err != nil {
-				return nil, fmt.Errorf("initializing change stream on database %q: %w", db, err)
-			}
-
-			out = append(out, changeStream{
-				ms:       cs,
-				database: db,
-				isGlobal: false,
-			})
-		}
 	}
 
 	return out, nil
@@ -233,7 +184,7 @@ func (c *capture) streamForever(
 
 			for {
 				if err := c.tryStream(groupCtx, s, nil); err != nil {
-					return fmt.Errorf("change stream for %q (global: %t): %w", s.database, s.isGlobal, err)
+					return fmt.Errorf("change stream for %q: %w", s.db, err)
 				}
 			}
 		})
@@ -285,9 +236,9 @@ func (c *capture) streamCatchup(
 		s := s
 		group.Go(func() error {
 			if err := c.tryStream(groupCtx, s, &helloRes.LastWrite.OpTime.Ts); err != nil {
-				return fmt.Errorf("catching up stream for %q (global: %t): %w", s.database, s.isGlobal, err)
+				return fmt.Errorf("catching up stream for %q: %w", s.db, err)
 			} else if err := s.ms.Close(groupCtx); err != nil {
-				return fmt.Errorf("catching up stream closing cursor for %q (global: %t): %w", s.database, s.isGlobal, err)
+				return fmt.Errorf("catching up stream closing cursor for %q: %w", s.db, err)
 			}
 
 			return nil
@@ -307,7 +258,7 @@ func (c *capture) tryStream(
 	for s.ms.TryNext(ctx) {
 		var ev changeEvent
 		if err := s.ms.Decode(&ev); err != nil {
-			return fmt.Errorf("change stream decoding document %#v: %w", s, err)
+			return fmt.Errorf("change stream decoding document: %w", err)
 		} else if emit, err := s.makeStreamEvent(&ev, c.collectionBindingIndex); err != nil {
 			return fmt.Errorf("change stream making stream event: %w", err)
 		} else if err := c.emitEvent(ctx, emit); err != nil {
@@ -316,8 +267,7 @@ func (c *capture) tryStream(
 
 		if tsCutoff != nil && ev.ClusterTime.After(*tsCutoff) {
 			log.WithFields(log.Fields{
-				"database":         s.database,
-				"isGlobal":         s.isGlobal,
+				"database":         s.db,
 				"eventClusterTime": ev.ClusterTime,
 			}).Info("catch up stream reached cluster OpTime high watermark")
 			// Early return without a checkpoint for the "post batch resume token", since by
