@@ -43,7 +43,6 @@ require (
 	github.com/jackc/pgtype v1.11.0
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/jmoiron/sqlx v1.3.3
-	github.com/joho/godotenv v1.4.0
 	github.com/klauspost/compress v1.17.2
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
