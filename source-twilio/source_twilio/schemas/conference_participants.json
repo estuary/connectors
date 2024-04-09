@@ -1,7 +1,7 @@
 {
   "properties": {
     "account_sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "call_sid": {
       "type": ["null", "string"]
@@ -10,7 +10,7 @@
       "type": ["null", "string"]
     },
     "conference_sid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "date_created": {
       "format": "date-time",
@@ -45,6 +45,7 @@
       "type": ["null", "string"]
     }
   },
+  "required": ["account_sid","conference_sid"],
   "type": "object",
   "additionalProperties": true
 }
