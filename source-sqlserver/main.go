@@ -30,16 +30,6 @@ var sqlserverDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
 	Connect:          connectSQLServer,
-	HistoryMode:      historyMode,
-}
-
-func historyMode(cfg json.RawMessage) (bool, error) {
-	var config Config
-	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
-		return false, fmt.Errorf("error parsing config json: %w", err)
-	}
-
-	return config.HistoryMode, nil
 }
 
 const defaultPort = "1433"
@@ -202,6 +192,10 @@ type sqlserverDatabase struct {
 	conn   *sql.DB
 
 	datetimeLocation *time.Location // The location in which to interpret DATETIME column values as timestamps.
+}
+
+func (db *sqlserverDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
 }
 
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
