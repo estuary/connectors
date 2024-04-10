@@ -38,16 +38,6 @@ var postgresDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-postgresql",
 	Connect:          connectPostgres,
-	HistoryMode:      historyMode,
-}
-
-func historyMode(cfg json.RawMessage) (bool, error) {
-	var config Config
-	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
-		return false, fmt.Errorf("error parsing config json: %w", err)
-	}
-
-	return config.HistoryMode, nil
 }
 
 // The standard library `time.RFC3339Nano` is wrong for historical reasons, this
@@ -220,6 +210,10 @@ type postgresDatabase struct {
 	conn         *pgx.Conn
 	explained    map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs map[string]bool     // Tracks which tables should have XID properties in their replication metadata
+}
+
+func (db *postgresDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
 }
 
 func (db *postgresDatabase) connect(ctx context.Context) error {
