@@ -15,7 +15,7 @@ import (
 
 // DiscoverCatalog queries the database and generates discovered bindings
 // describing the available tables and their columns.
-func DiscoverCatalog(ctx context.Context, db Database, historyMode bool) ([]*pc.Response_Discovered_Binding, error) {
+func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovered_Binding, error) {
 	tables, err := db.DiscoverTables(ctx)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func DiscoverCatalog(ctx context.Context, db Database, historyMode bool) ([]*pc.
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
-	if historyMode {
+	if db.HistoryMode() {
 		sourceSchema.Extras = map[string]interface{}{
 			"reduce": map[string]interface{}{
 				"strategy":    "lastWriteWins",
