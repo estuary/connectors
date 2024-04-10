@@ -28,6 +28,12 @@
         "default": "postgres",
         "order": 3
       },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": true,
+        "order": 4
+      },
       "advanced": {
         "properties": {
           "publicationName": {
@@ -121,7 +127,8 @@
       "address",
       "user",
       "password",
-      "database"
+      "database",
+      "historyMode"
     ],
     "title": "PostgreSQL Connection"
   },
@@ -145,12 +152,14 @@
       "namespace": {
         "type": "string",
         "title": "Schema",
-        "description": "The schema (namespace) in which the table resides."
+        "description": "The schema (namespace) in which the table resides.",
+        "readOnly": true
       },
       "stream": {
         "type": "string",
         "title": "Table Name",
-        "description": "The name of the table to be captured."
+        "description": "The name of the table to be captured.",
+        "readOnly": true
       }
     },
     "type": "object",
