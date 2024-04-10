@@ -45,16 +45,6 @@ var mysqlDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-mysql",
 	Connect:          connectMySQL,
-	HistoryMode:      historyMode,
-}
-
-func historyMode(cfg json.RawMessage) (bool, error) {
-	var config Config
-	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
-		return false, fmt.Errorf("error parsing config json: %w", err)
-	}
-
-	return config.HistoryMode, nil
 }
 
 func main() {
@@ -221,6 +211,10 @@ type mysqlDatabase struct {
 	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
 	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
 	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
+}
+
+func (db *mysqlDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
 }
 
 func (db *mysqlDatabase) connect(ctx context.Context) error {

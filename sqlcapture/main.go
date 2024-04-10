@@ -92,8 +92,7 @@ type Driver struct {
 	ConfigSchema     json.RawMessage
 	DocumentationURL string
 
-	Connect     func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
-	HistoryMode func(cfg json.RawMessage) (bool, error)
+	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
 }
 
 type prerequisitesError struct {
@@ -183,12 +182,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	}
 	defer db.Close(ctx)
 
-	historyMode, err := d.HistoryMode(req.ConfigJson)
-	if err != nil {
-		return nil, fmt.Errorf("error checking history mode: %w", err)
-	}
-
-	if _, err := DiscoverCatalog(ctx, db, historyMode); err != nil {
+	if _, err := DiscoverCatalog(ctx, db); err != nil {
 		return nil, err
 	}
 
@@ -225,12 +219,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	}
 	defer db.Close(ctx)
 
-	historyMode, err := d.HistoryMode(req.ConfigJson)
-	if err != nil {
-		return nil, fmt.Errorf("error checking history mode: %w", err)
-	}
-
-	discoveredBindings, err := DiscoverCatalog(ctx, db, historyMode)
+	discoveredBindings, err := DiscoverCatalog(ctx, db)
 	if err != nil {
 		return nil, err
 	}
