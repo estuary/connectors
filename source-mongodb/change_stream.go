@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -143,8 +144,11 @@ func (c *capture) initializeStreams(
 		}
 		started[db] = true
 
+		logEntry := log.WithField("db", db)
+
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
+			logEntry = logEntry.WithField("resumeToken", t)
 			opts = opts.SetResumeAfter(t)
 		}
 
@@ -152,6 +156,8 @@ func (c *capture) initializeStreams(
 		if err != nil {
 			return nil, fmt.Errorf("initializing change stream on database %q: %w", db, err)
 		}
+
+		logEntry.Info("intialized change stream")
 
 		out = append(out, changeStream{
 			ms: ms,
@@ -175,6 +181,11 @@ func (c *capture) streamForever(
 	ctx context.Context,
 	streams []changeStream,
 ) error {
+	c.startStreamLogger()
+	defer c.stopStreamLogger()
+
+	log.Info("streaming change events indefinitely")
+
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
@@ -215,6 +226,9 @@ func (c *capture) streamCatchup(
 	ctx context.Context,
 	streams []changeStream,
 ) error {
+	c.startStreamLogger()
+	defer c.stopStreamLogger()
+
 	// First get the current majority-committed operation time, which will be our high
 	// watermark for catching up the stream. Generally we would reach the "end" of the
 	// stream and TryNext will return `false`, but in cases where the stream has a high rate
@@ -228,14 +242,24 @@ func (c *capture) streamCatchup(
 	if err := result.Decode(&helloRes); err != nil {
 		return fmt.Errorf("decoding server 'hello' response: %w", err)
 	}
-	log.WithField("serverHello", helloRes).Info("catching up streams")
+
+	opTime := helloRes.LastWrite.OpTime.Ts
+	log.WithField("lastWriteOpTime", opTime).Info("catching up streams")
 
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
 		s := s
 		group.Go(func() error {
-			if err := c.tryStream(groupCtx, s, &helloRes.LastWrite.OpTime.Ts); err != nil {
+			ts := time.Now()
+
+			logEntry := log.WithField("database", s.db)
+			logEntry.Info("started catching up stream for database")
+			defer func() {
+				logEntry.WithField("took", time.Since(ts).String()).Info("finished catching up stream for database")
+			}()
+
+			if err := c.tryStream(groupCtx, s, &opTime); err != nil {
 				return fmt.Errorf("catching up stream for %q: %w", s.db, err)
 			} else if err := s.ms.Close(groupCtx); err != nil {
 				return fmt.Errorf("catching up stream closing cursor for %q: %w", s.db, err)

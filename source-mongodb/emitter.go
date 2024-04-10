@@ -4,11 +4,22 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/segmentio/encoding/json"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/exp/maps"
+)
+
+const (
+	// When the stream logger has been started, log a progress report at this frequency. The
+	// progress report is currently just the count of stream documents that have been processed,
+	// which provides a nice indication in the logs of what the capture is doing when it is reading
+	// change streams.
+	streamLoggerInterval = 1 * time.Minute
 )
 
 // emitter provides synchronization for emitted documents and checkpoints, as well as updating the
@@ -17,6 +28,14 @@ type emitter struct {
 	events chan emitEvent
 	errors chan error
 	wg     sync.WaitGroup
+
+	// processedStreamEvents is the number of events processed by the emitter. Not all of these will
+	// result in a document output if they are for a collection or operation that we don't track.
+	processedStreamEvents atomic.Uint64
+
+	// emittedStreamDocs is the count of documents that have actually been emitted from reading the
+	// change stream.
+	emittedStreamDocs atomic.Uint64
 }
 
 // emitEvent is either a single document + checkpoint from a streamEvent, or potentially multiple
@@ -84,6 +103,7 @@ func (c *capture) emitWorker(ctx context.Context) {
 
 			switch ev := event.(type) {
 			case streamEvent:
+				c.emitter.processedStreamEvents.Add(1)
 				if err := c.handleStreamEvent(ev); err != nil {
 					c.emitter.errors <- err
 					return
@@ -124,12 +144,15 @@ func (c *capture) handleStreamEvent(event streamEvent) error {
 	}
 
 	if event.doc != nil {
-		// There may not be a document if this is a checkpoint-only for a post-batch resume token.
+		// There may not be a document if this is a checkpoint-only for a post-batch resume token,
+		// or if it is for an untracked operation type or collection.
 		if docJson, err := json.Marshal(event.doc); err != nil {
 			return fmt.Errorf("serializing stream document: %w", err)
 		} else if err := c.output.Documents(event.binding.index, docJson); err != nil {
 			return fmt.Errorf("outputting stream document: %w", err)
 		}
+
+		c.emitter.emittedStreamDocs.Add(1)
 	}
 
 	if checkpointJson, err := json.Marshal(event.stateUpdate); err != nil {
@@ -179,4 +202,44 @@ func (c *capture) handleBackfillEvent(event backfillEvent) error {
 	}
 
 	return nil
+}
+
+func (c *capture) startStreamLogger() {
+	c.streamLoggerStop = make(chan struct{})
+	c.streamLoggerActive.Add(1)
+
+	go func() {
+		defer func() { c.streamLoggerActive.Done() }()
+
+		initialProcessed := c.emitter.processedStreamEvents.Load()
+		initialEmitted := c.emitter.emittedStreamDocs.Load()
+
+		for {
+			select {
+			case <-time.After(streamLoggerInterval):
+				nextProcessed := c.emitter.processedStreamEvents.Load()
+				nextEmitted := c.emitter.emittedStreamDocs.Load()
+
+				if nextProcessed != initialProcessed {
+					log.WithFields(log.Fields{
+						"events": nextProcessed - initialProcessed,
+						"docs":   nextEmitted - initialEmitted,
+					}).Info("processed change stream events")
+				} else {
+					log.Info("change stream idle")
+				}
+
+				initialProcessed = nextProcessed
+				initialEmitted = nextEmitted
+			case <-c.streamLoggerStop:
+				return
+			}
+
+		}
+	}()
+}
+
+func (c *capture) stopStreamLogger() {
+	close(c.streamLoggerStop)
+	c.streamLoggerActive.Wait()
 }
