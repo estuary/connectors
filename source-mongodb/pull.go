@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"sync"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -178,6 +179,8 @@ type capture struct {
 	state                  captureState
 	collectionBindingIndex map[string]bindingInfo
 	emitter                emitter
+	streamLoggerStop       chan (struct{})
+	streamLoggerActive     sync.WaitGroup
 }
 
 type bindingInfo struct {
@@ -225,7 +228,7 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 			log.WithFields(log.Fields{
 				"database":   db,
 				"priorToken": tok,
-			}).Info("reseting change stream resume token for database")
+			}).Info("resetting change stream resume token for database")
 			continue
 		}
 
@@ -249,8 +252,9 @@ func (s *captureState) Validate() error {
 }
 
 type backfillState struct {
-	Done   bool          `json:"done,omitempty"`
-	LastId bson.RawValue `json:"last_id,omitempty"`
+	Done           bool          `json:"done,omitempty"`
+	LastId         bson.RawValue `json:"last_id,omitempty"`
+	BackfilledDocs int           `json:"backfilled_docs,omitempty"`
 }
 
 type resourceState struct {
