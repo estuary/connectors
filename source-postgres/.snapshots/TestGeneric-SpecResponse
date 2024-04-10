@@ -28,6 +28,12 @@
         "default": "postgres",
         "order": 3
       },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": true,
+        "order": 4
+      },
       "advanced": {
         "properties": {
           "publicationName": {
@@ -121,7 +127,8 @@
       "address",
       "user",
       "password",
-      "database"
+      "database",
+      "historyMode"
     ],
     "title": "PostgreSQL Connection"
   },

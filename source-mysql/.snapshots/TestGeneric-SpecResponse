@@ -30,6 +30,12 @@
         "description": "Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX).",
         "order": 3
       },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": true,
+        "order": 4
+      },
       "advanced": {
         "properties": {
           "watermarks_table": {
@@ -109,7 +115,8 @@
     "required": [
       "address",
       "user",
-      "password"
+      "password",
+      "historyMode"
     ],
     "title": "MySQL Connection"
   },
