@@ -83,7 +83,7 @@ func addTestTableData(
 			}
 		}
 
-		log.WithField("data", item).WithField("col", collection).Info("inserting data")
+		log.WithField("data", item).WithField("col", collection).Debug("inserting data")
 		_, err := col.InsertOne(ctx, item)
 		require.NoError(t, err)
 	}

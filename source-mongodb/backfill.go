@@ -7,6 +7,7 @@ import (
 	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -38,6 +39,8 @@ func (c *capture) backfillCollections(
 	bindings []bindingInfo,
 	backfillFor time.Duration,
 ) error {
+	log.WithField("backfillFor", backfillFor.String()).Info("backfilling collections")
+
 	shuffledBindings := make([]bindingInfo, len(bindings))
 	copy(shuffledBindings, bindings)
 	rand.Shuffle(len(shuffledBindings), func(i, j int) {
@@ -121,6 +124,22 @@ func (c *capture) doBackfill(
 	stopBackfill <-chan struct{},
 ) error {
 	var collection = c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
+	var startingDocCount = state.Backfill.BackfilledDocs
+
+	// Not using the more precise `CountDocuments()` here since that requires a full collection
+	// scan. Getting an estimate from the collection's metadata is very fast and should be close
+	// enough for useful logging.
+	estimatedTotalDocs, err := collection.EstimatedDocumentCount(ctx)
+	if err != nil {
+		return fmt.Errorf("getting estimated document count: %w", err)
+	}
+
+	logEntry := log.WithFields(log.Fields{
+		"database":           binding.resource.Database,
+		"collection":         binding.resource.Collection,
+		"estimatedTotalDocs": estimatedTotalDocs,
+	})
+	logEntry.Info("starting backfill for collection")
 
 	// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
 	// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
@@ -145,8 +164,11 @@ func (c *capture) doBackfill(
 	defer cursor.Close(ctx)
 
 	lastId := state.Backfill.LastId
+	docCount := 0
 	var docs []primitive.M
 	for cursor.Next(ctx) {
+		docCount++
+
 		var err error
 		if lastId, err = cursor.Current.LookupErr(idProperty); err != nil {
 			return fmt.Errorf("looking up idProperty: %w", err)
@@ -169,7 +191,8 @@ func (c *capture) doBackfill(
 				docs: docs,
 				stateUpdate: resourceState{
 					Backfill: backfillState{
-						LastId: lastId,
+						LastId:         lastId,
+						BackfilledDocs: startingDocCount + docCount,
 					},
 				},
 				binding: binding,
@@ -182,6 +205,14 @@ func (c *capture) doBackfill(
 			select {
 			case <-stopBackfill:
 				// The backfill timer has run out, so don't request any more data from this cursor.
+				complete := fmt.Sprintf("%.0f", float64(startingDocCount+docCount)/float64(estimatedTotalDocs)*100)
+
+				logEntry.WithFields(log.Fields{
+					"docsCapturedThisRound": docCount,
+					"totalDocsCaptured":     startingDocCount + docCount,
+					"percentComplete":       complete,
+				}).Info("progressed backfill for collection")
+
 				return nil
 			default:
 				// Continue with the backfill.
@@ -197,14 +228,17 @@ func (c *capture) doBackfill(
 		docs: docs,
 		stateUpdate: resourceState{
 			Backfill: backfillState{
-				Done:   true,
-				LastId: lastId,
+				Done:           true,
+				LastId:         lastId,
+				BackfilledDocs: startingDocCount + docCount,
 			},
 		},
 		binding: binding,
 	}); err != nil {
 		return fmt.Errorf("emitting final backfill event: %w", err)
 	}
+
+	logEntry.WithField("totalDocsCaptured", startingDocCount+docCount).Info("completed backfill for collection")
 
 	return nil
 }
