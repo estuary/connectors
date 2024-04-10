@@ -1,32 +1,22 @@
 package main
 
 import (
-	"log"
-	"os"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAzureBlobStore_Read(t *testing.T) {
-	t.Skip("Skipping test as it demands a manually set storage environment.")
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	// Create a test instance of the azureBlobStore
+const connectionString = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
 
+func TestAzureBlobStore_Read(t *testing.T) {
+	// Create a test instance of the azureBlobStore
 	cfg := config{
 		Credentials: &credentials{
-			AzureClientID:       os.Getenv("AZURE_CLIENT_ID"),
-			AzureClientSecret:   os.Getenv("AZURE_CLIENT_SECRET"),
-			AzureTenantID:       os.Getenv("AZURE_TENANT_ID"),
-			AzureSubscriptionID: os.Getenv("AZURE_SUBSCRIPTION_ID"),
+			ConnectionString: connectionString,
 		},
-		StorageAccountName: os.Getenv("STORAGE_ACCOUNT_NAME"),
-		ContainerName:      os.Getenv("CONTAINER_NAME"),
+		StorageAccountName: "devstoreaccount1",
+		ContainerName:      "example",
 	}
 	az, err := newAzureBlobStore(cfg) // Pass cfg directly instead of its address
 	assert.NoError(t, err)
