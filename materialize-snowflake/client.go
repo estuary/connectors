@@ -74,7 +74,6 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
 		return err
 	}
-
 	_, err = conn.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
