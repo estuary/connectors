@@ -34,6 +34,12 @@
         "default": "UTC",
         "order": 4
       },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": true,
+        "order": 5
+      },
       "advanced": {
         "properties": {
           "watermarksTable": {
@@ -96,7 +102,8 @@
       "address",
       "user",
       "password",
-      "database"
+      "database",
+      "historyMode"
     ],
     "title": "SQL Server Connection"
   },
