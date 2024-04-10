@@ -1,0 +1,804 @@
+[
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "avatar_url": null,
+      "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+      "name": "WillB Estuary",
+      "object": "user",
+      "person": {},
+      "type": "person"
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "avatar_url": null,
+      "bot": {
+        "owner": {
+          "info": true,
+          "type": "workspace"
+        },
+        "workspace_name": "WillB Estuary's Notion"
+      },
+      "id": "e1440030-aafa-458b-b03e-854a8e2fc629",
+      "name": "estuary",
+      "object": "user",
+      "type": "bot"
+    }
+  ],
+  [
+    "acmeCo/databases",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "archived": false,
+      "cover": null,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "description": [],
+      "icon": null,
+      "id": "20e1921f-a184-4b40-bfb1-513ad5bb90af",
+      "is_inline": true,
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:43:00.000Z",
+      "object": "database",
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "properties": [
+        {
+          "name": "value",
+          "value": {
+            "id": "Mw%3F_",
+            "name": "value",
+            "number": {
+              "format": "number"
+            },
+            "type": "number"
+          }
+        },
+        {
+          "name": "Tags",
+          "value": {
+            "id": "g%5C%3Fo",
+            "multi_select": {
+              "options": [
+                {
+                  "color": "pink",
+                  "description": null,
+                  "id": "15d458c9-e810-4487-a1b5-35aabd8be0a3",
+                  "name": "myTag"
+                }
+              ]
+            },
+            "name": "Tags",
+            "type": "multi_select"
+          }
+        },
+        {
+          "name": "Name",
+          "value": {
+            "id": "title",
+            "name": "Name",
+            "title": {},
+            "type": "title"
+          }
+        }
+      ],
+      "public_url": null,
+      "title": [
+        {
+          "annotations": {
+            "bold": false,
+            "code": false,
+            "color": "default",
+            "italic": false,
+            "strikethrough": false,
+            "underline": false
+          },
+          "href": null,
+          "plain_text": "database",
+          "text": {
+            "content": "database",
+            "link": null
+          },
+          "type": "text"
+        }
+      ],
+      "url": "https://www.notion.so/20e1921fa1844b40bfb1513ad5bb90af"
+    }
+  ],
+  [
+    "acmeCo/pages",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "archived": false,
+      "cover": null,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "icon": null,
+      "id": "044986df-d173-437c-9bf9-014296e5d4d2",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "page",
+      "parent": {
+        "database_id": "20e1921f-a184-4b40-bfb1-513ad5bb90af",
+        "type": "database_id"
+      },
+      "properties": [
+        {
+          "name": "value",
+          "value": {
+            "id": "Mw%3F_",
+            "number": null,
+            "type": "number"
+          }
+        },
+        {
+          "name": "Tags",
+          "value": {
+            "id": "g%5C%3Fo",
+            "multi_select": [],
+            "type": "multi_select"
+          }
+        },
+        {
+          "name": "Name",
+          "value": {
+            "id": "title",
+            "title": [],
+            "type": "title"
+          }
+        }
+      ],
+      "public_url": null,
+      "url": "https://www.notion.so/044986dfd173437c9bf9014296e5d4d2"
+    }
+  ],
+  [
+    "acmeCo/pages",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "archived": false,
+      "cover": null,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:27:00.000Z",
+      "icon": null,
+      "id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "page",
+      "parent": {
+        "type": "workspace",
+        "workspace": true
+      },
+      "properties": [
+        {
+          "name": "title",
+          "value": {
+            "id": "title",
+            "title": [
+              {
+                "annotations": {
+                  "bold": false,
+                  "code": false,
+                  "color": "default",
+                  "italic": false,
+                  "strikethrough": false,
+                  "underline": false
+                },
+                "href": null,
+                "plain_text": "some blocks",
+                "text": {
+                  "content": "some blocks",
+                  "link": null
+                },
+                "type": "text"
+              }
+            ],
+            "type": "title"
+          }
+        }
+      ],
+      "public_url": null,
+      "url": "https://www.notion.so/some-blocks-45c1fbd92cc9416093a43ebb94f77914"
+    }
+  ],
+  [
+    "acmeCo/pages",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "archived": false,
+      "cover": null,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "icon": null,
+      "id": "9291c59d-f8dd-4af8-a37a-a6646988c5d2",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T14:45:00.000Z",
+      "object": "page",
+      "parent": {
+        "database_id": "20e1921f-a184-4b40-bfb1-513ad5bb90af",
+        "type": "database_id"
+      },
+      "properties": [
+        {
+          "name": "value",
+          "value": {
+            "id": "Mw%3F_",
+            "number": 24,
+            "type": "number"
+          }
+        },
+        {
+          "name": "Tags",
+          "value": {
+            "id": "g%5C%3Fo",
+            "multi_select": [],
+            "type": "multi_select"
+          }
+        },
+        {
+          "name": "Name",
+          "value": {
+            "id": "title",
+            "title": [
+              {
+                "annotations": {
+                  "bold": false,
+                  "code": false,
+                  "color": "default",
+                  "italic": false,
+                  "strikethrough": false,
+                  "underline": false
+                },
+                "href": null,
+                "plain_text": "second row",
+                "text": {
+                  "content": "second row",
+                  "link": null
+                },
+                "type": "text"
+              }
+            ],
+            "type": "title"
+          }
+        }
+      ],
+      "public_url": null,
+      "url": "https://www.notion.so/second-row-9291c59df8dd4af8a37aa6646988c5d2"
+    }
+  ],
+  [
+    "acmeCo/pages",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "archived": false,
+      "cover": null,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "icon": null,
+      "id": "a5417102-7101-4972-aa35-eda60453e20c",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "page",
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "properties": [
+        {
+          "name": "title",
+          "value": {
+            "id": "title",
+            "title": [
+              {
+                "annotations": {
+                  "bold": false,
+                  "code": false,
+                  "color": "default",
+                  "italic": false,
+                  "strikethrough": false,
+                  "underline": false
+                },
+                "href": null,
+                "plain_text": "embedded page",
+                "text": {
+                  "content": "embedded page",
+                  "link": null
+                },
+                "type": "text"
+              }
+            ],
+            "type": "title"
+          }
+        }
+      ],
+      "public_url": null,
+      "url": "https://www.notion.so/embedded-page-a541710271014972aa35eda60453e20c"
+    }
+  ],
+  [
+    "acmeCo/pages",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "archived": false,
+      "cover": null,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "icon": null,
+      "id": "cc5f4018-24ed-4300-9e1d-440d9bd43676",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:43:00.000Z",
+      "object": "page",
+      "parent": {
+        "database_id": "20e1921f-a184-4b40-bfb1-513ad5bb90af",
+        "type": "database_id"
+      },
+      "properties": [
+        {
+          "name": "value",
+          "value": {
+            "id": "Mw%3F_",
+            "number": 12,
+            "type": "number"
+          }
+        },
+        {
+          "name": "Tags",
+          "value": {
+            "id": "g%5C%3Fo",
+            "multi_select": [
+              {
+                "color": "pink",
+                "id": "15d458c9-e810-4487-a1b5-35aabd8be0a3",
+                "name": "myTag"
+              }
+            ],
+            "type": "multi_select"
+          }
+        },
+        {
+          "name": "Name",
+          "value": {
+            "id": "title",
+            "title": [
+              {
+                "annotations": {
+                  "bold": false,
+                  "code": false,
+                  "color": "default",
+                  "italic": false,
+                  "strikethrough": false,
+                  "underline": false
+                },
+                "href": null,
+                "plain_text": "first row",
+                "text": {
+                  "content": "first row",
+                  "link": null
+                },
+                "type": "text"
+              }
+            ],
+            "type": "title"
+          }
+        }
+      ],
+      "public_url": null,
+      "url": "https://www.notion.so/first-row-cc5f401824ed43009e1d440d9bd43676"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "has_children": false,
+      "id": "1aa059d4-c48d-4655-af76-4a59b6151935",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "block",
+      "paragraph": {
+        "color": "default",
+        "rich_text": []
+      },
+      "parent": {
+        "page_id": "a5417102-7101-4972-aa35-eda60453e20c",
+        "type": "page_id"
+      },
+      "type": "paragraph"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:27:00.000Z",
+      "has_children": false,
+      "id": "27ac18f9-d494-4801-b675-05c283120955",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:28:00.000Z",
+      "object": "block",
+      "paragraph": {
+        "color": "default",
+        "rich_text": [
+          {
+            "annotations": {
+              "bold": false,
+              "code": false,
+              "color": "default",
+              "italic": false,
+              "strikethrough": false,
+              "underline": false
+            },
+            "href": null,
+            "plain_text": "text block",
+            "text": {
+              "content": "text block",
+              "link": null
+            },
+            "type": "text"
+          }
+        ]
+      },
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "type": "paragraph"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:28:00.000Z",
+      "has_children": false,
+      "id": "7dfaf5e3-bbce-4ba9-a531-a1ba3058aa9c",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:28:00.000Z",
+      "object": "block",
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "to_do": {
+        "checked": false,
+        "color": "default",
+        "rich_text": [
+          {
+            "annotations": {
+              "bold": false,
+              "code": false,
+              "color": "default",
+              "italic": false,
+              "strikethrough": false,
+              "underline": false
+            },
+            "href": null,
+            "plain_text": "Todo 2",
+            "text": {
+              "content": "Todo 2",
+              "link": null
+            },
+            "type": "text"
+          }
+        ]
+      },
+      "type": "to_do"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "has_children": false,
+      "id": "7ef9f951-07e3-4c0e-a242-227c126e597c",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "block",
+      "paragraph": {
+        "color": "default",
+        "rich_text": [
+          {
+            "annotations": {
+              "bold": false,
+              "code": false,
+              "color": "default",
+              "italic": false,
+              "strikethrough": false,
+              "underline": false
+            },
+            "href": null,
+            "plain_text": "this is an embedded page",
+            "text": {
+              "content": "this is an embedded page",
+              "link": null
+            },
+            "type": "text"
+          }
+        ]
+      },
+      "parent": {
+        "page_id": "a5417102-7101-4972-aa35-eda60453e20c",
+        "type": "page_id"
+      },
+      "type": "paragraph"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:28:00.000Z",
+      "has_children": false,
+      "id": "aea6d5e3-5dc7-412f-b8c7-24a31e9f8a21",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:28:00.000Z",
+      "object": "block",
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "to_do": {
+        "checked": false,
+        "color": "default",
+        "rich_text": [
+          {
+            "annotations": {
+              "bold": false,
+              "code": false,
+              "color": "default",
+              "italic": false,
+              "strikethrough": false,
+              "underline": false
+            },
+            "href": null,
+            "plain_text": "Todo 1",
+            "text": {
+              "content": "Todo 1",
+              "link": null
+            },
+            "type": "text"
+          }
+        ]
+      },
+      "type": "to_do"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "has_children": false,
+      "id": "bc7b782c-0c7a-480a-b664-f4eb9b58a220",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "block",
+      "paragraph": {
+        "color": "default",
+        "rich_text": []
+      },
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "type": "paragraph"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
+      "archived": false,
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:42:00.000Z",
+      "has_children": false,
+      "id": "e15834f9-c267-47f6-b804-a636456559ad",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:42:00.000Z",
+      "object": "block",
+      "paragraph": {
+        "color": "default",
+        "rich_text": []
+      },
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "type": "paragraph"
+    }
+  ],
+  [
+    "acmeCo/blocks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "archived": false,
+      "code": {
+        "caption": [],
+        "language": "python",
+        "rich_text": [
+          {
+            "annotations": {
+              "bold": false,
+              "code": false,
+              "color": "default",
+              "italic": false,
+              "strikethrough": false,
+              "underline": false
+            },
+            "href": null,
+            "plain_text": "code block",
+            "text": {
+              "content": "code block",
+              "link": null
+            },
+            "type": "text"
+          }
+        ]
+      },
+      "created_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "created_time": "2024-03-21T13:28:00.000Z",
+      "has_children": false,
+      "id": "e292f784-aa6b-400f-923a-30be2b4a1299",
+      "last_edited_by": {
+        "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
+        "object": "user"
+      },
+      "last_edited_time": "2024-03-21T13:28:00.000Z",
+      "object": "block",
+      "parent": {
+        "page_id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
+        "type": "page_id"
+      },
+      "type": "code"
+    }
+  ]
+]

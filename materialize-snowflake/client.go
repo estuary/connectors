@@ -22,7 +22,7 @@ type client struct {
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, false))
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,26 @@ func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) er
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	var schemaName = c.cfg.Schema
+	if len(tc.Path) > 1 {
+		schemaName = tc.Path[0]
+	}
+
+	var conn, err = c.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))); err != nil {
+		return err
+	}
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
+		return err
+	}
+
+	_, err = conn.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
@@ -64,7 +83,16 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var conn, err = c.db.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
+			return err
+		}
+		_, err = conn.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -77,7 +105,16 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	alterColumnStmt := alterColumnStmtBuilder.String()
 
 	return alterColumnStmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, alterColumnStmt)
+		var conn, err = c.db.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
+			return err
+		}
+		_, err = conn.ExecContext(ctx, alterColumnStmt)
 		return err
 	}, nil
 }
@@ -99,7 +136,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
 			case 390201:
-				// This means "doesn't exist or not authorized", and we don't have a way to
+				// This means "doesn't exist or not authorized", and we don't have a great way to
 				// distinguish between that for the database, schema, or warehouse. The snowflake
 				// error message in these cases is fairly decent fortunately.
 			case 390189:

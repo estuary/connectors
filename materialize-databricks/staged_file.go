@@ -7,7 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/databricks/databricks-sdk-go/service/files"
+	stdsql "database/sql"
+	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -15,7 +16,7 @@ import (
 )
 
 const fileSizeLimit = 128 * 1024 * 1024
-const uploadConcurrency = 5 // that means we may use up to 1.28GB disk space
+const uploadConcurrency = 3
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
 // buffer and close the underlying file.
@@ -73,11 +74,11 @@ type stagedFile struct {
 	// The remote root directory for uploading files
 	root string
 
-	filesAPI *files.FilesAPI
-
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
 	// start() and `false` by flush().
 	started bool
+
+	cfg *config
 
 	// References to the current file being written.
 	buf     *fileBuffer
@@ -93,15 +94,15 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(filesAPI *files.FilesAPI, root string, fields []string) *stagedFile {
+func newStagedFile(cfg *config, root string, fields []string) *stagedFile {
 	uuid := uuid.NewString()
 	var tempdir = os.TempDir()
 
 	return &stagedFile{
-		fields:   fields,
-		dir:      filepath.Join(tempdir, uuid),
-		root:     root,
-		filesAPI: filesAPI,
+		fields: fields,
+		dir:    filepath.Join(tempdir, uuid),
+		root:   root,
+		cfg:    cfg,
 	}
 }
 
@@ -191,10 +192,17 @@ func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) err
 
 		var fName = filepath.Base(file)
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: uploading")
-		if r, err := os.Open(file); err != nil {
-			return fmt.Errorf("opening file: %w", err)
-		} else if err := f.filesAPI.Upload(ctx, files.UploadRequest{Contents: r, FilePath: f.remoteFilePath(fName)}); err != nil {
-			return fmt.Errorf("uploading file: %w", err)
+
+		db, err := stdsql.Open("databricks", f.cfg.ToURI())
+		if err != nil {
+			return fmt.Errorf("sql.Open: %w", err)
+		}
+		defer db.Close()
+
+		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
+
+		if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
+			return fmt.Errorf("put file: %w", err)
 		}
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: upload done")
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import Field
-from typing import Any, ClassVar, Annotated, Callable, Awaitable, Literal
+from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal
 import logging
 import os
 
@@ -78,12 +78,49 @@ class ResourceState(common.BaseResourceState, extra="forbid"):
     """state is a dict encoding of AirbyteStateMessage"""
 
 
-ConnectorState = common.ConnectorState[ResourceState]
-"""Use the common.ConnectorState shape with ResourceState"""
+class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
+    """ConnectorState represents a number of ResourceStates, keyed by binding state key.
+    
+    Top-level fields other than bindingStateV1 are ignored, to allow for a lossy migration from
+    states that existed prior to adopting this convection. Connectors transitioning in this way will
+    effectively start over from the beginning.
+    """
+
+    bindingStateV1: dict[str, ResourceState] = {}
 
 
 class Document(common.BaseDocument, extra="allow"):
     pass
+
+
+def escape_field(field: str) -> str:
+    return field.replace("~", "~0").replace("/", "~1")
+
+
+def transform_airbyte_key(key: str | List[str] | List[List[str]]) -> List[str]:
+    key_fields: List[str] = []
+
+    if isinstance(key, str):
+        # key = "piz/za"
+        # key_fields: ["piz~1za"]
+        key_fields = [escape_field(key)]
+    elif isinstance(key, list):
+        for component in key:
+            if isinstance(component, str):
+                # key = ["piz/za", "par~ty"]
+                # key_fields: ["piz~1za", "pa~0rty"]
+                key_fields.append(escape_field(component))
+            elif isinstance(component, list):
+                # key = [["pizza", "che/ese"], "potato"]
+                # Implies a document like {"potato": 12, "pizza": {"che/ese": 5}}
+                # key_fields: ["pizza/che~1ese", "potato"]
+                key_fields.append(
+                    "/".join((escape_field(field) for field in component))
+                )
+            else:
+                raise ValueError(f"Invalid key component: {component}")
+
+    return key_fields
 
 
 @dataclass
@@ -124,11 +161,8 @@ class CaptureShim(BaseCaptureConnector):
             if stream.source_defined_primary_key:
                 # Map array of array of property names into an array of JSON pointers.
                 key = [
-                    "/"
-                    + "/".join(
-                        p.replace("~", "~0").replace("/", "~1") for p in component
-                    )
-                    for component in stream.source_defined_primary_key
+                    "/" + key
+                    for key in transform_airbyte_key(stream.source_defined_primary_key)
                 ]
             elif resource_config.sync_mode == "full_refresh":
                 # Synthesize a key based on the record's order within each stream refresh.
@@ -176,13 +210,17 @@ class CaptureShim(BaseCaptureConnector):
         )
 
     async def discover(
-        self, log: Logger, discover: request.Discover[EndpointConfig],
+        self,
+        log: Logger,
+        discover: request.Discover[EndpointConfig],
     ) -> response.Discovered:
         resources = await self._all_resources(log, discover.config)
         return common.discovered(resources)
 
     async def validate(
-        self, log: Logger, validate: request.Validate[EndpointConfig, ResourceConfig],
+        self,
+        log: Logger,
+        validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
 
         result = self.delegate.check(log, validate.config)
@@ -236,6 +274,12 @@ class CaptureShim(BaseCaptureConnector):
             for binding, resource in resolved
         ]
         airbyte_catalog = ConfiguredAirbyteCatalog(streams=airbyte_streams)
+
+        if "bindingStateV1" not in connector_state.__fields_set__:
+            # Initialize the top-level state object so that it is properly serialized if this is an
+            # "empty" state, which occurs for a brand new task that has never emitted any
+            # checkpoints.
+            connector_state.__setattr__("bindingStateV1", {})
 
         # Index of Airbyte (namespace, stream) => ResourceState.
         # Use `setdefault()` to initialize ResourceState if it's not already part of `connector_state`.

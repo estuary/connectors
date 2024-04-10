@@ -140,7 +140,7 @@
       "type": ["null", "boolean"]
     },
     "id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "io_number": {
       "type": ["null", "number"]
@@ -263,5 +263,6 @@
         }
       }
     }
-  }
+  },
+  "required": ["id"]
 }

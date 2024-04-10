@@ -2,8 +2,7 @@ Binding 0:
 {
     "resource_config_json": {
       "name": "test_basic_datatypes_13111208",
-      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"basic_datatypes_13111208\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"basic_datatypes_13111208\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"basic_datatypes_13111208\";\n{{- end}}\n",
-      "cursor": null
+      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"basic_datatypes_13111208\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"basic_datatypes_13111208\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"basic_datatypes_13111208\";\n{{- end}}\n"
     },
     "resource_path": [
       "test_basic_datatypes_13111208"
@@ -39,11 +38,43 @@ Binding 0:
               "index"
             ]
           },
+          "a_bool": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "a_date": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "a_real": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "a_ts": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "a_tstz": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
           }
-        },
-        "x-infer-schema": true
+        }
       },
       "key": [
         "/id"

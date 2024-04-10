@@ -171,6 +171,15 @@ func (db *mysqlDatabase) translateRecordFields(columnTypes map[string]interface{
 		return nil
 	}
 	for id, val := range f {
+		// MariaDB versions 10.4 and up include a synthetic `DB_ROW_HASH_1` column in the
+		// binlog row change events for certain tables with unique hash indices (see issue
+		// https://github.com/estuary/connectors/issues/1344). In such cases we won't have
+		// any type information for the column, but we also don't want it anyway, so as a
+		// special case we just delete the 'DB_ROW_HASH_1' property from the document.
+		if id == "DB_ROW_HASH_1" && columnTypes[id] == nil {
+			delete(f, id)
+			continue
+		}
 		var translated, err = db.translateRecordField(columnTypes[id], val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
@@ -454,7 +463,7 @@ var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
 
 // enumValueReplacements contains the complete list of MySQL string escapes from
 // https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
-// plus the `”` repeated-single-quote mechanism.
+// plus the `'​'` repeated-single-quote mechanism.
 var enumValueReplacements = map[string]string{
 	`''`: "'",
 	`\0`: "\x00",
@@ -483,13 +492,22 @@ func parseEnumValues(details string) []string {
 	// and take submatch #1 which is the body of each string.
 	var opts []string
 	for _, match := range enumValuesRegexp.FindAllStringSubmatch(details, -1) {
-		var opt = match[1]
-		for old, new := range enumValueReplacements {
-			opt = strings.ReplaceAll(opt, old, new)
-		}
-		opts = append(opts, opt)
+		opts = append(opts, decodeMySQLString(match[1]))
 	}
 	return opts
+}
+
+// decodeStringMySQL decodes a MySQL-format single-quoted string (including
+// possible backslash escapes) and returns it in unquoted, unescaped form.
+func decodeMySQLString(qstr string) string {
+	if strings.HasPrefix(qstr, "'") && strings.HasSuffix(qstr, "'") {
+		qstr = strings.TrimPrefix(qstr, "'")
+		qstr = strings.TrimSuffix(qstr, "'")
+		for old, new := range enumValueReplacements {
+			qstr = strings.ReplaceAll(qstr, old, new)
+		}
+	}
+	return qstr
 }
 
 const queryDiscoverPrimaryKeys = `

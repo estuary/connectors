@@ -368,10 +368,29 @@ func (c *capture) Run(ctx context.Context) error {
 		}
 		if resourceState.Backfill == nil || resourceState.Backfill.Completed {
 			// Do nothing when no backfill is required
-		} else if resumeState, ok := backfillCollections[collectionID]; !ok {
+			continue
+		}
+		log.WithFields(log.Fields{
+			"resource":   resourceState.path,
+			"collection": collectionID,
+			"startAfter": resourceState.Backfill.StartAfter,
+			"cursor":     resourceState.Backfill.Cursor,
+		}).Debug("backfill required for binding")
+		if resumeState, ok := backfillCollections[collectionID]; !ok {
 			backfillCollections[collectionID] = resourceState.Backfill
 		} else if !resumeState.Equal(resourceState.Backfill) {
-			return fmt.Errorf("internal error: backfill state mismatch for resource %q with collection ID %q", resourceState.path, collectionID)
+			log.WithFields(log.Fields{
+				"resource":   resourceState.path,
+				"collection": collectionID,
+			}).Warn("backfill state mismatch, restarting all impacted collections")
+
+			resumeState.Cursor = ""
+			resumeState.MTime = time.Time{}
+			if resumeState.StartAfter.After(resourceState.Backfill.StartAfter) {
+				// Take the minimum StartAfter time across all collections so that we begin
+				// backfilling the new one as soon as possible.
+				resumeState.StartAfter = resourceState.Backfill.StartAfter
+			}
 		}
 	}
 
@@ -433,14 +452,20 @@ func (c *capture) Run(ctx context.Context) error {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
 		eg.Go(func() error {
-			return c.StreamChanges(ctx, rpcClient, collectionID, startTime)
+			if err := c.StreamChanges(ctx, rpcClient, collectionID, startTime); err != nil {
+				return fmt.Errorf("error streaming changes for collection %q: %w", collectionID, err)
+			}
+			return nil
 		})
 	}
 	for collectionID, resumeState := range backfillCollections {
 		var collectionID, resumeState = collectionID, resumeState // Copy loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting backfill worker")
 		eg.Go(func() error {
-			return c.BackfillAsync(ctx, libraryClient, collectionID, resumeState)
+			if err := c.BackfillAsync(ctx, libraryClient, collectionID, resumeState); err != nil {
+				return fmt.Errorf("error backfilling collection %q: %w", collectionID, err)
+			}
+			return nil
 		})
 	}
 	defer log.Info("capture terminating")
@@ -653,7 +678,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 	var listenClient firestore_pb.Firestore_ListenClient
 	var numRestarts, numDocuments int
 	var isCurrent, catchupStreaming bool
-	var catchupStarted time.Time
 	for {
 		if listenClient == nil {
 			var err error
@@ -683,7 +707,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					}
 				}()
 			}
-			catchupStarted = time.Now()
 		}
 
 		resp, err := listenClient.Recv()
@@ -744,8 +767,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					return fmt.Errorf("unexpected target ID %d", tc.TargetIds[0])
 				}
 			case firestore_pb.TargetChange_REMOVE:
-				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
-					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, skipping to latest changes (go.estuary.dev/YRDsKd)")
+				listenClient = nil
+				if catchupStreaming {
+					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up, skipping to latest changes (go.estuary.dev/YRDsKd)")
 					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
@@ -755,11 +779,12 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						logEntry.Fatal("forcing connector restart to establish consistency")
 					})
 					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
-					listenClient = nil
 				} else if tc.Cause != nil {
-					return fmt.Errorf("unexpected TargetChange.REMOVE: %v", tc.Cause.Message)
+					logEntry.WithField("cause", tc.Cause.Message).Warn("unexpected TargetChange.REMOVE")
+					time.Sleep(retryInterval)
 				} else {
-					return fmt.Errorf("unexpected TargetChange.REMOVE")
+					logEntry.Warn("unexpected TargetChange.REMOVE")
+					time.Sleep(retryInterval)
 				}
 			case firestore_pb.TargetChange_CURRENT:
 				if log.IsLevelEnabled(log.TraceLevel) {

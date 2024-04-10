@@ -1,0 +1,102 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "test_keyless_discovery_10352",
+      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"keyless_discovery_10352\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"keyless_discovery_10352\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"keyless_discovery_10352\";\n{{- end}}\n"
+    },
+    "resource_path": [
+      "test_keyless_discovery_10352"
+    ],
+    "collection": {
+      "name": "acmeCo/test/test_keyless_discovery_10352",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-redshift-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index"
+            ]
+          },
+          "v_bigint": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "v_bool": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "v_int": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "v_int_notnull": {
+            "type": "integer"
+          },
+          "v_smallint": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "v_str": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "v_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "v_text_notnull": {
+            "type": "string"
+          },
+          "v_ts": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "v_tstz": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "projections": null
+    },
+    "state_key": "test_keyless_discovery_10352"
+  }
+

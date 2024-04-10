@@ -15,7 +15,6 @@ import (
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
-	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -125,10 +124,6 @@ type transactor struct {
 	bindings []*binding
 
 	updateDelay time.Duration
-}
-
-func (t *transactor) Context(ctx context.Context) context.Context {
-	return driverctx.NewContextWithStagingInfo(ctx, []string{t.localStagingPath})
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -246,8 +241,8 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 		return out
 	}
 
-	b.loadFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
-	b.storeFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
+	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
 
 	t.bindings = append(t.bindings, b)
 
@@ -259,7 +254,7 @@ func (t *transactor) AckDelay() time.Duration {
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	var ctx = d.Context(it.Context())
+	var ctx = it.Context()
 
 	log.Info("load: starting upload and copying of files")
 	for it.Next() {
@@ -497,6 +492,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
+
+	log.Info("store: finished committing changes")
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 

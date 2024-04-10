@@ -301,8 +301,15 @@ jobs:
           sudo apt update
           sudo apt install postgresql
 
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            connector:
+              - "${{ matrix.connector }}/**"
+
       - name: Refresh connector tags for ${{ matrix.connector }}
-        if: ${{ github.event_name == 'push' }}
+        if: github.event_name == 'push' && steps.filter.outputs.connector == 'true'
         env:
           PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
           PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}

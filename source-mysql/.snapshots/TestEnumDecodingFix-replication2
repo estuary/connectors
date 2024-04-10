@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test/test_enumdecodingfix_32314857": 5 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"A","id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"B","id":12}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"C","id":13}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"D","id":14}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"","id":15}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FEnumDecodingFix_32314857":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","category"],"types":{"category":{"enum":["","A","C","B","D"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

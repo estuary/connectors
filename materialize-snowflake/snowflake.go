@@ -62,6 +62,9 @@ func schemasEqual(s1 string, s2 string) bool {
 }
 
 func (c tableConfig) Path() sql.TablePath {
+	// This is here for backward compatibility purposes. There was a time when binding resources could not
+	// have schema configuration. If we change this for all bindings to be a two-part resource path, that will
+	// lead to a re-backfilling of the bindings which did not previously have a schema as part of their resource path
 	if c.Schema == "" || schemasEqual(c.Schema, c.endpointSchema) {
 		return []string{c.Table}
 	}
@@ -95,7 +98,7 @@ func newSnowflakeDriver() *sql.Driver {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			var metaBase sql.TablePath
+			var metaBase sql.TablePath = []string{parsed.Schema}
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			var dialect = snowflakeDialect(parsed.Schema)
@@ -185,7 +188,7 @@ func newTransactor(
 
 	dialect := snowflakeDialect(cfg.Schema)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true))
 	if err != nil {
 		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
@@ -218,12 +221,13 @@ func newTransactor(
 	d.store.fence = &fence
 
 	// Establish connections.
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
+
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
@@ -615,10 +619,17 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// until they have all been successful, or an error has been thrown
 
 	// If we see no results from the REST API for `maxTries` iterations, then we
-	// fallback to asking the `COPY_HISTORY` table.
-	var maxTries = 10
-	for pipeName, pipe := range pipes {
-		for tries := 0; tries < maxTries; tries++ {
+	// fallback to asking the `COPY_HISTORY` table. We allow up to 5 minutes for results to show up in the REST API.
+	var maxTries = 20
+	var retryDelaySeconds = 3 * time.Second
+	for tries := 0; tries < maxTries; tries++ {
+		for pipeName, pipe := range pipes {
+			// if the pipe has no files to begin with, just skip it
+			// we might have processed all files of this pipe previously
+			if len(pipe.files) == 0 {
+				continue
+			}
+
 			// We first try to check the status of pipes using the REST API's insertReport
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is not the most ergonomic and sometimes does not yield
@@ -632,7 +643,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// which is ahead, and some results have not been seen by us and will not be
 			// seen with the given cursor. So we reset the cursor in this case and try again.
 			if !report.CompleteResult {
-				tries--
 				d.pipeMarkers[pipeName] = ""
 			} else {
 				d.pipeMarkers[pipeName] = report.NextBeginMark
@@ -648,7 +658,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// We try `maxTries` times since it may take some time for the REST API
 				// to reflect the new pipe requests
 				if tries < maxTries-1 {
-					time.Sleep(5 * time.Second)
+					time.Sleep(retryDelaySeconds)
 					continue
 				}
 
@@ -684,7 +694,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
 					tries--
-					time.Sleep(2 * time.Second)
+					time.Sleep(retryDelaySeconds)
 					continue
 				}
 
@@ -694,7 +704,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 				// All files have been processed for this pipe, we can skip to the next pipe
 				d.deleteFiles(ctx, []string{pipe.dir})
-				break
+				continue
 			}
 
 			// So long as we are able to get some results from the REST API, we do not
@@ -713,9 +723,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 			if len(pipe.files) == 0 {
 				d.deleteFiles(ctx, []string{pipe.dir})
-				break
+				continue
 			} else {
-				time.Sleep(5 * time.Second)
+				time.Sleep(retryDelaySeconds)
 			}
 		}
 	}

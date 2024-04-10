@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/test_altertable_addenumcolumn_30213486": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddEnumColumn_30213486","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"eee","enumcol":"med","id":3}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddEnumColumn_30213486","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"fff","enumcol":"lg","id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddEnumColumn_30213486","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ggg","enumcol":"sm","id":5}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FAlterTable_AddEnumColumn_30213486":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","enumcol"],"types":{"data":"text","enumcol":{"enum":["","sm","med","lg"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

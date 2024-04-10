@@ -13,7 +13,12 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+<<<<<<< HEAD
       - "source-google-analytics-data-api/**"
+=======
+      - "source-notion/**"
+      - "source-linkedin-pages/**"
+>>>>>>> refs/rewritten/main
   pull_request:
     branches: [main]
     paths:
@@ -26,7 +31,12 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+<<<<<<< HEAD
       - "source-google-analytics-data-api/**"
+=======
+      - "source-notion/**"
+      - "source-linkedin-pages/**"
+>>>>>>> refs/rewritten/main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -74,9 +84,19 @@ jobs:
             type: capture
             version: v5
             usage_rate: "1.0"
+<<<<<<< HEAD
           - name: source-google-analytics-data-api
             type: capture
             version: v3
+=======
+          - name: source-notion
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-linkedin-pages
+            type: capture
+            version: v1
+>>>>>>> refs/rewritten/main
             usage_rate: "1.0"
 
     steps:

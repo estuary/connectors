@@ -4,7 +4,7 @@
       "type": ["null", "string"]
     },
     "account_id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "account_name": {
       "type": ["null", "string"]
@@ -19,7 +19,7 @@
       "$ref": "ads_action_stats.json"
     },
     "ad_id": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "ad_impression_actions": {
       "$ref": "ads_action_stats.json"
@@ -156,7 +156,7 @@
     },
     "date_start": {
       "format": "date",
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "date_stop": {
       "format": "date",
@@ -338,5 +338,6 @@
       "type": ["null", "number"]
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["account_id", "ad_id", "date_start"]
 }

@@ -452,7 +452,9 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
-var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
+var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|# [^\n]*)$`)
+var createDefinerRegex = `CREATE\s*(OR REPLACE){0,1}\s*(ALGORITHM\s*=\s*[^ ]+)*\s*DEFINER`
+var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
 
 func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
 	// There are basically three types of query events we might receive:
@@ -467,11 +469,15 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	//     that we don't care about, either because they change things that
 	//     don't impact our capture or because we get the relevant information
 	//     by some other means.
-	if ignoreQueriesRe.MatchString(query) {
-		logrus.WithField("query", query).Trace("ignoring query event")
+	if silentIgnoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Trace("silently ignoring query event")
 		return nil
 	}
-	logrus.WithField("query", query).Debug("handling query event")
+	if ignoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Info("ignoring query event")
+		return nil
+	}
+	logrus.WithField("query", query).Info("handling query event")
 
 	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
@@ -480,7 +486,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
 	switch stmt := stmt.(type) {
-	case *sqlparser.CreateDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
+	case *sqlparser.CreateDatabase, *sqlparser.AlterDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
@@ -677,11 +683,30 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 func translateDataType(t sqlparser.ColumnType) any {
 	var typeName = strings.ToLower(t.Type)
 	if typeName == "enum" {
-		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, t.EnumValues...)}
+		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
 	} else if typeName == "set" {
-		return &mysqlColumnType{Type: typeName, EnumValues: t.EnumValues}
+		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
 	}
 	return typeName
+}
+
+// unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted
+// escaped string values such as the EnumValues list returned by the Vitess SQL Parser
+// package when parsing a DDL query involving enum/set values.
+//
+// The single-quote wrapping and escaping of these strings is clearly deliberate, as
+// under the hood the package actually tokenizes the strings to raw values and then
+// explicitly calls `encodeSQLString()` to re-wrap them when building the AST. The
+// actual reason for doing this is unknown however, and it makes very little sense.
+//
+// So whatever, here's a helper function to undo that escaping and get back down to
+// the raw strings again.
+func unquoteEnumValues(values []string) []string {
+	var unquoted []string
+	for _, qval := range values {
+		unquoted = append(unquoted, decodeMySQLString(qval))
+	}
+	return unquoted
 }
 
 func findStr(needle string, cols []string) int {
@@ -766,6 +791,36 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 				var parsedType mysqlColumnType
 				if err := mapstructure.Decode(columnType, &parsedType); err == nil {
 					metadata.Schema.ColumnTypes[column] = &parsedType
+				}
+			}
+		}
+
+		// This is a temporary piece of migration logic added in March of 2024. In the PR
+		// https://github.com/estuary/connectors/pull/1336 the ordering of enum cases in this
+		// metadata was changed to simplify the decoding logic. Specifically the order of the
+		// cases was changed from ["A", "B", ""] to ["", "A", "B"] to more directly mirror how
+		// MySQL represents the illegal-enum value "" as integer 0. However this introduced a bug
+		// when the new indexing code was used with older metadata from before that change, and
+		// by the time this was discovered there were captures in production with the new ordering
+		// in their checkpointed metadata, so a simple revert was not an option.
+		//
+		// The solution is to push forward and add the missing migration step, so that upon table
+		// activation any metadata containing the old ordering will be updated to the new. Once all
+		// metadata in production has been so updated, it will be safe to remove this logic and the
+		// associated 'TestEnumDecodingFix' test case.
+		for column, columnType := range metadata.Schema.ColumnTypes {
+			if enumType, ok := columnType.(*mysqlColumnType); ok && enumType.Type == "enum" {
+				if len(enumType.EnumValues) > 0 && enumType.EnumValues[0] != "" {
+					var logEntry = logrus.WithField("column", column)
+					var vals = enumType.EnumValues
+					logEntry.WithField("vals", vals).Warn("old enum metadata ordering detected, will migrate")
+					if vals[len(vals)-1] == "" {
+						logEntry.Info("trimming empty-string case from the end")
+						vals = vals[:len(vals)-1]
+					}
+					vals = append([]string{""}, vals...)
+					logEntry.WithField("vals", vals).Info("migrated old enum metadata")
+					enumType.EnumValues = vals
 				}
 			}
 		}

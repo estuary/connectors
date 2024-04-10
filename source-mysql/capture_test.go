@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
@@ -178,5 +179,62 @@ func TestEnumPrimaryKey(t *testing.T) {
 		{"D", 1, "D1"}, {"D", 2, "D2"}, {"D", 3, "D3"}, {"D", 4, "D4"},
 		{"E", 1, "E1"}, {"E", 2, "E2"}, {"E", 3, "E3"}, {"E", 4, "E4"},
 	})
+	tests.VerifiedCapture(ctx, t, cs)
+}
+
+func TestEnumDecodingFix(t *testing.T) {
+	// This test is part of the fix for the enum decoding bug introduced by https://github.com/estuary/connectors/pull/1336
+	// and can be deleted after the metadata migration logic is also removed. The metadata migration logic can safely be
+	// removed after all live captures we care about have run the fix code and updated their checkpoint metadata.
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "32314857"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, category ENUM('A', 'C', 'B', 'D'))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	// Insert various test values and then capture them via replication
+	tb.Insert(ctx, t, tableName, [][]interface{}{{1, "A"}, {2, "B"}, {3, "C"}, {4, "D"}, {5, "error"}})
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]interface{}{{6, "A"}, {7, "B"}, {8, "C"}, {9, "D"}, {10, "error"}})
+	t.Run("replication1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Manually fiddle with the persisted checkpoint metadata used for enum decoding, to
+	// simulate the situation where an old capture with old metadata is used with the newer
+	// enum decoding logic.
+	cs.Checkpoint = json.RawMessage(strings.ReplaceAll(string(cs.Checkpoint), `"enum":["","A","C","B","D"]`, `"enum":["A","C","B","D",""]`))
+	tb.Insert(ctx, t, tableName, [][]interface{}{{11, "A"}, {12, "B"}, {13, "C"}, {14, "D"}, {15, "error"}})
+	t.Run("replication2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestBackfillModes(t *testing.T) {
+	// Create two tables with 1,000 rows each
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueA, uniqueB = "11837744", "25282936"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id VARCHAR(32) PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id VARCHAR(32) PRIMARY KEY, data TEXT)")
+
+	// TODO: Generate more challenging keys?
+	var rows [][]any
+	for idx := 0; idx < 1000; idx++ {
+		rows = append(rows, []any{fmt.Sprintf("Row %d", idx), fmt.Sprintf("Data for row %d", idx)})
+	}
+	tb.Insert(ctx, t, tableA, rows)
+	tb.Insert(ctx, t, tableB, rows)
+
+	// Capture both tables, one with a precise backfill and one imprecise
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	var resA, resB sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &resA))
+	require.NoError(t, json.Unmarshal(cs.Bindings[1].ResourceConfigJson, &resB))
+	resA.Mode = sqlcapture.BackfillModeNormal
+	resB.Mode = sqlcapture.BackfillModePrecise
+	resourceSpecA, err := json.Marshal(resA)
+	require.NoError(t, err)
+	resourceSpecB, err := json.Marshal(resB)
+	require.NoError(t, err)
+	cs.Bindings[0].ResourceConfigJson = resourceSpecA
+	cs.Bindings[1].ResourceConfigJson = resourceSpecB
+
 	tests.VerifiedCapture(ctx, t, cs)
 }
