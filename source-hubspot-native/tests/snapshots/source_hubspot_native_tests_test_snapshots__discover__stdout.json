@@ -3760,7 +3760,7 @@
     "recommendedName": "properties",
     "resourceConfig": {
       "name": "properties",
-      "interval": "PT30S"
+      "interval": "P1D"
     },
     "documentSchema": {
       "$defs": {

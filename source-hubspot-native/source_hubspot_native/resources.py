@@ -410,7 +410,7 @@ def properties(http: HTTPSession) -> common.Resource:
         open=open,
         initial_state=ResourceState(),
         initial_config=ResourceConfig(
-            name=Names.properties, interval=timedelta(seconds=30)
+            name=Names.properties, interval=timedelta(days=1)
         ),
         schema_inference=True,
     )
