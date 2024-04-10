@@ -24,6 +24,7 @@ type config struct {
 	ContainerName      string         `json:"containerName"`
 	Parser             *parser.Config `json:"parser"`
 	MatchKeys          string         `json:"matchKeys"`
+	AscendingKeys      bool           `json:"ascendingKeys"`
 }
 
 type credentials struct {
@@ -63,12 +64,8 @@ func (c config) RecommendedName() string {
 	return c.ContainerName
 }
 
-// Azure Blob Storage does not inherently enforce a monotonic order on the files
-// it stores. The order of files in Azure Blob Storage is not determined by the
-// system, but rather by how the user or application uploads, names, and organizes
-// the files. See https://learn.microsoft.com/en-us/azure/storage/blobs/storage-performance-checklist.
 func (c config) FilesAreMonotonic() bool {
-	return false
+	return c.AscendingKeys
 }
 
 func (c config) ParserConfig() *parser.Config {
@@ -311,6 +308,12 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
 				"order": 5
 			},
+			"ascendingKeys": {
+				"type":        "boolean",
+				"title":       "Ascending Keys",
+				"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+				"default":     false
+			  },
 			"parser": ` + string(parserSchema) + `
 		}
 	}`)
