@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -19,9 +18,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
-//go:embed schema.json
-var jsonSchema string
-
 type config struct {
 	Credentials        *credentials   `json:"credentials"`
 	StorageAccountName string         `json:"storageAccountName"`
@@ -35,9 +31,13 @@ type credentials struct {
 	AzureClientSecret   string `json:"azureClientSecret"`
 	AzureTenantID       string `json:"azureTenantID"`
 	AzureSubscriptionID string `json:"azureSubscriptionID"`
+	ConnectionString    string `json:"connectionString"`
 }
 
 func (c config) Validate() error {
+	if c.Credentials.ConnectionString != "" {
+		return nil
+	}
 	var requiredProperties = [][]string{
 		{"AzureTenantID", c.Credentials.AzureTenantID},
 		{"AzureClientID", c.Credentials.AzureClientID},
@@ -79,18 +79,26 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
-// TODO: Test this
 func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.StorageAccountName)
+	var client *azblob.Client
+	var err error
 
-	credential, err := azidentity.NewClientSecretCredential(cfg.Credentials.AzureTenantID, cfg.Credentials.AzureClientID, cfg.Credentials.AzureClientSecret, nil)
-	if err != nil {
-		return nil, err
-	}
+	if cfg.Credentials.ConnectionString != "" {
+		client, err = azblob.NewClientFromConnectionString(cfg.Credentials.ConnectionString, nil)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		credential, err := azidentity.NewClientSecretCredential(cfg.Credentials.AzureTenantID, cfg.Credentials.AzureClientID, cfg.Credentials.AzureClientSecret, nil)
+		if err != nil {
+			return nil, err
+		}
 
-	client, err := azblob.NewClient(blobUrl, credential, nil)
-	if err != nil {
-		return nil, err
+		client, err = azblob.NewClient(blobUrl, credential, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	store := &azureBlobStore{client: client, cfg: &cfg}
@@ -117,13 +125,12 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	maxResults := int32(1)
 	listingOptions := azblob.ListBlobsFlatOptions{MaxResults: &maxResults}
 
-	var blobName string
 	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &listingOptions)
 	if !pager.More() {
 		log.Printf("The container '%q' is empty", az.cfg.ContainerName)
 		return nil
 	}
-	page, err := pager.NextPage(ctx)
+	_, err := pager.NextPage(ctx)
 	if bloberror.HasCode(err, bloberror.AccountIsDisabled) {
 		return fmt.Errorf("account is disabled: %w", err)
 	} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
@@ -142,24 +149,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 		return fmt.Errorf("unable to list objects in container %q: %w", az.cfg.ContainerName, err)
 	}
 
-	if len(page.Segment.BlobItems) == 0 {
-		return nil
-	}
-	blobName = *page.Segment.BlobItems[0].Name
-
-	// Read a blob from the container
-	resp, err := az.client.DownloadStream(ctx, az.cfg.ContainerName, blobName, nil)
-	if err != nil {
-		return fmt.Errorf("unable to download blob %q: %w", blobName, err)
-	}
-	downloadedData := bytes.Buffer{}
-	retryReader := resp.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
-	_, err = downloadedData.ReadFrom(retryReader)
-
-	if err != nil {
-		return fmt.Errorf("unable to read blob content: %w", err)
-	}
-
+	// If we can list a object, we can read it too
 	return nil
 }
 
@@ -239,46 +229,91 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 	return &page, nil
 }
 
-type property struct {
-	JsonType    string      `json:"type"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Order       int         `json:"order"`
-	Secret      bool        `json:"secret"`
-	Credentials credentials `json:"credentials"`
-}
+func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 
-type schema struct {
-	SchemaType string   `json:"$schema"`
-	Title      string   `json:"title"`
-	JsonType   string   `json:"type"`
-	Required   []string `json:"required"`
-	Properties map[string]property
-}
-
-func getConfigSchema(parserJsonSchema json.RawMessage) json.RawMessage {
-	schema := schema{}
-	err := json.Unmarshal([]byte(jsonSchema), &schema)
-	if err != nil {
-		log.Fatalf("Error unmarshalling schema: %v", err)
-		return nil
-	}
-	parserSchema := property{}
-
-	err = json.Unmarshal(parserJsonSchema, &parserSchema)
-	if err != nil {
-		log.Fatalf("Error unmarshalling schema: %v", err)
-		return nil
-	}
-	schema.Properties["parser"] = parserSchema
-
-	schemaJSON, err := json.Marshal(schema)
-	if err != nil {
-		log.Fatalf("Error marshalling schema: %v", err)
-		return nil
-	}
-
-	return json.RawMessage(schemaJSON)
+	return json.RawMessage(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"title": "S3 Source",
+		"type": "object",
+		"required": [
+			"AzureClientID",
+			"AzureClientSecret",
+			"AzureTenantID",
+			"AzureSubscriptionID",
+			"StorageAccountName"
+		],
+		"properties": {
+			"credentials": {
+				"type": "object",
+				"anyOf": [
+					{
+						"required": [
+							"ConnectionString"
+						],
+						"properties": {
+							"ConnectionString": {
+								"type": "string",
+								"title": "Connection String",
+								"description": "The connection string used to authenticate with Azure Blob Storage.",
+								"order": 0
+							}
+						}
+					},
+					{
+						"required": [
+							"azureClientID",
+							"azureClientSecret",
+							"azureTenantID",
+							"azureSubscriptionID"
+						],
+						"properties": {
+							"azureClientID": {
+								"type": "string",
+								"title": "Azure Client ID",
+								"description": "The client ID used to authenticate with Azure Blob Storage.",
+								"order": 0
+							},
+							"azureClientSecret": {
+								"type": "string",
+								"title": "Azure Client Secret",
+								"description": "The client secret used to authenticate with Azure Blob Storage.",
+								"secret": true,
+								"order": 1
+							},
+							"azureTenantID": {
+								"type": "string",
+								"title": "Azure Tenant ID",
+								"description": "The ID of the Azure tenant where the Azure Blob Storage account is located.",
+								"order": 2
+							},
+							"azureSubscriptionID": {
+								"type": "string",
+								"title": "Azure Subscription ID",
+								"description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
+								"order": 3
+							}
+						}
+					}
+				],
+				"title": "Credentials",
+				"description": "Azure credentials used to authenticate with Azure Blob Storage."
+			},
+			"storageAccountName": {
+				"type": "string",
+				"title": "Storage Account Name",
+				"description": "The name of the Azure Blob Storage account.",
+				"order": 4
+			},
+			"matchKeys": {
+				"type": "string",
+				"title": "Match Keys",
+				"format": "regex",
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
+				"order": 5
+			},
+			"parser": ` + string(parserSchema) + `
+		}
+	}`)
 }
 
 func main() {
