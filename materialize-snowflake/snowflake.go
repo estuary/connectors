@@ -129,13 +129,6 @@ type transactor struct {
 	db         *stdsql.DB
 	pipeClient *PipeClient
 
-	// We initialise pipes (with a create or replace query) on the first Store
-	// to ensure that queries running as part of the first recovery Acknowledge
-	// do not create duplicates. Queries running on a pipe are idempotent so long
-	// as the pipe is not removed or replaced. The replace clause of the query
-	// will wipe the history of the pipe and so lead to duplicate documents
-	pipesInit bool
-
 	// map of pipe name to beginMarker cursors
 	pipeMarkers map[string]string
 
@@ -153,8 +146,12 @@ type transactor struct {
 	updateDelay time.Duration
 	cp          checkpoint
 
-	// this shard's range spec, used to key pipes so they don't collide
-	_range *pf.RangeSpec
+	// this shard's range spec and version, used to key pipes so they don't collide
+	_range  *pf.RangeSpec
+	version string
+
+	// list of pipe names that need to be cleaned up
+	pipeCleanups []string
 }
 
 func (t *transactor) AckDelay() time.Duration {
@@ -164,14 +161,6 @@ func (t *transactor) AckDelay() time.Duration {
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
-	}
-	// TODO: remove after migration
-	for _, item := range d.cp {
-		if len(item.StagedDir) == 0 {
-			log.WithField("state", string(state)).Info("found old checkpoint format, ignoring the checkpoint and starting clean")
-			d.cp = make(checkpoint)
-			break
-		}
 	}
 
 	return nil
@@ -212,6 +201,7 @@ func newTransactor(
 		pipeClient:  pipeClient,
 		pipeMarkers: make(map[string]string),
 		_range:      open.Range,
+		version:     open.Version,
 	}
 
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -264,14 +254,44 @@ type binding struct {
 	}
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
-	var d = new(binding)
-	d.target = target
+func (d *transactor) addBinding(ctx context.Context, target sql.Table) error {
+	var b = new(binding)
+	b.target = target
 
-	d.load.stage = newStagedFile(os.TempDir())
-	d.store.stage = newStagedFile(os.TempDir())
+	b.load.stage = newStagedFile(os.TempDir())
+	b.store.stage = newStagedFile(os.TempDir())
 
-	t.bindings = append(t.bindings, d)
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
+		var pipeName string
+		var err error
+		if pipeName, err = RenderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.pipeName); err != nil {
+			return fmt.Errorf("pipeName template: %w", err)
+		} else {
+			pipeName = strings.ToUpper(strings.Trim(pipeName, "`"))
+			b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, pipeName)
+		}
+
+		// Check to see if a pipe for this version already exists
+		var queries = fmt.Sprintf("SHOW PIPES LIKE '%s';", pipeName)
+		rows, err := d.db.QueryContext(ctx, queries)
+		if err != nil {
+			return fmt.Errorf("finding pipe %q: %w", b.pipeName, err)
+		}
+		var pipeExists = rows.Next()
+
+		// Only create the pipe if it doesn't exist. Since the pipe name is versioned by the spec
+		// it means if the spec has been updated, we will end up creating a new pipe
+		if !pipeExists {
+			log.WithField("name", b.pipeName).Info("store: creating pipe")
+			if createPipe, err := RenderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.createPipe); err != nil {
+				return fmt.Errorf("createPipe template: %w", err)
+			} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
+				return fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
+			}
+		}
+	}
+
+	d.bindings = append(d.bindings, b)
 	return nil
 }
 
@@ -380,6 +400,7 @@ type checkpointItem struct {
 	StagedDir string
 	PipeName  string
 	PipeFiles []fileRecord
+	Version   string
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -387,28 +408,21 @@ type checkpoint = map[string]*checkpointItem
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	if !d.pipesInit {
-		log.Info("store: initialising pipes")
-		for _, b := range d.bindings {
-			// If this is a delta updates binding and we are using JWT auth type, this binding
-			// can use snowpipe
-			if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
-				if pipeName, err := RenderTableAndShardTemplate(b.target, d._range.KeyBegin, d.templates.pipeName); err != nil {
-					return nil, fmt.Errorf("pipeName template: %w", err)
-				} else {
-					b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
-				}
-
-				if createPipe, err := RenderTableAndShardTemplate(b.target, d._range.KeyBegin, d.templates.createPipe); err != nil {
-					return nil, fmt.Errorf("createPipe template: %w", err)
-				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
-					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
-				}
-			}
+	// FIXME: I initially wrote this piece in Acknowledge, but in that case
+	// if we are unable to commit the checkpoint update after deleting the pipes, on a restart
+	// the acknowledge will be tried again but the pipe won't exist. I don't feel easy about ignoring cases where the pipe does not exist
+	// since that means committing a transaction that we are not 100% sure has been actually processed
+	// an alternative is cleaning up the pipes as part of the Store phase by keeping the list of pipes to cleanup in memory
+	// of the connector. This means there is a possible edge case where we will not cleanup the pipe: if Acknowledge runs successfully
+	// but the connector restarts before the next Store is able to process the pipe cleanups. I think I prefer the latter.
+	for _, pipeName := range d.pipeCleanups {
+		log.WithField("pipeName", pipeName).Info("dropping pipe")
+		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s;", pipeName)); err != nil {
+			return nil, fmt.Errorf("dropping pipe %s failed: %w", pipeName, err)
 		}
-
-		d.pipesInit = true
 	}
+
+	d.pipeCleanups = nil
 
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
@@ -452,6 +466,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					Table:     b.target.Identifier,
 					Query:     mergeIntoQuery,
 					StagedDir: dir,
+					Version:   d.version,
 				}
 			}
 		} else if b.pipeName != "" {
@@ -460,6 +475,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				StagedDir: dir,
 				PipeFiles: b.store.stage.uploaded,
 				PipeName:  b.pipeName,
+				Version:   d.version,
 			}
 
 		} else {
@@ -748,6 +764,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+
+	for _, item := range d.cp {
+		// If the spec version has bumped, we need to clean up the old pipes
+		if len(item.PipeName) > 0 && item.Version != d.version {
+			d.pipeCleanups = append(d.pipeCleanups, item.PipeName)
+		}
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
