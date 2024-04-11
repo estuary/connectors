@@ -18,18 +18,18 @@ import (
 )
 
 type config struct {
-	Credentials        credentials    `json:"credentials"`
-	StorageAccountName string         `json:"storageAccountName"`
-	Parser             *parser.Config `json:"parser"`
-	MatchKeys          string         `json:"matchKeys,omitempty"`
-	Advanced           advancedConfig `json:"advanced"`
+	Credentials   credentials    `json:"credentials"`
+	Parser        *parser.Config `json:"parser"`
+	MatchKeys     string         `json:"matchKeys,omitempty"`
+	Advanced      advancedConfig `json:"advanced"`
+	ContainerName string         `json:"containerName"`
 }
 type advancedConfig struct {
 	AscendingKeys bool `json:"ascendingKeys,omitempty"`
 }
 
 type credentials struct {
-	ContainerName       string `json:"containerName"`
+	StorageAccountName  string `json:"storageAccountName"`
 	AzureClientID       string `json:"azureClientID"`
 	AzureClientSecret   string `json:"azureClientSecret"`
 	AzureTenantID       string `json:"azureTenantID"`
@@ -45,13 +45,13 @@ func (c config) Validate() error {
 			{"AzureClientID", c.Credentials.AzureClientID},
 			{"AzureClientSecret", c.Credentials.AzureClientSecret},
 			{"AzureSubscriptionID", c.Credentials.AzureSubscriptionID},
-			{"StorageAccountName", c.StorageAccountName},
-			{"ContainerName", c.Credentials.ContainerName},
+			{"StorageAccountName", c.Credentials.StorageAccountName},
+			{"StorageAccountName", c.Credentials.StorageAccountName},
 		}
 	} else {
 		requiredProperties = [][]string{
 			{"ConnectionString", c.Credentials.ConnectionString},
-			{"ContainerName", c.Credentials.ContainerName},
+			{"StorageAccountName", c.Credentials.StorageAccountName},
 		}
 	}
 
@@ -64,11 +64,11 @@ func (c config) Validate() error {
 }
 
 func (c config) DiscoverRoot() string {
-	return c.Credentials.ContainerName
+	return c.ContainerName
 }
 
 func (c config) RecommendedName() string {
-	return c.Credentials.ContainerName
+	return c.ContainerName
 }
 
 func (c config) FilesAreMonotonic() bool {
@@ -84,7 +84,7 @@ func (c config) PathRegex() string {
 }
 
 func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error) {
-	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.StorageAccountName)
+	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.Credentials.StorageAccountName)
 	var client *azblob.Client
 	var err error
 
@@ -128,7 +128,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	maxResults := int32(1)
 	listingOptions := azblob.ListBlobsFlatOptions{MaxResults: &maxResults}
 
-	pager := az.client.NewListBlobsFlatPager(az.cfg.Credentials.ContainerName, &listingOptions)
+	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &listingOptions)
 	if !pager.More() {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
 		return fmt.Errorf("authorization failure: %w", err)
 	} else if bloberror.HasCode(err, bloberror.ContainerNotFound) {
-		return fmt.Errorf("container '%q' not found: %w", az.cfg.Credentials.ContainerName, err)
+		return fmt.Errorf("container '%q' not found: %w", az.cfg.ContainerName, err)
 	} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
 		return fmt.Errorf("authentication failure: %w", err)
 	} else if bloberror.HasCode(err, bloberror.InvalidResourceName) {
@@ -148,7 +148,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	} else if bloberror.HasCode(err, bloberror.AuthorizationSourceIPMismatch) {
 		return fmt.Errorf("authorization source IP mismatch: %w", err)
 	} else if err != nil {
-		return fmt.Errorf("unable to list objects in container %q: %w", az.cfg.Credentials.ContainerName, err)
+		return fmt.Errorf("unable to list objects in container %q: %w", az.cfg.ContainerName, err)
 	}
 
 	// If we can list a object, we can read it too
@@ -156,7 +156,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 }
 
 func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
-	pager := az.client.NewListBlobsFlatPager(az.cfg.Credentials.ContainerName, &azblob.ListBlobsFlatOptions{
+	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &azblob.ListBlobsFlatOptions{
 		Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
 	})
 	page, err := pager.NextPage(ctx)
@@ -175,7 +175,7 @@ func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (fil
 }
 
 func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	resp, err := s.client.DownloadStream(ctx, s.cfg.Credentials.ContainerName, obj.Path, nil)
+	resp, err := s.client.DownloadStream(ctx, s.cfg.ContainerName, obj.Path, nil)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
@@ -234,20 +234,15 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"title": "S3 Source",
 		"type": "object",
-		"required": [
-			"AzureClientID",
-			"AzureClientSecret",
-			"AzureTenantID",
-			"AzureSubscriptionID",
-			"StorageAccountName"
-		],
 		"properties": {
 			"credentials": {
 				"type": "object",
+				"order": 0,
 				"anyOf": [
 					{
 						"required": [
-							"ConnectionString"
+							"ConnectionString",
+							"storageAccountName"
 						],
 						"properties": {
 							"ConnectionString": {
@@ -255,6 +250,12 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 								"title": "Connection String",
 								"description": "The connection string used to authenticate with Azure Blob Storage.",
 								"order": 0
+							},
+							"storageAccountName": {
+								"type": "string",
+								"title": "Storage Account Name",
+								"description": "The name of the Azure Blob Storage account.",
+								"order": 1
 							}
 						}
 					},
@@ -263,7 +264,8 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 							"azureClientID",
 							"azureClientSecret",
 							"azureTenantID",
-							"azureSubscriptionID"
+							"azureSubscriptionID",
+							"storageAccountName"
 						],
 						"properties": {
 							"azureClientID": {
@@ -290,6 +292,12 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 								"title": "Azure Subscription ID",
 								"description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
 								"order": 3
+							},
+							"storageAccountName": {
+								"type": "string",
+								"title": "Storage Account Name",
+								"description": "The name of the Azure Blob Storage account.",
+								"order": 1
 							}
 						}
 					}
@@ -297,18 +305,18 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"title": "Credentials",
 				"description": "Azure credentials used to authenticate with Azure Blob Storage."
 			},
-			"storageAccountName": {
+			"containerName": {
 				"type": "string",
-				"title": "Storage Account Name",
-				"description": "The name of the Azure Blob Storage account.",
-				"order": 4
+				"title": "Container Name",
+				"description": "The name of the Azure Blob Storage container to read from.",
+				"order": 1
 			},
 			"matchKeys": {
 				"type": "string",
 				"title": "Match Keys",
 				"format": "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 5
+				"order": 2
 			},
 			"advanced": {
 				"properties": {
@@ -322,7 +330,8 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"additionalProperties": false,
 				"type": "object",
 				"description": "Options for advanced users. You should not typically need to modify these.",
-				"advanced": true
+				"advanced": true,
+				"order": 3
 			},
 			"parser": ` + string(parserSchema) + `
 		}
