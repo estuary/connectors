@@ -38,9 +38,6 @@ type credentials struct {
 }
 
 func (c config) Validate() error {
-	if c.Credentials.ConnectionString != "" {
-		return nil
-	}
 	var requiredProperties [][]string
 	if c.Credentials.ConnectionString == "" {
 		requiredProperties = [][]string{
