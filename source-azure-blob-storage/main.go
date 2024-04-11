@@ -100,8 +100,7 @@ func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error)
 
 	store := &azureBlobStore{client: client, cfg: &cfg}
 
-	err = store.check(ctx)
-	if err != nil {
+	if err = store.check(ctx); err != nil {
 		return nil, err
 	}
 
@@ -113,9 +112,9 @@ type azureBlobStore struct {
 	cfg    *config
 }
 
-// check verifies that we can list objects in the bucket and potentially read an object in
-// the bucket. This is done in a way that requires only s3:ListBucket and s3:GetObject permissions,
-// since these are the permissions required by the connector.
+// check checks the connection to the Azure Blob Storage container.
+// It returns an error if the container is not found, the account is disabled, or if there is an authorization failure.
+// If the listing is successful, it returns nil.
 func (az *azureBlobStore) check(ctx context.Context) error {
 	// All we care about is a successful listing rather than iterating on all objects
 
