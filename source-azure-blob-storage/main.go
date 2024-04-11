@@ -199,9 +199,6 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 		return filesource.ObjectInfo{}, io.EOF
 	}
 
-	for _, blob := range page.Segment.BlobItems {
-		fmt.Println(*blob.Name)
-	}
 	blob := page.Segment.BlobItems[l.index]
 	l.index++
 
