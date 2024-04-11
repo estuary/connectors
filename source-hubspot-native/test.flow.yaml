@@ -117,7 +117,7 @@ captures:
         target: acmeCo/workflows
       - resource:
           name: properties
-          interval: PT30S
+          interval: P1D
         target: acmeCo/properties
     interval: 3m
     shards:
