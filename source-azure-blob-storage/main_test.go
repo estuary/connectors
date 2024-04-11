@@ -9,7 +9,7 @@ import (
 
 	"github.com/estuary/connectors/filesource"
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const connectionString = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
@@ -34,8 +34,8 @@ func TestAzureBlobStore_newAzureBlobStore(t *testing.T) {
 	cfg := getTestConfig(t)
 	ctx := context.TODO()
 	az, err := newAzureBlobStore(ctx, cfg)
-	assert.NoError(t, err)
-	assert.NotNil(t, az)
+	require.NoError(t, err)
+	require.NotNil(t, az)
 }
 
 func TestGetConfigSchema(t *testing.T) {
@@ -54,18 +54,18 @@ func TestAzureBlobStore_List(t *testing.T) {
 	ctx := context.TODO()
 	az, err := newAzureBlobStore(ctx, cfg)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, az)
+	require.NoError(t, err)
+	require.NotNil(t, az)
 
 	query := filesource.Query{}
 	listing, err := az.List(ctx, query)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, listing)
+	require.NoError(t, err)
+	require.NotNil(t, listing)
 
 	file, err := listing.Next()
-	assert.NoError(t, err)
-	assert.NotNil(t, file)
+	require.NoError(t, err)
+	require.NotNil(t, file)
 
 	fmt.Println(file.Path)
 }
@@ -75,22 +75,22 @@ func TestAzureBlobStore_Read(t *testing.T) {
 	ctx := context.TODO()
 	az, err := newAzureBlobStore(ctx, cfg)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, az)
+	require.NoError(t, err)
+	require.NotNil(t, az)
 
 	obj := filesource.ObjectInfo{
 		Path: "l00cmqdvppy01-4060447306.jpg",
 	}
 
 	reader, info, err := az.Read(ctx, obj)
-	assert.NoError(t, err)
-	assert.NotNil(t, reader)
-	assert.Equal(t, obj, info)
+	require.NoError(t, err)
+	require.NotNil(t, reader)
+	require.Equal(t, obj, info)
 
 	data, err := io.ReadAll(reader)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, data)
+	require.NoError(t, err)
+	require.NotEmpty(t, data)
 
 	err = reader.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
