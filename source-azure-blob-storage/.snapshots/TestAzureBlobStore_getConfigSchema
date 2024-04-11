@@ -2,20 +2,15 @@
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"title": "S3 Source",
 		"type": "object",
-		"required": [
-			"AzureClientID",
-			"AzureClientSecret",
-			"AzureTenantID",
-			"AzureSubscriptionID",
-			"StorageAccountName"
-		],
 		"properties": {
 			"credentials": {
 				"type": "object",
+				"order": 0,
 				"anyOf": [
 					{
 						"required": [
-							"ConnectionString"
+							"ConnectionString",
+							"storageAccountName"
 						],
 						"properties": {
 							"ConnectionString": {
@@ -23,6 +18,12 @@
 								"title": "Connection String",
 								"description": "The connection string used to authenticate with Azure Blob Storage.",
 								"order": 0
+							},
+							"storageAccountName": {
+								"type": "string",
+								"title": "Storage Account Name",
+								"description": "The name of the Azure Blob Storage account.",
+								"order": 1
 							}
 						}
 					},
@@ -31,7 +32,8 @@
 							"azureClientID",
 							"azureClientSecret",
 							"azureTenantID",
-							"azureSubscriptionID"
+							"azureSubscriptionID",
+							"storageAccountName"
 						],
 						"properties": {
 							"azureClientID": {
@@ -58,6 +60,12 @@
 								"title": "Azure Subscription ID",
 								"description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
 								"order": 3
+							},
+							"storageAccountName": {
+								"type": "string",
+								"title": "Storage Account Name",
+								"description": "The name of the Azure Blob Storage account.",
+								"order": 1
 							}
 						}
 					}
@@ -65,18 +73,18 @@
 				"title": "Credentials",
 				"description": "Azure credentials used to authenticate with Azure Blob Storage."
 			},
-			"storageAccountName": {
+			"containerName": {
 				"type": "string",
-				"title": "Storage Account Name",
-				"description": "The name of the Azure Blob Storage account.",
-				"order": 4
+				"title": "Container Name",
+				"description": "The name of the Azure Blob Storage container to read from.",
+				"order": 1
 			},
 			"matchKeys": {
 				"type": "string",
 				"title": "Match Keys",
 				"format": "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 5
+				"order": 2
 			},
 			"advanced": {
 				"properties": {
@@ -90,7 +98,8 @@
 				"additionalProperties": false,
 				"type": "object",
 				"description": "Options for advanced users. You should not typically need to modify these.",
-				"advanced": true
+				"advanced": true,
+				"order": 3
 			},
 			"parser": {"type": "object", "properties": {"name": {"type": "string"}}}
 		}
