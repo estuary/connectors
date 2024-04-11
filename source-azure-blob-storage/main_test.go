@@ -32,7 +32,8 @@ func getTestConfig(t *testing.T) config {
 func TestAzureBlobStore_newAzureBlobStore(t *testing.T) {
 	// Create a test instance of the azureBlobStore
 	cfg := getTestConfig(t)
-	az, err := newAzureBlobStore(cfg) // Pass cfg directly instead of its address
+	ctx := context.TODO()
+	az, err := newAzureBlobStore(ctx, cfg)
 	assert.NoError(t, err)
 	assert.NotNil(t, az)
 }
@@ -49,17 +50,13 @@ func TestGetConfigSchema(t *testing.T) {
 }
 
 func TestAzureBlobStore_List(t *testing.T) {
-	// Create a test instance of the azureBlobStore
 	cfg := getTestConfig(t)
+	ctx := context.TODO()
+	az, err := newAzureBlobStore(ctx, cfg)
 
-	az, err := newAzureBlobStore(cfg)
 	assert.NoError(t, err)
 	assert.NotNil(t, az)
 
-	// Create a test context
-	ctx := context.TODO()
-
-	// Create a test query
 	query := filesource.Query{}
 	listing, err := az.List(ctx, query)
 
@@ -73,33 +70,27 @@ func TestAzureBlobStore_List(t *testing.T) {
 	fmt.Println(file.Path)
 }
 func TestAzureBlobStore_Read(t *testing.T) {
-	// Create a test instance of the azureBlobStore
 	cfg := getTestConfig(t)
 
-	az, err := newAzureBlobStore(cfg)
+	ctx := context.TODO()
+	az, err := newAzureBlobStore(ctx, cfg)
+
 	assert.NoError(t, err)
 	assert.NotNil(t, az)
 
-	// Create a test context
-	ctx := context.TODO()
-
-	// Create a test object
 	obj := filesource.ObjectInfo{
 		Path: "l00cmqdvppy01-4060447306.jpg",
 	}
 
-	// Call the Read function
 	reader, info, err := az.Read(ctx, obj)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	assert.Equal(t, obj, info)
 
-	// Read from the reader
 	data, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, data)
 
-	// Close the reader
 	err = reader.Close()
 	assert.NoError(t, err)
 }
