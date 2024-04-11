@@ -76,7 +76,7 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
-func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
+func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error) {
 	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.StorageAccountName)
 	var client *azblob.Client
 	var err error
@@ -100,7 +100,7 @@ func newAzureBlobStore(cfg config) (*azureBlobStore, error) {
 
 	store := &azureBlobStore{client: client, cfg: &cfg}
 
-	err = store.check(context.TODO())
+	err = store.check(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +329,7 @@ func main() {
 			return cfg, nil
 		},
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
-			return newAzureBlobStore(cfg.(config))
+			return newAzureBlobStore(ctx, cfg.(config))
 		},
 		ConfigSchema:     getConfigSchema,
 		DocumentationURL: "https://go.estuary.dev/source-azure-blob-storage",
