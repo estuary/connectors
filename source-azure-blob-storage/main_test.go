@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/filesource"
-	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,15 +38,12 @@ func TestAzureBlobStore_newAzureBlobStore(t *testing.T) {
 	require.NotNil(t, az)
 }
 
-func TestGetConfigSchema(t *testing.T) {
+func TestAzureBlobStore_getConfigSchema(t *testing.T) {
 	parserJsonSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
 
 	result := getConfigSchema(parserJsonSchema)
 
-	snaps.WithConfig(
-		snaps.Dir("snapshots"),
-		snaps.Filename("config_schema"),
-	).MatchJSON(t, string(result))
+	cupaloy.SnapshotT(t, string(result))
 }
 
 func TestAzureBlobStore_List(t *testing.T) {
