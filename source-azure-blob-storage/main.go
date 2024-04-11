@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -19,15 +18,18 @@ import (
 )
 
 type config struct {
-	Credentials        *credentials   `json:"credentials"`
+	Credentials        credentials    `json:"credentials"`
 	StorageAccountName string         `json:"storageAccountName"`
-	ContainerName      string         `json:"containerName"`
 	Parser             *parser.Config `json:"parser"`
-	MatchKeys          string         `json:"matchKeys"`
-	AscendingKeys      bool           `json:"ascendingKeys"`
+	MatchKeys          string         `json:"matchKeys,omitempty"`
+	Advanced           advancedConfig `json:"advanced"`
+}
+type advancedConfig struct {
+	AscendingKeys bool `json:"ascendingKeys,omitempty"`
 }
 
 type credentials struct {
+	ContainerName       string `json:"containerName"`
 	AzureClientID       string `json:"azureClientID"`
 	AzureClientSecret   string `json:"azureClientSecret"`
 	AzureTenantID       string `json:"azureTenantID"`
@@ -39,13 +41,21 @@ func (c config) Validate() error {
 	if c.Credentials.ConnectionString != "" {
 		return nil
 	}
-	var requiredProperties = [][]string{
-		{"AzureTenantID", c.Credentials.AzureTenantID},
-		{"AzureClientID", c.Credentials.AzureClientID},
-		{"AzureClientSecret", c.Credentials.AzureClientSecret},
-		{"AzureSubscriptionID", c.Credentials.AzureSubscriptionID},
-		{"StorageAccountName", c.StorageAccountName},
-		{"ContainerName", c.ContainerName},
+	var requiredProperties [][]string
+	if c.Credentials.ConnectionString == "" {
+		requiredProperties = [][]string{
+			{"AzureTenantID", c.Credentials.AzureTenantID},
+			{"AzureClientID", c.Credentials.AzureClientID},
+			{"AzureClientSecret", c.Credentials.AzureClientSecret},
+			{"AzureSubscriptionID", c.Credentials.AzureSubscriptionID},
+			{"StorageAccountName", c.StorageAccountName},
+			{"ContainerName", c.Credentials.ContainerName},
+		}
+	} else {
+		requiredProperties = [][]string{
+			{"ConnectionString", c.Credentials.ConnectionString},
+			{"ContainerName", c.Credentials.ContainerName},
+		}
 	}
 
 	for _, req := range requiredProperties {
@@ -57,15 +67,15 @@ func (c config) Validate() error {
 }
 
 func (c config) DiscoverRoot() string {
-	return c.ContainerName
+	return c.Credentials.ContainerName
 }
 
 func (c config) RecommendedName() string {
-	return c.ContainerName
+	return c.Credentials.ContainerName
 }
 
 func (c config) FilesAreMonotonic() bool {
-	return c.AscendingKeys
+	return c.Advanced.AscendingKeys
 }
 
 func (c config) ParserConfig() *parser.Config {
@@ -98,7 +108,7 @@ func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error)
 		}
 	}
 
-	store := &azureBlobStore{client: client, cfg: &cfg}
+	store := &azureBlobStore{client: *client, cfg: cfg}
 
 	if err = store.check(ctx); err != nil {
 		return nil, err
@@ -108,8 +118,8 @@ func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error)
 }
 
 type azureBlobStore struct {
-	client *azblob.Client
-	cfg    *config
+	client azblob.Client
+	cfg    config
 }
 
 // check checks the connection to the Azure Blob Storage container.
@@ -121,9 +131,8 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	maxResults := int32(1)
 	listingOptions := azblob.ListBlobsFlatOptions{MaxResults: &maxResults}
 
-	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &listingOptions)
+	pager := az.client.NewListBlobsFlatPager(az.cfg.Credentials.ContainerName, &listingOptions)
 	if !pager.More() {
-		log.Printf("The container '%q' is empty", az.cfg.ContainerName)
 		return nil
 	}
 	_, err := pager.NextPage(ctx)
@@ -132,7 +141,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
 		return fmt.Errorf("authorization failure: %w", err)
 	} else if bloberror.HasCode(err, bloberror.ContainerNotFound) {
-		return fmt.Errorf("container '%q' not found: %w", az.cfg.ContainerName, err)
+		return fmt.Errorf("container '%q' not found: %w", az.cfg.Credentials.ContainerName, err)
 	} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
 		return fmt.Errorf("authentication failure: %w", err)
 	} else if bloberror.HasCode(err, bloberror.InvalidResourceName) {
@@ -142,7 +151,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 	} else if bloberror.HasCode(err, bloberror.AuthorizationSourceIPMismatch) {
 		return fmt.Errorf("authorization source IP mismatch: %w", err)
 	} else if err != nil {
-		return fmt.Errorf("unable to list objects in container %q: %w", az.cfg.ContainerName, err)
+		return fmt.Errorf("unable to list objects in container %q: %w", az.cfg.Credentials.ContainerName, err)
 	}
 
 	// If we can list a object, we can read it too
@@ -150,7 +159,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 }
 
 func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
-	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &azblob.ListBlobsFlatOptions{
+	pager := az.client.NewListBlobsFlatPager(az.cfg.Credentials.ContainerName, &azblob.ListBlobsFlatOptions{
 		Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
 	})
 	page, err := pager.NextPage(ctx)
@@ -161,15 +170,15 @@ func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (fil
 	return &azureBlobListing{
 		ctx:               ctx,
 		client:            az.client,
-		pager:             pager,
+		pager:             *pager,
 		index:             0,
 		currentPageLength: len(page.Segment.BlobItems),
-		page:              &page,
+		page:              page,
 	}, nil
 }
 
 func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	resp, err := s.client.DownloadStream(ctx, s.cfg.ContainerName, obj.Path, nil)
+	resp, err := s.client.DownloadStream(ctx, s.cfg.Credentials.ContainerName, obj.Path, nil)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
@@ -180,11 +189,11 @@ func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (i
 
 type azureBlobListing struct {
 	ctx               context.Context
-	client            *azblob.Client
-	pager             *runtime.Pager[azblob.ListBlobsFlatResponse]
+	client            azblob.Client
+	pager             runtime.Pager[azblob.ListBlobsFlatResponse]
 	index             int
 	currentPageLength int
-	page              *azblob.ListBlobsFlatResponse
+	page              azblob.ListBlobsFlatResponse
 }
 
 func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
@@ -206,7 +215,7 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 
 func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 	if l.index < l.currentPageLength {
-		return l.page, nil
+		return &l.page, nil
 	}
 	if !l.pager.More() {
 		return nil, nil
@@ -216,7 +225,7 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 		return nil, err
 	}
 
-	l.page = &page
+	l.page = page
 	l.currentPageLength = len(page.Segment.BlobItems)
 
 	return &page, nil
@@ -304,12 +313,20 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
 				"order": 5
 			},
-			"ascendingKeys": {
-				"type":        "boolean",
-				"title":       "Ascending Keys",
-				"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
-				"default":     false
-			  },
+			"advanced": {
+				"properties": {
+				  "ascendingKeys": {
+					"type":        "boolean",
+					"title":       "Ascending Keys",
+					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+					"default":     false
+				  }
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"description": "Options for advanced users. You should not typically need to modify these.",
+				"advanced": true
+			},
 			"parser": ` + string(parserSchema) + `
 		}
 	}`)
