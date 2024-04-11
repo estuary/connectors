@@ -124,6 +124,16 @@ type InsertFilesResponse struct {
 	RequestId string `json:"requestId"`
 }
 
+type InsertFilesError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Success bool   `json:"success"`
+}
+
+func (e InsertFilesError) Error() string {
+	return fmt.Sprintf("(%s) %s", e.Code, e.Message)
+}
+
 const insertFilesRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/insertFiles?requestId={{ $.RequestId }}"
 const contentType = "application/json;charset=UTF-8"
 const userAgent = "Estuary Technologies Flow"
@@ -201,7 +211,12 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}).Debug("pipe client")
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf.String())
+		var errResponse InsertFilesError
+		if err := json.Unmarshal([]byte(respBuf.String()), &errResponse); err != nil {
+			return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf.String())
+		} else {
+			return nil, errResponse
+		}
 	}
 
 	var response InsertFilesResponse
