@@ -1,6 +1,4 @@
 ---
-import:
-  - acmeCo/flow.yaml
 captures:
   acmeCo/source-google-analytics-data-api:
     endpoint:

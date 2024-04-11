@@ -87,14 +87,44 @@
         },
         "custom_reports": {
           "description": "A JSON array describing the custom reports you want to sync from Google Analytics. See  our docs for more info about exactly how to fill out this field: https://go.estuary.dev/fz3SSy",
-          "title": "Custom Reports (Optional)"
+          "order": 3,
+          "title": "Custom Reports (Optional)",
+          "type": "string"
         },
         "date_ranges_start_date": {
-          "format": "date"
+          "description": "The start date from which to replicate report data in the format YYYY-MM-DD. Data generated before this date will not be included in the report. Not applied to custom Cohort reports.",
+          "examples": [
+            "2021-01-01"
+          ],
+          "format": "date",
+          "order": 2,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "property_id": {
+          "description": "A Google Analytics GA4 property identifier whose events are tracked. Specified in the URL path and not the body such as \"123...\". See <a href=\"https://developers.google.com/analytics/devguides/reporting/data/v1/property-id#what_is_my_property_id\">the docs</a> for more details.",
+          "order": 1,
+          "pattern": "^[0-9]*$",
+          "title": "Property ID",
+          "type": "string"
         },
         "window_in_days": {
+          "default": 1,
           "description": "The time increment used by the connector when requesting data from the Google Analytics API.  We recommend setting this to 1 unless you have a hard requirement to make the sync faster at the expense of accuracy. The minimum allowed value for this field is 1, and the maximum is 364.  More info can be found in our docs: https://go.estuary.dev/C9pwjr",
-          "title": "Data request time increment in days (Optional)"
+          "examples": [
+            30,
+            60,
+            90,
+            120,
+            200,
+            364
+          ],
+          "maximum": 364,
+          "minimum": 1,
+          "order": 4,
+          "title": "Data request time increment in days (Optional)",
+          "type": "integer"
         }
       },
       "required": [
@@ -105,7 +135,7 @@
       "title": "Google Analytics Data API Spec",
       "type": "object"
     },
-    "documentationUrl": "https://docs.airbyte.com/integrations/sources/google-analytics-data-api",
+    "documentationUrl": "https://go.estuary.dev/RIcwJU",
     "oauth2": {
       "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
       "accessTokenResponseMap": {
