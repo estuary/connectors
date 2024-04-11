@@ -21,10 +21,10 @@ func getTestConfig(t *testing.T) config {
 	}
 	cfg := config{
 		Credentials: credentials{
-			ConnectionString: connectionString,
-			ContainerName:    "example",
+			ConnectionString:   connectionString,
+			StorageAccountName: "devstoreaccount1",
 		},
-		StorageAccountName: "devstoreaccount1",
+		ContainerName: "example",
 	}
 	return cfg
 }
