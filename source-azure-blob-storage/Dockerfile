@@ -6,7 +6,6 @@ FROM golang:1.21-bullseye as builder
 
 WORKDIR /builder
 
-
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
@@ -17,8 +16,13 @@ COPY filesource ./filesource
 COPY source-boilerplate ./source-boilerplate
 COPY source-azure-blob-storage  ./source-azure-blob-storage
 
+# Run the unit tests.
+RUN go test -v ./filesource/...
+RUN go test -v ./source-azure-blob-storage/...
+
 # Build the connector.
 RUN go build -o ./connector -v ./source-azure-blob-storage/...
+
 
 # Runtime Stage
 ################################################################################
