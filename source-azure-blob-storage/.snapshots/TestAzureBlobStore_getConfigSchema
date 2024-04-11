@@ -78,12 +78,20 @@
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
 				"order": 5
 			},
-			"ascendingKeys": {
-				"type":        "boolean",
-				"title":       "Ascending Keys",
-				"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
-				"default":     false
-			  },
+			"advanced": {
+				"properties": {
+				  "ascendingKeys": {
+					"type":        "boolean",
+					"title":       "Ascending Keys",
+					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+					"default":     false
+				  }
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"description": "Options for advanced users. You should not typically need to modify these.",
+				"advanced": true
+			},
 			"parser": {"type": "object", "properties": {"name": {"type": "string"}}}
 		}
 	}
