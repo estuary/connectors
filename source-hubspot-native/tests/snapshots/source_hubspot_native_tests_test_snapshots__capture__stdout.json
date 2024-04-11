@@ -632,20 +632,6 @@
     }
   ],
   [
-    "acmeCo/owners",
-    {
-      "archived": false,
-      "createdAt": "2024-02-27T07:05:06.660Z",
-      "email": "leofs123@gmail.com",
-      "firstName": "Luis",
-      "id": 750122779,
-      "lastName": "Henrique",
-      "updatedAt": "2024-03-13T18:17:48.512000Z",
-      "userId": 51770238,
-      "userIdIncludingInactive": 51770238
-    }
-  ],
-  [
     "acmeCo/properties",
     {
       "_meta": {
@@ -2076,6 +2062,37 @@
       "options": [],
       "type": "datetime",
       "updatedAt": "2023-12-05T17:03:58.823Z"
+    }
+  ],
+  [
+    "acmeCo/properties",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 42
+      },
+      "calculated": false,
+      "createdAt": "2024-02-23T19:17:13.324Z",
+      "description": "This property stores the average sentiment of open support tickets at a given time",
+      "displayOrder": -1,
+      "externalOptions": false,
+      "fieldType": "number",
+      "formField": false,
+      "groupName": "company_activity",
+      "hasUniqueValue": false,
+      "hidden": false,
+      "hubspotDefined": true,
+      "hubspotObject": "companies",
+      "label": "Customer Success Ticket Sentiment",
+      "modificationMetadata": {
+        "archivable": true,
+        "readOnlyDefinition": false,
+        "readOnlyValue": true
+      },
+      "name": "hs_customer_success_ticket_sentiment",
+      "options": [],
+      "type": "number",
+      "updatedAt": "2024-02-23T19:17:13.324Z"
     }
   ]
 ]
