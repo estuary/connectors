@@ -131,7 +131,10 @@ class GoogleAnalyticsApiQuotaBase:
                 self._set_retry_attrs_for_quota(quota_name)
                 return None
             else:
-                self.logger.warning(self.error_message)
+                if self.error_message is None:
+                    pass
+                else:
+                    self.logger.warning(f"{self.error_message}")
 
     def _check_for_errors(self, response: requests.Response) -> None:
         try:

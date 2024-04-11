@@ -5,7 +5,7 @@ description = ""
 authors = ["Luishfs <luish1980@hotmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<=3.12.2"
+python = "^3.12"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 airbyte-cdk = "^0.52"
 pydantic = "1.10.14"
