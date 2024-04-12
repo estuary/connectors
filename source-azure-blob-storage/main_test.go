@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -82,6 +83,12 @@ func TestAzureBlobStore_Read(t *testing.T) {
 	reader, info, err := az.Read(ctx, obj)
 	require.NoError(t, err)
 	require.NotNil(t, reader)
+	downloadedData := bytes.Buffer{}
+
+	_, err = downloadedData.ReadFrom(reader)
+	require.NoError(t, err)
+	cupaloy.SnapshotT(t, downloadedData)
+
 	require.Equal(t, obj, info)
 
 	data, err := io.ReadAll(reader)
