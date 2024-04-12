@@ -22,6 +22,7 @@ OAUTH2_SPEC = OAuth2Spec(
     accessTokenBody=(
         '{"grant_type": "authorization_code", "client_id": "{{{ client_id }}}", "client_secret": "{{{ client_secret }}}", "redirect_uri": "{{{ redirect_uri }}}", "code": "{{{ code }}}"}'
     ),
+    accessTokenHeaders={"content-type":"application/json"},
     accessTokenResponseMap={"refresh_token": "/refresh_token"},
 )
 
