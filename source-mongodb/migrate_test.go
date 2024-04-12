@@ -39,10 +39,10 @@ func TestDecodeState(t *testing.T) {
 
 	testResources := map[boilerplate.StateKey]resourceState{
 		"something": {
-			Backfill: backfillState{Done: true, LastId: bson.RawValue{Value: []byte("first")}},
+			Backfill: backfillState{Done: true, LastId: &bson.RawValue{Value: []byte("first")}},
 		},
 		"other": {
-			Backfill: backfillState{Done: true, LastId: bson.RawValue{Value: []byte("second")}},
+			Backfill: backfillState{Done: true, LastId: &bson.RawValue{Value: []byte("second")}},
 		},
 	}
 

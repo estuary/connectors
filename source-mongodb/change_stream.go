@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -13,45 +14,23 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// changeStream associates a *mongo.ChangeStream with metadata about which database it is for.
+// changeStream associates a *mongo.ChangeStream with which database it is for.
 type changeStream struct {
 	ms *mongo.ChangeStream
 	db string
 }
 
-// makeStreamEvent produces an appropriate streamEvent for a provided changeEvent decoded from this
-// changeStream.
-func (cs *changeStream) makeStreamEvent(ev *changeEvent, collectionBindingIndex map[string]bindingInfo) (streamEvent, error) {
-	tok := cs.ms.ResumeToken()
-	if tok == nil {
-		// This should never happen.
-		return streamEvent{}, fmt.Errorf("application error: got a nil resume token")
+// makeEventDocument processes a change event and returns a document if the change event is for a
+// tracked collection and operation type. The binding index is also returned if a document is
+// available from the change event. If no document is applicable to the change event, the boolean
+// output will be false.
+func makeEventDocument(ev changeEvent, collectionBindingIndex map[string]bindingInfo) (map[string]any, int, bool) {
+	binding, ok := collectionBindingIndex[eventResourceId(ev)]
+	if !ok {
+		// Event is not for a tracked collection.
+		return nil, 0, false
 	}
 
-	stateUpdate := captureState{
-		DatabaseResumeTokens: map[string]bson.Raw{cs.db: tok},
-	}
-
-	out := streamEvent{
-		stateUpdate: stateUpdate,
-	}
-
-	if ev == nil {
-		// Checkpoint only for a post-batch resume token.
-		return out, nil
-	}
-
-	binding, ok := collectionBindingIndex[eventResourceId(*ev)]
-	if ok {
-		// Event is for a monitored collection.
-		out.binding = binding
-		out.doc = makeEventDocument(ev)
-	}
-
-	return out, nil
-}
-
-func makeEventDocument(ev *changeEvent) map[string]any {
 	switch ev.OperationType {
 	case "insert", "update", "replace":
 		if ev.FullDocument == nil {
@@ -62,7 +41,7 @@ func makeEventDocument(ev *changeEvent) map[string]any {
 			// different from the deltas in the update event. We ignore events where
 			// FullDocument is null. Another change event of type delete will eventually come
 			// and delete the document.
-			return nil
+			return nil, 0, false
 		}
 
 		doc := sanitizeDocument(ev.FullDocument)
@@ -77,7 +56,7 @@ func makeEventDocument(ev *changeEvent) map[string]any {
 			opProperty: op,
 		}
 
-		return doc
+		return doc, binding.index, true
 	case "delete":
 		var doc = map[string]any{
 			idProperty: ev.DocumentKey.Id,
@@ -85,11 +64,12 @@ func makeEventDocument(ev *changeEvent) map[string]any {
 				opProperty: "d",
 			},
 		}
+		doc = sanitizeDocument(doc)
 
-		return sanitizeDocument(doc)
+		return doc, binding.index, true
 	default:
 		// Event is of an operation type that we don't care about.
-		return nil
+		return nil, 0, false
 	}
 }
 
@@ -220,8 +200,8 @@ type helloTs struct {
 
 // streamCatchup is similar to streamForever, but returns when `TryNext` yields no documents, or
 // when we are sufficiently caught up on reading the change stream as determined by comparing the
-// cluster time of the received event to the last majority-committed operation on the cluster at the
-// start of catching up the stream.
+// cluster time of the received event to the last majority-committed operation time of the cluster
+// at the start of catching up the stream.
 func (c *capture) streamCatchup(
 	ctx context.Context,
 	streams []changeStream,
@@ -229,11 +209,10 @@ func (c *capture) streamCatchup(
 	c.startStreamLogger()
 	defer c.stopStreamLogger()
 
-	// First get the current majority-committed operation time, which will be our high
-	// watermark for catching up the stream. Generally we would reach the "end" of the
-	// stream and TryNext will return `false`, but in cases where the stream has a high rate
-	// of changes we could end up tailing it forever and need some point to know that we are
-	// sufficiently caught up to stop.
+	// First get the current majority-committed operation time, which will be our high watermark for
+	// catching up the stream. Generally we will reach the "end" of the stream and TryNext will
+	// return `false`, but in cases where the stream has a high rate of changes we could end up
+	// tailing it forever and need some point to know that we are sufficiently caught up to stop.
 
 	// Note: Although we are using the "admin" database, this command works for any database, even
 	// if it doesn't exist, no matter what permissions the connecting user has.
@@ -243,8 +222,10 @@ func (c *capture) streamCatchup(
 		return fmt.Errorf("decoding server 'hello' response: %w", err)
 	}
 
+	ts := time.Now()
 	opTime := helloRes.LastWrite.OpTime.Ts
 	log.WithField("lastWriteOpTime", opTime).Info("catching up streams")
+	defer func() { log.WithField("took", time.Since(ts).String()).Info("finished catching up streams") }()
 
 	group, groupCtx := errgroup.WithContext(ctx)
 
@@ -252,7 +233,6 @@ func (c *capture) streamCatchup(
 		s := s
 		group.Go(func() error {
 			ts := time.Now()
-
 			logEntry := log.WithField("database", s.db)
 			logEntry.Info("started catching up stream for database")
 			defer func() {
@@ -283,10 +263,8 @@ func (c *capture) tryStream(
 		var ev changeEvent
 		if err := s.ms.Decode(&ev); err != nil {
 			return fmt.Errorf("change stream decoding document: %w", err)
-		} else if emit, err := s.makeStreamEvent(&ev, c.collectionBindingIndex); err != nil {
-			return fmt.Errorf("change stream making stream event: %w", err)
-		} else if err := c.emitEvent(ctx, emit); err != nil {
-			return fmt.Errorf("change stream emitting stream event: %w", err)
+		} else if err := c.handleEvent(ev, s.db, s.ms.ResumeToken()); err != nil {
+			return err
 		}
 
 		if tsCutoff != nil && ev.ClusterTime.After(*tsCutoff) {
@@ -310,13 +288,111 @@ func (c *capture) tryStream(
 	// change stream has scanned up to on the server (not necessarily a matching change). This will
 	// be present even if TryNext returned no documents and allows us to keep the position of the
 	// change stream fresh even if we are watching a database that has infrequent events.
-	if emit, err := s.makeStreamEvent(nil, c.collectionBindingIndex); err != nil {
-		return fmt.Errorf("change stream making post-batch stream event: %w", err)
-	} else if err := c.emitEvent(ctx, emit); err != nil {
-		return fmt.Errorf("changing stream emitting post-batch stream event: %w", err)
+	tok := s.ms.ResumeToken()
+
+	stateUpdate := captureState{
+		DatabaseResumeTokens: map[string]bson.Raw{s.db: tok},
 	}
 
+	cpJson, err := json.Marshal(stateUpdate)
+	if err != nil {
+		return fmt.Errorf("serializing pbrt stream checkpoint: %w", err)
+	}
+
+	if err := c.output.Checkpoint(cpJson, true); err != nil {
+		return fmt.Errorf("outputting pbrt stream checkpoint: %w", err)
+	}
+
+	c.mu.Lock()
+	c.state.DatabaseResumeTokens[s.db] = tok
+	c.mu.Unlock()
+
 	return nil
+}
+
+// handleEvent processes a changeEvent, outputting a document if applicable and a checkpoint.
+func (c *capture) handleEvent(ev changeEvent, db string, tok bson.Raw) error {
+	var docJson json.RawMessage
+	doc, bindingIdx, madeDoc := makeEventDocument(ev, c.collectionBindingIndex)
+	if madeDoc {
+		var err error
+		if docJson, err = json.Marshal(doc); err != nil {
+			return fmt.Errorf("serializing stream document: %w", err)
+		}
+	}
+
+	stateUpdate := captureState{
+		DatabaseResumeTokens: map[string]bson.Raw{db: tok},
+	}
+
+	cpJson, err := json.Marshal(stateUpdate)
+	if err != nil {
+		return fmt.Errorf("serializing stream checkpoint: %w", err)
+	}
+
+	if madeDoc {
+		if err := c.output.DocumentsAndCheckpoint(cpJson, true, bindingIdx, docJson); err != nil {
+			return fmt.Errorf("outputting stream document: %w", err)
+		}
+	} else {
+		if err := c.output.Checkpoint(cpJson, true); err != nil {
+			return fmt.Errorf("outputting stream checkpoint: %w", err)
+		}
+	}
+
+	c.mu.Lock()
+	c.state.DatabaseResumeTokens[db] = tok
+	c.processedStreamEvents += 1
+	if madeDoc {
+		c.emittedStreamDocs += 1
+	}
+	c.mu.Unlock()
+
+	return nil
+}
+
+func (c *capture) startStreamLogger() {
+	c.streamLoggerStop = make(chan struct{})
+	c.streamLoggerActive.Add(1)
+
+	eventCounts := func() (int, int) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		return c.processedStreamEvents, c.emittedStreamDocs
+	}
+
+	go func() {
+		defer func() { c.streamLoggerActive.Done() }()
+
+		initialProcessed, initialEmitted := eventCounts()
+
+		for {
+			select {
+			case <-time.After(streamLoggerInterval):
+				nextProcessed, nextEmitted := eventCounts()
+
+				if nextProcessed != initialProcessed {
+					log.WithFields(log.Fields{
+						"events": nextProcessed - initialProcessed,
+						"docs":   nextEmitted - initialEmitted,
+					}).Info("processed change stream events")
+				} else {
+					log.Info("change stream idle")
+				}
+
+				initialProcessed = nextProcessed
+				initialEmitted = nextEmitted
+			case <-c.streamLoggerStop:
+				return
+			}
+		}
+	}()
+}
+
+func (c *capture) stopStreamLogger() {
+	close(c.streamLoggerStop)
+	c.streamLoggerActive.Wait()
 }
 
 func resourceId(res resource) string {
