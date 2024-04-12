@@ -3,7 +3,7 @@
     "recommendedName": "companies",
     "resourceConfig": {
       "name": "companies",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -193,7 +193,7 @@
     "recommendedName": "contacts",
     "resourceConfig": {
       "name": "contacts",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -375,7 +375,7 @@
     "recommendedName": "deals",
     "resourceConfig": {
       "name": "deals",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -573,7 +573,7 @@
     "recommendedName": "engagements",
     "resourceConfig": {
       "name": "engagements",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -755,7 +755,7 @@
     "recommendedName": "contact_lists",
     "resourceConfig": {
       "name": "contact_lists",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -827,7 +827,7 @@
     "recommendedName": "contacts_lists_subscription",
     "resourceConfig": {
       "name": "contacts_lists_subscription",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -899,7 +899,7 @@
     "recommendedName": "campaigns",
     "resourceConfig": {
       "name": "campaigns",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -971,7 +971,7 @@
     "recommendedName": "subscription_changes",
     "resourceConfig": {
       "name": "subscription_changes",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -1043,7 +1043,7 @@
     "recommendedName": "email_events",
     "resourceConfig": {
       "name": "email_events",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -1115,7 +1115,7 @@
     "recommendedName": "ticket_pipelines",
     "resourceConfig": {
       "name": "ticket_pipelines",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -1302,7 +1302,7 @@
     "recommendedName": "deal_pipelines",
     "resourceConfig": {
       "name": "deal_pipelines",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -1374,7 +1374,7 @@
     "recommendedName": "engagements_calls",
     "resourceConfig": {
       "name": "engagements_calls",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -1588,7 +1588,7 @@
     "recommendedName": "engagements_emails",
     "resourceConfig": {
       "name": "engagements_emails",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -1802,7 +1802,7 @@
     "recommendedName": "engagements_meetings",
     "resourceConfig": {
       "name": "engagements_meetings",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -2016,7 +2016,7 @@
     "recommendedName": "engagements_notes",
     "resourceConfig": {
       "name": "engagements_notes",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -2230,7 +2230,7 @@
     "recommendedName": "engagements_tasks",
     "resourceConfig": {
       "name": "engagements_tasks",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -2444,7 +2444,7 @@
     "recommendedName": "goal_targets",
     "resourceConfig": {
       "name": "goal_targets",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -2626,7 +2626,7 @@
     "recommendedName": "feedback_submissions",
     "resourceConfig": {
       "name": "feedback_submissions",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -2808,7 +2808,7 @@
     "recommendedName": "line_items",
     "resourceConfig": {
       "name": "line_items",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -2990,7 +2990,7 @@
     "recommendedName": "products",
     "resourceConfig": {
       "name": "products",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3172,7 +3172,7 @@
     "recommendedName": "tickets",
     "resourceConfig": {
       "name": "tickets",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3370,7 +3370,7 @@
     "recommendedName": "marketing_emails",
     "resourceConfig": {
       "name": "marketing_emails",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3448,7 +3448,7 @@
     "recommendedName": "email_subscriptions",
     "resourceConfig": {
       "name": "email_subscriptions",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3532,7 +3532,7 @@
     "recommendedName": "marketing_forms",
     "resourceConfig": {
       "name": "marketing_forms",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3604,7 +3604,7 @@
     "recommendedName": "owners",
     "resourceConfig": {
       "name": "owners",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3682,7 +3682,7 @@
     "recommendedName": "workflows",
     "resourceConfig": {
       "name": "workflows",
-      "interval": "PT30S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {
@@ -3832,7 +3832,7 @@
     "recommendedName": "venues",
     "resourceConfig": {
       "name": "venues",
-      "interval": "PT60S"
+      "interval": "PT0S"
     },
     "documentSchema": {
       "$defs": {

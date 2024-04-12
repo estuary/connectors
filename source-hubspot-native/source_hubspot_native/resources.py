@@ -159,7 +159,7 @@ def crm_object_paginated(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=30)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
@@ -204,7 +204,7 @@ def crm_object_custom(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=30)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
@@ -249,7 +249,7 @@ def crm_object_streamed(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=30)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
@@ -294,7 +294,7 @@ def crm_object_streamed_no_batch(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=1)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
@@ -330,7 +330,7 @@ def workflow_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=30)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
@@ -368,7 +368,7 @@ def subscription_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=30)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
@@ -450,6 +450,6 @@ def custom_objects(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=1)),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=False,
     )
