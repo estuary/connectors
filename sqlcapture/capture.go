@@ -476,7 +476,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 	// bindings and then re-enable them (which will cause them all to get backfilled anew, as they
 	// should after such an event).
 	if allStreamsAreNew {
-		logrus.Info("no active bindings, resetting cursor")
+		logrus.Info("all bindings are new, resetting replication cursor")
 		c.State.Cursor = ""
 	}
 
