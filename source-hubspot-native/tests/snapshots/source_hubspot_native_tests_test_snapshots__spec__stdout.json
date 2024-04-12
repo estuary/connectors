@@ -7,6 +7,7 @@
           "properties": {
             "credentials_title": {
               "const": "Private App Credentials",
+              "default": "Private App Credentials",
               "title": "Credentials Title"
             },
             "access_token": {
@@ -15,7 +16,6 @@
             }
           },
           "required": [
-            "credentials_title",
             "access_token"
           ],
           "title": "AccessToken",
@@ -25,6 +25,7 @@
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
               "title": "Credentials Title"
             },
             "client_id": {
@@ -41,7 +42,6 @@
             }
           },
           "required": [
-            "credentials_title",
             "client_id",
             "client_secret",
             "refresh_token"
