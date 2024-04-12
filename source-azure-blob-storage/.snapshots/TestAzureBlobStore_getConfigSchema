@@ -8,6 +8,7 @@
 				"order": 0,
 				"anyOf": [
 					{
+						"title": "Connection String",
 						"required": [
 							"ConnectionString",
 							"storageAccountName"
@@ -28,6 +29,7 @@
 						}
 					},
 					{
+						"title": "OAuth2 Credentials",
 						"required": [
 							"azureClientID",
 							"azureClientSecret",
