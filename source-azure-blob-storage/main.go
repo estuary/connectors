@@ -240,6 +240,7 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"order": 0,
 				"anyOf": [
 					{
+						"title": "Connection String",
 						"required": [
 							"ConnectionString",
 							"storageAccountName"
@@ -260,6 +261,7 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 						}
 					},
 					{
+						"title": "OAuth2 Credentials",
 						"required": [
 							"azureClientID",
 							"azureClientSecret",
