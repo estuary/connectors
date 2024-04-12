@@ -677,7 +677,7 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
 		logrus.WithFields(logrus.Fields{
-			"streams":  streams,
+			"count":    len(streams),
 			"selected": streamID,
 		}).Info("backfilling streams")
 		if err := c.backfillStream(ctx, streamID); err != nil {
