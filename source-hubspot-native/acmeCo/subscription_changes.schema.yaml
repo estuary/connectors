@@ -28,18 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  name:
-    default: ""
-    title: Name
+  portalId:
+    title: Portalid
     type: string
-  calculated:
-    default: false
-    title: Calculated
-    type: boolean
-  hubspotObject:
-    default: unknown
-    title: Hubspotobject
-    type: string
-title: Property
+  timeline:
+    default: []
+    items:
+      type: integer
+    title: Timeline
+    type: array
+required:
+  - portalId
+title: SubscriptionChanges
 type: object
 x-infer-schema: true

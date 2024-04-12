@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "source_hubspot_native"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Johnny Graettinger <johnny@estuary.dev>"]
 
@@ -8,6 +8,7 @@ authors = ["Johnny Graettinger <johnny@estuary.dev>"]
 estuary-cdk = {path="../estuary-cdk", develop = true}
 pydantic = "^2"
 python = "^3.12"
+pytz = "^2024.1"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

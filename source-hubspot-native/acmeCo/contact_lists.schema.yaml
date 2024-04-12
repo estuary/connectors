@@ -28,18 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  name:
-    default: ""
-    title: Name
+  listId:
+    title: Listid
     type: string
-  calculated:
-    default: false
-    title: Calculated
-    type: boolean
-  hubspotObject:
-    default: unknown
-    title: Hubspotobject
-    type: string
-title: Property
+  lists:
+    default: []
+    items:
+      type: integer
+    title: Lists
+    type: array
+required:
+  - listId
+title: ContactLists
 type: object
 x-infer-schema: true
