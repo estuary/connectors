@@ -3,24 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math/rand"
 	"time"
+
+	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	// Limit the number of backfills running concurrently to avoid excessive memory use and limit the
-	// number of open cursors at a single time.
-	concurrentBackfillLimit = 10
-
-	// Backfill for this long each "round" before catching up change streams.
-	backfillFor = 5 * time.Minute
 )
 
 // backfillBinding is the information needed to backfill a binding.
@@ -35,11 +28,12 @@ type backfillBinding struct {
 // backfilled continuously until it finishes.
 func (c *capture) backfillCollections(
 	ctx context.Context,
-	resourceState map[boilerplate.StateKey]resourceState,
 	bindings []bindingInfo,
 	backfillFor time.Duration,
 ) error {
+	ts := time.Now()
 	log.WithField("backfillFor", backfillFor.String()).Info("backfilling collections")
+	defer func() { log.WithField("took", time.Since(ts).String()).Info("finished backfill round") }()
 
 	shuffledBindings := make([]bindingInfo, len(bindings))
 	copy(shuffledBindings, bindings)
@@ -55,6 +49,13 @@ func (c *capture) backfillCollections(
 		close(stopBackfill)
 	}()
 
+	// Create a copy of the binding state map to avoid races with the backfill worker which will
+	// update the state concurrent. Each binding to be backfilled receives the initial copy of its
+	// state and backfills the collection entirely from there, or time runs out and the process
+	// starts over.
+	resourceStates := make(map[boilerplate.StateKey]resourceState)
+	maps.Copy(resourceStates, c.state.Resources)
+
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for idx := 0; idx < concurrentBackfillLimit; idx++ {
@@ -66,7 +67,7 @@ func (c *capture) backfillCollections(
 	// Push bindings to backfill to the backfill workers until time runs out. Each worker backfills
 	// a single binding until it is done backfilling, and is then able to start working on another.
 	for _, b := range shuffledBindings {
-		state := resourceState[b.stateKey]
+		state := resourceStates[b.stateKey]
 		if state.Backfill.Done {
 			continue
 		}
@@ -120,11 +121,12 @@ func (c *capture) backfillWorker(
 func (c *capture) doBackfill(
 	ctx context.Context,
 	binding bindingInfo,
-	state resourceState,
+	initialState resourceState,
 	stopBackfill <-chan struct{},
 ) error {
+	var sk = binding.stateKey
 	var collection = c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
-	var startingDocCount = state.Backfill.BackfilledDocs
+	var initialDocCount = initialState.Backfill.BackfilledDocs
 
 	// Not using the more precise `CountDocuments()` here since that requires a full collection
 	// scan. Getting an estimate from the collection's metadata is very fast and should be close
@@ -149,9 +151,9 @@ func (c *capture) doBackfill(
 	var opts = options.Find().SetHint(bson.M{"_id": 1})
 
 	var filter = bson.D{}
-	if !state.Backfill.LastId.IsZero() {
+	if initialState.Backfill.LastId != nil {
 		var v interface{}
-		if err := state.Backfill.LastId.Unmarshal(&v); err != nil {
+		if err := initialState.Backfill.LastId.Unmarshal(&v); err != nil {
 			return fmt.Errorf("unmarshalling last_id: %w", err)
 		}
 		filter = bson.D{{idProperty, bson.D{{"$gt", v}}}}
@@ -163,53 +165,96 @@ func (c *capture) doBackfill(
 	}
 	defer cursor.Close(ctx)
 
-	lastId := state.Backfill.LastId
+	// docs represents a batch of serialized documents read from the cursor which are ready to be
+	// output.
+	var docs []json.RawMessage
+	batchBytes := 0
+
+	var lastId bson.RawValue
+
 	docCount := 0
-	var docs []primitive.M
+	totalDocsCaptured := initialDocCount
+
+	// emitDocs is a helper for emitted a batch of documents.
+	emitDocs := func() error {
+		checkpoint := captureState{
+			Resources: map[boilerplate.StateKey]resourceState{
+				sk: {Backfill: backfillState{LastId: &lastId, BackfilledDocs: totalDocsCaptured}},
+			},
+		}
+
+		if cpJson, err := json.Marshal(checkpoint); err != nil {
+			return fmt.Errorf("serializing checkpoint: %w", err)
+		} else if err := c.output.DocumentsAndCheckpoint(cpJson, true, binding.index, docs...); err != nil {
+			return fmt.Errorf("ouutputting documents and checkpoint: %w", err)
+		}
+
+		// Reset for the next batch.
+		docs = nil
+		batchBytes = 0
+
+		c.mu.Lock()
+		state := c.state.Resources[sk]
+		state.Backfill.LastId = &lastId
+		state.Backfill.BackfilledDocs = totalDocsCaptured
+		c.state.Resources[sk] = state
+		c.mu.Unlock()
+
+		return nil
+	}
+
 	for cursor.Next(ctx) {
 		docCount++
-
-		var err error
-		if lastId, err = cursor.Current.LookupErr(idProperty); err != nil {
-			return fmt.Errorf("looking up idProperty: %w", err)
-		}
+		totalDocsCaptured++
 
 		var doc bson.M
-		if err = cursor.Decode(&doc); err != nil {
+		if lastId, err = cursor.Current.LookupErr(idProperty); err != nil {
+			return fmt.Errorf("looking up idProperty: %w", err)
+		} else if err = cursor.Decode(&doc); err != nil {
 			return fmt.Errorf("backfill decoding document: %w", err)
 		}
+
 		doc[metaProperty] = map[string]interface{}{
 			opProperty: "c",
 		}
+		doc = sanitizeDocument(doc)
 
-		docs = append(docs, sanitizeDocument(doc))
+		docJson, err := json.Marshal(doc)
+		if err != nil {
+			return fmt.Errorf("serializing document: %w", err)
+		}
 
-		// This means the next call to cursor.Next() will trigger a new network request. Before we
-		// do that, we checkpoint so that we can resume from this point after a failure.
-		if cursor.RemainingBatchLength() == 0 {
-			if err := c.emitEvent(ctx, backfillEvent{
-				docs: docs,
-				stateUpdate: resourceState{
-					Backfill: backfillState{
-						LastId:         lastId,
-						BackfilledDocs: startingDocCount + docCount,
-					},
-				},
-				binding: binding,
-			}); err != nil {
-				return fmt.Errorf("emitting backfill event: %w", err)
+		docs = append(docs, docJson)
+		batchBytes += len(docJson)
+
+		// If the batch has gotten sufficiently large either based on the number of documents it
+		// contains or the cumulative size of those documents, emit a checkpoint and reset the
+		// batch.
+		if len(docs) > backfillCheckpointSize || batchBytes > backfillCheckpointSize {
+			if err := emitDocs(); err != nil {
+				return err
 			}
+		}
 
-			docs = nil // Reset for the next batch.
-
+		// This means the next call to cursor.Next() will trigger a new network request. We'll check
+		// and see if the backfill timer has elapsed now and emit the final partial batch, if any.
+		// We wait for the current data buffered in the cursor to be consumed before checking the
+		// backfill timer to avoid wasted work getting the current batch of documents from the
+		// source database.
+		if cursor.RemainingBatchLength() == 0 {
 			select {
 			case <-stopBackfill:
-				// The backfill timer has run out, so don't request any more data from this cursor.
-				complete := fmt.Sprintf("%.0f", float64(startingDocCount+docCount)/float64(estimatedTotalDocs)*100)
+				if len(docs) > 0 {
+					if err := emitDocs(); err != nil {
+						return fmt.Errorf("emitting partial backfill batch: %w", err)
+					}
+				}
+
+				complete := fmt.Sprintf("%.0f", float64(totalDocsCaptured)/float64(estimatedTotalDocs)*100)
 
 				logEntry.WithFields(log.Fields{
 					"docsCapturedThisRound": docCount,
-					"totalDocsCaptured":     startingDocCount + docCount,
+					"totalDocsCaptured":     totalDocsCaptured,
 					"percentComplete":       complete,
 				}).Info("progressed backfill for collection")
 
@@ -218,27 +263,42 @@ func (c *capture) doBackfill(
 				// Continue with the backfill.
 			}
 		}
+
 	}
 	if err := cursor.Err(); err != nil {
 		return fmt.Errorf("cursor error: %w", err)
 	}
 
-	// The backfill for this binding has completed.
-	if err := c.emitEvent(ctx, backfillEvent{
-		docs: docs,
-		stateUpdate: resourceState{
-			Backfill: backfillState{
-				Done:           true,
-				LastId:         lastId,
-				BackfilledDocs: startingDocCount + docCount,
-			},
-		},
-		binding: binding,
-	}); err != nil {
-		return fmt.Errorf("emitting final backfill event: %w", err)
+	// Emit any partial batch of documents after the backfill has completed. We're going to end up
+	// emitting another checkpoint with the "done" flag immediately after this, but its simpler to
+	// just use the same emitDocs() helper as we've used before rather than trying to combine the
+	// checkpoint updates.
+	if len(docs) > 0 {
+		if err := emitDocs(); err != nil {
+			return fmt.Errorf("emitting final backfill batch: %w", err)
+		}
 	}
 
-	logEntry.WithField("totalDocsCaptured", startingDocCount+docCount).Info("completed backfill for collection")
+	logEntry.WithField("totalDocsCaptured", totalDocsCaptured).Info("completed backfill for collection")
+
+	// Emit the final checkpoint.
+	c.mu.Lock()
+	state := c.state.Resources[sk]
+	state.Backfill.Done = true
+	c.state.Resources[sk] = state
+	c.mu.Unlock()
+
+	checkpoint := captureState{
+		Resources: map[boilerplate.StateKey]resourceState{
+			sk: {Backfill: backfillState{Done: true}},
+		},
+	}
+
+	if cp, err := json.Marshal(checkpoint); err != nil {
+		return fmt.Errorf("serializing checkpoint: %w", err)
+	} else if err := c.output.Checkpoint(cp, true); err != nil {
+		return fmt.Errorf("outputting checkpoint: %w", err)
+	}
 
 	return nil
 }

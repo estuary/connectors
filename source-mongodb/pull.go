@@ -2,20 +2,42 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"maps"
 	"math"
 	"sync"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+const (
+	// Limit the number of backfills running concurrently to avoid excessive memory use and limit the
+	// number of open cursors at a single time.
+	concurrentBackfillLimit = 10
+
+	// Backfill for this long each "round" before catching up change streams.
+	backfillFor = 5 * time.Minute
+
+	// backfillCheckpointSize and backfillBytesSize control how often we emit checkpoints while
+	// backfilling collections. We checkpoint either on reaching a large amount of documents to
+	// minimize replay reads when materializing the captured collections, or on reaching a
+	// moderately large amount of buffered data to regulate connector memory use.
+	backfillCheckpointSize = 50000
+	backfillBytesSize      = 4 * 1024 * 1024
+
+	// When the stream logger has been started, log a progress report at this frequency. The
+	// progress report is currently just the count of stream documents that have been processed,
+	// which provides a nice indication in the logs of what the capture is doing when it is reading
+	// change streams.
+	streamLoggerInterval = 1 * time.Minute
 )
 
 // Pull is a very long lived RPC through which the Flow runtime and a
@@ -97,9 +119,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		collectionBindingIndex: collectionBindingIndex,
 	}
 
-	// Get ready to emit documents and checkpoints.
-	c.startEmitter(ctx)
-
 	if err := c.output.Ready(false); err != nil {
 		return err
 	}
@@ -121,14 +140,9 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
+	didBackfill := false
 	for !prevState.isBackfillComplete(bindings) {
-		// Create a copy of the binding state map to avoid races with the emit worker which will
-		// update the global state. Each binding to be backfilled receives the initial copy of its
-		// state and backfills the collection entirely from there, or time runs out and the process
-		// starts over.
-		resourceStates := make(map[boilerplate.StateKey]resourceState)
-		maps.Copy(resourceStates, c.state.Resources)
-
+		didBackfill = true
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
 		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
@@ -138,49 +152,40 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			return err
 		} else if err := c.streamCatchup(ctx, streams); err != nil {
 			return err
-		} else if err := c.backfillCollections(ctx, resourceStates, bindings, backfillFor); err != nil {
+		} else if err := c.backfillCollections(ctx, bindings, backfillFor); err != nil {
 			return err
 		}
+	}
 
-		// Flush the emitter before looping around to the next round where we will get a new copy of
-		// the state.
-		if err := c.flushEmitter(ctx); err != nil {
-			return fmt.Errorf("flushing emitter after backfill round: %w", err)
-		}
+	if didBackfill {
+		log.Info("backfill complete")
 	}
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	streams, err := c.initializeStreams(ctx, bindings)
-	if err != nil {
+	if streams, err := c.initializeStreams(ctx, bindings); err != nil {
 		return err
+	} else if err := c.streamForever(ctx, streams); err != nil {
+		return fmt.Errorf("streaming changes forever: %w", err)
 	}
 
-	streamFuture := pf.RunAsyncOperation(func() error {
-		return c.streamForever(ctx, streams)
-	})
-
-	// If streamForever returns with an error we need to bail out, and similarly if the emitter ever
-	// encounters an error we'll crash.
-	select {
-	case <-streamFuture.Done():
-		if err := streamFuture.Err(); err != nil {
-			return fmt.Errorf("streamFuture error from streamForever: %w", streamFuture.Err())
-		}
-
-		return nil
-	case err := <-c.emitter.errors:
-		return fmt.Errorf("emitter error while running streamForever: %w", err)
-	}
+	return nil
 }
 
 type capture struct {
 	client                 *mongo.Client
 	output                 *boilerplate.PullOutput
-	state                  captureState
 	collectionBindingIndex map[string]bindingInfo
-	emitter                emitter
-	streamLoggerStop       chan (struct{})
-	streamLoggerActive     sync.WaitGroup
+
+	// mu provides synchronization for values that are accessed by concurrent backfill and change
+	// stream goroutines.
+	mu                    sync.Mutex
+	state                 captureState
+	processedStreamEvents int
+	emittedStreamDocs     int
+
+	// Controls for starting and stopping the stream progress logger.
+	streamLoggerStop   chan (struct{})
+	streamLoggerActive sync.WaitGroup
 }
 
 type bindingInfo struct {
@@ -252,13 +257,13 @@ func (s *captureState) Validate() error {
 }
 
 type backfillState struct {
-	Done           bool          `json:"done,omitempty"`
-	LastId         bson.RawValue `json:"last_id,omitempty"`
-	BackfilledDocs int           `json:"backfilled_docs,omitempty"`
+	Done           bool           `json:"done,omitempty"`
+	LastId         *bson.RawValue `json:"last_id,omitempty"`
+	BackfilledDocs int            `json:"backfilled_docs,omitempty"`
 }
 
 type resourceState struct {
-	Backfill backfillState `json:"backfill,omitempty"`
+	Backfill backfillState `json:"backfill"`
 }
 
 // MongoDB considers datetimes outside of the 0-9999 year range to be _unsafe_
