@@ -15,6 +15,7 @@ import (
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -184,7 +185,10 @@ func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (i
 	obj.ModTime = *resp.LastModified
 	obj.ContentType = *resp.ContentType
 	obj.Size = *resp.ContentLength
-	obj.ContentEncoding = *resp.ContentEncoding
+
+	if resp.ContentEncoding != nil {
+		obj.ContentEncoding = *resp.ContentEncoding
+	}
 
 	return retryReader, obj, nil
 }
@@ -206,22 +210,29 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 	}
 
 	if page == nil {
+		log.Debug("No more files to list")
 		return filesource.ObjectInfo{}, io.EOF
 	}
 
 	blob := page.Segment.BlobItems[l.index]
 	l.index++
 
-	return filesource.ObjectInfo{Path: *blob.Name, Size: *blob.Properties.ContentLength}, nil
+	obj := filesource.ObjectInfo{Path: *blob.Name, Size: *blob.Properties.ContentLength}
+	log.Debug("Listing object: ", obj.Path)
+
+	return obj, nil
 }
 
 func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 	if l.index < l.currentPageLength {
+		log.Debug("Returning current page")
 		return &l.page, nil
 	}
 	if !l.pager.More() {
+		log.Debug("No more pages")
 		return nil, nil
 	}
+	log.Debug("Fetching next page")
 	page, err := l.pager.NextPage(l.ctx)
 	if err != nil {
 		return nil, err
