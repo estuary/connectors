@@ -17,5 +17,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"other_db%2Fother_collection":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}},"test_db_1%2FcollectionOne":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}},"test_db_2%2FcollectionTwo":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}},"test_db_3%2FcollectionThree":{"backfill":{"done":true,"last_id":{"Type":0,"Value":null}}}},"databaseResumeTokens":{"other_db":"<TOKEN>","test_db_1":"<TOKEN>","test_db_2":"<TOKEN>","test_db_3":"<TOKEN>"}}
+{"bindingStateV1":{"other_db%2Fother_collection":{"backfill":{"done":true}},"test_db_1%2FcollectionOne":{"backfill":{"done":true}},"test_db_2%2FcollectionTwo":{"backfill":{"done":true}},"test_db_3%2FcollectionThree":{"backfill":{"done":true}}},"databaseResumeTokens":{"other_db":"<TOKEN>","test_db_1":"<TOKEN>","test_db_2":"<TOKEN>","test_db_3":"<TOKEN>"}}
 

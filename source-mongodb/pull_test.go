@@ -74,9 +74,9 @@ func TestSanitizeDocument(t *testing.T) {
 func TestUpdateResourceStates(t *testing.T) {
 	prevState := captureState{
 		Resources: map[boilerplate.StateKey]resourceState{
-			"sk1": {Backfill: backfillState{Done: true, LastId: bson.RawValue{Value: []byte("first")}}},
-			"sk2": {Backfill: backfillState{Done: true, LastId: bson.RawValue{Value: []byte("second")}}},
-			"sk3": {Backfill: backfillState{Done: true, LastId: bson.RawValue{Value: []byte("third")}}},
+			"sk1": {Backfill: backfillState{Done: true, LastId: &bson.RawValue{Value: []byte("first")}}},
+			"sk2": {Backfill: backfillState{Done: true, LastId: &bson.RawValue{Value: []byte("second")}}},
+			"sk3": {Backfill: backfillState{Done: true, LastId: &bson.RawValue{Value: []byte("third")}}},
 		},
 		DatabaseResumeTokens: map[string]bson.Raw{
 			"firstDb":  bson.Raw("firstDbToken"),
@@ -125,7 +125,7 @@ func TestUpdateResourceStates(t *testing.T) {
 
 		want := captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
-				"sk3": {Backfill: backfillState{Done: true, LastId: bson.RawValue{Value: []byte("third")}}},
+				"sk3": {Backfill: backfillState{Done: true, LastId: &bson.RawValue{Value: []byte("third")}}},
 			},
 			DatabaseResumeTokens: map[string]bson.Raw{
 				"secondDb": bson.Raw("secondDbToken"),

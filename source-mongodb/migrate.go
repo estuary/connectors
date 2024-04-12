@@ -281,19 +281,17 @@ func (c *capture) populateDatabaseResumeTokens(
 
 	// Emit any of the documents that resulted if they are for monitored collections.
 	for _, ev := range databasePollResults {
-		binding, ok := c.collectionBindingIndex[eventResourceId(ev)]
-		if ok {
-			if docJson, err := json.Marshal(makeEventDocument(&ev)); err != nil {
+		doc, bindingIdx, madeDoc := makeEventDocument(ev, c.collectionBindingIndex)
+		if madeDoc {
+			if docJson, err := json.Marshal(doc); err != nil {
 				return fmt.Errorf("serializing stream document: %w", err)
-			} else if err := c.output.Documents(binding.index, docJson); err != nil {
+			} else if err := c.output.Documents(bindingIdx, docJson); err != nil {
 				return fmt.Errorf("outputting stream document: %w", err)
 			}
 
 			log.WithFields(log.Fields{
-				"binding":  binding.index,
-				"stateKey": binding.stateKey,
-				"id":       ev.DocumentKey.Id,
-				"ns":       ev.Ns,
+				"id": ev.DocumentKey.Id,
+				"ns": ev.Ns,
 			}).Info("v2 state migration emitted document from change stream")
 		}
 	}
