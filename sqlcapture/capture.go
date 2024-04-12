@@ -730,8 +730,13 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	}
 
 	// Update stream state to reflect backfill results
+	logrus.WithFields(logrus.Fields{
+		"stream": streamID,
+		"rows":   eventCount,
+	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	if eventCount == 0 {
+		logrus.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableModeActive
 		state.Scanned = nil
 	} else {
