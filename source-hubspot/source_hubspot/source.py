@@ -12,6 +12,7 @@ from airbyte_cdk.logger import AirbyteLogger
 from airbyte_cdk.sources import AbstractSource
 from airbyte_cdk.sources.streams import Stream
 from requests import HTTPError
+
 from .streams import (
     API,
     Campaigns,
@@ -46,11 +47,12 @@ from .streams import (
 )
 
 
-
 class SourceHubspot(AbstractSource):
-    logger = logging.getLogger('hubspot')
+    logger = logging.getLogger("hubspot")
 
-    def check_connection(self, logger: logging.Logger, config: Mapping[str, Any]) -> Tuple[bool, Optional[Any]]:
+    def check_connection(
+        self, logger: logging.Logger, config: Mapping[str, Any]
+    ) -> Tuple[bool, Optional[Any]]:
         """Check connection"""
         common_params = self.get_common_params(config=config)
         alive = True
@@ -126,11 +128,23 @@ class SourceHubspot(AbstractSource):
             granted_scopes = self.get_granted_scopes(authenticator)
             self.logger.info(f"The following scopes were granted: {granted_scopes}")
 
-            available_streams = [stream for stream in streams if stream.scope_is_granted(granted_scopes)]
-            unavailable_streams = [stream for stream in streams if not stream.scope_is_granted(granted_scopes)]
-            self.logger.info(f"The following streams are unavailable: {[s.name for s in unavailable_streams]}")
-            partially_available_streams = [stream for stream in streams if not stream.properties_scope_is_granted()]
-            required_scoped = set(chain(*[x.properties_scopes for x in partially_available_streams]))
+            available_streams = [
+                stream for stream in streams if stream.scope_is_granted(granted_scopes)
+            ]
+            unavailable_streams = [
+                stream
+                for stream in streams
+                if not stream.scope_is_granted(granted_scopes)
+            ]
+            self.logger.info(
+                f"The following streams are unavailable: {[s.name for s in unavailable_streams]}"
+            )
+            partially_available_streams = [
+                stream for stream in streams if not stream.properties_scope_is_granted()
+            ]
+            required_scoped = set(
+                chain(*[x.properties_scopes for x in partially_available_streams])
+            )
             self.logger.info(
                 f"The following streams are partially available: {[s.name for s in partially_available_streams]}, "
                 f"add the following scopes to download all available data: {required_scoped}"
@@ -139,7 +153,9 @@ class SourceHubspot(AbstractSource):
             self.logger.info("No scopes to grant when authenticating with API key.")
             available_streams = streams
 
-        available_streams.extend(self.get_custom_object_streams(api=api, common_params=common_params))
+        available_streams.extend(
+            self.get_custom_object_streams(api=api, common_params=common_params)
+        )
 
         return available_streams
 

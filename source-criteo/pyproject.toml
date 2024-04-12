@@ -15,6 +15,9 @@ debugpy = "^1.8.0"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
 pytest-insta = "^0.2.0"
+pre-commit = "^3.7.0"
+ruff = "^0.3.4"
+isort = "^5.13.2"
 
 [build-system]
 requires = ["poetry-core"]

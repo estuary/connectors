@@ -12,7 +12,10 @@ import pendulum
 from airbyte_cdk.models import FailureType
 from airbyte_cdk.utils import AirbyteTracedException
 from google.ads.googleads.client import GoogleAdsClient
-from google.ads.googleads.v15.services.types.google_ads_service import GoogleAdsRow, SearchGoogleAdsResponse
+from google.ads.googleads.v15.services.types.google_ads_service import (
+    GoogleAdsRow,
+    SearchGoogleAdsResponse,
+)
 from google.api_core.exceptions import ServerError, TooManyRequests
 from google.auth import exceptions
 from proto.marshal.collections import Repeated, RepeatedComposite
@@ -56,7 +59,9 @@ class GoogleAds:
             return GoogleAdsClient.load_from_dict(credentials, version=API_VERSION)
         except exceptions.RefreshError as e:
             message = "The authentication to Google Ads has expired. Re-authenticate to restore access to Google Ads."
-            raise AirbyteTracedException(message=message, failure_type=FailureType.config_error) from e
+            raise AirbyteTracedException(
+                message=message, failure_type=FailureType.config_error
+            ) from e
 
     @backoff.on_exception(
         backoff.expo,
@@ -66,7 +71,9 @@ class GoogleAds:
         ),
         max_tries=5,
     )
-    def send_request(self, query: str, customer_id: str) -> Iterator[SearchGoogleAdsResponse]:
+    def send_request(
+        self, query: str, customer_id: str
+    ) -> Iterator[SearchGoogleAdsResponse]:
         client = self.client
         search_request = client.get_type("SearchGoogleAdsRequest")
         search_request.query = query
@@ -103,7 +110,11 @@ class GoogleAds:
 
     @staticmethod
     def convert_schema_into_query(
-        schema: Mapping[str, Any], report_name: str, from_date: str = None, to_date: str = None, cursor_field: str = None
+        schema: Mapping[str, Any],
+        report_name: str,
+        from_date: str = None,
+        to_date: str = None,
+        cursor_field: str = None,
     ) -> str:
         from_category = REPORT_MAPPING[report_name]
         fields = GoogleAds.get_fields_from_schema(schema)
@@ -112,15 +123,19 @@ class GoogleAds:
         query_template = f"SELECT {fields} FROM {from_category} "
 
         if cursor_field:
-            end_date_inclusive = "<=" if (pendulum.parse(to_date) - pendulum.parse(from_date)).days > 1 else "<"
-            query_template += (
-                f"WHERE {cursor_field} >= '{from_date}' AND {cursor_field} {end_date_inclusive} '{to_date}' ORDER BY {cursor_field} ASC"
+            end_date_inclusive = (
+                "<="
+                if (pendulum.parse(to_date) - pendulum.parse(from_date)).days > 1
+                else "<"
             )
+            query_template += f"WHERE {cursor_field} >= '{from_date}' AND {cursor_field} {end_date_inclusive} '{to_date}' ORDER BY {cursor_field} ASC"
 
         return query_template
 
     @staticmethod
-    def get_field_value(field_value: GoogleAdsRow, field: str, schema_type: Mapping[str, Any]) -> str:
+    def get_field_value(
+        field_value: GoogleAdsRow, field: str, schema_type: Mapping[str, Any]
+    ) -> str:
         field_name = field.split(".")
         for level_attr in field_name:
             """
@@ -182,7 +197,10 @@ class GoogleAds:
         # 1. ad_group_ad.ad.responsive_display_ad.long_headline - type AdTextAsset (https://developers.google.com/google-ads/api/reference/rpc/v6/AdTextAsset?hl=en).
         # 2. ad_group_ad.ad.legacy_app_install_ad - type LegacyAppInstallAdInfo (https://developers.google.com/google-ads/api/reference/rpc/v7/LegacyAppInstallAdInfo?hl=en).
         #
-        if not (isinstance(field_value, (list, int, float, str, bool, dict)) or field_value is None):
+        if not (
+            isinstance(field_value, (list, int, float, str, bool, dict))
+            or field_value is None
+        ):
             field_value = str(field_value)
         # In case of custom query field has MESSAGE type it represents protobuf
         # message and could be anything, convert it to a string or array of
@@ -199,5 +217,8 @@ class GoogleAds:
     def parse_single_result(schema: Mapping[str, Any], result: GoogleAdsRow):
         props = schema.get("properties")
         fields = GoogleAds.get_fields_from_schema(schema)
-        single_record = {field: GoogleAds.get_field_value(result, field, props.get(field)) for field in fields}
+        single_record = {
+            field: GoogleAds.get_field_value(result, field, props.get(field))
+            for field in fields
+        }
         return single_record

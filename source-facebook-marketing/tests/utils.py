@@ -7,7 +7,10 @@ from unittest import mock
 
 from airbyte_cdk.models.airbyte_protocol import ConnectorSpecification
 from airbyte_cdk.sources import Source
-from airbyte_cdk.sources.utils.schema_helpers import check_config_against_spec_or_exit, split_config
+from airbyte_cdk.sources.utils.schema_helpers import (
+    check_config_against_spec_or_exit,
+    split_config,
+)
 
 
 def command_check(source: Source, config):

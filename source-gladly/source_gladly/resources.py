@@ -1,20 +1,18 @@
-from datetime import UTC, datetime, timedelta
 import functools
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 
+from estuary_cdk.capture import Task, common
 from estuary_cdk.flow import CaptureBinding
-from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPMixin, TokenSource, BasicAuth
+from estuary_cdk.http import BasicAuth, HTTPMixin, TokenSource
 
+from .api import fetch_events
 from .models import (
+    EVENTS_ENTITY_TYPES,
     EndpointConfig,
+    Event,
     ResourceConfig,
     ResourceState,
-    Event,
-    EVENTS_ENTITY_TYPES,
-)
-from .api import (
-    fetch_events,
 )
 
 

@@ -16,7 +16,11 @@ from facebook_business.adobjects.adimage import AdImage
 from facebook_business.adobjects.user import User
 
 from .base_insight_streams import AdsInsights
-from .base_streams import FBMarketingIncrementalStream, FBMarketingReversedIncrementalStream, FBMarketingStream
+from .base_streams import (
+    FBMarketingIncrementalStream,
+    FBMarketingReversedIncrementalStream,
+    FBMarketingStream,
+)
 
 logger = logging.getLogger("airbyte")
 
@@ -61,11 +65,15 @@ class AdCreatives(FBMarketingStream):
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
         """Read with super method and append thumbnail_data_url if enabled"""
-        for record in super().read_records(sync_mode, cursor_field, stream_slice, stream_state):
+        for record in super().read_records(
+            sync_mode, cursor_field, stream_slice, stream_state
+        ):
             if self._fetch_thumbnail_images:
                 thumbnail_url = record.get("thumbnail_url")
                 if thumbnail_url:
-                    record["thumbnail_data_url"] = fetch_thumbnail_data_url(thumbnail_url)
+                    record["thumbnail_data_url"] = fetch_thumbnail_data_url(
+                        thumbnail_url
+                    )
             yield record
 
     def list_objects(self, params: Mapping[str, Any]) -> Iterable:
@@ -114,8 +122,14 @@ class Activities(FBMarketingIncrementalStream):
 
     entity_prefix = "activity"
     cursor_field = "event_time"
-    primary_key = ["object_id", "actor_id", "application_id", "event_time", "event_type"]
-    
+    primary_key = [
+        "object_id",
+        "actor_id",
+        "application_id",
+        "event_time",
+        "event_type",
+    ]
+
     def list_objects(self, fields: List[str], params: Mapping[str, Any]) -> Iterable:
         return self._api.account.get_activities(fields=fields, params=params)
 
@@ -127,7 +141,9 @@ class Activities(FBMarketingIncrementalStream):
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
         """Main read method used by CDK"""
-        loaded_records_iter = self.list_objects(fields=self.fields, params=self.request_params(stream_state=stream_state))
+        loaded_records_iter = self.list_objects(
+            fields=self.fields, params=self.request_params(stream_state=stream_state)
+        )
 
         for record in loaded_records_iter:
             if isinstance(record, AbstractObject):
@@ -140,9 +156,13 @@ class Activities(FBMarketingIncrementalStream):
         state_value = stream_state.get(self.cursor_field)
         since = self._start_date if not state_value else pendulum.parse(state_value)
 
-        potentially_new_records_in_the_past = self._include_deleted and not stream_state.get("include_deleted", False)
+        potentially_new_records_in_the_past = (
+            self._include_deleted and not stream_state.get("include_deleted", False)
+        )
         if potentially_new_records_in_the_past:
-            self.logger.info(f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option")
+            self.logger.info(
+                f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option"
+            )
             since = self._start_date
 
         return {"since": since.int_timestamp}
@@ -169,7 +189,9 @@ class AdAccount(FBMarketingStream):
         res = set()
         me = User(fbid="me", api=self._api.api)
         for business_user in me.get_business_users():
-            assigned_users = self._api.account.get_assigned_users(params={"business": business_user["business"].get_id()})
+            assigned_users = self._api.account.get_assigned_users(
+                params={"business": business_user["business"].get_id()}
+            )
             for assigned_user in assigned_users:
                 if business_user.get_id() == assigned_user.get_id():
                     res.update(set(assigned_user["tasks"]))
@@ -181,9 +203,15 @@ class AdAccount(FBMarketingStream):
         # https://developers.facebook.com/docs/marketing-apis/guides/javascript-ads-dialog-for-payments/
         # To access "funding_source_details", the user making the API call must have a MANAGE task permission for
         # that specific ad account.
-        if "funding_source_details" in properties and "MANAGE" not in self.get_task_permissions():
+        if (
+            "funding_source_details" in properties
+            and "MANAGE" not in self.get_task_permissions()
+        ):
             properties.remove("funding_source_details")
-        if "is_prepay_account" in properties and "MANAGE" not in self.get_task_permissions():
+        if (
+            "is_prepay_account" in properties
+            and "MANAGE" not in self.get_task_permissions()
+        ):
             properties.remove("is_prepay_account")
         return properties
 

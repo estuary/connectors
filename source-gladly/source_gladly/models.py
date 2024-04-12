@@ -1,14 +1,9 @@
 from typing import Optional
-
-from estuary_cdk.capture.common import (
-    BaseDocument,
-    ResourceConfig,
-    ResourceState,
-)
-from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-)
+from estuary_cdk.capture.common import BaseDocument
+from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
+from estuary_cdk.capture.common import ResourceState
 from pydantic import AwareDatetime, BaseModel, Field
+
 
 # Supported entity types for the Gladly Events API and the corresponding resource name.
 EVENTS_ENTITY_TYPES: list[tuple[str, str]] = [
@@ -59,7 +54,6 @@ ConnectorState = GenericConnectorState[ResourceState]
 # contains the entity-specific data, and its schema allows additional properties to be inferred
 # through schema inference.
 class Event(BaseDocument, extra="forbid"):
-
     class Initiator(BaseModel, extra="forbid"):
         id: str
         type: str

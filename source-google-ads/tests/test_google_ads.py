@@ -12,7 +12,11 @@ from google.auth import exceptions
 from pendulum.tz.timezone import Timezone
 from source_google_ads.google_ads import GoogleAds
 from source_google_ads.models import Customer
-from source_google_ads.streams import IncrementalGoogleAdsStream, chunk_date_range, get_date_params
+from source_google_ads.streams import (
+    IncrementalGoogleAdsStream,
+    chunk_date_range,
+    get_date_params,
+)
 
 from .common import MockGoogleAdsClient, MockGoogleAdsService
 
@@ -55,13 +59,18 @@ EXPECTED_CRED = {
 
 
 def test_google_ads_init(mocker):
-    google_client_mocker = mocker.patch("source_google_ads.google_ads.GoogleAdsClient", return_value=MockGoogleAdsClient)
+    google_client_mocker = mocker.patch(
+        "source_google_ads.google_ads.GoogleAdsClient", return_value=MockGoogleAdsClient
+    )
     _ = GoogleAds(**SAMPLE_CONFIG)
     assert google_client_mocker.load_from_dict.call_args[0][0] == EXPECTED_CRED
 
 
 def test_google_ads_wrong_permissions(mocker):
-    mocker.patch("source_google_ads.google_ads.GoogleAdsClient.load_from_dict", side_effect=exceptions.RefreshError("invalid_grant"))
+    mocker.patch(
+        "source_google_ads.google_ads.GoogleAdsClient.load_from_dict",
+        side_effect=exceptions.RefreshError("invalid_grant"),
+    )
     with pytest.raises(AirbyteTracedException) as e:
         GoogleAds(**SAMPLE_CONFIG)
     expected_message = "The authentication to Google Ads has expired. Re-authenticate to restore access to Google Ads."
@@ -69,8 +78,14 @@ def test_google_ads_wrong_permissions(mocker):
 
 
 def test_send_request(mocker, customers):
-    mocker.patch("source_google_ads.google_ads.GoogleAdsClient.load_from_dict", return_value=MockGoogleAdsClient(SAMPLE_CONFIG))
-    mocker.patch("source_google_ads.google_ads.GoogleAdsClient.get_service", return_value=MockGoogleAdsService())
+    mocker.patch(
+        "source_google_ads.google_ads.GoogleAdsClient.load_from_dict",
+        return_value=MockGoogleAdsClient(SAMPLE_CONFIG),
+    )
+    mocker.patch(
+        "source_google_ads.google_ads.GoogleAdsClient.get_service",
+        return_value=MockGoogleAdsService(),
+    )
     google_ads_client = GoogleAds(**SAMPLE_CONFIG)
     query = "Query"
     page_size = 1000
@@ -96,7 +111,9 @@ def test_interval_chunking():
         {"start_date": "2021-07-28", "end_date": "2021-08-06"},
         {"start_date": "2021-08-07", "end_date": "2021-08-15"},
     ]
-    intervals = chunk_date_range("2021-07-01", 14, "segments.date", "2021-08-15", range_days=10)
+    intervals = chunk_date_range(
+        "2021-07-01", 14, "segments.date", "2021-08-15", range_days=10
+    )
 
     assert mock_intervals == intervals
 
@@ -118,7 +135,10 @@ def test_get_date_params(customers):
 
     for customer in stream.customers:
         start_date, end_date = get_date_params(
-            start_date="2021-05-18", range_days=stream.range_days, time_zone=customer.time_zone, end_date=pendulum.parse("2021-08-15")
+            start_date="2021-05-18",
+            range_days=stream.range_days,
+            time_zone=customer.time_zone,
+            end_date=pendulum.parse("2021-08-15"),
         )
 
         assert mock_start_date == start_date and mock_end_date == end_date
@@ -128,10 +148,16 @@ def test_get_date_params(customers):
 def test_get_date_params_with_time_zone():
     time_zone_chatham = Timezone("Pacific/Chatham")  # UTC+12:45
     customer = Customer(id="id", time_zone=time_zone_chatham, is_manager_account=False)
-    mock_start_date_chatham = pendulum.today(tz=time_zone_chatham).subtract(days=1).to_date_string()
+    mock_start_date_chatham = (
+        pendulum.today(tz=time_zone_chatham).subtract(days=1).to_date_string()
+    )
     time_zone_honolulu = Timezone("Pacific/Honolulu")  # UTC-10:00
-    customer_2 = Customer(id="id_2", time_zone=time_zone_honolulu, is_manager_account=False)
-    mock_start_date_honolulu = pendulum.today(tz=time_zone_honolulu).subtract(days=1).to_date_string()
+    customer_2 = Customer(
+        id="id_2", time_zone=time_zone_honolulu, is_manager_account=False
+    )
+    mock_start_date_honolulu = (
+        pendulum.today(tz=time_zone_honolulu).subtract(days=1).to_date_string()
+    )
 
     mock_conversion_window_days = 14
 
@@ -143,23 +169,34 @@ def test_get_date_params_with_time_zone():
     )
     stream = IncrementalGoogleAdsStream(**incremental_stream_config)
     start_date_chatham, end_date_chatham = get_date_params(
-        start_date=mock_start_date_chatham, time_zone=customer.time_zone, range_days=stream.range_days
+        start_date=mock_start_date_chatham,
+        time_zone=customer.time_zone,
+        range_days=stream.range_days,
     )
 
-    incremental_stream_config.update({"start_date": mock_start_date_honolulu, "customers": [customer_2]})
+    incremental_stream_config.update(
+        {"start_date": mock_start_date_honolulu, "customers": [customer_2]}
+    )
     stream_2 = IncrementalGoogleAdsStream(**incremental_stream_config)
 
     start_date_honolulu, end_date_honolulu = get_date_params(
-        start_date=mock_start_date_honolulu, time_zone=customer_2.time_zone, range_days=stream_2.range_days
+        start_date=mock_start_date_honolulu,
+        time_zone=customer_2.time_zone,
+        range_days=stream_2.range_days,
     )
 
-    assert start_date_honolulu != start_date_chatham and end_date_honolulu != end_date_chatham
+    assert (
+        start_date_honolulu != start_date_chatham
+        and end_date_honolulu != end_date_chatham
+    )
 
 
 def test_convert_schema_into_query():
     report_name = "ad_group_ad_report"
     query = "SELECT segment.date FROM ad_group_ad WHERE segments.date >= '2020-01-01' AND segments.date <= '2020-03-01' ORDER BY segments.date ASC"
-    response = GoogleAds.convert_schema_into_query(SAMPLE_SCHEMA, report_name, "2020-01-01", "2020-03-01", "segments.date")
+    response = GoogleAds.convert_schema_into_query(
+        SAMPLE_SCHEMA, report_name, "2020-01-01", "2020-03-01", "segments.date"
+    )
     assert response == query
 
 
@@ -204,7 +241,10 @@ def test_get_date_params_with_date(customers):
     stream = IncrementalGoogleAdsStream(**incremental_stream_config)
     for customer in stream.customers:
         start_date, end_date = get_date_params(
-            start_date="2021-10-31", time_zone=customer.time_zone, range_days=stream.range_days, end_date=pendulum.parse("2021-11-15")
+            start_date="2021-10-31",
+            time_zone=customer.time_zone,
+            range_days=stream.range_days,
+            end_date=pendulum.parse("2021-11-15"),
         )
         assert mock_start_date == start_date and mock_end_date == end_date
 
@@ -234,7 +274,11 @@ def test_get_date_params_without_end_date(customers):
     )
     stream = IncrementalGoogleAdsStream(**incremental_stream_config)
     for customer in stream.customers:
-        start_date, end_date = get_date_params(start_date="2021-10-31", range_days=stream.range_days, time_zone=customer.time_zone)
+        start_date, end_date = get_date_params(
+            start_date="2021-10-31",
+            range_days=stream.range_days,
+            time_zone=customer.time_zone,
+        )
         assert mock_start_date == start_date
         # There is a Google limitation where we capture only a 15-day date range
         assert end_date == "2021-11-15"

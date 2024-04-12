@@ -11,9 +11,13 @@ from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams import IncrementalMixin, Stream
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v15.errors.types.authorization_error import AuthorizationErrorEnum
+from google.ads.googleads.v15.errors.types.authorization_error import (
+    AuthorizationErrorEnum,
+)
 from google.ads.googleads.v15.errors.types.request_error import RequestErrorEnum
-from google.ads.googleads.v15.services.services.google_ads_service.pagers import SearchPager
+from google.ads.googleads.v15.services.services.google_ads_service.pagers import (
+    SearchPager,
+)
 
 from .google_ads import GoogleAds
 from .models import Customer
@@ -43,7 +47,12 @@ def parse_dates(stream_slice):
     return start_date, end_date
 
 
-def get_date_params(start_date: str, time_zone=None, range_days: int = None, end_date: pendulum.datetime = None) -> Tuple[str, str]:
+def get_date_params(
+    start_date: str,
+    time_zone=None,
+    range_days: int = None,
+    end_date: pendulum.datetime = None,
+) -> Tuple[str, str]:
     """
     Returns `start_date` and `end_date` for the given stream_slice.
     If (end_date - start_date) is a big date range (>= 1 month), it can take more than 2 hours to process all the records from the given slice.
@@ -59,7 +68,9 @@ def get_date_params(start_date: str, time_zone=None, range_days: int = None, end
 
     # Fix issue #4806, start date should always be lower than end date.
     if start_date.add(days=1).date() >= end_date.date():
-        return start_date.add(days=1).to_date_string(), start_date.add(days=2).to_date_string()
+        return start_date.add(days=1).to_date_string(), start_date.add(
+            days=2
+        ).to_date_string()
     return start_date.add(days=1).to_date_string(), end_date.to_date_string()
 
 
@@ -83,7 +94,10 @@ def chunk_date_range(
 
     # For some metrics we can only get data not older than N days, it is Google Ads policy
     if days_of_data_storage:
-        start_date = max(start_date, pendulum.now().subtract(days=days_of_data_storage - conversion_window))
+        start_date = max(
+            start_date,
+            pendulum.now().subtract(days=days_of_data_storage - conversion_window),
+        )
 
     # As in to return some state when state in abnormal
     if start_date > end_date:
@@ -93,7 +107,12 @@ def chunk_date_range(
     start_date = start_date.subtract(days=conversion_window)
 
     while start_date < end_date:
-        start, end = get_date_params(start_date.to_date_string(), time_zone=time_zone, range_days=range_days, end_date=end_date)
+        start, end = get_date_params(
+            start_date.to_date_string(),
+            time_zone=time_zone,
+            range_days=range_days,
+            end_date=end_date,
+        )
         intervals.append(
             {
                 "start_date": start,
@@ -113,26 +132,38 @@ class GoogleAdsStream(Stream, ABC):
         self.base_sieve_logger = cyclic_sieve(self.logger, 10)
 
     def get_query(self, stream_slice: Mapping[str, Any]) -> str:
-        query = GoogleAds.convert_schema_into_query(schema=self.get_json_schema(), report_name=self.name)
+        query = GoogleAds.convert_schema_into_query(
+            schema=self.get_json_schema(), report_name=self.name
+        )
         return query
 
     def parse_response(self, response: SearchPager) -> Iterable[Mapping]:
         for result in response:
-            yield self.google_ads_client.parse_single_result(self.get_json_schema(), result)
+            yield self.google_ads_client.parse_single_result(
+                self.get_json_schema(), result
+            )
 
-    def stream_slices(self, stream_state: Mapping[str, Any] = None, **kwargs) -> Iterable[Optional[Mapping[str, any]]]:
+    def stream_slices(
+        self, stream_state: Mapping[str, Any] = None, **kwargs
+    ) -> Iterable[Optional[Mapping[str, any]]]:
         for customer in self.customers:
             yield {"customer_id": customer.id}
 
-    def read_records(self, sync_mode, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, sync_mode, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         self.base_sieve_logger.bump()
-        self.base_sieve_logger.info(f"Read records using g-ads client. Stream slice is {stream_slice}")
+        self.base_sieve_logger.info(
+            f"Read records using g-ads client. Stream slice is {stream_slice}"
+        )
         if stream_slice is None:
             return []
 
         customer_id = stream_slice["customer_id"]
         try:
-            response_records = self.google_ads_client.send_request(self.get_query(stream_slice), customer_id=customer_id)
+            response_records = self.google_ads_client.send_request(
+                self.get_query(stream_slice), customer_id=customer_id
+            )
             for response in response_records:
                 yield from self.parse_response(response)
         except GoogleAdsException as exc:
@@ -140,7 +171,10 @@ class GoogleAdsStream(Stream, ABC):
             if not self.CATCH_API_ERRORS:
                 raise
             for error in exc.failure.errors:
-                if error.error_code.authorization_error == AuthorizationErrorEnum.AuthorizationError.CUSTOMER_NOT_ENABLED:
+                if (
+                    error.error_code.authorization_error
+                    == AuthorizationErrorEnum.AuthorizationError.CUSTOMER_NOT_ENABLED
+                ):
                     self.base_sieve_logger.error(error.message)
                     continue
                 # log and ignore only CUSTOMER_NOT_ENABLED error, otherwise - raise further
@@ -155,7 +189,13 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
     # Range less than 15 days will break the integration tests.
     range_days = 15
 
-    def __init__(self, start_date: str, conversion_window_days: int, end_date: str = None, **kwargs):
+    def __init__(
+        self,
+        start_date: str,
+        conversion_window_days: int,
+        end_date: str = None,
+        **kwargs,
+    ):
         self.conversion_window_days = conversion_window_days
         self._start_date = start_date
         self._end_date = end_date
@@ -175,12 +215,16 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
         default = default or self.state.get(self.cursor_field)
         return self.state.get(customer_id, {}).get(self.cursor_field) or default
 
-    def stream_slices(self, stream_state: Mapping[str, Any] = None, **kwargs) -> Iterable[Optional[MutableMapping[str, any]]]:
+    def stream_slices(
+        self, stream_state: Mapping[str, Any] = None, **kwargs
+    ) -> Iterable[Optional[MutableMapping[str, any]]]:
         for customer in self.customers:
             logger = cyclic_sieve(self.logger, 10)
             stream_state = stream_state or {}
             if stream_state.get(customer.id):
-                start_date = stream_state[customer.id].get(self.cursor_field) or self._start_date
+                start_date = (
+                    stream_state[customer.id].get(self.cursor_field) or self._start_date
+                )
 
             # We should keep backward compatibility with the previous version
             elif stream_state.get(self.cursor_field) and len(self.customers) == 1:
@@ -189,7 +233,9 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                 start_date = self._start_date
 
             end_date = self._end_date
-            logger.info(f"Generating slices for customer {customer.id}. Start date is {start_date}, end date is {end_date}")
+            logger.info(
+                f"Generating slices for customer {customer.id}. Start date is {start_date}, end date is {end_date}"
+            )
 
             for chunk in chunk_date_range(
                 start_date=start_date,
@@ -207,7 +253,11 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                 yield chunk
 
     def read_records(
-        self, sync_mode: SyncMode, cursor_field: List[str] = None, stream_slice: MutableMapping[str, Any] = None, **kwargs
+        self,
+        sync_mode: SyncMode,
+        cursor_field: List[str] = None,
+        stream_slice: MutableMapping[str, Any] = None,
+        **kwargs,
     ) -> Iterable[Mapping[str, Any]]:
         """
         This method is overridden to handle GoogleAdsException with EXPIRED_PAGE_TOKEN error code,
@@ -223,20 +273,35 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                     current_state = self.current_state(customer_id)
                     if current_state:
                         date_in_current_stream = pendulum.parse(current_state)
-                        date_in_latest_record = pendulum.parse(record[self.cursor_field])
-                        cursor_value = (max(date_in_current_stream, date_in_latest_record)).to_date_string()
+                        date_in_latest_record = pendulum.parse(
+                            record[self.cursor_field]
+                        )
+                        cursor_value = (
+                            max(date_in_current_stream, date_in_latest_record)
+                        ).to_date_string()
                         self.state = {customer_id: {self.cursor_field: cursor_value}}
-                        self.incremental_sieve_logger.info(f"Updated state for customer {customer_id}. Full state is {self.state}.")
+                        self.incremental_sieve_logger.info(
+                            f"Updated state for customer {customer_id}. Full state is {self.state}."
+                        )
                         yield record
                         continue
-                    self.state = {customer_id: {self.cursor_field: record[self.cursor_field]}}
-                    self.incremental_sieve_logger.info(f"Initialized state for customer {customer_id}. Full state is {self.state}.")
+                    self.state = {
+                        customer_id: {self.cursor_field: record[self.cursor_field]}
+                    }
+                    self.incremental_sieve_logger.info(
+                        f"Initialized state for customer {customer_id}. Full state is {self.state}."
+                    )
                     yield record
                     continue
             except GoogleAdsException as exception:
-                self.incremental_sieve_logger.info(f"Caught a GoogleAdsException: {str(exception)}")
+                self.incremental_sieve_logger.info(
+                    f"Caught a GoogleAdsException: {str(exception)}"
+                )
                 error = next(iter(exception.failure.errors))
-                if error.error_code.request_error == RequestErrorEnum.RequestError.EXPIRED_PAGE_TOKEN:
+                if (
+                    error.error_code.request_error
+                    == RequestErrorEnum.RequestError.EXPIRED_PAGE_TOKEN
+                ):
                     start_date, end_date = parse_dates(stream_slice)
                     current_state = self.current_state(customer_id)
                     self.incremental_sieve_logger.info(
@@ -252,14 +317,20 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                         self.incremental_sieve_logger.error("Page token has expired.")
                         raise exception
                     # Retry reading records from where it crushed
-                    stream_slice["start_date"] = self.current_state(customer_id, default=stream_slice["start_date"])
-                    self.incremental_sieve_logger.info(f"Retry reading records from where it crushed with a modified slice: {stream_slice}")
+                    stream_slice["start_date"] = self.current_state(
+                        customer_id, default=stream_slice["start_date"]
+                    )
+                    self.incremental_sieve_logger.info(
+                        f"Retry reading records from where it crushed with a modified slice: {stream_slice}"
+                    )
                 else:
                     # raise caught error for other error statuses
                     raise exception
             else:
                 # return the control if no exception is raised
-                self.incremental_sieve_logger.info("Current slice has been read. Exiting read_records()")
+                self.incremental_sieve_logger.info(
+                    "Current slice has been read. Exiting read_records()"
+                )
                 return
 
     def get_query(self, stream_slice: Mapping[str, Any] = None) -> str:
@@ -347,6 +418,7 @@ class AccountPerformanceReport(IncrementalGoogleAdsStream):
     AccountPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/customer
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#account_performance
     """
+
     primary_key = [
         "segments.ad_network_type",
         "segments.device",
@@ -360,13 +432,14 @@ class AdGroupAdReport(IncrementalGoogleAdsStream):
     AdGroupAdReport stream: https://developers.google.com/google-ads/api/fields/v11/ad_group_ad
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#ad_performance
     """
+
     primary_key = [
         "segments.ad_network_type",
         "segments.date",
         "ad_group.id",
         "campaign.id",
         "customer.id",
-        "ad_group_ad.ad.id"
+        "ad_group_ad.ad.id",
     ]
 
 
@@ -375,6 +448,7 @@ class DisplayKeywordPerformanceReport(IncrementalGoogleAdsStream):
     DisplayKeywordPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/display_keyword_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#display_keyword_performance
     """
+
     primary_key = [
         "segments.ad_network_type",
         "segments.device",
@@ -382,7 +456,7 @@ class DisplayKeywordPerformanceReport(IncrementalGoogleAdsStream):
         "ad_group.id",
         "customer.id",
         "campaign.id",
-        "ad_group_criterion.criterion_id"
+        "ad_group_criterion.criterion_id",
     ]
 
 
@@ -391,6 +465,7 @@ class DisplayTopicsPerformanceReport(IncrementalGoogleAdsStream):
     DisplayTopicsPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/topic_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#display_topics_performance
     """
+
     primary_key = [
         "segments.ad_network_type",
         "segments.device",
@@ -398,7 +473,7 @@ class DisplayTopicsPerformanceReport(IncrementalGoogleAdsStream):
         "ad_group.id",
         "customer.id",
         "campaign.id",
-        "ad_group_criterion.criterion_id"
+        "ad_group_criterion.criterion_id",
     ]
 
 
@@ -407,6 +482,7 @@ class ShoppingPerformanceReport(IncrementalGoogleAdsStream):
     ShoppingPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/shopping_performance_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#shopping_performance
     """
+
     primary_key = [
         "segments.ad_network_type",
         "segments.device",
@@ -414,7 +490,7 @@ class ShoppingPerformanceReport(IncrementalGoogleAdsStream):
         "ad_group.id",
         "customer.id",
         "campaign.id",
-        "segments.product_item_id"
+        "segments.product_item_id",
     ]
 
 
@@ -423,12 +499,13 @@ class UserLocationReport(IncrementalGoogleAdsStream):
     UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/user_location_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#geo_performance
     """
+
     primary_key = [
         "segments.ad_network_type",
         "segments.date",
         "customer.id",
         "campaign.id",
-        "user_location_view.resource_name"
+        "user_location_view.resource_name",
     ]
 
 
@@ -436,11 +513,12 @@ class GeographicReport(IncrementalGoogleAdsStream):
     """
     UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/geographic_view
     """
+
     primary_key = [
         "segments.date",
         "ad_group.id",
         "geographic_view.country_criterion_id",
-        "customer.descriptive_name"
+        "customer.descriptive_name",
     ]
 
 
@@ -448,11 +526,8 @@ class KeywordReport(IncrementalGoogleAdsStream):
     """
     UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/keyword_view
     """
-    primary_key = [
-        "segments.date",
-        "ad_group.id",
-        "ad_group_criterion.criterion_id"
-    ]
+
+    primary_key = ["segments.date", "ad_group.id", "ad_group_criterion.criterion_id"]
 
 
 class ClickView(IncrementalGoogleAdsStream):

@@ -13,7 +13,6 @@ logger: logging.Logger = logging.getLogger("airbyte")
 
 
 class SchemaTypes:
-
     string: Dict = {"type": ["null", "string"]}
 
     number: Dict = {"type": ["null", "number", "string"], "format": "number"}
@@ -24,7 +23,10 @@ class SchemaTypes:
 
     datetime: Dict = {"type": ["null", "string"], "format": "date-time"}
 
-    array_with_strings: Dict = {"type": ["null", "array"], "items": {"type": ["null", "string"]}}
+    array_with_strings: Dict = {
+        "type": ["null", "array"],
+        "items": {"type": ["null", "string"]},
+    }
 
     # array items should be automatically determined
     # based on field complexity
@@ -110,19 +112,32 @@ class SchemaHelpers:
                 # Other edge cases, if `field_type` not in SIMPLE_AIRTABLE_TYPES, fall back to "simpleText" == `string`
                 # reference issue: https://github.com/airbytehq/oncall/issues/1432#issuecomment-1412743120
                 if complex_type == SchemaTypes.array_with_any:
-                    if original_type == "formula" and field_type in ("number", "currency", "percent", "duration"):
+                    if original_type == "formula" and field_type in (
+                        "number",
+                        "currency",
+                        "percent",
+                        "duration",
+                    ):
                         complex_type = SchemaTypes.number
-                    elif original_type == "formula" and not any((options.get("formula").startswith(x) for x in ARRAY_FORMULAS)):
+                    elif original_type == "formula" and not any(
+                        (options.get("formula").startswith(x) for x in ARRAY_FORMULAS)
+                    ):
                         complex_type = SchemaTypes.string
                     elif field_type in SIMPLE_AIRTABLE_TYPES:
-                        complex_type["items"] = deepcopy(SIMPLE_AIRTABLE_TYPES.get(field_type))
+                        complex_type["items"] = deepcopy(
+                            SIMPLE_AIRTABLE_TYPES.get(field_type)
+                        )
                     else:
                         complex_type["items"] = SchemaTypes.string
-                        logger.warning(f"Unknown field type: {field_type}, falling back to `simpleText` type")
+                        logger.warning(
+                            f"Unknown field type: {field_type}, falling back to `simpleText` type"
+                        )
                 properties.update(**{name: complex_type})
             elif original_type in SIMPLE_AIRTABLE_TYPES.keys():
                 field_type: str = exec_type if exec_type else original_type
-                properties.update(**{name: deepcopy(SIMPLE_AIRTABLE_TYPES.get(field_type))})
+                properties.update(
+                    **{name: deepcopy(SIMPLE_AIRTABLE_TYPES.get(field_type))}
+                )
             else:
                 # Airtable may add more field types in the future and don't consider it a breaking change
                 properties.update(**{name: SchemaTypes.string})
@@ -132,17 +147,22 @@ class SchemaHelpers:
             "type": "object",
             "additionalProperties": True,
             "properties": properties,
-            "required": ["_airtable_id"]
+            "required": ["_airtable_id"],
         }
 
         return json_schema
 
     @staticmethod
-    def get_airbyte_stream(stream_name: str, json_schema: Dict[str, Any]) -> AirbyteStream:
+    def get_airbyte_stream(
+        stream_name: str, json_schema: Dict[str, Any]
+    ) -> AirbyteStream:
         return AirbyteStream(
             name=stream_name,
             json_schema=json_schema,
             supported_sync_modes=[SyncMode.full_refresh],
-            supported_destination_sync_modes=[DestinationSyncMode.overwrite, DestinationSyncMode.append_dedup],
-            source_defined_primary_key=[["_airtable_id"]]
+            supported_destination_sync_modes=[
+                DestinationSyncMode.overwrite,
+                DestinationSyncMode.append_dedup,
+            ],
+            source_defined_primary_key=[["_airtable_id"]],
         )

@@ -1,18 +1,12 @@
+import urllib.parse
 from datetime import datetime
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator
-from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING
-import urllib.parse
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeVar
 
-from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-    AccessToken,
-    BaseDocument,
-    BaseOAuth2Credentials,
-    OAuth2Spec,
-    ResourceConfig,
-    ResourceState,
-)
+from estuary_cdk.capture.common import AccessToken, BaseDocument, BaseOAuth2Credentials
+from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
+from estuary_cdk.capture.common import OAuth2Spec, ResourceConfig, ResourceState
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 scopes = [
     "crm.lists.read",
@@ -99,7 +93,6 @@ class Names(StrEnum):
 # A Property is a HubSpot or HubSpot-user defined attribute that's
 # attached to a HubSpot CRM object.
 class Property(BaseDocument, extra="allow"):
-
     name: str = ""
     calculated: bool = False
     hubspotObject: str = "unknown"  # Added by us.
@@ -210,7 +203,6 @@ class Ticket(BaseCRMObject):
 
 # An Association, as returned by the v4 associations API.
 class Association(BaseModel, extra="forbid"):
-
     class Type(BaseModel, extra="forbid"):
         category: Literal["HUBSPOT_DEFINED", "USER_DEFINED"]
         # Type IDs are defined here: https://developers.hubspot.com/docs/api/crm/associations
@@ -242,7 +234,6 @@ Item = TypeVar("Item")
 
 # Common shape of a v3 API paged listing.
 class PageResult(BaseModel, Generic[Item], extra="forbid"):
-
     class Cursor(BaseModel, extra="forbid"):
         after: str
         link: str
@@ -256,7 +247,6 @@ class PageResult(BaseModel, Generic[Item], extra="forbid"):
 
 # Common shape of a v3 API batch read.
 class BatchResult(BaseModel, Generic[Item], extra="forbid"):
-
     class Error(BaseModel, extra="forbid"):
         status: Literal["error"]
         category: Literal["OBJECT_NOT_FOUND"]
@@ -280,7 +270,6 @@ class BatchResult(BaseModel, Generic[Item], extra="forbid"):
 
 
 class OldRecentCompanies(BaseModel):
-
     class Item(BaseModel):
         class Properties(BaseModel):
             class Timestamp(BaseModel):
@@ -298,7 +287,6 @@ class OldRecentCompanies(BaseModel):
 
 
 class OldRecentContacts(BaseModel):
-
     class Item(BaseModel):
         class Properties(BaseModel):
             class Timestamp(BaseModel):
@@ -316,7 +304,6 @@ class OldRecentContacts(BaseModel):
 
 
 class OldRecentDeals(BaseModel):
-
     class Item(BaseModel):
         class Properties(BaseModel):
             class Timestamp(BaseModel):
@@ -334,7 +321,6 @@ class OldRecentDeals(BaseModel):
 
 
 class OldRecentEngagements(BaseModel):
-
     class Item(BaseModel):
         class Engagement(BaseModel):
             id: int

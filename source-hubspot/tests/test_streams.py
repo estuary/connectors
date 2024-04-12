@@ -42,7 +42,9 @@ def time_sleep_mock(mocker):
     yield time_mock
 
 
-def test_updated_at_field_non_exist_handler(requests_mock, common_params, fake_properties_list):
+def test_updated_at_field_non_exist_handler(
+    requests_mock, common_params, fake_properties_list
+):
     stream = ContactLists(**common_params)
 
     responses = [
@@ -60,7 +62,12 @@ def test_updated_at_field_non_exist_handler(requests_mock, common_params, fake_p
     properties_response = [
         {
             "json": [
-                {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+                {
+                    "name": property_name,
+                    "type": "string",
+                    "updatedAt": 1571085954360,
+                    "createdAt": 1565059306048,
+                }
                 for property_name in fake_properties_list
             ],
             "status_code": 200,
@@ -68,7 +75,9 @@ def test_updated_at_field_non_exist_handler(requests_mock, common_params, fake_p
     ]
 
     requests_mock.register_uri("GET", stream.url, responses)
-    requests_mock.register_uri("GET", "/properties/v2/contact/properties", properties_response)
+    requests_mock.register_uri(
+        "GET", "/properties/v2/contact/properties", properties_response
+    )
 
     _, stream_state = read_incremental(stream, {})
 
@@ -106,7 +115,9 @@ def test_updated_at_field_non_exist_handler(requests_mock, common_params, fake_p
         (Workflows, "", {"updatedAt": 1675121674226}),
     ],
 )
-def test_streams_read(stream, endpoint, cursor_value, requests_mock, common_params, fake_properties_list):
+def test_streams_read(
+    stream, endpoint, cursor_value, requests_mock, common_params, fake_properties_list
+):
     stream = stream(**common_params)
     responses = [
         {
@@ -124,7 +135,12 @@ def test_streams_read(stream, endpoint, cursor_value, requests_mock, common_para
     properties_response = [
         {
             "json": [
-                {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+                {
+                    "name": property_name,
+                    "type": "string",
+                    "updatedAt": 1571085954360,
+                    "createdAt": 1565059306048,
+                }
                 for property_name in fake_properties_list
             ],
             "status_code": 200,
@@ -138,7 +154,9 @@ def test_streams_read(stream, endpoint, cursor_value, requests_mock, common_para
     requests_mock.register_uri("GET", stream_url, responses)
     requests_mock.register_uri("GET", "/marketing/v3/forms", responses)
     requests_mock.register_uri("GET", "/email/public/v1/campaigns/test_id", responses)
-    requests_mock.register_uri("GET", f"/properties/v2/{endpoint}/properties", properties_response)
+    requests_mock.register_uri(
+        "GET", f"/properties/v2/{endpoint}/properties", properties_response
+    )
 
     records = read_full_refresh(stream)
     assert records
@@ -152,10 +170,17 @@ def test_streams_read(stream, endpoint, cursor_value, requests_mock, common_para
         {"json": {}, "status_code": 504},
     ],
 )
-def test_common_error_retry(error_response, requests_mock, common_params, fake_properties_list):
+def test_common_error_retry(
+    error_response, requests_mock, common_params, fake_properties_list
+):
     """Error once, check that we retry and not fail"""
     properties_response = [
-        {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+        {
+            "name": property_name,
+            "type": "string",
+            "updatedAt": 1571085954360,
+            "createdAt": 1565059306048,
+        }
         for property_name in fake_properties_list
     ]
     responses = [
@@ -224,16 +249,30 @@ def test_contact_lists_transform(requests_mock, common_params):
     assert records[2]["filters"][0][0]["value"] == "1000"
 
 
-def test_client_side_incremental_stream(requests_mock, common_params, fake_properties_list):
+def test_client_side_incremental_stream(
+    requests_mock, common_params, fake_properties_list
+):
     stream = Forms(**common_params)
     latest_cursor_value = "2030-01-30T23:46:36.287Z"
     responses = [
         {
             "json": {
                 stream.data_field: [
-                    {"id": "test_id_1", "createdAt": "2022-03-25T16:43:11Z", "updatedAt": "2023-01-30T23:46:36.287Z"},
-                    {"id": "test_id_2", "createdAt": "2022-03-25T16:43:11Z", "updatedAt": latest_cursor_value},
-                    {"id": "test_id_3", "createdAt": "2022-03-25T16:43:11Z", "updatedAt": "2023-02-20T23:46:36.287Z"},
+                    {
+                        "id": "test_id_1",
+                        "createdAt": "2022-03-25T16:43:11Z",
+                        "updatedAt": "2023-01-30T23:46:36.287Z",
+                    },
+                    {
+                        "id": "test_id_2",
+                        "createdAt": "2022-03-25T16:43:11Z",
+                        "updatedAt": latest_cursor_value,
+                    },
+                    {
+                        "id": "test_id_3",
+                        "createdAt": "2022-03-25T16:43:11Z",
+                        "updatedAt": "2023-02-20T23:46:36.287Z",
+                    },
                 ],
             }
         }
@@ -241,7 +280,12 @@ def test_client_side_incremental_stream(requests_mock, common_params, fake_prope
     properties_response = [
         {
             "json": [
-                {"name": property_name, "type": "string", "createdAt": "2023-01-30T23:46:24.355Z", "updatedAt": "2023-01-30T23:46:36.287Z"}
+                {
+                    "name": property_name,
+                    "type": "string",
+                    "createdAt": "2023-01-30T23:46:24.355Z",
+                    "updatedAt": "2023-01-30T23:46:36.287Z",
+                }
                 for property_name in fake_properties_list
             ],
             "status_code": 200,
@@ -249,24 +293,38 @@ def test_client_side_incremental_stream(requests_mock, common_params, fake_prope
     ]
 
     requests_mock.register_uri("GET", stream.url, responses)
-    requests_mock.register_uri("GET", "/properties/v2/form/properties", properties_response)
+    requests_mock.register_uri(
+        "GET", "/properties/v2/form/properties", properties_response
+    )
 
     list(stream.read_records(SyncMode.incremental))
-    assert stream.state == {stream.cursor_field: pendulum.parse(latest_cursor_value).to_rfc3339_string()}
+    assert stream.state == {
+        stream.cursor_field: pendulum.parse(latest_cursor_value).to_rfc3339_string()
+    }
 
 
 @pytest.mark.parametrize(
     "state, record, expected",
     [
-        ({"updatedAt": ""}, {"id": "test_id_1", "updatedAt": "2023-01-30T23:46:36.287Z"}, (True, {"updatedAt": "2023-01-30T23:46:36.287000+00:00"})),
-        ({"updatedAt": "2023-01-30T23:46:36.287000+00:00"}, {"id": "test_id_1", "updatedAt": "2023-01-29T01:02:03.123Z"}, (False, {"updatedAt": "2023-01-30T23:46:36.287000+00:00"})),
+        (
+            {"updatedAt": ""},
+            {"id": "test_id_1", "updatedAt": "2023-01-30T23:46:36.287Z"},
+            (True, {"updatedAt": "2023-01-30T23:46:36.287000+00:00"}),
+        ),
+        (
+            {"updatedAt": "2023-01-30T23:46:36.287000+00:00"},
+            {"id": "test_id_1", "updatedAt": "2023-01-29T01:02:03.123Z"},
+            (False, {"updatedAt": "2023-01-30T23:46:36.287000+00:00"}),
+        ),
     ],
     ids=[
         "Empty Sting in state + new record",
         "State + old record",
-    ]
+    ],
 )
-def test_empty_string_in_state(state, record, expected, requests_mock, common_params, fake_properties_list):
+def test_empty_string_in_state(
+    state, record, expected, requests_mock, common_params, fake_properties_list
+):
     stream = Forms(**common_params)
     stream.state = state
     # overcome the availability strartegy issues by mocking the responses
@@ -274,14 +332,21 @@ def test_empty_string_in_state(state, record, expected, requests_mock, common_pa
     properties_response = [
         {
             "json": [
-                {"name": property_name, "type": "string", "CreatedAt": "2023-01-30T23:46:24.355Z", "updatedAt": "2023-01-30T23:46:36.287Z"}
+                {
+                    "name": property_name,
+                    "type": "string",
+                    "CreatedAt": "2023-01-30T23:46:24.355Z",
+                    "updatedAt": "2023-01-30T23:46:36.287Z",
+                }
                 for property_name in fake_properties_list
             ],
             "status_code": 200,
         }
     ]
     requests_mock.register_uri("GET", stream.url, json=record)
-    requests_mock.register_uri("GET", "/properties/v2/form/properties", properties_response)
+    requests_mock.register_uri(
+        "GET", "/properties/v2/form/properties", properties_response
+    )
     # end of mocking `availability strategy`
 
     result = stream.filter_by_state(stream.state, record)
@@ -320,7 +385,11 @@ def custom_object_schema_fixture():
                 "hasUniqueValue": False,
                 "hidden": False,
                 "hubspotDefined": False,
-                "modificationMetadata": {"archivable": True, "readOnlyDefinition": True, "readOnlyValue": False},
+                "modificationMetadata": {
+                    "archivable": True,
+                    "readOnlyDefinition": True,
+                    "readOnlyValue": False,
+                },
                 "formField": True,
             }
         ],
@@ -340,18 +409,28 @@ def expected_custom_object_json_schema():
             "createdAt": {"type": ["null", "string"], "format": "date-time"},
             "updatedAt": {"type": ["null", "string"], "format": "date-time"},
             "archived": {"type": ["null", "boolean"]},
-            "properties": {"type": ["null", "object"], "properties": {"name": {"type": ["null", "string"]}}},
+            "properties": {
+                "type": ["null", "object"],
+                "properties": {"name": {"type": ["null", "string"]}},
+            },
         },
         "required": ["id"],
     }
 
 
 def test_custom_object_stream_doesnt_call_hubspot_to_get_json_schema_if_available(
-    requests_mock, custom_object_schema, expected_custom_object_json_schema, common_params
+    requests_mock,
+    custom_object_schema,
+    expected_custom_object_json_schema,
+    common_params,
 ):
-    stream = CustomObject(entity="animals", schema=expected_custom_object_json_schema, **common_params)
+    stream = CustomObject(
+        entity="animals", schema=expected_custom_object_json_schema, **common_params
+    )
 
-    adapter = requests_mock.register_uri("GET", "/crm/v3/schemas", [{"json": {"results": [custom_object_schema]}}])
+    adapter = requests_mock.register_uri(
+        "GET", "/crm/v3/schemas", [{"json": {"results": [custom_object_schema]}}]
+    )
     json_schema = stream.get_json_schema()
 
     assert json_schema == expected_custom_object_json_schema
@@ -359,11 +438,16 @@ def test_custom_object_stream_doesnt_call_hubspot_to_get_json_schema_if_availabl
 
 
 def test_custom_object_stream_calls_hubspot_to_get_json_schema(
-    requests_mock, custom_object_schema, expected_custom_object_json_schema, common_params
+    requests_mock,
+    custom_object_schema,
+    expected_custom_object_json_schema,
+    common_params,
 ):
     stream = CustomObject(entity="animals", schema=None, **common_params)
 
-    adapter = requests_mock.register_uri("GET", "/crm/v3/schemas", [{"json": {"results": [custom_object_schema]}}])
+    adapter = requests_mock.register_uri(
+        "GET", "/crm/v3/schemas", [{"json": {"results": [custom_object_schema]}}]
+    )
     json_schema = stream.get_json_schema()
     assert json_schema == expected_custom_object_json_schema
     assert adapter.called

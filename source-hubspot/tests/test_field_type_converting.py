@@ -37,7 +37,6 @@ def test_field_type_format_converting(field_type, expected):
     ],
 )
 def test_bad_field_type_converting(field_type, expected, caplog, capsys):
-
     assert Stream._get_field_props(field_type=field_type) == expected
 
     logs = caplog.records
@@ -76,13 +75,24 @@ def test_bad_field_type_converting(field_type, expected, caplog, capsys):
         # Test casting fields with format specified
         (["null", "string"], "some_field", "", "date-time", None),
         (["string"], "some_field", "", "date-time", ""),
-        (["null", "string"], "some_field", "2020", "date-time", "2020-01-01T00:00:00+00:00"),
+        (
+            ["null", "string"],
+            "some_field",
+            "2020",
+            "date-time",
+            "2020-01-01T00:00:00+00:00",
+        ),
     ],
 )
-def test_cast_type_if_needed(declared_field_types, field_name, field_value, format, casted_value):
+def test_cast_type_if_needed(
+    declared_field_types, field_name, field_value, format, casted_value
+):
     assert (
         Stream._cast_value(
-            declared_field_types=declared_field_types, field_name=field_name, field_value=field_value, declared_format=format
+            declared_field_types=declared_field_types,
+            field_name=field_name,
+            field_value=field_value,
+            declared_format=format,
         )
         == casted_value
     )
@@ -103,5 +113,7 @@ def test_cast_type_if_needed(declared_field_types, field_name, field_value, form
     ],
 )
 def test_cast_timestamp_to_date(field_value, declared_format, expected_casted_value):
-    casted_value = Stream._cast_datetime("hs_recurring_billing_end_date", field_value, declared_format=declared_format)
+    casted_value = Stream._cast_datetime(
+        "hs_recurring_billing_end_date", field_value, declared_format=declared_format
+    )
     assert casted_value == expected_casted_value

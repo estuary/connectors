@@ -46,10 +46,17 @@ def test_config():
 def mock_oauth_call(requests_mock):
     yield requests_mock.post(
         "https://accounts.google.com/o/oauth2/token",
-        json={"access_token": "access_token", "refresh_token": "refresh_token", "expires_in": 0},
+        json={
+            "access_token": "access_token",
+            "refresh_token": "refresh_token",
+            "expires_in": 0,
+        },
     )
 
 
 @pytest.fixture
 def customers(config):
-    return [Customer(id=_id, time_zone="local", is_manager_account=False) for _id in config["customer_id"].split(",")]
+    return [
+        Customer(id=_id, time_zone="local", is_manager_account=False)
+        for _id in config["customer_id"].split(",")
+    ]

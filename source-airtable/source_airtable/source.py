@@ -7,7 +7,12 @@ import logging
 from typing import Any, Iterable, Iterator, List, Mapping, MutableMapping, Tuple, Union
 
 from airbyte_cdk.logger import AirbyteLogger
-from airbyte_cdk.models import AirbyteCatalog, AirbyteMessage, AirbyteStateMessage, ConfiguredAirbyteCatalog
+from airbyte_cdk.models import (
+    AirbyteCatalog,
+    AirbyteMessage,
+    AirbyteStateMessage,
+    ConfiguredAirbyteCatalog,
+)
 from airbyte_cdk.sources import AbstractSource
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.utils.schema_helpers import split_config
@@ -18,12 +23,13 @@ from .streams import AirtableBases, AirtableStream, AirtableTables
 
 
 class SourceAirtable(AbstractSource):
-
     logger: logging.Logger = logging.getLogger("airbyte")
     streams_catalog: Iterable[Mapping[str, Any]] = []
     _auth: AirtableAuth = None
 
-    def check_connection(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> Tuple[bool, Any]:
+    def check_connection(
+        self, logger: AirbyteLogger, config: Mapping[str, Any]
+    ) -> Tuple[bool, Any]:
         auth = AirtableAuth(config)
         try:
             # try reading first table from each base, to check the connectivity,
@@ -31,13 +37,20 @@ class SourceAirtable(AbstractSource):
                 base_id = base.get("id")
                 base_name = base.get("name")
                 self.logger.info(f"Reading first table info for base: {base_name}")
-                next(AirtableTables(base_id=base_id, authenticator=auth).read_records(sync_mode=None))
+                next(
+                    AirtableTables(base_id=base_id, authenticator=auth).read_records(
+                        sync_mode=None
+                    )
+                )
             return True, None
         except Exception as e:
             return False, str(e)
 
     def _remove_missed_streams_from_catalog(
-        self, logger: logging.Logger, config: Mapping[str, Any], catalog: ConfiguredAirbyteCatalog
+        self,
+        logger: logging.Logger,
+        config: Mapping[str, Any],
+        catalog: ConfiguredAirbyteCatalog,
     ) -> ConfiguredAirbyteCatalog:
         config, _ = split_config(config)
         stream_instances = {s.name: s for s in self.streams(config)}
@@ -78,7 +91,9 @@ class SourceAirtable(AbstractSource):
             base_id = base.get("id")
             base_name = SchemaHelpers.clean_name(base.get("name"))
             # list and process each table under each base to generate the JSON Schema
-            for table in AirtableTables(base_id, authenticator=auth).read_records(sync_mode=None):
+            for table in AirtableTables(base_id, authenticator=auth).read_records(
+                sync_mode=None
+            ):
                 self.streams_catalog.append(
                     {
                         "stream_path": f"{base_id}/{table.get('id')}",
@@ -89,7 +104,9 @@ class SourceAirtable(AbstractSource):
                         "table_name": table.get("name"),
                     }
                 )
-        return AirbyteCatalog(streams=[stream["stream"] for stream in self.streams_catalog])
+        return AirbyteCatalog(
+            streams=[stream["stream"] for stream in self.streams_catalog]
+        )
 
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
         self._auth = AirtableAuth(config)

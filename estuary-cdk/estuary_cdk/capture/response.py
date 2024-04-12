@@ -1,7 +1,8 @@
-from pydantic import BaseModel
-from typing import Generic, Any
+from typing import Any, Generic
 
-from ..flow import ResourceConfig, ConnectorState, ConnectorStateUpdate
+from pydantic import BaseModel
+
+from ..flow import ConnectorState, ConnectorStateUpdate, ResourceConfig
 
 
 class DiscoveredBinding(BaseModel, Generic[ResourceConfig]):

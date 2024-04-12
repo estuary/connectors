@@ -14,7 +14,15 @@ from airbyte_cdk.models import ConfiguredAirbyteCatalog, SyncMode, Type
 from source_hubspot.errors import HubspotRateLimited, InvalidStartDateConfigError
 from source_hubspot.helpers import APIv3Property
 from source_hubspot.source import SourceHubspot
-from source_hubspot.streams import API, Companies, Deals, Engagements, MarketingEmails, Products, Stream
+from source_hubspot.streams import (
+    API,
+    Companies,
+    Deals,
+    Engagements,
+    MarketingEmails,
+    Products,
+    Stream,
+)
 
 from .utils import read_full_refresh, read_incremental
 
@@ -64,14 +72,15 @@ def test_check_connection_exception(config):
 
 def test_check_connection_invalid_start_date_exception(config_invalid_date):
     with pytest.raises(InvalidStartDateConfigError):
-        ok, error_msg = SourceHubspot().check_connection(logger, config=config_invalid_date)
+        ok, error_msg = SourceHubspot().check_connection(
+            logger, config=config_invalid_date
+        )
         assert not ok
         assert error_msg
 
 
 @mock.patch("source_hubspot.source.SourceHubspot.get_custom_object_streams")
 def test_streams(requests_mock, config):
-
     streams = SourceHubspot().streams(config)
 
     assert len(streams) == 28
@@ -96,7 +105,9 @@ def test_convert_datetime_to_string():
     pendulum_time = pendulum.now()
 
     assert Stream._convert_datetime_to_string(pendulum_time, declared_format="date")
-    assert Stream._convert_datetime_to_string(pendulum_time, declared_format="date-time")
+    assert Stream._convert_datetime_to_string(
+        pendulum_time, declared_format="date-time"
+    )
 
 
 def test_cast_datetime(common_params, caplog):
@@ -118,7 +129,11 @@ def test_cast_datetime(common_params, caplog):
 def test_check_connection_backoff_on_limit_reached(requests_mock, config):
     """Error once, check that we retry and not fail"""
     responses = [
-        {"json": {"error": "limit reached"}, "status_code": 429, "headers": {"Retry-After": "0"}},
+        {
+            "json": {"error": "limit reached"},
+            "status_code": 429,
+            "headers": {"Retry-After": "0"},
+        },
         {"json": [], "status_code": 200},
     ]
 
@@ -149,8 +164,12 @@ def test_stream_forbidden(requests_mock, config, caplog):
         "status": "error",
         "message": "This access_token does not have proper permissions!",
     }
-    requests_mock.get("https://api.hubapi.com/automation/v3/workflows", json=json, status_code=403)
-    requests_mock.get("https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403)
+    requests_mock.get(
+        "https://api.hubapi.com/automation/v3/workflows", json=json, status_code=403
+    )
+    requests_mock.get(
+        "https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403
+    )
 
     catalog = ConfiguredAirbyteCatalog.parse_obj(
         {
@@ -179,18 +198,29 @@ def test_parent_stream_forbidden(requests_mock, config, caplog, fake_properties_
         "status": "error",
         "message": "This access_token does not have proper permissions!",
     }
-    requests_mock.get("https://api.hubapi.com/marketing/v3/forms", json=json, status_code=403)
+    requests_mock.get(
+        "https://api.hubapi.com/marketing/v3/forms", json=json, status_code=403
+    )
     properties_response = [
         {
             "json": [
-                {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+                {
+                    "name": property_name,
+                    "type": "string",
+                    "updatedAt": 1571085954360,
+                    "createdAt": 1565059306048,
+                }
                 for property_name in fake_properties_list
             ],
             "status_code": 200,
         }
     ]
-    requests_mock.get("https://api.hubapi.com/properties/v2/form/properties", properties_response)
-    requests_mock.get("https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403)
+    requests_mock.get(
+        "https://api.hubapi.com/properties/v2/form/properties", properties_response
+    )
+    requests_mock.get(
+        "https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403
+    )
 
     catalog = ConfiguredAirbyteCatalog.parse_obj(
         {
@@ -226,7 +256,12 @@ class TestSplittingPropertiesFunctionality:
         properties_response = [
             {
                 "json": [
-                    {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+                    {
+                        "name": property_name,
+                        "type": "string",
+                        "updatedAt": 1571085954360,
+                        "createdAt": 1565059306048,
+                    }
                     for property_name in fake_properties_list
                 ],
                 "status_code": 200,
@@ -239,16 +274,23 @@ class TestSplittingPropertiesFunctionality:
         response = api._session.get(api.BASE_URL + url, params=params)
         return api._parse_and_handle_errors(response)
 
-    def test_stream_with_splitting_properties(self, requests_mock, api, fake_properties_list, common_params):
+    def test_stream_with_splitting_properties(
+        self, requests_mock, api, fake_properties_list, common_params
+    ):
         """
         Check working stream `companies` with large list of properties using new functionality with splitting properties
         """
         test_stream = Companies(**common_params)
 
         parsed_properties = list(APIv3Property(fake_properties_list).split())
-        self.set_mock_properties(requests_mock, "/properties/v2/company/properties", fake_properties_list)
+        self.set_mock_properties(
+            requests_mock, "/properties/v2/company/properties", fake_properties_list
+        )
 
-        record_ids_paginated = [list(map(str, range(100))), list(map(str, range(100, 150, 1)))]
+        record_ids_paginated = [
+            list(map(str, range(100))),
+            list(map(str, range(100, 150, 1))),
+        ]
 
         test_stream._sync_mode = SyncMode.full_refresh
         test_stream_url = test_stream.url
@@ -261,10 +303,21 @@ class TestSplittingPropertiesFunctionality:
                     {
                         "json": {
                             "results": [
-                                {**self.BASE_OBJECT_BODY, **{"id": id, "properties": {p: "fake_data" for p in property_slice.properties}}}
+                                {
+                                    **self.BASE_OBJECT_BODY,
+                                    **{
+                                        "id": id,
+                                        "properties": {
+                                            p: "fake_data"
+                                            for p in property_slice.properties
+                                        },
+                                    },
+                                }
                                 for id in id_list
                             ],
-                            "paging": {"next": {"after": id_list[-1]}} if len(id_list) == 100 else {},
+                            "paging": {"next": {"after": id_list[-1]}}
+                            if len(id_list) == 100
+                            else {},
                         },
                         "status_code": 200,
                     }
@@ -285,13 +338,17 @@ class TestSplittingPropertiesFunctionality:
         for record in stream_records:
             assert len(record["properties"]) == NUMBER_OF_PROPERTIES
 
-    def test_stream_with_splitting_properties_with_pagination(self, requests_mock, common_params, api, fake_properties_list):
+    def test_stream_with_splitting_properties_with_pagination(
+        self, requests_mock, common_params, api, fake_properties_list
+    ):
         """
         Check working stream `products` with large list of properties using new functionality with splitting properties
         """
 
         parsed_properties = list(APIv3Property(fake_properties_list).split())
-        self.set_mock_properties(requests_mock, "/properties/v2/product/properties", fake_properties_list)
+        self.set_mock_properties(
+            requests_mock, "/properties/v2/product/properties", fake_properties_list
+        )
 
         test_stream = Products(**common_params)
 
@@ -300,8 +357,23 @@ class TestSplittingPropertiesFunctionality:
                 {
                     "json": {
                         "results": [
-                            {**self.BASE_OBJECT_BODY, **{"id": id, "properties": {p: "fake_data" for p in property_slice.properties}}}
-                            for id in ["6043593519", "1092593519", "1092593518", "1092593517", "1092593516"]
+                            {
+                                **self.BASE_OBJECT_BODY,
+                                **{
+                                    "id": id,
+                                    "properties": {
+                                        p: "fake_data"
+                                        for p in property_slice.properties
+                                    },
+                                },
+                            }
+                            for id in [
+                                "6043593519",
+                                "1092593519",
+                                "1092593518",
+                                "1092593517",
+                                "1092593516",
+                            ]
                         ],
                         "paging": {},
                     },
@@ -309,7 +381,9 @@ class TestSplittingPropertiesFunctionality:
                 }
             ]
             prop_key, prop_val = next(iter(property_slice.as_url_param().items()))
-            requests_mock.register_uri("GET", f"{test_stream.url}?{prop_key}={prop_val}", record_responses)
+            requests_mock.register_uri(
+                "GET", f"{test_stream.url}?{prop_key}={prop_val}", record_responses
+            )
 
         stream_records = list(test_stream.read_records(sync_mode=SyncMode.incremental))
 
@@ -317,23 +391,42 @@ class TestSplittingPropertiesFunctionality:
         for record in stream_records:
             assert len(record["properties"]) == NUMBER_OF_PROPERTIES
 
-    def test_stream_with_splitting_properties_with_new_record(self, requests_mock, common_params, api, fake_properties_list):
+    def test_stream_with_splitting_properties_with_new_record(
+        self, requests_mock, common_params, api, fake_properties_list
+    ):
         """
         Check working stream `workflows` with large list of properties using new functionality with splitting properties
         """
 
         parsed_properties = list(APIv3Property(fake_properties_list).split())
-        self.set_mock_properties(requests_mock, "/properties/v2/deal/properties", fake_properties_list)
+        self.set_mock_properties(
+            requests_mock, "/properties/v2/deal/properties", fake_properties_list
+        )
 
         test_stream = Deals(**common_params)
 
-        ids_list = ["6043593519", "1092593519", "1092593518", "1092593517", "1092593516"]
+        ids_list = [
+            "6043593519",
+            "1092593519",
+            "1092593518",
+            "1092593517",
+            "1092593516",
+        ]
         for property_slice in parsed_properties:
             record_responses = [
                 {
                     "json": {
                         "results": [
-                            {**self.BASE_OBJECT_BODY, **{"id": id, "properties": {p: "fake_data" for p in property_slice.properties}}}
+                            {
+                                **self.BASE_OBJECT_BODY,
+                                **{
+                                    "id": id,
+                                    "properties": {
+                                        p: "fake_data"
+                                        for p in property_slice.properties
+                                    },
+                                },
+                            }
                             for id in ids_list
                         ],
                         "paging": {},
@@ -343,7 +436,9 @@ class TestSplittingPropertiesFunctionality:
             ]
             test_stream._sync_mode = SyncMode.full_refresh
             prop_key, prop_val = next(iter(property_slice.as_url_param().items()))
-            requests_mock.register_uri("GET", f"{test_stream.url}?{prop_key}={prop_val}", record_responses)
+            requests_mock.register_uri(
+                "GET", f"{test_stream.url}?{prop_key}={prop_val}", record_responses
+            )
             test_stream._sync_mode = None
             ids_list.append("1092593513")
 
@@ -373,7 +468,9 @@ def configured_catalog_fixture():
     return ConfiguredAirbyteCatalog.parse_obj(configured_catalog)
 
 
-def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(requests_mock, common_params, fake_properties_list):
+def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(
+    requests_mock, common_params, fake_properties_list
+):
     """
     If there are more than 10,000 records that would be returned by the Hubspot search endpoint,
     the CRMSearchStream instance should stop at the 10Kth record
@@ -382,7 +479,10 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
     responses = [
         {
             "json": {
-                "results": [{"id": f"{y}", "updatedAt": "2022-02-25T16:43:11Z"} for y in range(100)],
+                "results": [
+                    {"id": f"{y}", "updatedAt": "2022-02-25T16:43:11Z"}
+                    for y in range(100)
+                ],
                 "paging": {
                     "next": {
                         "after": f"{x * 100}",
@@ -398,7 +498,10 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
         [
             {
                 "json": {
-                    "results": [{"id": f"{y}", "updatedAt": "2022-03-01T00:00:00Z"} for y in range(100)],
+                    "results": [
+                        {"id": f"{y}", "updatedAt": "2022-03-01T00:00:00Z"}
+                        for y in range(100)
+                    ],
                     "paging": {
                         "next": {
                             "after": f"{x * 100}",
@@ -413,7 +516,13 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
     # Last page... it does not have paging->next->after
     responses.append(
         {
-            "json": {"results": [{"id": f"{y}", "updatedAt": "2022-03-01T00:00:00Z"} for y in range(100)], "paging": {}},
+            "json": {
+                "results": [
+                    {"id": f"{y}", "updatedAt": "2022-03-01T00:00:00Z"}
+                    for y in range(100)
+                ],
+                "paging": {},
+            },
             "status_code": 200,
         }
     )
@@ -421,7 +530,12 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
     properties_response = [
         {
             "json": [
-                {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+                {
+                    "name": property_name,
+                    "type": "string",
+                    "updatedAt": 1571085954360,
+                    "createdAt": 1565059306048,
+                }
                 for property_name in fake_properties_list
             ],
             "status_code": 200,
@@ -437,8 +551,14 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
     test_stream._sync_mode = SyncMode.incremental
     requests_mock.register_uri("POST", test_stream.url, responses)
     test_stream._sync_mode = None
-    requests_mock.register_uri("GET", "/properties/v2/company/properties", properties_response)
-    requests_mock.register_uri("POST", "/crm/v4/associations/company/contacts/batch/read", [{"status_code": 200, "json": {"results": []}}])
+    requests_mock.register_uri(
+        "GET", "/properties/v2/company/properties", properties_response
+    )
+    requests_mock.register_uri(
+        "POST",
+        "/crm/v4/associations/company/contacts/batch/read",
+        [{"status_code": 200, "json": {"results": []}}],
+    )
 
     records, _ = read_incremental(test_stream, {})
     # The stream should not attempt to get more than 10K records.
@@ -460,7 +580,10 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
         [
             {
                 "json": {
-                    "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234593251}} for y in range(250)],
+                    "results": [
+                        {"engagement": {"id": f"{y}", "lastUpdated": 1641234593251}}
+                        for y in range(250)
+                    ],
                     "hasMore": True,
                     "offset": 250,
                 },
@@ -468,7 +591,10 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
             },
             {
                 "json": {
-                    "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234593251}} for y in range(250, 500)],
+                    "results": [
+                        {"engagement": {"id": f"{y}", "lastUpdated": 1641234593251}}
+                        for y in range(250, 500)
+                    ],
                     "hasMore": True,
                     "offset": 500,
                 },
@@ -476,7 +602,10 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
             },
             {
                 "json": {
-                    "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234595251}} for y in range(500, 600)],
+                    "results": [
+                        {"engagement": {"id": f"{y}", "lastUpdated": 1641234595251}}
+                        for y in range(500, 600)
+                    ],
                     "hasMore": False,
                 },
                 "status_code": 200,
@@ -490,7 +619,10 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
         [
             {
                 "json": {
-                    "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}} for y in range(100)],
+                    "results": [
+                        {"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}}
+                        for y in range(100)
+                    ],
                     "hasMore": True,
                     "offset": 100,
                 },
@@ -498,7 +630,10 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
             },
             {
                 "json": {
-                    "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}} for y in range(100, 200)],
+                    "results": [
+                        {"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}}
+                        for y in range(100, 200)
+                    ],
                     "hasMore": True,
                     "offset": 200,
                 },
@@ -506,7 +641,10 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
             },
             {
                 "json": {
-                    "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}} for y in range(200, 250)],
+                    "results": [
+                        {"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}}
+                        for y in range(200, 250)
+                    ],
                     "hasMore": False,
                 },
                 "status_code": 200,
@@ -520,16 +658,22 @@ def test_engagements_stream_pagination_works(requests_mock, common_params):
     records = read_full_refresh(test_stream)
     # The stream should handle pagination correctly and output 600 records.
     assert len(records) == 600
-    assert test_stream.state["lastUpdated"] == int(test_stream._init_sync.timestamp() * 1000)
+    assert test_stream.state["lastUpdated"] == int(
+        test_stream._init_sync.timestamp() * 1000
+    )
 
     test_stream = Engagements(**common_params)
     records, _ = read_incremental(test_stream, {})
     # The stream should handle pagination correctly and output 250 records.
     assert len(records) == 250
-    assert test_stream.state["lastUpdated"] == int(test_stream._init_sync.timestamp() * 1000)
+    assert test_stream.state["lastUpdated"] == int(
+        test_stream._init_sync.timestamp() * 1000
+    )
 
 
-def test_incremental_engagements_stream_stops_at_10K_records(requests_mock, common_params, fake_properties_list):
+def test_incremental_engagements_stream_stops_at_10K_records(
+    requests_mock, common_params, fake_properties_list
+):
     """
     If there are more than 10,000 engagements that would be returned by the Hubspot recent engagements endpoint,
     the Engagements instance should stop at the 10Kth record.
@@ -538,7 +682,10 @@ def test_incremental_engagements_stream_stops_at_10K_records(requests_mock, comm
     responses = [
         {
             "json": {
-                "results": [{"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}} for y in range(100)],
+                "results": [
+                    {"engagement": {"id": f"{y}", "lastUpdated": 1641234595252}}
+                    for y in range(100)
+                ],
                 "hasMore": True,
                 "offset": x * 100,
             },
@@ -551,11 +698,15 @@ def test_incremental_engagements_stream_stops_at_10K_records(requests_mock, comm
     test_stream = Engagements(**common_params)
     test_stream.state = {"lastUpdated": 1641234595251}
     # Mocking Request
-    requests_mock.register_uri("GET", "/engagements/v1/engagements/recent/modified?count=100", responses)
+    requests_mock.register_uri(
+        "GET", "/engagements/v1/engagements/recent/modified?count=100", responses
+    )
     records, _ = read_incremental(test_stream, {})
     # The stream should not attempt to get more than 10K records.
     assert len(records) == 10000
-    assert test_stream.state["lastUpdated"] == int(test_stream._init_sync.timestamp() * 1000)
+    assert test_stream.state["lastUpdated"] == int(
+        test_stream._init_sync.timestamp() * 1000
+    )
 
 
 def test_pagination_marketing_emails_stream(requests_mock, common_params):
@@ -569,7 +720,9 @@ def test_pagination_marketing_emails_stream(requests_mock, common_params):
         [
             {
                 "json": {
-                    "objects": [{"id": f"{y}", "updated": 1641234593251} for y in range(250)],
+                    "objects": [
+                        {"id": f"{y}", "updated": 1641234593251} for y in range(250)
+                    ],
                     "limit": 250,
                     "offset": 0,
                     "total": 600,
@@ -578,7 +731,10 @@ def test_pagination_marketing_emails_stream(requests_mock, common_params):
             },
             {
                 "json": {
-                    "objects": [{"id": f"{y}", "updated": 1641234593251} for y in range(250, 500)],
+                    "objects": [
+                        {"id": f"{y}", "updated": 1641234593251}
+                        for y in range(250, 500)
+                    ],
                     "limit": 250,
                     "offset": 250,
                     "total": 600,
@@ -587,7 +743,10 @@ def test_pagination_marketing_emails_stream(requests_mock, common_params):
             },
             {
                 "json": {
-                    "objects": [{"id": f"{y}", "updated": 1641234595251} for y in range(500, 600)],
+                    "objects": [
+                        {"id": f"{y}", "updated": 1641234595251}
+                        for y in range(500, 600)
+                    ],
                     "limit": 250,
                     "offset": 500,
                     "total": 600,
