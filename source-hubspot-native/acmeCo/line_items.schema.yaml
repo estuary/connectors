@@ -100,11 +100,11 @@ properties:
     default: {}
     title: Associations
     type: object
-  companies:
+  results:
     default: []
     items:
       type: integer
-    title: Companies
+    title: Results
     type: array
 required:
   - id
@@ -112,6 +112,6 @@ required:
   - updatedAt
   - archived
   - properties
-title: Contact
+title: LineItems
 type: object
 x-infer-schema: true

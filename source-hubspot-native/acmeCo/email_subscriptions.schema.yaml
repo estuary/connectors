@@ -28,18 +28,27 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  name:
-    default: ""
-    title: Name
+  id:
+    title: Id
     type: string
-  calculated:
-    default: false
-    title: Calculated
-    type: boolean
-  hubspotObject:
-    default: unknown
-    title: Hubspotobject
+  updatedAt:
+    format: date-time
+    title: Updatedat
     type: string
-title: Property
+  createdAt:
+    format: date-time
+    title: Createdat
+    type: string
+  subscriptionDefinitions:
+    default: []
+    items:
+      type: integer
+    title: Subscriptiondefinitions
+    type: array
+required:
+  - id
+  - updatedAt
+  - createdAt
+title: EmailSubscriptions
 type: object
 x-infer-schema: true

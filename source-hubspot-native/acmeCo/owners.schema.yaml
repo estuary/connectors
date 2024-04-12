@@ -28,18 +28,22 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  name:
-    default: ""
-    title: Name
+  id:
+    title: Id
+    type: integer
+  updatedAt:
+    format: date-time
+    title: Updatedat
     type: string
-  calculated:
-    default: false
-    title: Calculated
-    type: boolean
-  hubspotObject:
-    default: unknown
-    title: Hubspotobject
-    type: string
-title: Property
+  results:
+    default: []
+    items:
+      type: integer
+    title: Results
+    type: array
+required:
+  - id
+  - updatedAt
+title: Owners
 type: object
 x-infer-schema: true

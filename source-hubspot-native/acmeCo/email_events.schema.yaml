@@ -28,18 +28,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  name:
-    default: ""
-    title: Name
+  id:
+    title: Id
     type: string
-  calculated:
-    default: false
-    title: Calculated
-    type: boolean
-  hubspotObject:
-    default: unknown
-    title: Hubspotobject
-    type: string
-title: Property
+  events:
+    default: []
+    items:
+      type: integer
+    title: Events
+    type: array
+required:
+  - id
+title: EmailEvents
 type: object
 x-infer-schema: true

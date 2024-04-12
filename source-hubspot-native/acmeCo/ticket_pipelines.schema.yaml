@@ -100,11 +100,14 @@ properties:
     default: {}
     title: Associations
     type: object
-  companies:
+  pipelineId:
+    title: Pipelineid
+    type: string
+  results:
     default: []
     items:
       type: integer
-    title: Companies
+    title: Results
     type: array
 required:
   - id
@@ -112,6 +115,7 @@ required:
   - updatedAt
   - archived
   - properties
-title: Contact
+  - pipelineId
+title: TicketPipelines
 type: object
 x-infer-schema: true
