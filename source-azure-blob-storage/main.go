@@ -181,6 +181,11 @@ func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (i
 	}
 	retryReader := resp.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
 
+	obj.ModTime = *resp.LastModified
+	obj.ContentType = *resp.ContentType
+	obj.Size = *resp.ContentLength
+	obj.ContentEncoding = *resp.ContentEncoding
+
 	return retryReader, obj, nil
 }
 
