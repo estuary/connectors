@@ -217,7 +217,16 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 	blob := page.Segment.BlobItems[l.index]
 	l.index++
 
-	obj := filesource.ObjectInfo{Path: *blob.Name, Size: *blob.Properties.ContentLength}
+	obj := filesource.ObjectInfo{}
+
+	obj.Path = *blob.Name
+	obj.ModTime = *blob.Properties.LastModified
+	obj.ContentType = *blob.Properties.ContentType
+	obj.Size = *blob.Properties.ContentLength
+
+	if blob.Properties.ContentEncoding != nil {
+		obj.ContentEncoding = *blob.Properties.ContentEncoding
+	}
 	log.Debug("Listing object: ", obj.Path)
 
 	return obj, nil
