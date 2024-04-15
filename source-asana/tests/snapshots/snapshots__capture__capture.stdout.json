@@ -59,6 +59,53 @@
     }
   ],
   [
+    "acmeCo/projects",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "archived": false,
+      "color": "light-pink",
+      "created_at": "2024-04-02T02:49:14.479Z",
+      "current_status": null,
+      "custom_fields": [],
+      "default_view": "calendar",
+      "due_date": null,
+      "due_on": null,
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081226",
+      "html_notes": "<body>There are so many moving pieces when it comes to planning an event. What you need is a way to track it all in one place. From budget planning to vendor negotiation, use this project to know exactly when work needs to be done.</body>",
+      "icon": "calendar",
+      "members": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:16.079Z",
+      "name": "Event Planning",
+      "notes": "There are so many moving pieces when it comes to planning an event. What you need is a way to track it all in one place. From budget planning to vendor negotiation, use this project to know exactly when work needs to be done.",
+      "owner": {
+        "gid": "1205846172619387"
+      },
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081226",
+      "public": true,
+      "resource_type": "project",
+      "start_on": null,
+      "team": {
+        "gid": "1205846104557048"
+      },
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
     "acmeCo/sections",
     {
       "_meta": {
@@ -104,6 +151,91 @@
       "name": "Done",
       "project": {
         "gid": "1205846048939069"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "created_at": "2024-04-02T02:49:14.735Z",
+      "gid": "1206976273081228",
+      "name": "Overview",
+      "project": {
+        "gid": "1206976273081226"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "created_at": "2024-04-02T02:49:15.914Z",
+      "gid": "1206976273081237",
+      "name": "Pre-event (1 month to go)",
+      "project": {
+        "gid": "1206976273081226"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
+      "created_at": "2024-04-02T02:49:15.972Z",
+      "gid": "1206976273081238",
+      "name": "Nearing event (2 weeks to go)",
+      "project": {
+        "gid": "1206976273081226"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
+      "created_at": "2024-04-02T02:49:16.037Z",
+      "gid": "1206976273081239",
+      "name": "Day of event",
+      "project": {
+        "gid": "1206976273081226"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
+      "created_at": "2024-04-02T02:49:16.101Z",
+      "gid": "1206976273081240",
+      "name": "Wrap-up (1 week after event)",
+      "project": {
+        "gid": "1206976273081226"
       },
       "resource_type": "section",
       "ts": "redacted-timestamp"
@@ -273,6 +405,216 @@
       "resource_subtype": "due_date_changed",
       "resource_type": "story",
       "text": "David Yaffe changed the due date to Nov 6, 2023",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
+      "created_at": "2024-04-02T02:49:49.265Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976289479326",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
+      "created_at": "2024-04-02T02:49:31.568Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976376017413",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
+      "created_at": "2024-04-02T02:49:16.234Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417177994",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 11
+      },
+      "created_at": "2024-04-02T02:49:16.524Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212174",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 12
+      },
+      "created_at": "2024-04-02T02:49:16.748Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212177",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 13
+      },
+      "created_at": "2024-04-02T02:49:17.010Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212180",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 14
+      },
+      "created_at": "2024-04-02T02:49:17.234Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212183",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 15
+      },
+      "created_at": "2024-04-02T02:49:17.512Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212186",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 16
+      },
+      "created_at": "2024-04-02T02:49:17.800Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212189",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 17
+      },
+      "created_at": "2024-04-02T02:49:17.997Z",
+      "created_by": {
+        "gid": "1205846172619387"
+      },
+      "gid": "1206976417212192",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846172708274\">Jonathan Wihl</a></b> added to <a href=\"https://app.asana.com/0/1206976273081226/1206976273081226\">Event Planning</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "Jonathan Wihl added to Event Planning",
       "type": "system",
       "ts": "redacted-timestamp"
     }
@@ -451,6 +793,596 @@
       "resource_subtype": "default_task",
       "resource_type": "task",
       "start_on": "2023-11-02",
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.073Z",
+      "due_at": null,
+      "due_on": null,
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081229",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081228"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:16.319Z",
+      "name": "[Example] Budget overview",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081229",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.117Z",
+      "due_at": null,
+      "due_on": "2024-04-01",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081230",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081237"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:18.965Z",
+      "name": "[Example] Kickoff meeting with stakeholders",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081230",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.153Z",
+      "due_at": null,
+      "due_on": "2024-04-09",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081231",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081237"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:19.036Z",
+      "name": "[Example] Build event registration page",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081231",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.192Z",
+      "due_at": null,
+      "due_on": "2024-04-12",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081232",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081237"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:19.087Z",
+      "name": "[Example] Launch event registration page",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081232",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 9
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.231Z",
+      "due_at": null,
+      "due_on": "2024-04-18",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081233",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081238"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:19.131Z",
+      "name": "[Example] Tease guest speakers on social media",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081233",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 10
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.273Z",
+      "due_at": null,
+      "due_on": "2024-04-22",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081234",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081238"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:19.183Z",
+      "name": "[Example] Create event agenda and outline",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081234",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 11
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.320Z",
+      "due_at": null,
+      "due_on": "2024-04-25",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081235",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081239"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:17.844Z",
+      "name": "[Example] Event date",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081235",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 12
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:15.367Z",
+      "due_at": null,
+      "due_on": "2024-05-01",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273081236",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081240"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:19.226Z",
+      "name": "[Example] Collect survey feedback",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273081236",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:31.414Z",
+      "due_at": null,
+      "due_on": "2024-04-02",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273437268",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081228"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:49:46.738Z",
+      "name": "End of the month review",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273437268",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2024-04-02T02:49:49.118Z",
+      "due_at": null,
+      "due_on": "2024-04-05",
+      "followers": [
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1206976273437270",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1206976273081226"
+          },
+          "section": {
+            "gid": "1206976273081228"
+          }
+        }
+      ],
+      "modified_at": "2024-04-02T02:50:06.531Z",
+      "name": "Offsite",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1206976273081226/1206976273437270",
+      "projects": [
+        {
+          "gid": "1206976273081226"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": null,
       "tags": [],
       "workspace": {
         "gid": "1205846104557046"
