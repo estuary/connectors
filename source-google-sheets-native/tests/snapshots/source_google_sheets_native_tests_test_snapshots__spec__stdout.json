@@ -11,6 +11,7 @@
               "title": "Credentials Title"
             },
             "access_token": {
+              "secret": true,
               "title": "Access Token",
               "type": "string"
             }
@@ -29,14 +30,17 @@
               "title": "Credentials Title"
             },
             "client_id": {
+              "secret": true,
               "title": "Client Id",
               "type": "string"
             },
             "client_secret": {
+              "secret": true,
               "title": "Client Secret",
               "type": "string"
             },
             "refresh_token": {
+              "secret": true,
               "title": "Refresh Token",
               "type": "string"
             }

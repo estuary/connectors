@@ -2096,27 +2096,46 @@
         "row_id": 42
       },
       "calculated": false,
-      "createdAt": "2024-02-23T19:17:13.324Z",
-      "description": "This property stores the average sentiment of open support tickets at a given time",
+      "createdAt": "2024-04-09T21:45:07.560Z",
+      "description": "This property stores a CSM's sentiment towards a company.",
       "displayOrder": -1,
       "externalOptions": false,
-      "fieldType": "number",
+      "fieldType": "select",
       "formField": false,
-      "groupName": "company_activity",
+      "groupName": "companyinformation",
       "hasUniqueValue": false,
       "hidden": false,
       "hubspotDefined": true,
       "hubspotObject": "companies",
-      "label": "Customer Success Ticket Sentiment",
+      "label": "CSM Sentiment",
       "modificationMetadata": {
         "archivable": true,
         "readOnlyDefinition": false,
-        "readOnlyValue": true
+        "readOnlyValue": false
       },
-      "name": "hs_customer_success_ticket_sentiment",
-      "options": [],
-      "type": "number",
-      "updatedAt": "2024-02-23T19:17:13.324Z"
+      "name": "hs_csm_sentiment",
+      "options": [
+        {
+          "displayOrder": 0,
+          "hidden": false,
+          "label": "At-Risk",
+          "value": "at_risk"
+        },
+        {
+          "displayOrder": 1,
+          "hidden": false,
+          "label": "Neutral",
+          "value": "neutral"
+        },
+        {
+          "displayOrder": 2,
+          "hidden": false,
+          "label": "Healthy",
+          "value": "healthy"
+        }
+      ],
+      "type": "enumeration",
+      "updatedAt": "2024-04-09T21:45:07.560Z"
     }
   ]
 ]
