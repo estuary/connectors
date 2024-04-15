@@ -19,6 +19,7 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
     AccessToken,
+    BasicAuth,
     BaseOAuth2Credentials,
     CaptureBinding,
     OAuth2Spec,
@@ -654,7 +655,7 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for : timedelta = binding.resourceConfig.interval
+        sleep_for: timedelta = binding.resourceConfig.interval
 
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.

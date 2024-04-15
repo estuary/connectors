@@ -1,5 +1,4 @@
 import asyncio
+import source_oracle
 
-import source_netsuite
-
-asyncio.run(source_netsuite.Connector().serve())
+asyncio.run(source_oracle.Connector().serve())
