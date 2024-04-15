@@ -262,29 +262,10 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 		"properties": {
 			"credentials": {
 				"type": "object",
+				"title": "Credentials",
+				"description": "Azure credentials used to authenticate with Azure Blob Storage.",
 				"order": 0,
 				"anyOf": [
-					{
-						"title": "Connection String",
-						"required": [
-							"ConnectionString",
-							"storageAccountName"
-						],
-						"properties": {
-							"ConnectionString": {
-								"type": "string",
-								"title": "Connection String",
-								"description": "The connection string used to authenticate with Azure Blob Storage.",
-								"order": 0
-							},
-							"storageAccountName": {
-								"type": "string",
-								"title": "Storage Account Name",
-								"description": "The name of the Azure Blob Storage account.",
-								"order": 1
-							}
-						}
-					},
 					{
 						"title": "OAuth2 Credentials",
 						"required": [
@@ -319,6 +300,27 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 								"title": "Azure Subscription ID",
 								"description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
 								"order": 3
+							},
+							"storageAccountName": {
+								"type": "string",
+								"title": "Storage Account Name",
+								"description": "The name of the Azure Blob Storage account.",
+								"order": 1
+							}
+						}
+					},
+					{
+						"title": "Connection String",
+						"required": [
+							"ConnectionString",
+							"storageAccountName"
+						],
+						"properties": {
+							"ConnectionString": {
+								"type": "string",
+								"title": "Connection String",
+								"description": "The connection string used to authenticate with Azure Blob Storage.",
+								"order": 0
 							},
 							"storageAccountName": {
 								"type": "string",
