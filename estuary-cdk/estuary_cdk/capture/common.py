@@ -18,6 +18,7 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
     AccessToken,
+    BasicAuth,
     BaseOAuth2Credentials,
     CaptureBinding,
     OAuth2Spec,
@@ -562,7 +563,7 @@ async def _binding_backfill_task(
         await asyncio.sleep(0)
 
         # Track if fetch_page returns without having yielded a PageCursor.
-        done = True 
+        done = True
 
         async for item in fetch_page(task.log, state.next_page, state.cutoff):
             if isinstance(item, BaseDocument):
@@ -644,11 +645,11 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for : timedelta = binding.resourceConfig.interval
+        sleep_for: timedelta = binding.resourceConfig.interval
 
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.
-            sleep_for = binding.resourceConfig.interval 
+            sleep_for = binding.resourceConfig.interval
 
         elif isinstance(state.cursor, datetime):
             lag = (datetime.now(tz=UTC) - state.cursor)
