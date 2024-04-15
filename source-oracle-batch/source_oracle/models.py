@@ -1,26 +1,60 @@
-import collections
-import itertools
-from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from decimal import Decimal
-from enum import StrEnum
-from typing import Annotated, Any, Iterable, List, Literal, TypeAlias
+from dataclasses import dataclass
+from enum import StrEnum, auto
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints
+from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any
+import urllib.parse
 
-import netsuite
-from estuary_cdk.capture.common import BaseDocument
-from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
-from estuary_cdk.capture.common import ResourceConfig as BaseResourceConfig
-from estuary_cdk.capture.common import ResourceState
-from pydantic import BaseModel, BeforeValidator, Field, StringConstraints, create_model
+from estuary_cdk.capture.common import (
+    ConnectorState as GenericConnectorState,
+    BasicAuth,
+    BaseDocument,
+    ResourceConfig as GenericResourceConfig,
+    ResourceState,
+)
 
 
 class EndpointConfig(BaseModel):
     address: str = Field(description="Address")
-    user: str = Field(description="Username")
-    password: str = Field(description="Password", json_schema_extra={"secret": True})
+    credentials: BasicAuth = Field(
+        discriminator="credentials_title",
+        title="Authentication",
+    )
+    start_date: AwareDatetime = Field(
+        title="start_date",
+    )
+
+    class Advanced(BaseModel):
+        connection_limit: int = Field(
+            description="Number of concurrent connections to open to suiteanalytics", default=5
+        )
+        cursor_fields: list[Annotated[str, StringConstraints(to_lower=True)]] = Field(
+            default=[
+                "last_modified_date_gmt",
+                "last_modified_date",
+                "lastmodifieddate",
+                "date_last_modified_gmt",
+                "date_last_modified",
+                "datelastmodified",
+                "lastmodifieddate",
+            ],
+            description="Columns to use as cursor for incremental replication, in order of preference. Case insensitive.",
+        )
+        enable_auto_cursor: bool = Field(
+            default=False,
+            description="Enable automatic cursor field selection. If enabled, will walk through the list of candidate cursors and select the first one with no null values, otherwise select the cursor with the least nulls.",
+        )
+
+    advanced: Advanced = Field(
+        default_factory=Advanced,
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
 
 
-class ResourceConfig(BaseResourceConfig):
+class ResourceConfig(GenericResourceConfig):
     log_cursor: str = Field(
         title="Incremental Cursor",
         description="A date-time column to use for incremental capture of modifications.",
@@ -42,7 +76,7 @@ class ResourceConfig(BaseResourceConfig):
 
 
 # We use ResourceState directly, without extending it.
-ConnectorState: TypeAlias = GenericConnectorState[ResourceState]
+ConnectorState = GenericConnectorState[ResourceState]
 
 
 class OracleTable(BaseModel, extra="forbid"):
@@ -90,15 +124,9 @@ class OracleColumn(BaseModel, extra="forbid"):
     is_pk: bool = Field(default=False, alias="COL_IS_PK", description="Calculated by join on all_constraints and all_cons_columns")
 
 
-class NextPageCursor(BaseModel, extra="forbid"):
-    """Used to fetch the next page cursor to backfill from."""
-
-    next_page_cursor: int
-
-
-@dataclass
+@ dataclass
 class Table:
-    """Table is an extracted representation of a table built from its OAColumns"""
+    """Table is an extracted representation of a table built from its OracleColumns"""
 
     table_name: str
     columns: list[OracleColumn]
@@ -123,12 +151,11 @@ def build_table(
 ) -> Table:
 
     primary_key: list[OracleColumn] = []
-    foreign_keys: list[OracleColumn] = []
     model_fields: dict[str, Any] = {}
     possible_log_cursors: list[tuple[float, OracleColumn]] = []
     possible_page_cursors: list[tuple[float, OracleColumn]] = []
 
-    # Order by sequenced primary key, then foreign keys, then lexicographic column name.
+    # Order by sequenced primary key then lexicographic column name.
     columns.sort(key=lambda col: (1 if col.is_pk else 1_000, col.column_name))
 
     for col in columns:
@@ -204,7 +231,6 @@ def build_table(
 
         # Finally, build the Pydantic model field.
         field_info = Field(
-            default=field_default,
             description=description.strip() or None,
             json_schema_extra=field_schema_extra,
         )
@@ -228,58 +254,7 @@ def build_table(
         table_name,
         columns,
         primary_key,
-        foreign_keys,
         model_fields,
         possible_log_cursors,
         possible_page_cursors,
     )
-
-
-def build_tables(columns: list[OAColumn], config: EndpointConfig) -> List[Table]:
-    return [
-        build_table(
-            config.advanced,
-            table,
-            list(columns),
-        )
-        for table, columns in itertools.groupby(
-            sorted(columns, key=lambda c: c.table_name),
-            key=lambda c: c.table_name,
-        )
-    ]
-
-
-# NOTE these magic numbers are extracted from the `sqlext.h` header file in the ODBC Netsuite Driver
-#      `rg TIMEOUT netsuite_odbc_driver/include/sqlext.h`
-class NETSUITE_ODBC_CONSTANTS:
-    SQL_LOGIN_TIMEOUT = 103
-    # SQL_ATTR_QUERY_TIMEOUT is the same in the driver source
-    SQL_QUERY_TIMEOUT = 0
-    SQL_ATTR_CONNECTION_TIMEOUT = 113
-
-    SQL_OPT_TRACE = 104
-    SQL_OPT_TRACEFILE = 105
-
-    SQL_ATTR_DISCONNECT_BEHAVIOR = 114
-    SQL_ACCESS_MODE = 101
-
-
-def fuzzy_diff(this: str, that: str) -> float:
-    """
-    Calculates one minus the ratio of the number of matched n-grams
-    between `this` and `that`, normalized by the number of n-grams in `this`.
-
-    More similar strings have values closer to zero,
-    and dissimilar strings have values close to one.
-    """
-
-    this_grams = collections.Counter(_n_grams(this, 3))
-    that_grams = collections.Counter(_n_grams(that, 3))
-    overlap = sum(min(this_grams[k], that_grams[k]) for k in this_grams & that_grams)
-    return 1 - (overlap / this_grams.total())
-
-
-def _n_grams(text, n) -> Iterable[str]:
-    # Extend with start ^ and stop $ characters.
-    text = "^" * (n - 1) + text + "$"
-    return (text[i: i + n] for i in range(len(text) - n + 1))
