@@ -139,7 +139,12 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// the behavior of change streams, which only represent data that has been majority committed.
 	// This read concern will overwrite any that is set in the connection string parameter
 	// "readConcernLevel".
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd", "zlib", "snappy"}).SetReadConcern(readconcern.Majority())
+	// TODO(whb): "zstd" is the last option for compression, since it currently results in quite a
+	// bit of memory usage, see https://jira.mongodb.org/browse/GODRIVER-3132. It uses about 1.5x as
+	// much memory as "zlib" or "snappy", but generally shouldn't OOM the connector so it isn't
+	// being completely disabled. We could re-evaluate this priority after
+	// https://github.com/mongodb/mongo-go-driver/pull/1577 is merged and released.
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority())
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
