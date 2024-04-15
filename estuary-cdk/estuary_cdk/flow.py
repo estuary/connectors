@@ -90,7 +90,7 @@ class ConnectorStateUpdate(GenericModel, Generic[ConnectorState]):
 
 
 class AccessToken(BaseModel):
-    credentials_title: Literal["Private App Credentials"]
+    credentials_title: Literal["Private App Credentials"] = "Private App Credentials"
     access_token: str
 
 
@@ -110,7 +110,7 @@ class ValidationError(Exception):
 
 
 class BaseOAuth2Credentials(abc.ABC, BaseModel):
-    credentials_title: Literal["OAuth Credentials"]
+    credentials_title: Literal["OAuth Credentials"] = "OAuth Credentials"
     client_id: str
     client_secret: str
     refresh_token: str
