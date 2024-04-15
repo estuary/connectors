@@ -257,7 +257,7 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 
 	return json.RawMessage(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title": "S3 Source",
+		"title": "Azure Blob Storage Source",
 		"type": "object",
 		"properties": {
 			"credentials": {
