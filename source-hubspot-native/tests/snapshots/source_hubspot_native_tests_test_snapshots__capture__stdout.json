@@ -2,6 +2,9 @@
   [
     "acmeCo/marketing_emails",
     {
+      "_meta": {
+        "op": "u"
+      },
       "activeDomain": "45386308.hs-sites.com",
       "archived": false,
       "businessUnitId": "0",
@@ -53,6 +56,9 @@
   [
     "acmeCo/marketing_emails",
     {
+      "_meta": {
+        "op": "u"
+      },
       "activeDomain": "45386308.hs-sites.com",
       "archived": false,
       "businessUnitId": "0",
@@ -104,6 +110,9 @@
   [
     "acmeCo/marketing_emails",
     {
+      "_meta": {
+        "op": "u"
+      },
       "activeDomain": "45386308.hs-sites.com",
       "archived": false,
       "businessUnitId": "0",
@@ -322,6 +331,9 @@
   [
     "acmeCo/marketing_emails",
     {
+      "_meta": {
+        "op": "u"
+      },
       "activeDomain": "45386308.hs-sites.com",
       "archived": false,
       "businessUnitId": "0",
@@ -589,6 +601,10 @@
   [
     "acmeCo/email_subscriptions",
     {
+      "_meta": {
+        "op": "u"
+      },
+      "businessUnitId": 0,
       "communicationMethod": "Email",
       "createdAt": "2024-02-27T07:05:00.536000Z",
       "description": "Receive feedback requests and customer service information.",
@@ -604,6 +620,10 @@
   [
     "acmeCo/email_subscriptions",
     {
+      "_meta": {
+        "op": "u"
+      },
+      "businessUnitId": 0,
       "communicationMethod": "Email",
       "createdAt": "2024-02-27T07:05:03.130000Z",
       "description": "Marketing offers and updates.",
@@ -619,6 +639,10 @@
   [
     "acmeCo/email_subscriptions",
     {
+      "_meta": {
+        "op": "u"
+      },
+      "businessUnitId": 0,
       "communicationMethod": "Email",
       "createdAt": "2024-02-27T07:05:03.192000Z",
       "description": "One to One emails",

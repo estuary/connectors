@@ -18,6 +18,7 @@ from .models import (
     Association,
     BatchResult,
     CRMObject,
+    BaseCRMObject,
     SubscriptionResult,
     EmailSubscriptions,
     WorkflowResult,
@@ -114,6 +115,7 @@ async def fetch_page(
 
     for doc in result.results:
         if doc.updatedAt < cutoff:
+            doc.meta_ = _cls.Meta(op="u")
             yield doc
 
     if result.paging:
@@ -164,6 +166,7 @@ async def fetch_page_custom(
 
     for doc in result.results:
         if doc.updatedAt < cutoff:
+            doc.meta_ = V1CRMObject.Meta(op="u")
             yield doc
 
     if result.paging:
@@ -208,6 +211,7 @@ async def fetch_page_workflow(
 
     for doc in result.workflows:
         if doc.updatedAt < cutoff:
+            doc.meta_ = V1CRMObject.Meta(op="u")
             yield doc
 
 async def fetch_page_subscriptions(
@@ -228,6 +232,7 @@ async def fetch_page_subscriptions(
 
     for doc in result.subscriptionDefinitions:
         if doc.updatedAt < cutoff:
+            doc.meta_ = EmailSubscriptions.Meta(op="u")
             yield doc
 
 
@@ -351,6 +356,7 @@ async def fetch_changes(
             log, cls, http, [id for _, id in batch]
         )
         for doc in documents.results:
+            doc.meta_ = BaseCRMObject.Meta(op="u")
             yield doc
 
     if recent:
