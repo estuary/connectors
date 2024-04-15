@@ -761,7 +761,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	log.Info("store: finished committing changes")
 
-	for _, item := range d.cp {
+	for _, b := range d.bindings {
+		var item, ok = d.cp[b.target.StateKey]
+		if !ok {
+			continue
+		}
 		// If the spec version has bumped, we need to clean up the old pipes
 		if len(item.PipeName) > 0 && item.Version != d.version {
 			log.WithField("pipeName", item.PipeName).Info("dropping pipe")
