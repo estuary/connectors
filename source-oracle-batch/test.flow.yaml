@@ -1,15 +1,20 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-oracle:
     endpoint:
       local:
         command:
-          - poetry
-          - run
           - python
           - "-m"
           - source_oracle
         config: config.yaml
-        env:
-          LOG_LEVEL: debug
-    bindings: []
+    bindings:
+      - resource:
+          name: companies
+          interval: PT0S
+        target: acmeCo/companies
+    interval: 3m
+    shards:
+      logLevel: debug
