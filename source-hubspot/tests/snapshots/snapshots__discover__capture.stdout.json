@@ -14605,6 +14605,12 @@
                 "string"
               ]
             },
+            "hs_assigned_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_assignment_method": {
               "type": [
                 "null",
@@ -14704,6 +14710,12 @@
                 "string"
               ]
             },
+            "hs_email_subject": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_external_object_ids": {
               "type": [
                 "null",
@@ -14740,6 +14752,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_is_latest_message_failed": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_is_visible_in_help_desk": {
@@ -14802,7 +14820,31 @@
                 "string"
               ]
             },
+            "hs_latest_message_attachment_types": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_message_is_forwarded_email": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_latest_message_is_thread_comment": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_latest_message_seen_by_agent_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_message_text": {
               "type": [
                 "null",
                 "string"
