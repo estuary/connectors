@@ -101,6 +101,7 @@ class AccessToken(BaseModel):
 
 
 class BasicAuth(BaseModel):
+    credentials_title: Literal["Username & Password"]
     username: str
     password: str
 
