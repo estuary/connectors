@@ -397,7 +397,9 @@ async def fetch_changes_no_batch(
         
         for ts, id, result in iter:
             recent.append((ts, id)) # Used later to update log_cursor value
-            yield V1CRMObject.model_validate_json(json.dumps(result)) 
+            doc = V1CRMObject.model_validate_json(json.dumps(result))
+            doc.meta_= V1CRMObject.Meta(op="u") 
+            yield  doc
 
 
         if not next_page:
