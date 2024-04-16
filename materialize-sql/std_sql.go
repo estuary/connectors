@@ -358,7 +358,38 @@ func StdFetchInfoSchema(
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
+	// Populate the list of applicable tables first, since it is possible for a table to exist with
+	// no columns that we'd otherwise not know about when only looking for columns.
+	tables, err := db.QueryContext(ctx, fmt.Sprintf(`
+		select table_schema, table_name
+		from information_schema.tables
+		where table_catalog = %s
+		and table_schema in (%s);
+		`,
+		dialect.Literal(catalog),
+		strings.Join(schemas, ","),
+	))
+	if err != nil {
+		return nil, err
+	}
+	defer tables.Close()
+
+	type tableRow struct {
+		TableSchema string
+		TableName   string
+	}
+
+	for tables.Next() {
+		var t tableRow
+		if err := tables.Scan(&t.TableSchema, &t.TableName); err != nil {
+			return nil, err
+		}
+
+		is.PushResource(t.TableSchema, t.TableName)
+	}
+
+	// Populate the list of columns.
+	columns, err := db.QueryContext(ctx, fmt.Sprintf(`
 		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
 		from information_schema.columns
 		where table_catalog = %s
@@ -370,11 +401,10 @@ func StdFetchInfoSchema(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer columns.Close()
 
 	type columnRow struct {
-		TableSchema            string
-		TableName              string
+		tableRow
 		ColumnName             string
 		IsNullable             string
 		DataType               string
@@ -382,9 +412,9 @@ func StdFetchInfoSchema(
 		ColumnDefault          sql.NullString
 	}
 
-	for rows.Next() {
+	for columns.Next() {
 		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
+		if err := columns.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
 			return nil, err
 		}
 
@@ -396,7 +426,7 @@ func StdFetchInfoSchema(
 			HasDefault:         c.ColumnDefault.Valid,
 		}, c.TableSchema, c.TableName)
 	}
-	if err := rows.Err(); err != nil {
+	if err := columns.Err(); err != nil {
 		return nil, err
 	}
 
