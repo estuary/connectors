@@ -376,13 +376,24 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 
 	var columns []sqlcapture.ColumnInfo
 	for _, row := range results.Values {
+		var tableSchema, tableName = string(row[0].AsString()), string(row[1].AsString())
+		var columnName = string(row[3].AsString())
+		var dataType, fullColumnType = string(row[5].AsString()), string(row[6].AsString())
+		if dataType == "enum" {
+			logrus.WithFields(logrus.Fields{
+				"schema": tableSchema,
+				"table":  tableName,
+				"column": columnName,
+				"type":   fullColumnType,
+			}).Debug("parsing enum type")
+		}
 		columns = append(columns, sqlcapture.ColumnInfo{
-			TableSchema: string(row[0].AsString()),
-			TableName:   string(row[1].AsString()),
+			TableSchema: tableSchema,
+			TableName:   tableName,
 			Index:       int(row[2].AsInt64()),
-			Name:        string(row[3].AsString()),
+			Name:        columnName,
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    parseDataType(string(row[5].AsString()), string(row[6].AsString())),
+			DataType:    parseDataType(dataType, fullColumnType),
 		})
 	}
 	return columns, err
