@@ -265,7 +265,7 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"title": "Credentials",
 				"description": "Azure credentials used to authenticate with Azure Blob Storage.",
 				"order": 0,
-				"anyOf": [
+				"oneOf": [
 					{
 						"title": "OAuth2 Credentials",
 						"required": [
