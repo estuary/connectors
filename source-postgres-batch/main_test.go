@@ -137,6 +137,26 @@ func TestDecimals(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+func TestJSONColumn(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "26214"
+	var tableName = fmt.Sprintf("test.json_column_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data JSON)", tableName))
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	executeControlQuery(ctx, t, control, fmt.Sprintf(`INSERT INTO %s VALUES (0, '{"a": 123}'), (1, ' {"b": 456}')`, tableName))
+
+	// Run the capture for 1 second, which should be plenty to pull down a few rows.
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	time.AfterFunc(1*time.Second, cancelCapture)
+	cs.Capture(captureCtx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func TestSchemaFilter(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
