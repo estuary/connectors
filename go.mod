@@ -48,7 +48,7 @@ require (
 	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
 	github.com/pkg/sftp v1.13.5
 	github.com/rockset/rockset-go-client v0.15.4
-	github.com/segmentio/encoding v0.3.6
+	github.com/segmentio/encoding v0.4.0
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/sirupsen/logrus v1.9.0
 	github.com/snowflakedb/gosnowflake v1.9.0
