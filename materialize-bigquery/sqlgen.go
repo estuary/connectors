@@ -89,9 +89,9 @@ var bqDialect = func() sql.Dialect {
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"bool"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"int64"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"float64"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"integer"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"json"}, Validate: sql.MultipleCompatible},
 		sql.ColValidation{Types: []string{"bignumeric"}, Validate: bignumericCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
