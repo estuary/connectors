@@ -349,7 +349,7 @@ async def fetch_changes(
 
     recent.sort()  # Oldest updates first.
 
-    for batch_it in itertools.batched(recent, 100):
+    for batch_it in itertools.batched(recent, 50):
         batch = list(batch_it)
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
@@ -449,11 +449,18 @@ async def fetch_recent_deals(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/deals/v1/deal/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
+    params = {"count": 100, "offset": page, "since": int(since.timestamp())} if page else {"count": 100}
 
     result = OldRecentDeals.model_validate_json(
         await http.request(log, url, params=params)
     )
+    if page:
+        if page == 9800:
+            return (
+        (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
+        for r in result.results
+    ), None
+
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
         for r in result.results
@@ -465,11 +472,18 @@ async def fetch_recent_engagements(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/engagements/v1/engagements/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
+    params = {"count": 100, "offset": page, "since": int(since.timestamp())} if page else {"count": 100}
 
     result = OldRecentEngagements.model_validate_json(
         await http.request(log, url, params=params)
     )
+    if page:
+        if page == 9800:
+            return(
+        (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
+        for r in result.results
+    ), None
+
     return (
         (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
         for r in result.results
@@ -662,6 +676,8 @@ async def fetch_campaigns(
     result = V1CRMObject.model_validate_json(
         data
     )
+    for item in result.campaigns:
+        item["id"] = str(item["id"])
 
     if result.hasMore is False:
         return (

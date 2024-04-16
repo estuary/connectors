@@ -8,7 +8,8 @@
             "credentials_title": {
               "const": "Private App Credentials",
               "default": "Private App Credentials",
-              "title": "Credentials Title"
+              "title": "Credentials Title",
+              "type": "string"
             },
             "access_token": {
               "secret": true,
@@ -27,7 +28,8 @@
             "credentials_title": {
               "const": "OAuth Credentials",
               "default": "OAuth Credentials",
-              "title": "Credentials Title"
+              "title": "Credentials Title",
+              "type": "string"
             },
             "client_id": {
               "secret": true,
