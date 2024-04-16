@@ -73,6 +73,19 @@ func (i *InfoSchema) PushField(field EndpointField, location ...string) {
 	i.resources[rk] = append(i.resources[rk], field)
 }
 
+// PushResource adds a resource with no fields to the InfoSchema. An example of using this is for a
+// database table which may be able to exist with no columns that would otherwise not be represented
+// by only registering all discovered columns.
+func (i *InfoSchema) PushResource(location ...string) {
+	rk := joinPath(location)
+
+	if _, ok := i.resources[rk]; ok {
+		panic(fmt.Sprintf("logic error: PushResource when resourceKey %q has already been set", rk))
+	}
+
+	i.resources[rk] = nil
+}
+
 // GetField returns the EndpointField for a Flow resource path and field name.
 func (i *InfoSchema) GetField(resourcePath []string, fieldName string) (EndpointField, error) {
 	rk := joinPath(i.locatePath(resourcePath))
