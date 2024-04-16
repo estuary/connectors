@@ -8,7 +8,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -198,7 +198,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -380,7 +380,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -578,7 +578,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -1120,7 +1120,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -1379,7 +1379,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -1593,7 +1593,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -1807,7 +1807,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -2021,7 +2021,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -2235,7 +2235,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -2449,7 +2449,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -2631,7 +2631,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -2813,7 +2813,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -2995,7 +2995,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -3177,7 +3177,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [
@@ -3837,7 +3837,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "_meta": {
               "allOf": [

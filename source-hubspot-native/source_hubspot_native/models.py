@@ -80,9 +80,10 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials | AccessToken = Field(
         discriminator="credentials_title",
         title="Authentication",
+        json_schema_extra={"type": "object"}
     )
     start_date: AwareDatetime = Field(
-        title="start_date",
+        title="Start Date",
     )
 
 
@@ -172,7 +173,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
     ENFORCE_URL: ClassVar[str]
 
-    class History(BaseDocument, extra="forbid"):
+    class History(BaseDocument, extra="allow"):
         timestamp: datetime
         value: str
         sourceType: str
