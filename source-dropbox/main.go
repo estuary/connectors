@@ -158,7 +158,7 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"type": "string",
 				"title": "Path",
 				"format": "string",
-				"description": "The path to the Dropbox folder to read from. For example, \"/my-folder\".,
+				"description": "The path to the Dropbox folder to read from. For example, \"/my-folder\".",
 				"order": 1
 			},
 			"matchKeys": {
