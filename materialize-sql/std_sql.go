@@ -340,7 +340,6 @@ func StdFetchInfoSchema(
 	db *sql.DB,
 	dialect Dialect,
 	catalog string, // typically the "database"
-	metaSchema string, // usually from the endpoint configuration; this is the schema where the metadata tables are
 	resourcePaths [][]string,
 ) (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
@@ -348,8 +347,15 @@ func StdFetchInfoSchema(
 		dialect.ColumnLocator,
 	)
 
+	if len(resourcePaths) == 0 {
+		// Trivial case: No resources, so there are no applicable tables or columns. This is only
+		// possible if the materialization has no bindings and the endpoint doesn't have any
+		// metadata tables or their table paths are not included in the list of resource paths.
+		return is, nil
+	}
+
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
-	schemas := []string{dialect.Literal(metaSchema)}
+	schemas := make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
 		loc := dialect.TableLocator(p)
 		schemas = append(schemas, dialect.Literal(loc.TableSchema))
@@ -431,6 +437,35 @@ func StdFetchInfoSchema(
 	}
 
 	return is, nil
+}
+
+type ListSchemasFn func(context.Context) ([]string, error)
+
+type CreateSchemaFn func(context.Context, string) error
+
+func StdListSchemas(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, "select schema_name from information_schema.schemata")
+	if err != nil {
+		return nil, fmt.Errorf("querying information_schema.schemata: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+
+	for rows.Next() {
+		var schema string
+		if err := rows.Scan(&schema); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, schema)
+	}
+
+	return out, nil
+}
+
+func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaName string) error {
+	_, err := db.ExecContext(ctx, fmt.Sprintf("create schema %s", dialect.Identifier(schemaName)))
+	return err
 }
 
 func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {

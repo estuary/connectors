@@ -72,7 +72,7 @@ func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (str
 func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient, error) {
 	httpClient := http.Client{}
 
-	var dsn = cfg.ToURI(tenant, true)
+	var dsn = cfg.ToURI(tenant)
 	dsnURL, err := url.Parse(fmt.Sprintf("https://%s", dsn))
 	if err != nil {
 		return nil, fmt.Errorf("parsing snowflake dsn: %w", err)

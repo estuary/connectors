@@ -12,6 +12,7 @@ import (
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -21,10 +22,13 @@ import (
 	_ "github.com/databricks/databricks-sql-go"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db       *stdsql.DB
+	cfg      *config
+	ep       *sql.Endpoint
+	wsClient *databricks.WorkspaceClient
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
@@ -32,13 +36,23 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 
 	db, err := stdsql.Open("databricks", cfg.ToURI())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.Credentials.PersonalAccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating workspace client: %w", err)
 	}
 
 	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
+		db:       db,
+		cfg:      cfg,
+		ep:       ep,
+		wsClient: wsClient,
 	}, nil
 }
 
@@ -159,25 +173,39 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}, nil
 }
 
-// TODO(whb): Consider using a WorkspaceClient here exclusively to check what we can and forego the
-// ping so that a sleeping warehouse doesn't hang on Validate.
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
-
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:        fmt.Sprintf("%s/%s", c.cfg.Address, c.cfg.HTTPPath),
-		Token:       c.cfg.Credentials.PersonalAccessToken,
-		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	listed, err := c.wsClient.Schemas.ListAll(ctx, catalog.ListSchemasRequest{
+		CatalogName: c.cfg.CatalogName,
 	})
 	if err != nil {
-		errs.Err(err)
+		return nil, err
 	}
+
+	schemaNames := make([]string, 0, len(listed))
+	for _, ls := range listed {
+		schemaNames = append(schemaNames, ls.Name)
+	}
+
+	return schemaNames, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	_, err := c.wsClient.Schemas.Create(ctx, catalog.CreateSchema{
+		CatalogName: c.cfg.CatalogName,
+		Name:        schemaName,
+	})
+
+	return err
+}
+
+func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+	errs := &sql.PrereqErr{}
 
 	var httpPathSplit = strings.Split(c.cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 	var warehouseStopped = true
 	var warehouseErr error
-	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
+	if res, err := c.wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
 		errs.Err(err)
 	} else {
 		switch res.State {
@@ -207,7 +235,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 		// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
 		// process however we don't want to wait 5 minutes as that does not create a good UX for the
 		// user in the UI
-		if r, err := wsClient.Warehouses.Start(ctx, databricksSql.StartRequest{Id: warehouseId}); err != nil {
+		if r, err := c.wsClient.Warehouses.Start(ctx, databricksSql.StartRequest{Id: warehouseId}); err != nil {
 			errs.Err(fmt.Errorf("Could not start the warehouse: %w", err))
 		} else if _, err := r.GetWithTimeout(60 * time.Second); err != nil {
 			errs.Err(warehouseErr)
