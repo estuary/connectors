@@ -12,9 +12,11 @@ captures:
         config: config.yaml
     bindings:
       - resource:
-          name: companies
+          name: testing
           interval: PT0S
-        target: acmeCo/companies
+          log_cursor: t
+          page_cursor: id
+        target: acmeCo/testing
     interval: 3m
     shards:
       logLevel: debug
