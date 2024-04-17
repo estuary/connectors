@@ -113,13 +113,6 @@ func (c *config) ToURI() string {
 	return uri.String()
 }
 
-func (c *config) metaSchema() string {
-	if c.Schema == "" {
-		return "public"
-	}
-	return c.Schema
-}
-
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`

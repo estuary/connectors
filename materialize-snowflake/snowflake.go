@@ -93,7 +93,6 @@ func newSnowflakeDriver() *sql.Driver {
 
 			log.WithFields(log.Fields{
 				"host":     parsed.Host,
-				"user":     parsed.User,
 				"database": parsed.Database,
 				"schema":   parsed.Schema,
 				"tenant":   tenant,
@@ -176,7 +175,7 @@ func newTransactor(
 
 	dialect := snowflakeDialect(cfg.Schema)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true))
+	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
 	if err != nil {
 		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
@@ -189,7 +188,7 @@ func newTransactor(
 		}
 		pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
 		if err != nil {
-			return nil, fmt.Errorf("NewPipeCLient: %w", err)
+			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 	}
 
@@ -211,13 +210,13 @@ func newTransactor(
 	d.store.fence = &fence
 
 	// Establish connections.
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
 
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
@@ -229,7 +228,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
+		if err = d.addBinding(binding); err != nil {
 			return nil, fmt.Errorf("%v: %w", binding, err)
 		}
 	}
@@ -255,7 +254,7 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (d *transactor) addBinding(target sql.Table) error {
 	var b = new(binding)
 	b.target = target
 
@@ -587,7 +586,7 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	// Use a freshly initialized connection for running queries with Snowflake's async mode, as a
 	// possible workaround for https://github.com/estuary/connectors/issues/1526.
-	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.ep.Tenant, true))
+	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.ep.Tenant))
 	if err != nil {
 		return nil, fmt.Errorf("acknowledge stdsql.Open: %w", err)
 	}

@@ -24,7 +24,11 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{}
+	out := config{
+		Credentials: credentialConfig{
+			AuthType: UserPass,
+		},
+	}
 
 	for _, prop := range []struct {
 		key  string
@@ -32,8 +36,8 @@ func mustGetCfg(t *testing.T) config {
 	}{
 		{"SNOWFLAKE_HOST", &out.Host},
 		{"SNOWFLAKE_ACCOUNT", &out.Account},
-		{"SNOWFLAKE_USER", &out.User},
-		{"SNOWFLAKE_PASSWORD", &out.Password},
+		{"SNOWFLAKE_USER", &out.Credentials.User},
+		{"SNOWFLAKE_PASSWORD", &out.Credentials.Password},
 		{"SNOWFLAKE_DATABASE", &out.Database},
 		{"SNOWFLAKE_SCHEMA", &out.Schema},
 	} {
@@ -57,7 +61,7 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI("testing", true))
+	db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -127,7 +131,7 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong username",
 			cfg: func(cfg config) *config {
-				cfg.User = "wrong" + cfg.User
+				cfg.Credentials.User = "wrong" + cfg.User
 				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
@@ -135,7 +139,7 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong password",
 			cfg: func(cfg config) *config {
-				cfg.Password = "wrong" + cfg.Password
+				cfg.Credentials.Password = "wrong" + cfg.Password
 				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
