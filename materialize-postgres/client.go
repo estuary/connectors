@@ -19,6 +19,8 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	db  *stdsql.DB
 	cfg *config
@@ -86,7 +88,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, pgDialect, catalog, c.cfg.metaSchema(), resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, pgDialect, catalog, resourcePaths)
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
@@ -133,6 +135,14 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		_, err := c.db.ExecContext(ctx, alterColumnStmt)
 		return err
 	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	return sql.StdListSchemas(ctx, c.db)
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, pgDialect, schemaName)
 }
 
 func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {

@@ -22,6 +22,8 @@ import (
 	_ "github.com/marcboeker/go-duckdb"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	db  *stdsql.DB
 	cfg *config
@@ -44,7 +46,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, c.cfg.Schema, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
@@ -96,6 +98,35 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}, nil
 }
 
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	// MotherDuck does not limit the schema listing to the currently connected database, so the
+	// StdListSchemasFn won't work if there are schemas with the same name in other databases.
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		"select schema_name from information_schema.schemata where catalog_name = %s",
+		duckDialect.Literal(c.cfg.Database),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying schemata: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+
+	for rows.Next() {
+		var schema string
+		if err := rows.Scan(&schema); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, schema)
+	}
+
+	return out, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, duckDialect, schemaName)
+}
+
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
@@ -104,15 +135,6 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 
 	if err := c.db.PingContext(pingCtx); err != nil {
 		errs.Err(err)
-	} else {
-		var t int
-		if err := c.db.QueryRowContext(ctx, fmt.Sprintf("SELECT 1 FROM information_schema.schemata WHERE schema_name = '%s'", c.cfg.Schema)).Scan(&t); err != nil {
-			if errors.Is(err, stdsql.ErrNoRows) {
-				errs.Err(fmt.Errorf("schema %q does not exist", c.cfg.Schema))
-			} else {
-				errs.Err(err)
-			}
-		}
 	}
 
 	s3client, err := c.cfg.toS3Client(ctx)

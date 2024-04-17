@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -13,6 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
 
@@ -41,7 +43,6 @@ func docsUrlFromEnv(providedURL string) string {
 	return providedURL
 }
 
-// Spec implements the DriverServer interface.
 func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	var endpoint, resource []byte
 
@@ -60,7 +61,6 @@ func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_S
 	}, nil
 }
 
-// Validate implements the DriverServer interface.
 func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var (
 		err        error
@@ -94,6 +94,12 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		}
 		resources = append(resources, res)
 		resourcePaths = append(resourcePaths, res.Path())
+	}
+	if endpoint.MetaSpecs != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
+	}
+	if endpoint.MetaCheckpoints != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
 	}
 
 	is, err := client.InfoSchema(ctx, resourcePaths)
@@ -143,7 +149,6 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	return resp, nil
 }
 
-// ApplyUpsert implements the DriverServer interface.
 func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	var (
 		endpoint *Endpoint
@@ -164,10 +169,38 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	for _, b := range req.Materialization.Bindings {
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
+	if endpoint.MetaSpecs != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
+	}
+	if endpoint.MetaCheckpoints != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
+	}
 
 	is, err := client.InfoSchema(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
+	}
+
+	if sm, ok := client.(SchemaManager); ok {
+		// Create any schemas that don't already exist, if the endpoint supports schemas.
+		existingSchemas, err := sm.ListSchemas(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting schema list from client: %w", err)
+		}
+
+		requiredSchemas := make(map[string]struct{})
+		for _, p := range resourcePaths {
+			requiredSchemas[endpoint.Dialect.TableLocator(p).TableSchema] = struct{}{}
+		}
+
+		for r := range requiredSchemas {
+			if !slices.Contains(existingSchemas, r) {
+				if err := sm.CreateSchema(ctx, r); err != nil {
+					return nil, fmt.Errorf("client creating schema '%s': %w", r, err)
+				}
+				log.WithField("schema", r).Info("created schema")
+			}
+		}
 	}
 
 	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint), is, endpoint.ConcurrentApply)

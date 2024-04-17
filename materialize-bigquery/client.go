@@ -24,6 +24,8 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	bigqueryClient     *bigquery.Client
 	cloudStorageClient *storage.Client
@@ -41,9 +43,9 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		bqDialect.ColumnLocator,
 	)
 
-	datasets := []string{c.cfg.Dataset}
+	rpDatasets := make(map[string]struct{})
 	for _, p := range resourcePaths {
-		datasets = append(datasets, p[1]) // Dataset is always the second element of the path.
+		rpDatasets[bqDialect.TableLocator(p).TableSchema] = struct{}{}
 	}
 
 	slices.Sort(datasets)
@@ -55,7 +57,19 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	var mu sync.Mutex
 	group, groupCtx := errgroup.WithContext(ctx)
 
-	for _, ds := range datasets {
+	// The table listing will fail if the dataset doesn't already exist, so only attempt to list
+	// tables in datasets that do exist.
+	existingDatasets, err := c.ListSchemas(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing schemas: %w", err)
+	}
+
+	for ds := range rpDatasets {
+		if !slices.Contains(existingDatasets, ds) {
+			log.WithField("dataset", ds).Debug("not listing tables for dataset since it doesn't exist")
+			continue
+		}
+
 		tableIter := c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, ds).Tables(ctx)
 
 		for {
@@ -132,6 +146,33 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		_, err := c.query(ctx, alterColumnStmt)
 		return err
 	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	// BigQuery represents the concept of a "schema" with datasets.
+	iter := c.bigqueryClient.Datasets(ctx)
+	iter.ProjectID = c.cfg.ProjectID
+
+	dsNames := []string{}
+	for {
+		ds, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, fmt.Errorf("dataset iterator next: %w", err)
+		}
+
+		dsNames = append(dsNames, ds.DatasetID)
+	}
+
+	return dsNames, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, schemaName).Create(ctx, &bigquery.DatasetMetadata{
+		Location: c.cfg.Region,
+	})
 }
 
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {

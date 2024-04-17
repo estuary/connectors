@@ -286,7 +286,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					continue
 				}
 
-				delete, err := b.storeFile.flush(ctx)
+				delete, err := b.storeFile.flush()
 				if err != nil {
 					return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 				}

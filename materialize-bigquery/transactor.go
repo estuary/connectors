@@ -87,7 +87,7 @@ func newTransactor(
 			fieldSchemas[f.Name] = f
 		}
 
-		if err = t.addBinding(ctx, binding, fieldSchemas); err != nil {
+		if err = t.addBinding(binding, fieldSchemas); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -95,7 +95,7 @@ func newTransactor(
 	return t, nil
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
+func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
 	loadSchema, err := schemaForCols(target.KeyPtrs(), fieldSchemas)
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		subqueries = append(subqueries, b.loadQuerySQL)
 
-		delete, err := b.loadFile.flush(ctx)
+		delete, err := b.loadFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
@@ -293,7 +293,7 @@ func (t *transactor) commit(ctx context.Context) error {
 			continue
 		}
 
-		delete, err := b.storeFile.flush(ctx)
+		delete, err := b.storeFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
