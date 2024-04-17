@@ -17,23 +17,18 @@ import (
 )
 
 type config struct {
-	Credentials credentials    `json:"credentials"`
-	Path        string         `json:"path"`
-	Parser      *parser.Config `json:"parser"`
-	MatchKeys   string         `json:"matchKeys,omitempty"`
-	Advanced    advancedConfig `json:"advanced"`
+	Path      string         `json:"path"`
+	Parser    *parser.Config `json:"parser"`
+	MatchKeys string         `json:"matchKeys,omitempty"`
+	Advanced  advancedConfig `json:"advanced"`
 }
 type advancedConfig struct {
 	AscendingKeys bool `json:"ascendingKeys,omitempty"`
 }
 
-type credentials struct {
-	ApiToken string `json:"apiToken"`
-}
-
 func (c config) Validate() error {
 	requiredProperties := [][]string{
-		{"AzureTenantID", c.Credentials.ApiToken},
+		{"Path", c.Path},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -64,18 +59,15 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
-	httpClient, err := GetOAuth2HTTPClient(ctx, dropboxConfig)
-	if err != nil {
-		return &dropboxStore{}, err
-	}
 	config := dropbox.Config{
-		Client:   httpClient,
-		LogLevel: dropbox.LogInfo, // if needed, set the desired logging level. Default is off
+		Token:    ctx.Value("code").(string),
+		LogLevel: dropbox.LogDebug,
 	}
 	client := files.New(config)
 
 	store := dropboxStore{
 		client: client,
+		config: cfg,
 	}
 	if err := store.check(); err != nil {
 		return &dropboxStore{}, err
@@ -85,43 +77,43 @@ func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
 
 type dropboxStore struct {
 	client files.Client
-	cfg    config
+	config config
 }
 
 // check checks the connection to the Azure Blob Storage container.
 // It returns an error if the container is not found, the account is disabled, or if there is an authorization failure.
 // If the listing is successful, it returns nil.
-func (db *dropboxStore) check() error {
-	_, err := db.client.ListFolder(&files.ListFolderArg{})
+func (dbx *dropboxStore) check() error {
+	_, err := dbx.client.ListFolder(&files.ListFolderArg{Path: dbx.config.Path})
 	if err != nil {
 		return fmt.Errorf("failed to list files: %w", err)
 	}
 	return nil
 }
 
-func (db *dropboxStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
-	files, err := db.client.ListFolder(&files.ListFolderArg{Path: query.Prefix})
+func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
+	files, err := dbx.client.ListFolder(&files.ListFolderArg{Path: query.Prefix})
 	if err != nil {
 		return nil, err
 	}
 
 	return &dropboxListing{
 		ctx:    ctx,
-		client: db.client,
+		client: dbx.client,
 		files:  *files,
 		index:  0,
 	}, nil
 }
 
-func (s *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	meta, reader, err := s.client.Download(&files.DownloadArg{Path: obj.Path})
+func (dbx *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
+	meta, reader, err := dbx.client.Download(&files.DownloadArg{Path: obj.Path})
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
 
 	obj.ModTime = meta.ClientModified
 	obj.ContentType = meta.ExportInfo.ExportAs
-	obj.Size = int64(meta.Size) // Convert uint64 to int64
+	obj.Size = int64(meta.Size)
 
 	return reader, obj, nil
 }
@@ -162,13 +154,12 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 		"title": "Dropbox Source",
 		"type": "object",
 		"properties": {
-			"credentials": {
-				"type": "object",
-				"title": "Credentials",
-				"description": "Dropbox credentials used to authenticate with Dropbox.",
-				"order": 0,
-				"title": "Credentials",
-				"description": "Dropbox credentials used to authenticate with Dropbox.",
+			"path": {
+				"type": "string",
+				"title": "Path",
+				"format": "string",
+				"description": "The path to the Dropbox folder to read from. For example, \"/my-folder\".,
+				"order": 1
 			},
 			"matchKeys": {
 				"type": "string",
@@ -214,6 +205,7 @@ func main() {
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
 		TimeHorizonDelta: time.Second * -30,
+		Oauth2:           OAuth2Spec(),
 	}
 
 	src.Main()
