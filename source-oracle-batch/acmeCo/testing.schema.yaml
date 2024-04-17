@@ -1,0 +1,108 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    description: Primary Key
+    title: Id
+    type: integer
+  c:
+    anyOf:
+      - type: string
+      - type: "null"
+    title: C
+  cl:
+    anyOf:
+      - type: string
+      - type: "null"
+    title: Cl
+  d:
+    anyOf:
+      - format: date
+        type: string
+      - type: "null"
+    title: D
+  doub:
+    anyOf:
+      - type: number
+      - type: "null"
+    title: Doub
+  i:
+    anyOf:
+      - type: string
+      - type: "null"
+    format: number
+    title: I
+  nc:
+    anyOf:
+      - type: string
+      - type: "null"
+    title: Nc
+  nv2:
+    anyOf:
+      - type: string
+      - type: "null"
+    title: Nv2
+  sm:
+    anyOf:
+      - type: string
+      - type: "null"
+    format: number
+    title: Sm
+  str:
+    anyOf:
+      - type: string
+      - type: "null"
+    title: Str
+  t:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    title: T
+  vc2:
+    anyOf:
+      - type: string
+      - type: "null"
+    title: Vc2
+required:
+  - id
+  - c
+  - cl
+  - d
+  - doub
+  - i
+  - nc
+  - nv2
+  - sm
+  - str
+  - t
+  - vc2
+title: testing
+type: object
