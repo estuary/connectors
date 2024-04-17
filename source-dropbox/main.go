@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
@@ -27,13 +28,12 @@ type advancedConfig struct {
 }
 
 type credentials struct {
-	apiToken string `json:"apiToken"`
+	ApiToken string `json:"apiToken"`
 }
 
 func (c config) Validate() error {
-	var requiredProperties [][]string
-	requiredProperties = [][]string{
-		{"AzureTenantID", c.Credentials.apiToken},
+	requiredProperties := [][]string{
+		{"AzureTenantID", c.Credentials.ApiToken},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -63,14 +63,24 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
-func newDropboxStore(ctx context.Context, cfg config) (files.Client, error) {
+func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
+	httpClient, err := GetOAuth2HTTPClient(ctx, dropboxConfig)
+	if err != nil {
+		return &dropboxStore{}, err
+	}
 	config := dropbox.Config{
-		Token:    cfg.Credentials.apiToken,
+		Client:   httpClient,
 		LogLevel: dropbox.LogInfo, // if needed, set the desired logging level. Default is off
 	}
 	client := files.New(config)
 
-	return client, nil
+	store := dropboxStore{
+		client: client,
+	}
+	if err := store.check(); err != nil {
+		return &dropboxStore{}, err
+	}
+	return &store, nil
 }
 
 type dropboxStore struct {
@@ -81,7 +91,7 @@ type dropboxStore struct {
 // check checks the connection to the Azure Blob Storage container.
 // It returns an error if the container is not found, the account is disabled, or if there is an authorization failure.
 // If the listing is successful, it returns nil.
-func (db *dropboxStore) check(ctx context.Context) error {
+func (db *dropboxStore) check() error {
 	_, err := db.client.ListFolder(&files.ListFolderArg{})
 	if err != nil {
 		return fmt.Errorf("failed to list files: %w", err)
@@ -90,7 +100,7 @@ func (db *dropboxStore) check(ctx context.Context) error {
 }
 
 func (db *dropboxStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
-	files, err := db.client.ListFolder(&files.ListFolderArg{})
+	files, err := db.client.ListFolder(&files.ListFolderArg{Path: query.Prefix})
 	if err != nil {
 		return nil, err
 	}
@@ -99,170 +109,66 @@ func (db *dropboxStore) List(ctx context.Context, query filesource.Query) (files
 		ctx:    ctx,
 		client: db.client,
 		files:  *files,
+		index:  0,
 	}, nil
 }
 
-// func (s *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-// 	resp, err := s.client.DownloadStream(ctx, s.cfg.ContainerName, obj.Path, nil)
-// 	if err != nil {
-// 		return nil, filesource.ObjectInfo{}, err
-// 	}
-// 	retryReader := resp.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
+func (s *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
+	meta, reader, err := s.client.Download(&files.DownloadArg{Path: obj.Path})
+	if err != nil {
+		return nil, filesource.ObjectInfo{}, err
+	}
 
-// 	obj.ModTime = *resp.LastModified
-// 	obj.ContentType = *resp.ContentType
-// 	obj.Size = *resp.ContentLength
+	obj.ModTime = meta.ClientModified
+	obj.ContentType = meta.ExportInfo.ExportAs
+	obj.Size = int64(meta.Size) // Convert uint64 to int64
 
-// 	if resp.ContentEncoding != nil {
-// 		obj.ContentEncoding = *resp.ContentEncoding
-// 	}
-
-// 	return retryReader, obj, nil
-// }
+	return reader, obj, nil
+}
 
 type dropboxListing struct {
 	ctx    context.Context
 	client files.Client
 	files  files.ListFolderResult
+	index  int
 }
 
 func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
-	// page, err := l.getPage()
-
-	// if err != nil {
-	// 	return filesource.ObjectInfo{}, err
-	// }
-
-	// if page == nil {
-	// 	log.Debug("No more files to list")
-	// 	return filesource.ObjectInfo{}, io.EOF
-	// }
-
-	// blob := page.Segment.BlobItems[l.index]
-	// l.index++
-
+	if !l.files.HasMore {
+		return filesource.ObjectInfo{}, io.EOF
+	}
+	entry, ok := l.files.Entries[l.index].(*files.FileMetadata)
+	if !ok {
+		return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
+	}
 	obj := filesource.ObjectInfo{}
 
-	// obj.Path = *blob.Name
-	// obj.ModTime = *blob.Properties.LastModified
-	// obj.ContentType = *blob.Properties.ContentType
-	// obj.Size = *blob.Properties.ContentLength
+	obj.Path = entry.PathDisplay
+	obj.ModTime = entry.ClientModified
+	obj.ContentType = entry.ExportInfo.ExportAs
+	obj.Size = int64(entry.Size) // Convert uint64 to int64
 
-	// if blob.Properties.ContentEncoding != nil {
-	// 	obj.ContentEncoding = *blob.Properties.ContentEncoding
-	// }
 	log.Debug("Listing object: ", obj.Path)
+
+	l.index++
 
 	return obj, nil
 }
-
-// func (l *dropboxListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
-// 	if l.index < l.currentPageLength {
-// 		log.Debug("Returning current page")
-// 		return &l.page, nil
-// 	}
-// 	if !l.pager.More() {
-// 		log.Debug("No more pages")
-// 		return nil, nil
-// 	}
-// 	log.Debug("Fetching next page")
-// 	page, err := l.pager.NextPage(l.ctx)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	l.page = page
-// 	l.currentPageLength = len(page.Segment.BlobItems)
-
-// 	return &page, nil
-// }
 
 func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 
 	return json.RawMessage(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title": "Azure Blob Storage Source",
+		"title": "Dropbox Source",
 		"type": "object",
 		"properties": {
 			"credentials": {
 				"type": "object",
 				"title": "Credentials",
-				"description": "Azure credentials used to authenticate with Azure Blob Storage.",
+				"description": "Dropbox credentials used to authenticate with Dropbox.",
 				"order": 0,
-				"anyOf": [
-					{
-						"title": "OAuth2 Credentials",
-						"required": [
-							"azureClientID",
-							"azureClientSecret",
-							"azureTenantID",
-							"azureSubscriptionID",
-							"storageAccountName"
-						],
-						"properties": {
-							"azureClientID": {
-								"type": "string",
-								"title": "Azure Client ID",
-								"description": "The client ID used to authenticate with Azure Blob Storage.",
-								"order": 0
-							},
-							"azureClientSecret": {
-								"type": "string",
-								"title": "Azure Client Secret",
-								"description": "The client secret used to authenticate with Azure Blob Storage.",
-								"secret": true,
-								"order": 1
-							},
-							"azureTenantID": {
-								"type": "string",
-								"title": "Azure Tenant ID",
-								"description": "The ID of the Azure tenant where the Azure Blob Storage account is located.",
-								"order": 2
-							},
-							"azureSubscriptionID": {
-								"type": "string",
-								"title": "Azure Subscription ID",
-								"description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
-								"order": 3
-							},
-							"storageAccountName": {
-								"type": "string",
-								"title": "Storage Account Name",
-								"description": "The name of the Azure Blob Storage account.",
-								"order": 1
-							}
-						}
-					},
-					{
-						"title": "Connection String",
-						"required": [
-							"ConnectionString",
-							"storageAccountName"
-						],
-						"properties": {
-							"ConnectionString": {
-								"type": "string",
-								"title": "Connection String",
-								"description": "The connection string used to authenticate with Azure Blob Storage.",
-								"order": 0
-							},
-							"storageAccountName": {
-								"type": "string",
-								"title": "Storage Account Name",
-								"description": "The name of the Azure Blob Storage account.",
-								"order": 1
-							}
-						}
-					}
-				],
 				"title": "Credentials",
-				"description": "Azure credentials used to authenticate with Azure Blob Storage."
-			},
-			"containerName": {
-				"type": "string",
-				"title": "Container Name",
-				"description": "The name of the Azure Blob Storage container to read from.",
-				"order": 1
+				"description": "Dropbox credentials used to authenticate with Dropbox.",
 			},
 			"matchKeys": {
 				"type": "string",
@@ -304,7 +210,7 @@ func main() {
 			return newDropboxStore(ctx, cfg.(config))
 		},
 		ConfigSchema:     getConfigSchema,
-		DocumentationURL: "https://go.estuary.dev/source-azure-blob-storage",
+		DocumentationURL: "https://go.estuary.dev/source-dropbox",
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
 		TimeHorizonDelta: time.Second * -30,
