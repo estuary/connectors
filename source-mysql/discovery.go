@@ -470,7 +470,7 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 // body characters and terminator so that submatch #1 is the full string body.
 // The options for string body characters are, in order, two successive quotes,
 // anything backslash-escaped, and anything that isn't a single-quote.
-var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
+var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])*)'(?:,|$)`)
 
 // enumValueReplacements contains the complete list of MySQL string escapes from
 // https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
