@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, UTC, date
 from decimal import Decimal
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any
 import urllib.parse
 
@@ -84,9 +84,8 @@ class OracleTable(BaseModel, extra="forbid"):
     Oracle all_tables records. docs: https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_TABLES.html
     """
 
-    tablespace_name: str = Field(alias="TABLESPACE_NAME")  # "SYSTEM", or "AcmeCo"
-    table_owner: str = Field(alias="TABLE_OWNER")  # "SYSTEM", or "AcmeCo - A Role".
-    table_name: str = Field(alias="TABLE_NAME")  # "OA_FOOBAR" for system tables, or e.x. "Account"
+    tablespace_name: constr(to_lower=True) = Field(alias="TABLESPACE_NAME")  # "SYSTEM", or "AcmeCo"
+    table_name: constr(to_lower=True) = Field(alias="TABLE_NAME")  # "OA_FOOBAR" for system tables, or e.x. "Account"
 
 
 class OracleColumn(BaseModel, extra="forbid"):
@@ -95,28 +94,37 @@ class OracleColumn(BaseModel, extra="forbid"):
     """
 
     class Type(StrEnum):
-        BIGINT = "BIGINT"
         CHAR = "CHAR"
         CLOB = "CLOB"
-        DOUBLE = "DOUBLE"
+        BLOB = "BLOB"
+        NCLOB = "NCLOB"
+        BFILE = "BFILE"
+        FLOAT = "FLOAT"
+        REAL = "REAL"
+        DOUBLE = "DOUBLE PRECISION"
         INTEGER = "INTEGER"
         NUMBER = "NUMBER"
         SMALLINT = "SMALLINT"
         TIMESTAMP = "TIMESTAMP"
         VARCHAR = "VARCHAR"
         VARCHAR2 = "VARCHAR2"
-        WVARCHAR = "WVARCHAR"
+        NCHAR = "NCHAR"
+        NVARCHAR2 = "NVARCHAR2"
+        DATE = "DATE"
+        TIMESATAMP_WITH_TIMEZONE = "TIMESTAMP WITH TIMEZONE"
 
-    table_owner: str = Field(alias="TABLE_OWNER")  # "SYSTEM", or "AcmeCo - A Role".
-    table_name: str = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
-    column_name: str = Field(alias="COLUMN_NAME")  # Ex 'recordid'
+    table_name: constr(to_lower=True) = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
+    column_name: constr(to_lower=True) = Field(alias="COLUMN_NAME")  # Ex 'recordid'
 
-    data_type: Type = Field(alias="DATA_TYPE")
+    # The timestamp type and various other types in Oracle have precision / size as part
+    # of their DATA_TYPE, so they are not easily made into an enum, e.g. we have
+    # TIMESTAMP(1) to TIMESTAMP(9), and TIMESTAMP(1) WITH TIMEZONE, etc.
+    data_type: str = Field(alias="DATA_TYPE")
     data_length: int = Field(alias="DATA_LENGTH", description="The length in bytes of data")
     data_precision: int = Field(default=0, alias="DATA_PRECISION")  # Ex 999
     data_scale: int = Field(
         default=0,
-        alias="OA_SCALE",
+        alias="DATA_SCALE",
         description="Number of digits to the right of the decimal point that are significant.",
     )
     nullable: bool = Field(default=True, alias="NULLABLE")
@@ -165,7 +173,7 @@ def build_table(
         field_schema_extra: dict | None = None
         field_zero: Any
 
-        if col.type_name == col.Type.NUMBER and col.data_scale == 0:
+        if col.data_type == col.Type.NUMBER and col.data_scale == 0:
             # This field could be EITHER an integer or a floating-point.
             # NetSuite.com is sneaky and doesn't give us enough information.
             if col.is_pk:
@@ -181,7 +189,7 @@ def build_table(
                 field_type, field_zero = Decimal, Decimal()
                 field_schema_extra = {"format": "number"}
 
-        elif col.type_name in (col.Type.DOUBLE, col.Type.NUMBER):
+        elif col.data_type in (col.Type.DOUBLE, col.Type.NUMBER, col.Type.FLOAT):
             # This field is definitely floating-point (oa_scale > 0).
             if col.is_pk:
                 # Floats cannot be used as keys, so use {type: string, format: number}.
@@ -190,18 +198,22 @@ def build_table(
             else:
                 field_type, field_zero = float, 0.0
 
-        elif col.type_name in (col.Type.BIGINT, col.Type.INTEGER, col.Type.SMALLINT):
+        elif col.data_type in (col.Type.INTEGER, col.Type.SMALLINT):
             field_type, field_zero = int, 0
-        elif col.type_name in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB):
+        elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type, field_zero = str, ""
-        elif col.type_name in (col.Type.TIMESTAMP,):
+        elif col.data_type.startswith(col.Type.TIMESTAMP):
             field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
+        elif col.data_type in (col.Type.DATE,):
+            field_type, field_zero = date, date(1, 1, 1)
         else:
             raise NotImplementedError(f"unsupported type {col}")
 
         if col.is_pk:
             primary_key.append(col)
-            description = "(PK)"
+            description = "Primary Key"
+        else:
+            description = ""
 
         # Is `col` eligible to act as the page cursor?
         if field_type is not int:
@@ -234,7 +246,7 @@ def build_table(
             description=description.strip() or None,
             json_schema_extra=field_schema_extra,
         )
-        field_info.annotation = field_type if col.pk_seq else field_type | None
+        field_info.annotation = field_type if col.is_pk else field_type | None
 
         # datetimes must have timezones. Use UTC.
         # TODO(johnny): add unit test coverage to confirm this works.
