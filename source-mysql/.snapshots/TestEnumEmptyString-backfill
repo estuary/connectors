@@ -1,0 +1,16 @@
+# ================================
+# Collection "acmeCo/test/test_enumemptystring_29144777": 8 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:0"}},"category":"A","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:1"}},"category":"B","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:2"}},"category":"C","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:3"}},"category":"","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:4"}},"category":"","id":100}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:5"}},"category":"","id":101}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:6"}},"category":"","id":102}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumEmptyString_29144777","cursor":"backfill:7"}},"category":"","id":105}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FEnumEmptyString_29144777":{"backfilled":8,"key_columns":["id"],"metadata":{"schema":{"columns":["id","category"],"types":{"category":{"enum":["","","A","B","C"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
