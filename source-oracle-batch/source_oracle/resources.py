@@ -10,11 +10,61 @@ from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 
 
 from .models import (
-    EndpointConfig
+    EndpointConfig,
+    build_table,
+    ResourceState,
+    ResourceConfig,
+)
+from .api import (
+    connect,
+    fetch_tables,
+    fetch_columns,
+    fetch_rows,
 )
 
 
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    return []
+    resources_list = []
+
+    conn = connect(config)
+    oracle_tables = await fetch_tables(log, conn)
+    log.info(oracle_tables)
+    oracle_columns = await fetch_columns(log, conn)
+
+    for ot in oracle_tables:
+        columns = [col for col in oracle_columns if col.table_name == ot.table_name]
+        t = build_table(config.advanced, ot.table_name, columns)
+
+        def open(
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+        ):
+            common.open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_page=functools.partial(fetch_rows, t, conn),
+            )
+        resources_list.append(common.Resource(
+            name=t.table_name,
+            key=[f"/{c.column_name}" for c in t.primary_key],
+            model=t.create_model(),
+            open=open,
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(
+                name=t.table_name,
+                interval=timedelta(seconds=0),
+                log_cursor=t.possible_log_cursors[0][1].column_name,
+                page_cursor=t.possible_page_cursors[0][1].column_name,
+            ),
+            schema_inference=False,
+        ))
+
+    log.info("resources", resources_list)
+
+    return resources_list
