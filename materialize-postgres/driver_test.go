@@ -20,8 +20,9 @@ import (
 func testConfig() *config {
 	return &config{
 		Address:  "localhost:5432",
-		User:     "postgres",
-		Password: "postgres",
+		User:     "flow",
+		Password: "flow",
+		Database: "flow",
 		Schema:   "public",
 	}
 }
@@ -48,7 +49,7 @@ func TestValidateAndApply(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			sch, err := sql.StdGetSchema(ctx, db, "postgres", resourceConfig.Schema, resourceConfig.Table)
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
 			require.NoError(t, err)
 
 			return sch

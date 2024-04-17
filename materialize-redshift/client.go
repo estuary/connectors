@@ -29,6 +29,8 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	db  *stdsql.DB
 	cfg *config
@@ -60,7 +62,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, c.cfg.metaSchema(), resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
@@ -134,6 +136,30 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		_, err := c.db.ExecContext(ctx, alterStmt)
 		return err
 	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, "select schema_name from svv_all_schemas")
+	if err != nil {
+		return nil, fmt.Errorf("querying svv_all_schemas: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+
+	for rows.Next() {
+		var schema string
+		if err := rows.Scan(&schema); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, schema)
+	}
+
+	return out, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, rsDialect, schemaName)
 }
 
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {

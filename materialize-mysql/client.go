@@ -88,7 +88,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", c.cfg.Database, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
