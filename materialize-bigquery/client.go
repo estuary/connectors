@@ -132,6 +132,13 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+// TODO(whb): In display of needless cruelty, BigQuery will throw an error if you try to use an
+// ALTER TABLE sql statement to add columns to a table with no pre-existing columns, claiming that
+// it does not have a schema. I believe the client API would allow us to set the schema, but this
+// would have to be done in a totally different way than we are currently doing things and I'm not
+// up for tackling that right now. With recent changes to at least recognizing that tables with no
+// columns exist, we'll at least get a coherent error message when this happens and can know that
+// the workaround is to re-backfill the table so it gets created fresh with the needed columns.
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var alterColumnStmtBuilder strings.Builder
 	if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
