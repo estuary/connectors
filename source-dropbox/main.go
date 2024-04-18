@@ -17,11 +17,13 @@ import (
 )
 
 type config struct {
-	Path      string         `json:"path"`
-	Parser    *parser.Config `json:"parser"`
-	MatchKeys string         `json:"matchKeys,omitempty"`
-	Advanced  advancedConfig `json:"advanced"`
+	Path        string         `json:"path"`
+	Credentials *Credentials   `json:"credentials"`
+	Parser      *parser.Config `json:"parser"`
+	MatchKeys   string         `json:"matchKeys,omitempty"`
+	Advanced    advancedConfig `json:"advanced"`
 }
+
 type advancedConfig struct {
 	AscendingKeys bool `json:"ascendingKeys,omitempty"`
 }
@@ -59,8 +61,12 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
+	httpClient, err := cfg.Credentials.GetClient(ctx)
+	if err != nil {
+		return &dropboxStore{}, err
+	}
 	config := dropbox.Config{
-		Token:    ctx.Value("code").(string),
+		Client:   httpClient,
 		LogLevel: dropbox.LogDebug,
 	}
 	client := files.New(config)
@@ -160,6 +166,34 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 				"format": "string",
 				"description": "The path to the Dropbox folder to read from. For example, \"/my-folder\".",
 				"order": 1
+			},
+			"credentials": {
+				"type": "object",
+				"title": "Credentials",
+				"properties": {
+					"auth_type": {
+						"type": "string",
+						"title": "Auth Type",
+						"description": "The type of authentication to use. For Dropbox, this should be \"refresh\".",
+						"enum": ["refresh"],
+						"default": "refresh",
+						"order": 1
+					},
+					"client_id": {
+						"type": "string",
+						"title": "Client ID",
+						"description": "The client ID for the Dropbox app.",
+						"order": 2
+					},
+					"client_secret": {
+						"type": "string",
+						"title": "Client Secret",
+						"description": "The client secret for the Dropbox app.",
+						"order": 3
+					}
+				},
+				"required": ["auth_type", "client_id", "client_secret"],
+				"order": 2
 			},
 			"matchKeys": {
 				"type": "string",
