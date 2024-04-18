@@ -72,6 +72,9 @@ from .api import (
     fetch_email_subscriptions,
     fetch_contacts_lists_subscription,
     fetch_custom_objects,
+    fetch_page_incremental,
+    fetch_page_custom_incremental,
+    fetch_batch_backfill,
 )
 
 
@@ -106,7 +109,7 @@ async def all_resources(
         subscription_object(EmailSubscriptions, http, fetch_email_subscriptions, config.start_date),
         crm_object_custom(MarketingForms, http, fetch_marketing_forms, config.start_date),
         crm_object_custom(Owners, http, fetch_owners, config.start_date),
-        workflow_object(Workflows, http, fetch_workflows, config.start_date),
+        workflow_object(Workflows, http, config.start_date),
         properties(http),
     ]
 
@@ -141,6 +144,7 @@ def crm_object_paginated(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -148,6 +152,7 @@ def crm_object_paginated(
             state,
             task,
             fetch_page=functools.partial(fetch_page, cls, http),
+            fetch_changes=functools.partial(fetch_page_incremental, cls, http),
         )
 
     return common.Resource(
@@ -156,8 +161,7 @@ def crm_object_paginated(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            inc=ResourceState.Incremental(cursor=started_at)
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -185,7 +189,7 @@ def crm_object_custom(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -193,6 +197,7 @@ def crm_object_custom(
             state,
             task,
             fetch_page=functools.partial(fetch_page_custom, cls, http),
+            fetch_changes=functools.partial(fetch_page_custom_incremental, cls, http),
         )
 
 
@@ -202,8 +207,7 @@ def crm_object_custom(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            inc=ResourceState.Incremental(cursor=started_at)
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -231,13 +235,15 @@ def crm_object_streamed(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http),
+            fetch_page=functools.partial(fetch_batch_backfill, cls, fetch_recent, http),
+            fetch_changes=functools.partial(fetch_page_incremental, cls, http),
         )
 
 
@@ -248,7 +254,6 @@ def crm_object_streamed(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -277,6 +282,7 @@ def crm_object_streamed_no_batch(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -293,14 +299,13 @@ def crm_object_streamed_no_batch(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
     )
 
 def workflow_object(
-    cls: type[V1CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn, started_at = datetime.now(tz=UTC)
+    cls: type[V1CRMObject], http: HTTPSession, started_at = datetime.now(tz=UTC)
 ) -> common.Resource:
 
     """Custom Resource to run specifically workflow stream objects
@@ -312,6 +317,7 @@ def workflow_object(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -350,6 +356,7 @@ def subscription_object(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -433,6 +440,7 @@ def custom_objects(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         common.open_binding(
             binding,
@@ -440,6 +448,7 @@ def custom_objects(
             state,
             task,
             fetch_page=functools.partial(fetch_page, cls, http),
+            fetch_changes=functools.partial(fetch_page_incremental, cls, http),
         )
     
 
@@ -450,7 +459,6 @@ def custom_objects(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=False,
