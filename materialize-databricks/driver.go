@@ -188,15 +188,24 @@ func newTransactor(
 	}
 	defer db.Close()
 
+	schemas := map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, open.Range); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
+
+		schemas[binding.Path[0]] = struct{}{}
 	}
 
-	// Create volume for storing staged files
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", cfg.SchemaName, volumeName)); err != nil {
-		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
+	// Create a volume for storing staged files for all schemas in the scope of the materialization.
+	for sch := range schemas {
+		log.WithFields(log.Fields{
+			"schema":     sch,
+			"volumeName": volumeName,
+		}).Debug("creating volume for schema if it doesn't already exist")
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", sch, volumeName)); err != nil {
+			return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
+		}
 	}
 
 	if tempDir, err := os.MkdirTemp("", "staging"); err != nil {
