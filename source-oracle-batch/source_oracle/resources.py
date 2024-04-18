@@ -26,11 +26,11 @@ from .api import (
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
+    started_at = datetime.now(tz=UTC)
     resources_list = []
 
     conn = connect(config)
     oracle_tables = await fetch_tables(log, conn)
-    log.info(oracle_tables)
     oracle_columns = await fetch_columns(log, conn)
 
     for ot in oracle_tables:
@@ -48,23 +48,23 @@ async def all_resources(
                 binding_index,
                 state,
                 task,
-                fetch_page=functools.partial(fetch_rows, t, conn),
+                fetch_page=functools.partial(fetch_rows, t, conn, binding.resourceConfig.cursor),
             )
         resources_list.append(common.Resource(
             name=t.table_name,
             key=[f"/{c.column_name}" for c in t.primary_key],
             model=t.create_model(),
             open=open,
-            initial_state=ResourceState(),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=started_at),
+                backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            ),
             initial_config=ResourceConfig(
                 name=t.table_name,
                 interval=timedelta(seconds=0),
-                log_cursor=t.possible_log_cursors[0][1].column_name,
-                page_cursor=t.possible_page_cursors[0][1].column_name,
+                cursor=[],
             ),
             schema_inference=False,
         ))
-
-    log.info("resources", resources_list)
 
     return resources_list
