@@ -647,10 +647,25 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
 
-	// If we see no results from the REST API for `maxTries` iterations, then we
-	// fallback to asking the `COPY_HISTORY` table. We allow up to 5 minutes for results to show up in the REST API.
-	var maxTries = 40
-	var retryDelaySeconds = 3 * time.Second
+	// we have a maximum of 15 minutes to fetch results from the REST API, but that's a very long time
+	// to wait for at least _some_ results to show up in the API. We allow a maximum of 5 minutes for results
+	// to show in the REST API. Given that we wait 2 seconds between each attempt, each try of all bindings takes
+	// bindings * 2 seconds. If we don't see any results from the REST API in 5 minutes, we fallback to asking COPY_HISTORY
+
+	// FIXME: We should really not have to retry for so long if Snowpipe REST API actually reported status
+	// of jobs even when they are in progress, however it seems Snowpipe REST API holds the status
+	// of files until they are fully loaded, which may take a long time. If we would have got the status
+	// of jobs as soon as they were submitted, we could retry based on that instead of guessing the time
+	// it may take for a file to be loaded
+	var maxTime = 5 * 60
+	var pipeCount = len(pipes)
+	if pipeCount == 0 {
+		pipeCount = 1
+	}
+	var maxTries = maxTime / (2 * pipeCount)
+	var retryDelaySeconds = 2 * time.Second
+
+	log.WithField("maxTries", maxTries).Debug("store: calculated maximum tries")
 	for tries := 0; tries < maxTries; tries++ {
 		for pipeName, pipe := range pipes {
 			// if the pipe has no files to begin with, just skip it
