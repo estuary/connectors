@@ -126,6 +126,10 @@ async def fetch_page_incremental(
     "associations": ",".join(cls.ASSOCIATED_ENTITIES),
     "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
     }
+
+    if log_cursor:
+        input["after"] = log_cursor
+
     if len(cls.ASSOCIATED_ENTITIES) == 0:
         del input['associations']
 
@@ -171,6 +175,9 @@ async def fetch_page_custom_incremental(
     "associations": ",".join(cls.ASSOCIATED_ENTITIES),
     "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
     }
+    if log_cursor:
+        input["after"] = log_cursor
+
     if len(cls.ASSOCIATED_ENTITIES) == 0:
         del input['associations'] 
 
