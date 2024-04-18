@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, AliasChoices
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING
 import urllib.parse
 
@@ -279,6 +279,7 @@ class CustomObject(BaseDocument, extra="allow"):
 class Company(BaseCRMObject):
     NAME = Names.companies
     PROPERTY_SEARCH_NAME = PropertyNames.companies
+    IGNORE_PROPERTY_SEARCH = True
     ASSOCIATED_ENTITIES = [Names.contacts, Names.deals]
 
     contacts: list[int] = []
@@ -288,6 +289,7 @@ class Company(BaseCRMObject):
 class Contact(BaseCRMObject):
     NAME = Names.contacts
     PROPERTY_SEARCH_NAME = PropertyNames.contacts
+    IGNORE_PROPERTY_SEARCH = True
     ASSOCIATED_ENTITIES = [Names.companies]
 
     companies: list[int] = []
@@ -296,6 +298,7 @@ class Contact(BaseCRMObject):
 class Deal(BaseCRMObject):
     NAME = Names.deals
     PROPERTY_SEARCH_NAME = PropertyNames.deals
+    IGNORE_PROPERTY_SEARCH = True
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
@@ -606,7 +609,7 @@ class OldRecentCompanies(BaseModel):
         properties: Properties
 
     results: list[Item]
-    hasMore: bool
+    hasMore: bool = Field(validation_alias=AliasChoices("hasMore", "has-more"))
     offset: int
     total: int
 
