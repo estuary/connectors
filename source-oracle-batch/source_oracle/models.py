@@ -55,13 +55,9 @@ class EndpointConfig(BaseModel):
 
 
 class ResourceConfig(GenericResourceConfig):
-    log_cursor: str = Field(
-        title="Incremental Cursor",
-        description="A date-time column to use for incremental capture of modifications.",
-    )
-    page_cursor: str = Field(
-        title="Backfill Cursor",
-        description="An indexed, non-NULL integer column to use for ordered table backfills. Does not need to be unique, but should have high cardinality.",
+    cursor: list[str] = Field(
+        title="Cursor Columns",
+        description="The names of columns which should be persisted between query executions as a cursor.",
     )
     query_limit: int = Field(
         title="Query Limit",
@@ -140,8 +136,6 @@ class Table:
     columns: list[OracleColumn]
     primary_key: list[OracleColumn]
     model_fields: dict[str, Any]
-    possible_log_cursors: list[tuple[float, OracleColumn]]
-    possible_page_cursors: list[tuple[float, OracleColumn]]
 
     def create_model(self) -> type[BaseDocument]:
         return create_model(
@@ -160,8 +154,6 @@ def build_table(
 
     primary_key: list[OracleColumn] = []
     model_fields: dict[str, Any] = {}
-    possible_log_cursors: list[tuple[float, OracleColumn]] = []
-    possible_page_cursors: list[tuple[float, OracleColumn]] = []
 
     # Order by sequenced primary key then lexicographic column name.
     columns.sort(key=lambda col: (1 if col.is_pk else 1_000, col.column_name))
@@ -174,12 +166,9 @@ def build_table(
         field_zero: Any
 
         if col.data_type == col.Type.NUMBER and col.data_scale == 0:
-            # This field could be EITHER an integer or a floating-point.
-            # NetSuite.com is sneaky and doesn't give us enough information.
             if col.is_pk:
                 # We assume keyed fields are always integers. This technically
-                # is not guaranteed, especially for the *_ID column match case,
-                # but is a pervasive practice.
+                # is not guaranteed but is a pervasive practice.
                 field_type, field_zero = int, 0
             else:
                 # Use Decimal to represent lossless integers OR floats.
@@ -190,7 +179,7 @@ def build_table(
                 field_schema_extra = {"format": "number"}
 
         elif col.data_type in (col.Type.DOUBLE, col.Type.NUMBER, col.Type.FLOAT):
-            # This field is definitely floating-point (oa_scale > 0).
+            # This field is definitely floating-point (data_scale > 0).
             if col.is_pk:
                 # Floats cannot be used as keys, so use {type: string, format: number}.
                 field_type, field_zero = Decimal, Decimal()
@@ -215,32 +204,6 @@ def build_table(
         else:
             description = ""
 
-        # Is `col` eligible to act as the page cursor?
-        if field_type is not int:
-            pass
-        elif col.is_pk:
-            # Primary key columns are the most-desired page cursor.
-            possible_page_cursors.append((-0.99, col))
-
-        # Is `col` eligible to act as the log cursor?
-        if field_type is datetime:
-            try:
-                # Prioritize on index within configured `cursor_fields`.
-                possible_log_cursors.append(
-                    (
-                        config.cursor_fields.index(col.column_name.lower()),
-                        col,
-                    )
-                )
-            except ValueError:
-                # Still allow fields not in the known list, just rank them below any known cursors
-                possible_log_cursors.append(
-                    (
-                        len(config.cursor_fields) + 1,
-                        col,
-                    )
-                )
-
         # Finally, build the Pydantic model field.
         field_info = Field(
             description=description.strip() or None,
@@ -258,15 +221,9 @@ def build_table(
 
         model_fields[col.column_name] = (field_info.annotation, field_info)
 
-    # Sort into priority order.
-    possible_log_cursors.sort(key=lambda c: c[0])
-    possible_page_cursors.sort(key=lambda c: c[0])
-
     return Table(
         table_name,
         columns,
         primary_key,
         model_fields,
-        possible_log_cursors,
-        possible_page_cursors,
     )
