@@ -86,25 +86,13 @@ async def fetch_page(
 
     url = f"{HUB}/crm/v3/objects/{cls.PROPERTY_SEARCH_NAME}"
 
-    if cls.IGNORE_PROPERTY_SEARCH is True:
-        input = {
-        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations']
-    else: 
-        properties = await fetch_properties(log, cls, http)
-        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+    input = {
+    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+    }
+    if len(cls.ASSOCIATED_ENTITIES) == 0:
+        del input['associations']
 
-        input = {
-            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-            "properties": property_names,
-            "propertiesWithHistory": property_names,
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations']
     if page:
         input["after"] = page
 
@@ -134,25 +122,12 @@ async def fetch_page_incremental(
 
     url = f"{HUB}/crm/v3/objects/{cls.PROPERTY_SEARCH_NAME}"
 
-    if cls.IGNORE_PROPERTY_SEARCH is True:
-        input = {
-        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations']
-    else: 
-        properties = await fetch_properties(log, cls, http)
-        property_names = ",".join(p.name for p in properties.results if not p.calculated)
-
-        input = {
-            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-            "properties": property_names,
-            "propertiesWithHistory": property_names,
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations']
+    input = {
+    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+    }
+    if len(cls.ASSOCIATED_ENTITIES) == 0:
+        del input['associations']
 
     recent_log_cursors = []
     while True:
@@ -191,24 +166,14 @@ async def fetch_page_custom_incremental(
     # Runs V3 API queries and formats the execution to match
     # the CDK's fetch_changes requirements 
     url = f"{HUB}{cls.ENFORCE_URL}"
+ 
+    input = {
+    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+    }
+    if len(cls.ASSOCIATED_ENTITIES) == 0:
+        del input['associations'] 
 
-    if cls.IGNORE_PROPERTY_SEARCH is True:
-        input = {
-        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations'] 
-    else: 
-        properties = await fetch_properties(log, cls, http)
-        property_names = ",".join(p.name for p in properties.results if not p.calculated)
-
-        input = {
-            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-            "properties": property_names,
-            "propertiesWithHistory": property_names,
-        }
     recent_log_cursors = []
     while True:
 
@@ -249,23 +214,13 @@ async def fetch_page_custom(
 
     url = f"{HUB}{cls.ENFORCE_URL}"
 
-    if cls.IGNORE_PROPERTY_SEARCH is True:
-        input = {
-        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations'] 
-    else: 
-        properties = await fetch_properties(log, cls, http)
-        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+    input = {
+    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+    }
+    if len(cls.ASSOCIATED_ENTITIES) == 0:
+        del input['associations'] 
 
-        input = {
-            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-            "properties": property_names,
-            "propertiesWithHistory": property_names,
-        }
     if page:
         input["after"] = page
 
@@ -299,23 +254,13 @@ async def fetch_page_workflow(
 
     url = f"{HUB}{cls.ENFORCE_URL}"
 
-    if cls.IGNORE_PROPERTY_SEARCH is True:
-        input = {
-        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-        }
-        if len(cls.ASSOCIATED_ENTITIES) == 0:
-            del input['associations'] 
-    else: 
-        properties = await fetch_properties(log, cls, http)
-        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+    input = {
+    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+    }
+    if len(cls.ASSOCIATED_ENTITIES) == 0:
+        del input['associations'] 
 
-        input = {
-            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-            "properties": property_names,
-            "propertiesWithHistory": property_names,
-        }
     if page:
         input["after"] = page
 
