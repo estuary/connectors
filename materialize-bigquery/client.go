@@ -48,9 +48,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		rpDatasets[bqDialect.TableLocator(p).TableSchema] = struct{}{}
 	}
 
-	slices.Sort(datasets)
-	datasets = slices.Compact(datasets)
-
 	// Fetch table and column metadata using the metadata API. This API is free to use, and has very
 	// high rate limits. Running a job to query the INFORMATION_SCHEMA view costs a minimum of 10MB
 	// per query, so this is a little more cost effective and efficient.
