@@ -55,13 +55,13 @@ class NumberType(StrEnum):
     PERCENT = "PERCENT"
 
 
-class Sheet(BaseModel, extra="forbid"):
+class Sheet(BaseModel, extra="allow"):
     """
     Models a Google Spreadsheet Sheet.
     See: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets
     """
 
-    class Properties(BaseModel, extra="forbid"):
+    class Properties(BaseModel, extra="allow"):
         class Grid(BaseModel, extra="forbid"):
             rowCount: int
             columnCount: int
