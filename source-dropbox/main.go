@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
@@ -45,7 +46,7 @@ func (c config) DiscoverRoot() string {
 }
 
 func (c config) RecommendedName() string {
-	return c.Path
+	return strings.ReplaceAll(c.Path, "/", "-")
 }
 
 func (c config) FilesAreMonotonic() bool {
