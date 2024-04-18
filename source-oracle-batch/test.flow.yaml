@@ -14,8 +14,7 @@ captures:
       - resource:
           name: testing
           interval: PT0S
-          log_cursor: t
-          page_cursor: id
+          cursor: ['id']
         target: acmeCo/testing
     interval: 3m
     shards:
