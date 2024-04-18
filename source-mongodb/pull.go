@@ -49,7 +49,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var bindings = make([]bindingInfo, len(open.Capture.Bindings))
-	var collectionBindingIndex = make(map[string]bindingInfo)
+	var resourceBindingInfo = make(map[string]bindingInfo)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
@@ -61,7 +61,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			index:    idx,
 			stateKey: sk,
 		}
-		collectionBindingIndex[resourceId(res)] = bindings[idx]
+		resourceBindingInfo[resourceId(res)] = bindings[idx]
 	}
 
 	var ctx = stream.Context()
@@ -113,10 +113,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var c = capture{
-		client:                 client,
-		output:                 stream,
-		state:                  prevState,
-		collectionBindingIndex: collectionBindingIndex,
+		client:              client,
+		output:              stream,
+		state:               prevState,
+		resourceBindingInfo: resourceBindingInfo,
 	}
 
 	if err := c.output.Ready(false); err != nil {
@@ -172,9 +172,9 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 }
 
 type capture struct {
-	client                 *mongo.Client
-	output                 *boilerplate.PullOutput
-	collectionBindingIndex map[string]bindingInfo
+	client              *mongo.Client
+	output              *boilerplate.PullOutput
+	resourceBindingInfo map[string]bindingInfo
 
 	// mu provides synchronization for values that are accessed by concurrent backfill and change
 	// stream goroutines.
