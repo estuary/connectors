@@ -22,13 +22,13 @@ type changeStream struct {
 
 // makeEventDocument processes a change event and returns a document if the change event is for a
 // tracked collection and operation type. The binding index is also returned if a document is
-// available from the change event. If no document is applicable to the change event, the boolean
-// output will be false.
-func makeEventDocument(ev changeEvent, collectionBindingIndex map[string]bindingInfo) (map[string]any, int, bool) {
-	binding, ok := collectionBindingIndex[eventResourceId(ev)]
+// available from the change event. If no document is applicable to the change event, the returned
+// map will be `nil`.
+func makeEventDocument(ev changeEvent, resourceBindingInfo map[string]bindingInfo) (map[string]any, int) {
+	binding, ok := resourceBindingInfo[eventResourceId(ev)]
 	if !ok {
 		// Event is not for a tracked collection.
-		return nil, 0, false
+		return nil, 0
 	}
 
 	switch ev.OperationType {
@@ -41,7 +41,7 @@ func makeEventDocument(ev changeEvent, collectionBindingIndex map[string]binding
 			// different from the deltas in the update event. We ignore events where
 			// FullDocument is null. Another change event of type delete will eventually come
 			// and delete the document.
-			return nil, 0, false
+			return nil, 0
 		}
 
 		doc := sanitizeDocument(ev.FullDocument)
@@ -56,7 +56,7 @@ func makeEventDocument(ev changeEvent, collectionBindingIndex map[string]binding
 			opProperty: op,
 		}
 
-		return doc, binding.index, true
+		return doc, binding.index
 	case "delete":
 		var doc = map[string]any{
 			idProperty: ev.DocumentKey.Id,
@@ -66,10 +66,10 @@ func makeEventDocument(ev changeEvent, collectionBindingIndex map[string]binding
 		}
 		doc = sanitizeDocument(doc)
 
-		return doc, binding.index, true
+		return doc, binding.index
 	default:
 		// Event is of an operation type that we don't care about.
-		return nil, 0, false
+		return nil, 0
 	}
 }
 
@@ -232,6 +232,8 @@ func (c *capture) streamCatchup(
 	for _, s := range streams {
 		s := s
 		group.Go(func() error {
+			defer s.ms.Close(groupCtx)
+
 			ts := time.Now()
 			logEntry := log.WithField("database", s.db)
 			logEntry.Info("started catching up stream for database")
@@ -313,8 +315,8 @@ func (c *capture) tryStream(
 // handleEvent processes a changeEvent, outputting a document if applicable and a checkpoint.
 func (c *capture) handleEvent(ev changeEvent, db string, tok bson.Raw) error {
 	var docJson json.RawMessage
-	doc, bindingIdx, madeDoc := makeEventDocument(ev, c.collectionBindingIndex)
-	if madeDoc {
+	doc, bindingIdx := makeEventDocument(ev, c.resourceBindingInfo)
+	if doc != nil {
 		var err error
 		if docJson, err = json.Marshal(doc); err != nil {
 			return fmt.Errorf("serializing stream document: %w", err)
@@ -330,7 +332,7 @@ func (c *capture) handleEvent(ev changeEvent, db string, tok bson.Raw) error {
 		return fmt.Errorf("serializing stream checkpoint: %w", err)
 	}
 
-	if madeDoc {
+	if doc != nil {
 		if err := c.output.DocumentsAndCheckpoint(cpJson, true, bindingIdx, docJson); err != nil {
 			return fmt.Errorf("outputting stream document: %w", err)
 		}
@@ -343,7 +345,7 @@ func (c *capture) handleEvent(ev changeEvent, db string, tok bson.Raw) error {
 	c.mu.Lock()
 	c.state.DatabaseResumeTokens[db] = tok
 	c.processedStreamEvents += 1
-	if madeDoc {
+	if doc != nil {
 		c.emittedStreamDocs += 1
 	}
 	c.mu.Unlock()

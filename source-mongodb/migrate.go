@@ -137,7 +137,7 @@ func (c *capture) populateDatabaseResumeTokens(
 ) error {
 	// Make a set of the database names we need to populate.
 	dbs := make(map[string]struct{})
-	for _, b := range c.collectionBindingIndex {
+	for _, b := range c.resourceBindingInfo {
 		db := b.resource.Database
 		dbs[db] = struct{}{}
 
@@ -213,7 +213,7 @@ func (c *capture) populateDatabaseResumeTokens(
 			"token": newToken,
 		}).Info("completed v2 state migration with post-batch resume token")
 
-		for _, b := range c.collectionBindingIndex {
+		for _, b := range c.resourceBindingInfo {
 			c.state.DatabaseResumeTokens[b.resource.Database] = newToken
 		}
 		return nil
@@ -281,8 +281,8 @@ func (c *capture) populateDatabaseResumeTokens(
 
 	// Emit any of the documents that resulted if they are for monitored collections.
 	for _, ev := range databasePollResults {
-		doc, bindingIdx, madeDoc := makeEventDocument(ev, c.collectionBindingIndex)
-		if madeDoc {
+		doc, bindingIdx := makeEventDocument(ev, c.resourceBindingInfo)
+		if doc != nil {
 			if docJson, err := json.Marshal(doc); err != nil {
 				return fmt.Errorf("serializing stream document: %w", err)
 			} else if err := c.output.Documents(bindingIdx, docJson); err != nil {
@@ -297,7 +297,7 @@ func (c *capture) populateDatabaseResumeTokens(
 	}
 
 	// Sanity check that we have a non-nil resume token for every database now.
-	for _, b := range c.collectionBindingIndex {
+	for _, b := range c.resourceBindingInfo {
 		tok := c.state.DatabaseResumeTokens[b.resource.Database]
 		if tok == nil {
 			return fmt.Errorf("application error: database resume token for db %q was nil after populating tokens", b.resource.Database)
