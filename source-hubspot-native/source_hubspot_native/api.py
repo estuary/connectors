@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
@@ -121,6 +121,121 @@ async def fetch_page(
     if result.paging:
         yield result.paging.next.after
 
+
+async def fetch_page_incremental(
+    cls: type[CRMObject],
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[CRMObject | LogCursor, None]:
+    # Runs V3 API queries and formats the execution to match
+    # the CDK's fetch_changes requirements 
+    assert isinstance(log_cursor, datetime)
+
+    url = f"{HUB}/crm/v3/objects/{cls.PROPERTY_SEARCH_NAME}"
+
+    if cls.IGNORE_PROPERTY_SEARCH is True:
+        input = {
+        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations']
+    else: 
+        properties = await fetch_properties(log, cls, http)
+        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+
+        input = {
+            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+            "properties": property_names,
+            "propertiesWithHistory": property_names,
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations']
+
+    recent_log_cursors = []
+    while True:
+
+        _cls: Any = cls  # Silence mypy false-positive.
+        result: PageResult[CRMObject] = PageResult[_cls].model_validate_json(
+            await http.request(log, url, method="GET", params=input)
+        )
+
+        for doc in result.results:
+            if doc.updatedAt > log_cursor:
+                recent_log_cursors.append(doc.updatedAt)
+                doc.meta_ = _cls.Meta(op="u")
+                yield doc
+
+        if result.paging:
+            input["after"] = result.paging.next.after
+        else:
+            break
+
+    if len(recent_log_cursors) > 0:
+        recent_log_cursors.sort()
+        yield recent_log_cursors[-1] 
+    else:
+        return
+
+
+
+async def fetch_page_custom_incremental(
+    cls: type[CRMObject],
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[CRMObject | LogCursor, None]:
+
+    # Runs V3 API queries and formats the execution to match
+    # the CDK's fetch_changes requirements 
+    url = f"{HUB}{cls.ENFORCE_URL}"
+
+    if cls.IGNORE_PROPERTY_SEARCH is True:
+        input = {
+        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+        "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+        }
+        if len(cls.ASSOCIATED_ENTITIES) == 0:
+            del input['associations'] 
+    else: 
+        properties = await fetch_properties(log, cls, http)
+        property_names = ",".join(p.name for p in properties.results if not p.calculated)
+
+        input = {
+            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+            "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+            "properties": property_names,
+            "propertiesWithHistory": property_names,
+        }
+    recent_log_cursors = []
+    while True:
+
+        data = json.loads(await http.request(log, url, method="GET", params=input))
+        if data.get('total') is not None:
+            del data['total']
+        _cls: Any = cls  # Silence mypy false-positive.
+        result: PageResult[V1CRMObject] = PageResult[_cls].model_validate_json(
+            json.dumps(data)
+        )
+
+        for doc in result.results:
+            if doc.updatedAt > log_cursor:
+                recent_log_cursors.append(doc.updatedAt)
+                doc.meta_ = V1CRMObject.Meta(op="u")
+                yield doc
+
+        if result.paging:
+            input["after"] = result.paging.next.after
+        else:
+            break
+
+    if len(recent_log_cursors) > 0:
+        recent_log_cursors.sort()
+        yield recent_log_cursors[-1] 
+    else:
+        return
 
 async def fetch_page_custom(
     # Closed over via functools.partial:
@@ -364,6 +479,43 @@ async def fetch_changes(
     else:
         return
 
+async def fetch_batch_backfill(
+    cls: type[V1CRMObject],
+    fetch_recent: FetchRecentFn,
+    http: HTTPSession,
+    log: Logger,
+    page: str | None,
+    cutoff: datetime,
+) -> AsyncGenerator[CRMObject | str, None]:
+    # Runs V3 API batch queries and formats the execution to match
+    # the CDK's fetch_page requirements 
+    # FetchRecentFn queries the recent data endpoint and returns 
+    # Ids and timefields for the batch queries
+
+    recent: list[tuple[datetime, str]] = []
+
+    iter, next_page = await fetch_recent(log, http, cutoff, page)
+
+    for ts, id in iter:
+        if ts < cutoff:
+            recent.append((ts, id))
+
+    if len(recent) > 0:
+        recent.sort()  # Oldest updates first.
+
+        for batch_it in itertools.batched(recent, 50):
+            batch = list(batch_it)
+
+            documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
+                log, cls, http, [id for _, id in batch]
+            )
+            for doc in documents.results:
+                doc.meta_ = BaseCRMObject.Meta(op="u")
+                yield doc
+    if next_page:
+        yield next_page
+
+
 
 async def fetch_changes_no_batch(
     # Closed over via functools.partial:
@@ -417,7 +569,7 @@ async def fetch_recent_companies(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/companies/v2/companies/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
+    params = {"count": 100, "offset": page, "since": int(since.timestamp())} if page else {"count": 100}
 
     result = OldRecentCompanies.model_validate_json(
         await http.request(log, url, params=params)
