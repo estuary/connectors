@@ -144,6 +144,7 @@ def crm_object_paginated(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -188,7 +189,7 @@ def crm_object_custom(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -234,6 +235,7 @@ def crm_object_streamed(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -280,6 +282,7 @@ def crm_object_streamed_no_batch(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -314,6 +317,7 @@ def workflow_object(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -352,6 +356,7 @@ def subscription_object(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -435,6 +440,7 @@ def custom_objects(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         common.open_binding(
             binding,
