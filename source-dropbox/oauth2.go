@@ -14,7 +14,7 @@ import (
 
 func GetScopes() []string {
 	return []string{
-		"files.metadata.read,files.content.read",
+		"files.metadata.read",
 		"files.content.read",
 		// "account_info.read",  // Not sure if we need this
 	}
@@ -46,6 +46,7 @@ type Credentials struct {
 	ClientID     string `json:"client_id,omitempty"`
 	ClientSecret string `json:"client_secret,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
+	AccessToken  string `json:"access_token,omitempty"`
 }
 
 func (c *Credentials) Validate() error {
