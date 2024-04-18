@@ -33,7 +33,7 @@
       "historyMode": {
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
-        "default": true,
+        "default": false,
         "order": 4
       },
       "advanced": {

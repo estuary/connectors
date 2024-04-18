@@ -41,7 +41,7 @@ type Config struct {
 	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
 	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=true,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
