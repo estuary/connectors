@@ -161,7 +161,8 @@ def crm_object_paginated(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at)
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -207,7 +208,8 @@ def crm_object_custom(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at)
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -254,6 +256,7 @@ def crm_object_streamed(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -299,6 +302,7 @@ def crm_object_streamed_no_batch(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=True,
@@ -459,6 +463,7 @@ def custom_objects(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(seconds=0)),
         schema_inference=False,

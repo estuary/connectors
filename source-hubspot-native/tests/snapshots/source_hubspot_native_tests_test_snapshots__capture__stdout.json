@@ -1,5 +1,966 @@
 [
   [
+    "acmeCo/companies",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "archived": false,
+      "createdAt": "2024-03-05T18:11:27.850000Z",
+      "id": 19384085668,
+      "properties": {
+        "address": "1600 Amphitheatre Parkway",
+        "annualrevenue": "1000000000",
+        "city": "Mountain View",
+        "country": "United States",
+        "createdate": "2024-03-05T18:11:27.850Z",
+        "description": "Google is a multinational corporation that specializes in internet-related services and products. Its mission is to organize the world's information and make it universally accessible and useful.",
+        "domain": "google.com",
+        "facebook_company_page": "https://facebook.com/google",
+        "founded_year": "1998",
+        "hs_all_owner_ids": "750122779",
+        "hs_created_by_user_id": "51770238",
+        "hs_date_entered_lead": "2024-03-05T18:11:27.850Z",
+        "hs_lastmodifieddate": "2024-04-05T16:06:40.733Z",
+        "hs_num_blockers": "0",
+        "hs_num_child_companies": "0",
+        "hs_num_contacts_with_buying_roles": "0",
+        "hs_num_decision_makers": "0",
+        "hs_num_open_deals": "0",
+        "hs_object_id": "19384085668",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:51770238",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "51770238",
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_target_account_probability": "0.4076234698295593",
+        "hs_time_in_lead": "3810787193",
+        "hs_updated_by_user_id": "51770238",
+        "hs_user_ids_of_all_owners": "51770238",
+        "hubspot_owner_assigneddate": "2024-03-05T18:11:27.850Z",
+        "hubspot_owner_id": "750122779",
+        "industry": "COMPUTER_SOFTWARE",
+        "is_public": "true",
+        "lifecyclestage": "lead",
+        "linkedin_company_page": "https://www.linkedin.com/company/google",
+        "linkedinbio": "Google is a multinational corporation known for its search engine and innovative technologies that aim to make information universally accessible and create opportunities for all.",
+        "name": "Google",
+        "num_associated_contacts": "0",
+        "numberofemployees": "10000",
+        "phone": "+1 650-253-0000",
+        "state": "CA",
+        "timezone": "America/Los_Angeles",
+        "total_money_raised": "786.1M",
+        "twitterhandle": "google",
+        "web_technologies": "amazon_s3;wordpress;google_analytics;amazon__cloudfront;double_click;google_tag_manager",
+        "website": "google.com",
+        "zip": "94043"
+      },
+      "propertiesWithHistory": {
+        "address": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "1600 Amphitheatre Parkway"
+          }
+        ],
+        "annualrevenue": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "1000000000"
+          }
+        ],
+        "city": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "Mountain View"
+          }
+        ],
+        "country": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "United States"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "2024-03-05T18:11:27.850Z"
+          }
+        ],
+        "description": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "Google is a multinational corporation that specializes in internet-related services and products. Its mission is to organize the world's information and make it universally accessible and useful."
+          }
+        ],
+        "domain": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "google.com"
+          }
+        ],
+        "facebook_company_page": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "https://facebook.com/google"
+          }
+        ],
+        "founded_year": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "1998"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "750122779"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "value": "2024-03-05T18:11:27.850Z"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-04-05T16:06:40.733000Z",
+            "value": "2024-04-05T16:06:40.733Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-05T18:11:32.771000Z",
+            "value": "2024-03-05T18:11:32.771Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.757000Z",
+            "value": "2024-03-05T18:11:29.757Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-05T18:11:28.362000Z",
+            "value": "2024-03-05T18:11:28.362Z"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.303000Z",
+            "value": "2024-03-05T18:11:28.303Z"
+          },
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "2024-03-05T18:11:27.850Z"
+          }
+        ],
+        "hs_num_blockers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.729000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_child_companies": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.729000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_contacts_with_buying_roles": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.729000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_decision_makers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.729000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_open_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.729000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "19384085668"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "userId:51770238"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "companies-lifecycle-pipeline"
+          }
+        ],
+        "hs_target_account_probability": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-05T18:11:32.771000Z",
+            "value": "0.4076234698295593"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-05T18:11:28.362000Z",
+            "value": "0.49565839767456055"
+          }
+        ],
+        "hs_time_in_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-04-18T20:44:35.043000Z",
+            "value": "3810787193"
+          }
+        ],
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "2024-03-05T18:11:27.850Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "750122779"
+          }
+        ],
+        "industry": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "COMPUTER_SOFTWARE"
+          }
+        ],
+        "is_public": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "true"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "lead"
+          }
+        ],
+        "linkedin_company_page": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "https://www.linkedin.com/company/google"
+          }
+        ],
+        "linkedinbio": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-04-05T16:06:40.733000Z",
+            "value": "Google is a multinational corporation known for its search engine and innovative technologies that aim to make information universally accessible and create opportunities for all."
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "Google is a multinational corporation that specializes in internet-related services and products. Its mission is to organize the world's information and make it universally accessible and useful."
+          }
+        ],
+        "name": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "Google"
+          }
+        ],
+        "num_associated_contacts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:29.729000Z",
+            "value": "0"
+          }
+        ],
+        "numberofemployees": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "10000"
+          }
+        ],
+        "phone": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "+1 650-253-0000"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "CA"
+          }
+        ],
+        "timezone": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "America/Los_Angeles"
+          }
+        ],
+        "total_money_raised": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "786.1M"
+          }
+        ],
+        "twitterhandle": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "google"
+          }
+        ],
+        "web_technologies": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-05T18:11:28.293000Z",
+            "value": "amazon_s3;wordpress;google_analytics;amazon__cloudfront;double_click;google_tag_manager"
+          }
+        ],
+        "website": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "google.com"
+          }
+        ],
+        "zip": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-05T18:11:27.850000Z",
+            "updatedByUserId": 51770238,
+            "value": "94043"
+          }
+        ]
+      },
+      "updatedAt": "2024-04-05T16:06:40.733000Z"
+    }
+  ],
+  [
+    "acmeCo/companies",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "archived": false,
+      "createdAt": "2024-03-13T18:19:41.878000Z",
+      "id": 19506970950,
+      "properties": {
+        "address": "88 Colin P Kelly Jr St",
+        "annualrevenue": "1000000000",
+        "city": "San Francisco",
+        "country": "United States",
+        "createdate": "2024-03-13T18:19:41.878Z",
+        "description": "GitHub is a web-based company that offers code hosting services for collaborative software development. It provides a platform for developers to contribute to open source projects, manage Git repositories, review code, track bugs and features, and auto...",
+        "domain": "github.com",
+        "facebook_company_page": "https://facebook.com/github",
+        "founded_year": "2008",
+        "hs_all_owner_ids": "750122779",
+        "hs_created_by_user_id": "51770238",
+        "hs_date_entered_lead": "2024-03-13T18:19:41.878Z",
+        "hs_lastmodifieddate": "2024-04-05T16:00:34.976Z",
+        "hs_num_blockers": "0",
+        "hs_num_child_companies": "0",
+        "hs_num_contacts_with_buying_roles": "0",
+        "hs_num_decision_makers": "0",
+        "hs_num_open_deals": "0",
+        "hs_object_id": "19506970950",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "userId:51770238",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "51770238",
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_target_account_probability": "0.4076234698295593",
+        "hs_time_in_lead": "3119093165",
+        "hs_updated_by_user_id": "51770238",
+        "hs_user_ids_of_all_owners": "51770238",
+        "hubspot_owner_assigneddate": "2024-03-13T18:19:41.878Z",
+        "hubspot_owner_id": "750122779",
+        "industry": "EDUCATION_MANAGEMENT",
+        "is_public": "false",
+        "lifecyclestage": "lead",
+        "linkedin_company_page": "https://www.linkedin.com/company/github",
+        "linkedinbio": "GitHub is a web-based company that offers code hosting services for collaborative software development. It provides tools for managing Git repositories, code review, bug tracking, CI/CD workflows, and secure coding practices, serving as a platform for ...",
+        "name": "GitHub, Inc.",
+        "num_associated_contacts": "0",
+        "numberofemployees": "5000",
+        "phone": "+1 415-448-6673",
+        "state": "CA",
+        "timezone": "America/Los_Angeles",
+        "total_money_raised": "350000000",
+        "twitterhandle": "github",
+        "web_technologies": "microsoft_exchange_online;aws_route_53;ios;salesforce;slack;stripe;mailchimp;amazon_s3;google_apps;youtube;zendesk;omniture_adobe_analytics;outlook",
+        "website": "github.com",
+        "zip": "94107"
+      },
+      "propertiesWithHistory": {
+        "address": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "88 Colin P Kelly Jr St"
+          }
+        ],
+        "annualrevenue": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "1000000000"
+          }
+        ],
+        "city": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "San Francisco"
+          }
+        ],
+        "country": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "United States"
+          }
+        ],
+        "createdate": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "2024-03-13T18:19:41.878Z"
+          }
+        ],
+        "description": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "GitHub is a web-based company that offers code hosting services for collaborative software development. It provides a platform for developers to contribute to open source projects, manage Git repositories, review code, track bugs and features, and auto..."
+          }
+        ],
+        "domain": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "github.com"
+          }
+        ],
+        "facebook_company_page": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "https://facebook.com/github"
+          }
+        ],
+        "founded_year": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "2008"
+          }
+        ],
+        "hs_all_owner_ids": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "750122779"
+          }
+        ],
+        "hs_created_by_user_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hs_date_entered_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "value": "2024-03-13T18:19:41.878Z"
+          }
+        ],
+        "hs_lastmodifieddate": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-04-05T16:00:34.976000Z",
+            "value": "2024-04-05T16:00:34.976Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-13T18:19:46.334000Z",
+            "value": "2024-03-13T18:19:46.334Z"
+          },
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.388000Z",
+            "value": "2024-03-13T18:19:43.388Z"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-13T18:19:42.802000Z",
+            "value": "2024-03-13T18:19:42.802Z"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.370000Z",
+            "value": "2024-03-13T18:19:42.370Z"
+          },
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "2024-03-13T18:19:41.878Z"
+          }
+        ],
+        "hs_num_blockers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.362000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_child_companies": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.362000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_contacts_with_buying_roles": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.362000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_decision_makers": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.362000Z",
+            "value": "0"
+          }
+        ],
+        "hs_num_open_deals": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.362000Z",
+            "value": "0"
+          }
+        ],
+        "hs_object_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "19506970950"
+          }
+        ],
+        "hs_object_source": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "userId:51770238"
+          }
+        ],
+        "hs_object_source_label": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "CRM_UI"
+          }
+        ],
+        "hs_object_source_user_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hs_pipeline": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "companies-lifecycle-pipeline"
+          }
+        ],
+        "hs_target_account_probability": [
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-13T18:19:46.334000Z",
+            "value": "0.4076234698295593"
+          },
+          {
+            "sourceType": "INTERNAL_PROCESSING",
+            "timestamp": "2024-03-13T18:19:42.802000Z",
+            "value": "0.49565839767456055"
+          }
+        ],
+        "hs_time_in_lead": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-04-18T20:44:35.043000Z",
+            "value": "3119093165"
+          }
+        ],
+        "hs_updated_by_user_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hs_user_ids_of_all_owners": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "51770238"
+          }
+        ],
+        "hubspot_owner_assigneddate": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "2024-03-13T18:19:41.878Z"
+          }
+        ],
+        "hubspot_owner_id": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "750122779"
+          }
+        ],
+        "industry": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "EDUCATION_MANAGEMENT"
+          }
+        ],
+        "is_public": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "false"
+          }
+        ],
+        "lifecyclestage": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "lead"
+          }
+        ],
+        "linkedin_company_page": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "https://www.linkedin.com/company/github"
+          }
+        ],
+        "linkedinbio": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-04-05T16:00:34.976000Z",
+            "value": "GitHub is a web-based company that offers code hosting services for collaborative software development. It provides tools for managing Git repositories, code review, bug tracking, CI/CD workflows, and secure coding practices, serving as a platform for ..."
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "GitHub is a web-based company that offers code hosting services for collaborative software development. It provides a platform for developers to contribute to open source projects, manage Git repositories, review code, track bugs and features, and auto..."
+          }
+        ],
+        "name": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "GitHub, Inc."
+          }
+        ],
+        "num_associated_contacts": [
+          {
+            "sourceId": "RollupProperties",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:43.362000Z",
+            "value": "0"
+          }
+        ],
+        "numberofemployees": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "5000"
+          }
+        ],
+        "phone": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "+1 415-448-6673"
+          }
+        ],
+        "state": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "CA"
+          }
+        ],
+        "timezone": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "America/Los_Angeles"
+          }
+        ],
+        "total_money_raised": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "350000000"
+          }
+        ],
+        "twitterhandle": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "github"
+          }
+        ],
+        "web_technologies": [
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-04-05T16:00:34.976000Z",
+            "value": "microsoft_exchange_online;aws_route_53;ios;salesforce;slack;stripe;mailchimp;amazon_s3;google_apps;youtube;zendesk;omniture_adobe_analytics;outlook"
+          },
+          {
+            "sourceType": "COMPANY_INSIGHTS",
+            "timestamp": "2024-03-13T18:19:42.356000Z",
+            "value": "microsoft_exchange_online;aws_route_53;ios;salesforce;slack;stripe;mailchimp;amazon_s3;google_apps;youtube;zendesk;outlook"
+          }
+        ],
+        "website": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "github.com"
+          }
+        ],
+        "zip": [
+          {
+            "sourceId": "userId:51770238",
+            "sourceType": "CRM_UI",
+            "timestamp": "2024-03-13T18:19:41.878000Z",
+            "updatedByUserId": 51770238,
+            "value": "94107"
+          }
+        ]
+      },
+      "updatedAt": "2024-04-05T16:00:34.976000Z"
+    }
+  ],
+  [
     "acmeCo/contacts",
     {
       "_meta": {
@@ -399,6 +1360,605 @@
         }
       },
       "vid": "51"
+    }
+  ],
+  [
+    "acmeCo/marketing_emails",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "activeDomain": "45386308.hs-sites.com",
+      "archived": false,
+      "businessUnitId": "0",
+      "content": {
+        "templatePath": "@hubspot/email/dnd/Plain_email.html",
+        "widgets": {
+          "primary_rich_text_module": {
+            "body": {
+              "html": "Hi there, <br> <br> Your ticket has been closed. Thanks for contacting our support team. We hope that your issue has been resolved to your satisfaction. <br> <br> Please don't hesitate to reach out if your issue isn't resolved.<br> <br> <strong> Request details </strong> <br> Contact email: {{contact.email}} <br> Date submitted: {{ticket.createdate}} <br> Reference number: {{ticket.hs_ticket_id}} <br> Issue: {{ticket.subject}} <br> Issue description: {{ticket.content}} <br>",
+              "module_id": 1155639
+            },
+            "id": "primary_rich_text_module",
+            "module_id": 1155639,
+            "name": "primary_rich_text_module",
+            "type": "module"
+          }
+        }
+      },
+      "createdAt": "2024-02-27T07:05:00.658Z",
+      "createdById": "100",
+      "deletedAt": "1970-01-01T00:00:00Z",
+      "from": {
+        "fromName": "support@45386308.hs-inbox.com",
+        "replyTo": "support@45386308.hs-inbox.com"
+      },
+      "id": 158518653207,
+      "isPublished": true,
+      "isTransactional": true,
+      "language": "en",
+      "name": "Ticket closed",
+      "publishDate": "2024-02-27T07:05:01.614Z",
+      "publishedById": "100",
+      "state": "AUTOMATED",
+      "subcategory": "ticket_closed_kickback_email",
+      "subject": "Your ticket '{{ticket.subject}}' has been closed",
+      "subscriptionDetails": {
+        "officeLocationId": "-1",
+        "subscriptionId": "-1"
+      },
+      "to": {
+        "limitSendFrequency": false,
+        "suppressGraymail": false
+      },
+      "type": "TICKET_EMAIL",
+      "updatedAt": "2024-02-27T07:05:01.976000Z",
+      "updatedById": "100"
+    }
+  ],
+  [
+    "acmeCo/marketing_emails",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "activeDomain": "45386308.hs-sites.com",
+      "archived": false,
+      "businessUnitId": "0",
+      "content": {
+        "templatePath": "@hubspot/email/dnd/Plain_email.html",
+        "widgets": {
+          "primary_rich_text_module": {
+            "body": {
+              "html": "Hi there, <br> Your request has been received and is being reviewed by our support team. We'll get back to you as soon as we can.<br> <br> <strong> Request details </strong> <br> Contact email: {{contact.email}} <br> Date submitted: {{ticket.createdate}} <br> Reference number: {{ticket.hs_ticket_id}} <br> Issue: {{ticket.subject}} <br> Issue description: {{ticket.content}} <br>",
+              "module_id": 1155639
+            },
+            "id": "primary_rich_text_module",
+            "module_id": 1155639,
+            "name": "primary_rich_text_module",
+            "type": "module"
+          }
+        }
+      },
+      "createdAt": "2024-02-27T07:05:02.194Z",
+      "createdById": "100",
+      "deletedAt": "1970-01-01T00:00:00Z",
+      "from": {
+        "fromName": "support@45386308.hs-inbox.com",
+        "replyTo": "support@45386308.hs-inbox.com"
+      },
+      "id": 158518708637,
+      "isPublished": true,
+      "isTransactional": true,
+      "language": "en",
+      "name": "Ticket received",
+      "publishDate": "2024-02-27T07:05:02.857Z",
+      "publishedById": "100",
+      "state": "AUTOMATED",
+      "subcategory": "ticket_opened_kickback_email",
+      "subject": "Your ticket '{{ticket.subject}}' has been received",
+      "subscriptionDetails": {
+        "officeLocationId": "158518862992",
+        "subscriptionId": "-1"
+      },
+      "to": {
+        "limitSendFrequency": false,
+        "suppressGraymail": false
+      },
+      "type": "TICKET_EMAIL",
+      "updatedAt": "2024-02-27T07:05:03.174000Z",
+      "updatedById": "100"
+    }
+  ],
+  [
+    "acmeCo/marketing_emails",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "activeDomain": "45386308.hs-sites.com",
+      "archived": false,
+      "businessUnitId": "0",
+      "campaign": "c92d1583-d11b-4d32-9b08-762c077060c0",
+      "campaignName": "Abandoned cart",
+      "content": {
+        "flexAreas": {
+          "main": {
+            "boxFirstElementIndex": null,
+            "boxLastElementIndex": null,
+            "boxed": false,
+            "isSingleColumnFullWidth": false,
+            "sections": [
+              {
+                "columns": [
+                  {
+                    "id": "column-0-0",
+                    "widgets": [
+                      "module-0-0-0"
+                    ],
+                    "width": 12
+                  }
+                ],
+                "id": "section-0",
+                "style": {
+                  "backgroundType": "CONTENT",
+                  "paddingBottom": "40px",
+                  "paddingTop": "40px",
+                  "stack": "LEFT_TO_RIGHT"
+                }
+              },
+              {
+                "columns": [
+                  {
+                    "id": "column-1-0",
+                    "widgets": [
+                      "module-1-0-0"
+                    ],
+                    "width": 12
+                  }
+                ],
+                "id": "section-1",
+                "style": {
+                  "backgroundColor": "",
+                  "backgroundType": "CONTENT",
+                  "paddingBottom": "0px",
+                  "paddingTop": "0px",
+                  "stack": "LEFT_TO_RIGHT"
+                }
+              }
+            ]
+          }
+        },
+        "styleSettings": {
+          "backgroundColor": "#ffffff",
+          "bodyBorderWidth": 1,
+          "bodyColor": "#ffffff",
+          "buttonStyleSettings": {
+            "backgroundColor": "#197FC4",
+            "cornerRadius": 8,
+            "fontStyle": {
+              "bold": false,
+              "color": "#ffffff",
+              "font": "Arial, sans-serif",
+              "italic": false,
+              "size": 16,
+              "underline": false
+            }
+          },
+          "dividerStyleSettings": {
+            "color": {
+              "color": "#000000",
+              "opacity": 100
+            },
+            "height": 1
+          },
+          "headingOneFont": {
+            "size": 28
+          },
+          "headingTwoFont": {
+            "size": 22
+          },
+          "linksFont": {
+            "bold": false,
+            "color": "#00a4bd",
+            "italic": false,
+            "underline": true
+          },
+          "primaryFont": "Arial, sans-serif",
+          "primaryFontColor": "#23496d",
+          "primaryFontSize": 15,
+          "secondaryFont": "Arial, sans-serif",
+          "secondaryFontColor": "#23496d",
+          "secondaryFontSize": 12
+        },
+        "templatePath": "@hubspot/email/dnd/plain_text.html",
+        "widgets": {
+          "module-0-0-0": {
+            "body": {
+              "css_class": "dnd-module",
+              "html": "<p style=\"margin-bottom:10px;\">Hello {{ contact.firstname }},<br><br>Plain text emails have minimal formatting so your reader can really focus on what you have to say. Introduce yourself and explain why you\u2019re reaching out.</p><p style=\"margin-bottom:10px;\">Every email should try to lead the reader to some kind of action. Use this space to describe why the reader should want to click on the link below. Put the link on its own line to really draw their eye to it.</p><p style=\"margin-bottom:10px;\"><a target=\"_blank\" rel=\"noopener\">Link text</a></p><p style=\"margin-bottom:10px;\">Now it\u2019s time to wrap up your email. Before your signature, thank the recipient for reading. You can also invite them to send this email to any of their colleagues who might be interested.</p><p style=\"margin-bottom:10px;\">All the best,<br>Your full name<br>Your job title<br>Other contact information</p>",
+              "i18nKey": "richText.plainText",
+              "lineNumber": 32,
+              "parent_widget_container": null,
+              "path": "@hubspot/rich_text",
+              "schema_version": 2,
+              "startPosition": 19
+            },
+            "child_css": {},
+            "css": {},
+            "id": "module-0-0-0",
+            "label": null,
+            "module_id": 1155639,
+            "name": "module-0-0-0",
+            "order": 2,
+            "smart_type": null,
+            "styles": {},
+            "type": "module"
+          },
+          "module-1-0-0": {
+            "body": {
+              "align": "center",
+              "css_class": "dnd-module",
+              "font": {
+                "color": "#23496d",
+                "font": "Arial, sans-serif",
+                "size": {
+                  "units": "px",
+                  "value": 12
+                }
+              },
+              "lineNumber": 61,
+              "link_font": {
+                "color": "#00a4bd",
+                "font": "Helvetica,Arial,sans-serif",
+                "size": {
+                  "units": "px",
+                  "value": 12
+                },
+                "styles": {
+                  "bold": false,
+                  "italic": false,
+                  "underline": true
+                }
+              },
+              "parent_widget_container": null,
+              "path": "@hubspot/email_footer",
+              "schema_version": 2,
+              "startPosition": -697,
+              "unsubscribe_link_type": "both"
+            },
+            "child_css": {},
+            "css": {},
+            "id": "module-1-0-0",
+            "label": null,
+            "module_id": 2869621,
+            "name": "module-1-0-0",
+            "order": 3,
+            "smart_type": null,
+            "styles": {},
+            "type": "module"
+          },
+          "preview_text": {
+            "body": {
+              "value": ""
+            },
+            "child_css": {},
+            "css": {},
+            "id": "preview_text",
+            "label": "Preview Text <span class=help-text>This will be used as the preview text that displays in some email clients</span>",
+            "name": "preview_text",
+            "order": 0,
+            "smart_type": null,
+            "styles": {},
+            "type": "text"
+          }
+        }
+      },
+      "createdAt": "2024-03-06T13:58:43.414Z",
+      "createdById": "51770238",
+      "deletedAt": "1970-01-01T00:00:00Z",
+      "from": {
+        "fromName": "Luis Henrique",
+        "replyTo": "leofs123@gmail.com"
+      },
+      "id": 159647332871,
+      "isPublished": false,
+      "isTransactional": false,
+      "language": "en",
+      "name": "New email",
+      "publishDate": "2024-03-06T13:58:59Z",
+      "sendOnPublish": true,
+      "state": "DRAFT",
+      "subcategory": "batch",
+      "subject": "",
+      "subscriptionDetails": {
+        "officeLocationId": "158518862992",
+        "subscriptionId": "308082190"
+      },
+      "to": {
+        "contactIds": {
+          "exclude": [],
+          "include": []
+        },
+        "contactLists": {
+          "exclude": [],
+          "include": []
+        },
+        "suppressGraymail": true
+      },
+      "type": "BATCH_EMAIL",
+      "updatedAt": "2024-03-06T13:58:59.797000Z",
+      "updatedById": "51770238"
+    }
+  ],
+  [
+    "acmeCo/marketing_emails",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "activeDomain": "45386308.hs-sites.com",
+      "archived": false,
+      "businessUnitId": "0",
+      "content": {
+        "flexAreas": {
+          "main": {
+            "boxFirstElementIndex": null,
+            "boxLastElementIndex": null,
+            "boxed": false,
+            "isSingleColumnFullWidth": false,
+            "sections": [
+              {
+                "columns": [
+                  {
+                    "id": "column-0-0",
+                    "widgets": [
+                      "module-0-0-0"
+                    ],
+                    "width": 12
+                  }
+                ],
+                "id": "section-0",
+                "style": {
+                  "backgroundColor": "#eaf0f6",
+                  "backgroundType": "CONTENT",
+                  "paddingBottom": "10px",
+                  "paddingTop": "10px",
+                  "stack": "LEFT_TO_RIGHT"
+                }
+              },
+              {
+                "columns": [
+                  {
+                    "id": "column-1-0",
+                    "widgets": [
+                      "module-1-0-0"
+                    ],
+                    "width": 12
+                  }
+                ],
+                "id": "section-1",
+                "style": {
+                  "backgroundType": "CONTENT",
+                  "paddingBottom": "30px",
+                  "paddingTop": "30px",
+                  "stack": "LEFT_TO_RIGHT"
+                }
+              },
+              {
+                "columns": [
+                  {
+                    "id": "column-2-0",
+                    "widgets": [
+                      "module-2-0-0"
+                    ],
+                    "width": 12
+                  }
+                ],
+                "id": "section-2",
+                "style": {
+                  "backgroundColor": "",
+                  "backgroundType": "CONTENT",
+                  "paddingBottom": "20px",
+                  "paddingTop": "20px",
+                  "stack": "LEFT_TO_RIGHT"
+                }
+              }
+            ]
+          }
+        },
+        "styleSettings": {
+          "backgroundColor": "#EAF0F6",
+          "bodyBorderColor": "#EAF0F6",
+          "bodyBorderColorChoice": "BORDER_MANUAL",
+          "bodyBorderWidth": 1,
+          "bodyColor": "#ffffff",
+          "buttonStyleSettings": {
+            "backgroundColor": "#00a4bd",
+            "cornerRadius": 8,
+            "fontStyle": {
+              "bold": false,
+              "color": "#ffffff",
+              "font": "Arial, sans-serif",
+              "italic": false,
+              "size": 16,
+              "underline": false
+            }
+          },
+          "dividerStyleSettings": {
+            "color": {
+              "color": "#23496d",
+              "opacity": 100
+            },
+            "height": 1,
+            "lineType": "solid"
+          },
+          "headingOneFont": {
+            "size": 28
+          },
+          "headingTwoFont": {
+            "size": 22
+          },
+          "linksFont": {
+            "bold": false,
+            "color": "#00a4bd",
+            "italic": false,
+            "underline": true
+          },
+          "primaryFont": "Arial, sans-serif",
+          "primaryFontColor": "#23496d",
+          "primaryFontSize": 15,
+          "secondaryFont": "Arial, sans-serif",
+          "secondaryFontColor": "#23496d",
+          "secondaryFontSize": 12
+        },
+        "templatePath": "@hubspot/email/dnd/welcome.html",
+        "widgets": {
+          "module-0-0-0": {
+            "body": {
+              "alignment": "center",
+              "css_class": "dnd-module",
+              "hs_enable_module_padding": true,
+              "img": {
+                "alt": "HubSpot logo orange",
+                "height": 72,
+                "src": "https://static.hsappstatic.net/TemplateAssets/static-1.262/img/hs_default_template_images/email_dnd_template_images/company-logo-orange.png",
+                "width": 240
+              },
+              "lineNumber": 37,
+              "parent_widget_container": null,
+              "path": "@hubspot/image_email",
+              "schema_version": 2,
+              "startPosition": -241
+            },
+            "child_css": {},
+            "css": {},
+            "id": "module-0-0-0",
+            "label": null,
+            "module_id": 1367093,
+            "name": "module-0-0-0",
+            "order": 1,
+            "smart_type": null,
+            "styles": {},
+            "type": "module"
+          },
+          "module-1-0-0": {
+            "body": {
+              "css_class": "dnd-module",
+              "html": "<p style=\"margin-bottom:10px;\">Welcome friend, thank the reader for signing up to your newsletter and welcome them on board. Below your introduction, add a few links to some popular pages or posts on your website to give the reader an idea of what\u2019s to come.<br></p><ol><li><strong>Showcase your best stories<br></strong>Give an overview of an existing blog post or a popular story from a previous newsletter. Be sure to add a <a target=\"_blank\" href=\"\">link</a> so the reader can learn more.<br><br></li><li><strong>Help people get to know you<br></strong>Share a link to your website\u2019s <a target=\"_blank\" href=\"\">about us</a> page where the reader can learn more about you and your community.<br><br></li><li><strong>Keep the conversation going<br></strong>Tell your reader how they can get in touch if they have questions.</li></ol><p style=\"margin-bottom:10px;\">Thanks,<br>The Your Company Name team</p>",
+              "i18nKey": "richText.welcome.primary",
+              "lineNumber": 47,
+              "parent_widget_container": null,
+              "path": "@hubspot/rich_text",
+              "schema_version": 2,
+              "startPosition": 19
+            },
+            "child_css": {},
+            "css": {},
+            "id": "module-1-0-0",
+            "label": null,
+            "module_id": 1155639,
+            "name": "module-1-0-0",
+            "order": 3,
+            "smart_type": null,
+            "styles": {},
+            "type": "module"
+          },
+          "module-2-0-0": {
+            "body": {
+              "align": "center",
+              "css_class": "dnd-module",
+              "font": {
+                "color": "#23496d",
+                "font": "Arial, sans-serif",
+                "size": {
+                  "units": "px",
+                  "value": 12
+                }
+              },
+              "hs_enable_module_padding": false,
+              "lineNumber": 76,
+              "link_font": {
+                "color": "#00a4bd",
+                "font": "Helvetica,Arial,sans-serif",
+                "size": {
+                  "units": "px",
+                  "value": 12
+                },
+                "styles": {
+                  "bold": false,
+                  "italic": false,
+                  "underline": true
+                }
+              },
+              "parent_widget_container": null,
+              "path": "@hubspot/email_footer",
+              "schema_version": 2,
+              "startPosition": -729,
+              "unsubscribe_link_type": "both"
+            },
+            "child_css": {},
+            "css": {},
+            "id": "module-2-0-0",
+            "label": null,
+            "module_id": 2869621,
+            "name": "module-2-0-0",
+            "order": 4,
+            "smart_type": null,
+            "styles": {},
+            "type": "module"
+          },
+          "preview_text": {
+            "body": {
+              "value": ""
+            },
+            "child_css": {},
+            "css": {},
+            "id": "preview_text",
+            "label": "Preview Text <span class=help-text>This will be used as the preview text that displays in some email clients</span>",
+            "name": "preview_text",
+            "order": 0,
+            "smart_type": null,
+            "styles": {},
+            "type": "text"
+          }
+        }
+      },
+      "createdAt": "2024-03-13T18:28:47.620Z",
+      "createdById": "51770238",
+      "deletedAt": "1970-01-01T00:00:00Z",
+      "from": {
+        "fromName": "Luis Henrique",
+        "replyTo": "leofs123@gmail.com"
+      },
+      "id": 160599935909,
+      "isPublished": false,
+      "isTransactional": false,
+      "language": "en",
+      "name": "New email",
+      "publishDate": "2024-03-13T18:28:59Z",
+      "sendOnPublish": true,
+      "state": "DRAFT",
+      "subcategory": "batch",
+      "subject": "",
+      "subscriptionDetails": {
+        "officeLocationId": "158518862992",
+        "subscriptionId": "308082190"
+      },
+      "to": {
+        "contactIds": {
+          "exclude": [],
+          "include": []
+        },
+        "contactLists": {
+          "exclude": [],
+          "include": []
+        },
+        "suppressGraymail": true
+      },
+      "type": "BATCH_EMAIL",
+      "updatedAt": "2024-03-13T18:28:59.892000Z",
+      "updatedById": "51770238"
     }
   ],
   [
