@@ -10,6 +10,7 @@ import itertools
 from copy import deepcopy
 import oracledb
 import inspect
+from jinja2 import Template
 
 
 from .models import (
@@ -17,11 +18,6 @@ from .models import (
     OracleColumn,
     EndpointConfig,
     Table,
-)
-
-from estuary_cdk.capture.common import (
-    PageCursor,
-    LogCursor,
 )
 
 
@@ -70,14 +66,12 @@ async def fetch_columns(
                 ) c
         ON (t.table_name = c.table_name AND t.column_name = c.column_name)
     """
-    log.info(query)
 
     columns = []
     for values in cursor.execute(query):
         cols = [col[0] for col in cursor.description]
         row = dict(zip(cols, values))
         row = {k: v for (k, v) in row.items() if v is not None}
-        log.info(row)
         columns.append(OracleColumn(**row))
 
     return columns
@@ -87,9 +81,82 @@ async def fetch_rows(
     # Closed over via functools.partial:
     table: Table,
     conn: oracledb.Connection,
+    cursor: list[str],
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
     cutoff: datetime,
-) -> AsyncGenerator[dict, None]:
-    yield {}
+) -> AsyncGenerator[dict | str, None]:
+    is_first_query = page is None
+    query = query_template.render(table_name=table.table_name,
+                                  cursor_fields=cursor,
+                                  is_first_query=is_first_query)
+
+    c = conn.cursor()
+    last_row = None
+    bind_params = {}
+    if page is not None:
+        bind_params['cursor_1'] = page
+    log.info(query)
+    for values in c.execute(query, bind_params):
+        cols = [col[0] for col in c.description]
+        row = dict(zip(cols, values))
+        row = {k.lower(): v for (k, v) in row.items() if v is not None}
+        last_row = row
+
+        yield row
+
+    if last_row is not None and len(cursor) > 0:
+        yield str(last_row[cursor[0]])
+    else:
+        return
+
+query_template = Template("""
+{#***********************************************************
+  * This is a generic query template which is provided so that *
+  * discovered bindings can have a vaguely reasonable default  *
+  * behavior.                                                  *
+  *                                                            *
+  * You are entirely free to delete this template and replace  *
+  * it with whatever query you want to execute. Just be aware  *
+  * that this query will be executed over and over every poll  *
+  * interval, and if you intend to lower the polling interval  *
+  * from its default of 24h you should probably try and use a  *
+  * cursor to capture only new rows each time.                 *
+  *                                                            *
+  * By default this template generates a 'SELECT * FROM table' *
+  * query which will read the whole table on each poll.        *
+  *                                                            *
+  * If the table has a suitable "cursor" column (or columns)   *
+  * which can be used to identify only changed rows, add the   *
+  * name(s) to the "Cursor" property of this binding. If you   *
+  * do that, the generated query will have the form:           *
+  *                                                            *
+  *     SELECT * FROM table                                    *
+  *       WHERE (ka > :0) OR (ka = :0 AND kb > :1)             *
+  *       ORDER BY ka, kb;                                     *
+  *                                                            *
+  * This can be used to incrementally capture new rows if the  *
+  * table has a serial ID column or a 'created_at' timestamp,  *
+  * or it could be used to capture updated rows if the table   *
+  * has an 'updated_at' timestamp.                             *
+  ***********************************************************/ #}
+{% if cursor_fields|length %}
+  {% if is_first_query %}
+    SELECT * FROM {{ table_name }}
+  {% else %}
+    SELECT * FROM {{ table_name }}
+	{% for k in cursor_fields %}
+      {% set outer_loop = loop %}
+	  {% if loop.first %} WHERE ({% else %}) OR ({% endif %}
+      {% for n in cursor_fields %}
+		{% if loop.index < outer_loop.index %}
+          {{ n }} = :cursor_{{loop.index}} AND {% endif %}
+	  {% endfor %}
+	  {{ k }} > :cursor_{{loop.index}}
+	{% endfor %}
+	)
+  {% endif %} ORDER BY {% for k in cursor_fields %}{% if not loop.first %}, {% endif %}{{k}}{% endfor %}
+{% else %}
+  SELECT * FROM {{ table_name }}
+{% endif %}""")
