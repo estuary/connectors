@@ -6,485 +6,75 @@
         "op": "u"
       },
       "archived": false,
+      "createdAt": "2024-02-27T07:05:09.191000Z",
+      "id": 1,
+      "properties": {
+        "createdate": "2024-02-27T07:05:09.191Z",
+        "email": "emailmaria@hubspot.com",
+        "firstname": "Maria",
+        "hs_object_id": "1",
+        "lastmodifieddate": "2024-04-17T17:24:26.055Z",
+        "lastname": "Johnson (Sample Contact)",
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_opportunity": "redacted"
+      },
+      "propertiesWithHistory": {
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_opportunity": "redacted"
+      },
+      "updatedAt": "2024-04-17T17:24:26.055000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "archived": false,
+      "createdAt": "2024-02-27T07:05:09.683000Z",
+      "id": 51,
+      "properties": {
+        "createdate": "2024-02-27T07:05:09.683Z",
+        "email": "bh@hubspot.com",
+        "firstname": "Brian",
+        "hs_object_id": "51",
+        "lastmodifieddate": "2024-04-17T17:22:20.068Z",
+        "lastname": "Halligan (Sample Contact)",
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_opportunity": "redacted"
+      },
+      "propertiesWithHistory": {
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_opportunity": "redacted"
+      },
+      "updatedAt": "2024-04-17T17:22:20.068000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "archived": false,
       "createdAt": "2024-04-16T03:42:41.810000Z",
       "id": 12791224888,
       "properties": {
         "createdate": "2024-04-16T03:42:41.810Z",
         "email": "test2@test.com",
         "firstname": "Joe2",
-        "hs_all_assigned_business_unit_ids": "0",
-        "hs_all_owner_ids": "750122779",
-        "hs_analytics_average_page_views": "0",
-        "hs_analytics_first_timestamp": "2024-04-16T03:42:41.810Z",
-        "hs_analytics_num_event_completions": "0",
-        "hs_analytics_num_page_views": "0",
-        "hs_analytics_num_visits": "0",
-        "hs_analytics_revenue": "0.0",
-        "hs_analytics_source": "OFFLINE",
-        "hs_analytics_source_data_1": "CRM_UI",
-        "hs_analytics_source_data_2": "userId:51770238",
-        "hs_count_is_unworked": "1",
-        "hs_count_is_worked": "0",
-        "hs_created_by_user_id": "51770238",
-        "hs_date_entered_lead": "2024-04-16T03:42:41.810Z",
-        "hs_is_unworked": "true",
-        "hs_latest_source": "OFFLINE",
-        "hs_latest_source_data_1": "CRM_UI",
-        "hs_latest_source_data_2": "userId:51770238",
-        "hs_latest_source_timestamp": "2024-04-16T03:42:41.934Z",
-        "hs_lifecyclestage_lead_date": "2024-04-16T03:42:41.810Z",
-        "hs_marketable_status": "false",
-        "hs_marketable_until_renewal": "false",
         "hs_object_id": "12791224888",
-        "hs_object_source": "CRM_UI",
-        "hs_object_source_id": "userId:51770238",
-        "hs_object_source_label": "CRM_UI",
-        "hs_object_source_user_id": "51770238",
-        "hs_pipeline": "contacts-lifecycle-pipeline",
-        "hs_predictivecontactscore_v2": "3.6",
-        "hs_sequences_actively_enrolled_count": "0",
-        "hs_social_facebook_clicks": "0",
-        "hs_social_google_plus_clicks": "0",
-        "hs_social_linkedin_clicks": "0",
-        "hs_social_num_broadcast_clicks": "0",
-        "hs_social_twitter_clicks": "0",
-        "hs_time_in_lead": "redacted",
-        "hs_updated_by_user_id": "51770238",
-        "hs_user_ids_of_all_owners": "51770238",
-        "hs_v2_date_entered_lead": "2024-04-16T03:42:41.810Z",
-        "hubspot_owner_assigneddate": "2024-04-16T03:42:41.810Z",
-        "hubspot_owner_id": "750122779",
-        "lastmodifieddate": "2024-04-16T03:43:09.380Z",
+        "lastmodifieddate": "2024-04-17T17:22:27.348Z",
         "lastname": "Doe2",
-        "lifecyclestage": "lead",
+        "hs_time_in_lead": "redacted",
         "hs_time_in_opportunity": "redacted"
       },
       "propertiesWithHistory": {
-        "createdate": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "email": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "test2@test.com"
-          }
-        ],
-        "firstname": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "Joe2"
-          }
-        ],
-        "hs_all_assigned_business_unit_ids": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "0"
-          }
-        ],
-        "hs_all_owner_ids": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "750122779"
-          }
-        ],
-        "hs_analytics_average_page_views": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_first_timestamp": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "hs_analytics_num_event_completions": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_num_page_views": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_num_visits": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_revenue": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0.0"
-          }
-        ],
-        "hs_analytics_source": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "OFFLINE"
-          }
-        ],
-        "hs_analytics_source_data_1": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_analytics_source_data_2": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "userId:51770238"
-          }
-        ],
-        "hs_count_is_unworked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "1"
-          }
-        ],
-        "hs_count_is_worked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "0"
-          }
-        ],
-        "hs_created_by_user_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "hs_is_unworked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "true"
-          }
-        ],
-        "hs_latest_source": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "OFFLINE"
-          }
-        ],
-        "hs_latest_source_data_1": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_latest_source_data_2": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "userId:51770238"
-          }
-        ],
-        "hs_latest_source_timestamp": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "2024-04-16T03:42:41.934Z"
-          }
-        ],
-        "hs_lifecyclestage_lead_date": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "hs_marketable_status": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "false"
-          }
-        ],
-        "hs_marketable_until_renewal": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "false"
-          }
-        ],
-        "hs_object_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "12791224888"
-          }
-        ],
-        "hs_object_source": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_object_source_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "userId:51770238"
-          }
-        ],
-        "hs_object_source_label": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_object_source_user_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_pipeline": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "contacts-lifecycle-pipeline"
-          }
-        ],
-        "hs_predictivecontactscore_v2": [
-          {
-            "sourceId": "DataPrediction",
-            "sourceLabel": "HubSpot Predictive Contact Scoring Model",
-            "sourceType": "AI_GROUP",
-            "timestamp": "2024-04-16T03:42:45.867000Z",
-            "value": "3.6"
-          }
-        ],
-        "hs_sequences_actively_enrolled_count": [
-          {
-            "sourceId": "RollupProperties",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:42:43.509000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_facebook_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_google_plus_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_linkedin_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_num_broadcast_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_twitter_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "0"
-          }
-        ],
         "hs_time_in_lead": "redacted",
-        "hs_updated_by_user_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_user_ids_of_all_owners": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_v2_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:43:09.356000Z",
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "hubspot_owner_assigneddate": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "hubspot_owner_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "750122779"
-          }
-        ],
-        "lastmodifieddate": [
-          {
-            "sourceType": "API",
-            "timestamp": "2024-04-16T03:43:09.380000Z",
-            "value": "2024-04-16T03:43:09.380Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-04-16T03:42:47.940000Z",
-            "value": "2024-04-16T03:42:47.940Z"
-          },
-          {
-            "sourceId": "DataPrediction",
-            "sourceType": "AI_GROUP",
-            "timestamp": "2024-04-16T03:42:46.249000Z",
-            "value": "2024-04-16T03:42:46.249Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T03:42:43.593000Z",
-            "value": "2024-04-16T03:42:43.593Z"
-          },
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T03:42:41.810Z"
-          }
-        ],
-        "lastname": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "Doe2"
-          }
-        ],
-        "lifecyclestage": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T03:42:41.810000Z",
-            "updatedByUserId": 51770238,
-            "value": "lead"
-          }
-        ],
         "hs_time_in_opportunity": "redacted"
       },
-      "updatedAt": "2024-04-16T03:43:09.380000Z"
+      "updatedAt": "2024-04-17T17:22:27.348000Z"
     }
   ],
   [
@@ -500,479 +90,160 @@
         "createdate": "2024-04-16T02:30:56.919Z",
         "email": "test@test.com",
         "firstname": "Joe",
-        "hs_all_assigned_business_unit_ids": "0",
-        "hs_all_owner_ids": "750122779",
-        "hs_analytics_average_page_views": "0",
-        "hs_analytics_first_timestamp": "2024-04-16T02:30:56.919Z",
-        "hs_analytics_num_event_completions": "0",
-        "hs_analytics_num_page_views": "0",
-        "hs_analytics_num_visits": "0",
-        "hs_analytics_revenue": "0.0",
-        "hs_analytics_source": "OFFLINE",
-        "hs_analytics_source_data_1": "CRM_UI",
-        "hs_analytics_source_data_2": "userId:51770238",
-        "hs_count_is_unworked": "1",
-        "hs_count_is_worked": "0",
-        "hs_created_by_user_id": "51770238",
-        "hs_date_entered_lead": "2024-04-16T02:30:56.919Z",
-        "hs_is_unworked": "true",
-        "hs_latest_source": "OFFLINE",
-        "hs_latest_source_data_1": "CRM_UI",
-        "hs_latest_source_data_2": "userId:51770238",
-        "hs_latest_source_timestamp": "2024-04-16T02:30:57.049Z",
-        "hs_lifecyclestage_lead_date": "2024-04-16T02:30:56.919Z",
-        "hs_marketable_status": "false",
-        "hs_marketable_until_renewal": "false",
         "hs_object_id": "12794981224",
-        "hs_object_source": "CRM_UI",
-        "hs_object_source_id": "userId:51770238",
-        "hs_object_source_label": "CRM_UI",
-        "hs_object_source_user_id": "51770238",
-        "hs_pipeline": "contacts-lifecycle-pipeline",
-        "hs_predictivecontactscore_v2": "3.6",
-        "hs_sequences_actively_enrolled_count": "0",
-        "hs_social_facebook_clicks": "0",
-        "hs_social_google_plus_clicks": "0",
-        "hs_social_linkedin_clicks": "0",
-        "hs_social_num_broadcast_clicks": "0",
-        "hs_social_twitter_clicks": "0",
-        "hs_time_in_lead": "redacted",
-        "hs_updated_by_user_id": "51770238",
-        "hs_user_ids_of_all_owners": "51770238",
-        "hs_v2_date_entered_lead": "2024-04-16T02:30:56.919Z",
-        "hubspot_owner_assigneddate": "2024-04-16T02:30:56.919Z",
-        "hubspot_owner_id": "750122779",
-        "lastmodifieddate": "2024-04-16T02:31:23.976Z",
+        "lastmodifieddate": "2024-04-17T17:20:36.783Z",
         "lastname": "Doe",
-        "lifecyclestage": "lead",
+        "hs_time_in_lead": "redacted",
         "hs_time_in_opportunity": "redacted"
       },
       "propertiesWithHistory": {
-        "createdate": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "email": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "test@test.com"
-          }
-        ],
-        "firstname": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "Joe"
-          }
-        ],
-        "hs_all_assigned_business_unit_ids": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "0"
-          }
-        ],
-        "hs_all_owner_ids": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "750122779"
-          }
-        ],
-        "hs_analytics_average_page_views": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_first_timestamp": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "hs_analytics_num_event_completions": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_num_page_views": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_num_visits": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_revenue": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0.0"
-          }
-        ],
-        "hs_analytics_source": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "OFFLINE"
-          }
-        ],
-        "hs_analytics_source_data_1": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_analytics_source_data_2": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "userId:51770238"
-          }
-        ],
-        "hs_count_is_unworked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "1"
-          }
-        ],
-        "hs_count_is_worked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "0"
-          }
-        ],
-        "hs_created_by_user_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "hs_is_unworked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "true"
-          }
-        ],
-        "hs_latest_source": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "OFFLINE"
-          }
-        ],
-        "hs_latest_source_data_1": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_latest_source_data_2": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "userId:51770238"
-          }
-        ],
-        "hs_latest_source_timestamp": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "2024-04-16T02:30:57.049Z"
-          }
-        ],
-        "hs_lifecyclestage_lead_date": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "hs_marketable_status": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "false"
-          }
-        ],
-        "hs_marketable_until_renewal": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "false"
-          }
-        ],
-        "hs_object_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "12794981224"
-          }
-        ],
-        "hs_object_source": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_object_source_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "userId:51770238"
-          }
-        ],
-        "hs_object_source_label": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "CRM_UI"
-          }
-        ],
-        "hs_object_source_user_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_pipeline": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "contacts-lifecycle-pipeline"
-          }
-        ],
-        "hs_predictivecontactscore_v2": [
-          {
-            "sourceId": "DataPrediction",
-            "sourceLabel": "HubSpot Predictive Contact Scoring Model",
-            "sourceType": "AI_GROUP",
-            "timestamp": "2024-04-16T02:31:22.568000Z",
-            "value": "3.6"
-          }
-        ],
-        "hs_sequences_actively_enrolled_count": [
-          {
-            "sourceId": "RollupProperties",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:30:58.315000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_facebook_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_google_plus_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_linkedin_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_num_broadcast_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_twitter_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "0"
-          }
-        ],
         "hs_time_in_lead": "redacted",
-        "hs_updated_by_user_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_user_ids_of_all_owners": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "51770238"
-          }
-        ],
-        "hs_v2_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:31:00.798000Z",
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "hubspot_owner_assigneddate": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "hubspot_owner_id": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "750122779"
-          }
-        ],
-        "lastmodifieddate": [
-          {
-            "sourceId": "DataPrediction",
-            "sourceType": "AI_GROUP",
-            "timestamp": "2024-04-16T02:31:23.976000Z",
-            "value": "2024-04-16T02:31:23.976Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-04-16T02:31:16.770000Z",
-            "value": "2024-04-16T02:31:16.770Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-04-16T02:31:00.809000Z",
-            "value": "2024-04-16T02:31:00.809Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-04-16T02:30:58.328000Z",
-            "value": "2024-04-16T02:30:58.328Z"
-          },
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "2024-04-16T02:30:56.919Z"
-          }
-        ],
-        "lastname": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "Doe"
-          }
-        ],
-        "lifecyclestage": [
-          {
-            "sourceId": "userId:51770238",
-            "sourceType": "CRM_UI",
-            "timestamp": "2024-04-16T02:30:56.919000Z",
-            "updatedByUserId": 51770238,
-            "value": "lead"
-          }
-        ],
         "hs_time_in_opportunity": "redacted"
       },
-      "updatedAt": "2024-04-16T02:31:23.976000Z"
+      "updatedAt": "2024-04-17T17:20:36.783000Z"
+    }
+  ],
+  [
+    "acmeCo/deals",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "archived": false,
+      "createdAt": "2024-04-17T13:30:08.918000Z",
+      "id": 18705140068,
+      "properties": {
+        "closedate": "2024-04-30T13:30:01.951Z",
+        "createdate": "2024-04-17T13:30:08.918Z",
+        "dealname": "TestDeao",
+        "dealstage": "appointmentscheduled",
+        "hs_lastmodifieddate": "2024-04-17T14:31:11.774Z",
+        "hs_object_id": "18705140068",
+        "pipeline": "default",
+        "hs_time_in_appointmentscheduled": "redacted"
+      },
+      "propertiesWithHistory": {
+        "hs_time_in_appointmentscheduled": "redacted"
+      },
+      "updatedAt": "2024-04-17T14:31:11.774000Z"
+    }
+  ],
+  [
+    "acmeCo/contacts_lists_subscription",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "addedAt": 1709017509260,
+      "canonical-vid": 1,
+      "form-submissions": [],
+      "identity-profiles": [
+        {
+          "deleted-changed-timestamp": 0,
+          "identities": [
+            {
+              "is-primary": true,
+              "timestamp": 1709017509181,
+              "type": "EMAIL",
+              "value": "emailmaria@hubspot.com"
+            },
+            {
+              "timestamp": 1709017509257,
+              "type": "LEAD_GUID",
+              "value": "c52f59c6-4b15-44e6-940c-8952723ebdc3"
+            }
+          ],
+          "saved-at-timestamp": 1709017509260,
+          "vid": 1
+        }
+      ],
+      "is-contact": true,
+      "list-memberships": [
+        {
+          "internal-list-id": 2147483643,
+          "is-member": true,
+          "static-list-id": 1,
+          "timestamp": 1709027977790,
+          "vid": 1
+        }
+      ],
+      "merge-audits": [],
+      "merged-vids": [],
+      "portal-id": 45386308,
+      "properties": {
+        "company": {
+          "value": "HubSpot"
+        },
+        "firstname": {
+          "value": "Maria"
+        },
+        "lastmodifieddate": {
+          "value": "1713374666055"
+        },
+        "lastname": {
+          "value": "Johnson (Sample Contact)"
+        }
+      },
+      "vid": "1"
+    }
+  ],
+  [
+    "acmeCo/contacts_lists_subscription",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "addedAt": 1709017509260,
+      "canonical-vid": 1,
+      "form-submissions": [],
+      "identity-profiles": [
+        {
+          "deleted-changed-timestamp": 0,
+          "identities": [
+            {
+              "is-primary": true,
+              "timestamp": 1709017509181,
+              "type": "EMAIL",
+              "value": "emailmaria@hubspot.com"
+            },
+            {
+              "timestamp": 1709017509257,
+              "type": "LEAD_GUID",
+              "value": "c52f59c6-4b15-44e6-940c-8952723ebdc3"
+            }
+          ],
+          "saved-at-timestamp": 1709017509260,
+          "vid": 1
+        }
+      ],
+      "is-contact": true,
+      "list-memberships": [
+        {
+          "internal-list-id": 2147483643,
+          "is-member": true,
+          "static-list-id": 1,
+          "timestamp": 1709027977790,
+          "vid": 1
+        }
+      ],
+      "merge-audits": [],
+      "merged-vids": [],
+      "portal-id": 45386308,
+      "properties": {
+        "company": {
+          "value": "HubSpot"
+        },
+        "firstname": {
+          "value": "Maria"
+        },
+        "lastmodifieddate": {
+          "value": "1713374666055"
+        },
+        "lastname": {
+          "value": "Johnson (Sample Contact)"
+        }
+      },
+      "vid": "1"
     }
   ],
   [
@@ -1014,7 +285,7 @@
           "value": "Joe2"
         },
         "lastmodifieddate": {
-          "value": "1713238989380"
+          "value": "1713374547348"
         },
         "lastname": {
           "value": "Doe2"
@@ -1062,7 +333,7 @@
           "value": "Joe"
         },
         "lastmodifieddate": {
-          "value": "1713234683976"
+          "value": "1713374436783"
         },
         "lastname": {
           "value": "Doe"
@@ -1072,602 +343,62 @@
     }
   ],
   [
-    "acmeCo/marketing_emails",
+    "acmeCo/contacts_lists_subscription",
     {
       "_meta": {
         "op": "u"
       },
-      "activeDomain": "45386308.hs-sites.com",
-      "archived": false,
-      "businessUnitId": "0",
-      "content": {
-        "templatePath": "@hubspot/email/dnd/Plain_email.html",
-        "widgets": {
-          "primary_rich_text_module": {
-            "body": {
-              "html": "Hi there, <br> <br> Your ticket has been closed. Thanks for contacting our support team. We hope that your issue has been resolved to your satisfaction. <br> <br> Please don't hesitate to reach out if your issue isn't resolved.<br> <br> <strong> Request details </strong> <br> Contact email: {{contact.email}} <br> Date submitted: {{ticket.createdate}} <br> Reference number: {{ticket.hs_ticket_id}} <br> Issue: {{ticket.subject}} <br> Issue description: {{ticket.content}} <br>",
-              "module_id": 1155639
+      "addedAt": 1709017509777,
+      "canonical-vid": 51,
+      "form-submissions": [],
+      "identity-profiles": [
+        {
+          "deleted-changed-timestamp": 0,
+          "identities": [
+            {
+              "is-primary": true,
+              "timestamp": 1709017509181,
+              "type": "EMAIL",
+              "value": "bh@hubspot.com"
             },
-            "id": "primary_rich_text_module",
-            "module_id": 1155639,
-            "name": "primary_rich_text_module",
-            "type": "module"
-          }
-        }
-      },
-      "createdAt": "2024-02-27T07:05:00.658Z",
-      "createdById": "100",
-      "deletedAt": "1970-01-01T00:00:00Z",
-      "from": {
-        "fromName": "support@45386308.hs-inbox.com",
-        "replyTo": "support@45386308.hs-inbox.com"
-      },
-      "id": 158518653207,
-      "isPublished": true,
-      "isTransactional": true,
-      "language": "en",
-      "name": "Ticket closed",
-      "publishDate": "2024-02-27T07:05:01.614Z",
-      "publishedById": "100",
-      "state": "AUTOMATED",
-      "subcategory": "ticket_closed_kickback_email",
-      "subject": "Your ticket '{{ticket.subject}}' has been closed",
-      "subscriptionDetails": {
-        "officeLocationId": "-1",
-        "subscriptionId": "-1"
-      },
-      "to": {
-        "limitSendFrequency": false,
-        "suppressGraymail": false
-      },
-      "type": "TICKET_EMAIL",
-      "updatedAt": "2024-02-27T07:05:01.976000Z",
-      "updatedById": "100"
-    }
-  ],
-  [
-    "acmeCo/marketing_emails",
-    {
-      "_meta": {
-        "op": "u"
-      },
-      "activeDomain": "45386308.hs-sites.com",
-      "archived": false,
-      "businessUnitId": "0",
-      "content": {
-        "templatePath": "@hubspot/email/dnd/Plain_email.html",
-        "widgets": {
-          "primary_rich_text_module": {
-            "body": {
-              "html": "Hi there, <br> Your request has been received and is being reviewed by our support team. We'll get back to you as soon as we can.<br> <br> <strong> Request details </strong> <br> Contact email: {{contact.email}} <br> Date submitted: {{ticket.createdate}} <br> Reference number: {{ticket.hs_ticket_id}} <br> Issue: {{ticket.subject}} <br> Issue description: {{ticket.content}} <br>",
-              "module_id": 1155639
-            },
-            "id": "primary_rich_text_module",
-            "module_id": 1155639,
-            "name": "primary_rich_text_module",
-            "type": "module"
-          }
-        }
-      },
-      "createdAt": "2024-02-27T07:05:02.194Z",
-      "createdById": "100",
-      "deletedAt": "1970-01-01T00:00:00Z",
-      "from": {
-        "fromName": "support@45386308.hs-inbox.com",
-        "replyTo": "support@45386308.hs-inbox.com"
-      },
-      "id": 158518708637,
-      "isPublished": true,
-      "isTransactional": true,
-      "language": "en",
-      "name": "Ticket received",
-      "publishDate": "2024-02-27T07:05:02.857Z",
-      "publishedById": "100",
-      "state": "AUTOMATED",
-      "subcategory": "ticket_opened_kickback_email",
-      "subject": "Your ticket '{{ticket.subject}}' has been received",
-      "subscriptionDetails": {
-        "officeLocationId": "158518862992",
-        "subscriptionId": "-1"
-      },
-      "to": {
-        "limitSendFrequency": false,
-        "suppressGraymail": false
-      },
-      "type": "TICKET_EMAIL",
-      "updatedAt": "2024-02-27T07:05:03.174000Z",
-      "updatedById": "100"
-    }
-  ],
-  [
-    "acmeCo/marketing_emails",
-    {
-      "_meta": {
-        "op": "u"
-      },
-      "activeDomain": "45386308.hs-sites.com",
-      "archived": false,
-      "businessUnitId": "0",
-      "campaign": "c92d1583-d11b-4d32-9b08-762c077060c0",
-      "campaignName": "Abandoned cart",
-      "content": {
-        "flexAreas": {
-          "main": {
-            "boxFirstElementIndex": null,
-            "boxLastElementIndex": null,
-            "boxed": false,
-            "isSingleColumnFullWidth": false,
-            "sections": [
-              {
-                "columns": [
-                  {
-                    "id": "column-0-0",
-                    "widgets": [
-                      "module-0-0-0"
-                    ],
-                    "width": 12
-                  }
-                ],
-                "id": "section-0",
-                "style": {
-                  "backgroundType": "CONTENT",
-                  "paddingBottom": "40px",
-                  "paddingTop": "40px",
-                  "stack": "LEFT_TO_RIGHT"
-                }
-              },
-              {
-                "columns": [
-                  {
-                    "id": "column-1-0",
-                    "widgets": [
-                      "module-1-0-0"
-                    ],
-                    "width": 12
-                  }
-                ],
-                "id": "section-1",
-                "style": {
-                  "backgroundColor": "",
-                  "backgroundType": "CONTENT",
-                  "paddingBottom": "0px",
-                  "paddingTop": "0px",
-                  "stack": "LEFT_TO_RIGHT"
-                }
-              }
-            ]
-          }
-        },
-        "styleSettings": {
-          "backgroundColor": "#ffffff",
-          "bodyBorderWidth": 1,
-          "bodyColor": "#ffffff",
-          "buttonStyleSettings": {
-            "backgroundColor": "#197FC4",
-            "cornerRadius": 8,
-            "fontStyle": {
-              "bold": false,
-              "color": "#ffffff",
-              "font": "Arial, sans-serif",
-              "italic": false,
-              "size": 16,
-              "underline": false
+            {
+              "timestamp": 1709017509774,
+              "type": "LEAD_GUID",
+              "value": "317b7a82-dc2b-4041-ae57-6f4218871e9a"
             }
-          },
-          "dividerStyleSettings": {
-            "color": {
-              "color": "#000000",
-              "opacity": 100
-            },
-            "height": 1
-          },
-          "headingOneFont": {
-            "size": 28
-          },
-          "headingTwoFont": {
-            "size": 22
-          },
-          "linksFont": {
-            "bold": false,
-            "color": "#00a4bd",
-            "italic": false,
-            "underline": true
-          },
-          "primaryFont": "Arial, sans-serif",
-          "primaryFontColor": "#23496d",
-          "primaryFontSize": 15,
-          "secondaryFont": "Arial, sans-serif",
-          "secondaryFontColor": "#23496d",
-          "secondaryFontSize": 12
+          ],
+          "saved-at-timestamp": 1709017509777,
+          "vid": 51
+        }
+      ],
+      "is-contact": true,
+      "list-memberships": [
+        {
+          "internal-list-id": 2147483643,
+          "is-member": true,
+          "static-list-id": 1,
+          "timestamp": 1709027977882,
+          "vid": 51
+        }
+      ],
+      "merge-audits": [],
+      "merged-vids": [],
+      "portal-id": 45386308,
+      "properties": {
+        "company": {
+          "value": "HubSpot"
         },
-        "templatePath": "@hubspot/email/dnd/plain_text.html",
-        "widgets": {
-          "module-0-0-0": {
-            "body": {
-              "css_class": "dnd-module",
-              "html": "<p style=\"margin-bottom:10px;\">Hello {{ contact.firstname }},<br><br>Plain text emails have minimal formatting so your reader can really focus on what you have to say. Introduce yourself and explain why you\u2019re reaching out.</p><p style=\"margin-bottom:10px;\">Every email should try to lead the reader to some kind of action. Use this space to describe why the reader should want to click on the link below. Put the link on its own line to really draw their eye to it.</p><p style=\"margin-bottom:10px;\"><a target=\"_blank\" rel=\"noopener\">Link text</a></p><p style=\"margin-bottom:10px;\">Now it\u2019s time to wrap up your email. Before your signature, thank the recipient for reading. You can also invite them to send this email to any of their colleagues who might be interested.</p><p style=\"margin-bottom:10px;\">All the best,<br>Your full name<br>Your job title<br>Other contact information</p>",
-              "i18nKey": "richText.plainText",
-              "lineNumber": 32,
-              "parent_widget_container": null,
-              "path": "@hubspot/rich_text",
-              "schema_version": 2,
-              "startPosition": 19
-            },
-            "child_css": {},
-            "css": {},
-            "id": "module-0-0-0",
-            "label": null,
-            "module_id": 1155639,
-            "name": "module-0-0-0",
-            "order": 2,
-            "smart_type": null,
-            "styles": {},
-            "type": "module"
-          },
-          "module-1-0-0": {
-            "body": {
-              "align": "center",
-              "css_class": "dnd-module",
-              "font": {
-                "color": "#23496d",
-                "font": "Arial, sans-serif",
-                "size": {
-                  "units": "px",
-                  "value": 12
-                }
-              },
-              "lineNumber": 61,
-              "link_font": {
-                "color": "#00a4bd",
-                "font": "Helvetica,Arial,sans-serif",
-                "size": {
-                  "units": "px",
-                  "value": 12
-                },
-                "styles": {
-                  "bold": false,
-                  "italic": false,
-                  "underline": true
-                }
-              },
-              "parent_widget_container": null,
-              "path": "@hubspot/email_footer",
-              "schema_version": 2,
-              "startPosition": -697,
-              "unsubscribe_link_type": "both"
-            },
-            "child_css": {},
-            "css": {},
-            "id": "module-1-0-0",
-            "label": null,
-            "module_id": 2869621,
-            "name": "module-1-0-0",
-            "order": 3,
-            "smart_type": null,
-            "styles": {},
-            "type": "module"
-          },
-          "preview_text": {
-            "body": {
-              "value": ""
-            },
-            "child_css": {},
-            "css": {},
-            "id": "preview_text",
-            "label": "Preview Text <span class=help-text>This will be used as the preview text that displays in some email clients</span>",
-            "name": "preview_text",
-            "order": 0,
-            "smart_type": null,
-            "styles": {},
-            "type": "text"
-          }
+        "firstname": {
+          "value": "Brian"
+        },
+        "lastmodifieddate": {
+          "value": "1713374540068"
+        },
+        "lastname": {
+          "value": "Halligan (Sample Contact)"
         }
       },
-      "createdAt": "2024-03-06T13:58:43.414Z",
-      "createdById": "51770238",
-      "deletedAt": "1970-01-01T00:00:00Z",
-      "from": {
-        "fromName": "Luis Henrique",
-        "replyTo": "leofs123@gmail.com"
-      },
-      "id": 159647332871,
-      "isPublished": false,
-      "isTransactional": false,
-      "language": "en",
-      "name": "New email",
-      "publishDate": "2024-03-06T13:58:59Z",
-      "sendOnPublish": true,
-      "state": "DRAFT",
-      "subcategory": "batch",
-      "subject": "",
-      "subscriptionDetails": {
-        "officeLocationId": "158518862992",
-        "subscriptionId": "308082190"
-      },
-      "to": {
-        "contactIds": {
-          "exclude": [],
-          "include": []
-        },
-        "contactLists": {
-          "exclude": [],
-          "include": []
-        },
-        "suppressGraymail": true
-      },
-      "type": "BATCH_EMAIL",
-      "updatedAt": "2024-03-06T13:58:59.797000Z",
-      "updatedById": "51770238"
-    }
-  ],
-  [
-    "acmeCo/marketing_emails",
-    {
-      "_meta": {
-        "op": "u"
-      },
-      "activeDomain": "45386308.hs-sites.com",
-      "archived": false,
-      "businessUnitId": "0",
-      "content": {
-        "flexAreas": {
-          "main": {
-            "boxFirstElementIndex": null,
-            "boxLastElementIndex": null,
-            "boxed": false,
-            "isSingleColumnFullWidth": false,
-            "sections": [
-              {
-                "columns": [
-                  {
-                    "id": "column-0-0",
-                    "widgets": [
-                      "module-0-0-0"
-                    ],
-                    "width": 12
-                  }
-                ],
-                "id": "section-0",
-                "style": {
-                  "backgroundColor": "#eaf0f6",
-                  "backgroundType": "CONTENT",
-                  "paddingBottom": "10px",
-                  "paddingTop": "10px",
-                  "stack": "LEFT_TO_RIGHT"
-                }
-              },
-              {
-                "columns": [
-                  {
-                    "id": "column-1-0",
-                    "widgets": [
-                      "module-1-0-0"
-                    ],
-                    "width": 12
-                  }
-                ],
-                "id": "section-1",
-                "style": {
-                  "backgroundType": "CONTENT",
-                  "paddingBottom": "30px",
-                  "paddingTop": "30px",
-                  "stack": "LEFT_TO_RIGHT"
-                }
-              },
-              {
-                "columns": [
-                  {
-                    "id": "column-2-0",
-                    "widgets": [
-                      "module-2-0-0"
-                    ],
-                    "width": 12
-                  }
-                ],
-                "id": "section-2",
-                "style": {
-                  "backgroundColor": "",
-                  "backgroundType": "CONTENT",
-                  "paddingBottom": "20px",
-                  "paddingTop": "20px",
-                  "stack": "LEFT_TO_RIGHT"
-                }
-              }
-            ]
-          }
-        },
-        "styleSettings": {
-          "backgroundColor": "#EAF0F6",
-          "bodyBorderColor": "#EAF0F6",
-          "bodyBorderColorChoice": "BORDER_MANUAL",
-          "bodyBorderWidth": 1,
-          "bodyColor": "#ffffff",
-          "buttonStyleSettings": {
-            "backgroundColor": "#00a4bd",
-            "cornerRadius": 8,
-            "fontStyle": {
-              "bold": false,
-              "color": "#ffffff",
-              "font": "Arial, sans-serif",
-              "italic": false,
-              "size": 16,
-              "underline": false
-            }
-          },
-          "dividerStyleSettings": {
-            "color": {
-              "color": "#23496d",
-              "opacity": 100
-            },
-            "height": 1,
-            "lineType": "solid"
-          },
-          "headingOneFont": {
-            "size": 28
-          },
-          "headingTwoFont": {
-            "size": 22
-          },
-          "linksFont": {
-            "bold": false,
-            "color": "#00a4bd",
-            "italic": false,
-            "underline": true
-          },
-          "primaryFont": "Arial, sans-serif",
-          "primaryFontColor": "#23496d",
-          "primaryFontSize": 15,
-          "secondaryFont": "Arial, sans-serif",
-          "secondaryFontColor": "#23496d",
-          "secondaryFontSize": 12
-        },
-        "templatePath": "@hubspot/email/dnd/welcome.html",
-        "widgets": {
-          "module-0-0-0": {
-            "body": {
-              "alignment": "center",
-              "css_class": "dnd-module",
-              "hs_enable_module_padding": true,
-              "img": {
-                "alt": "HubSpot logo orange",
-                "height": 72,
-                "src": "https://static.hsappstatic.net/TemplateAssets/static-1.262/img/hs_default_template_images/email_dnd_template_images/company-logo-orange.png",
-                "width": 240
-              },
-              "lineNumber": 37,
-              "parent_widget_container": null,
-              "path": "@hubspot/image_email",
-              "schema_version": 2,
-              "startPosition": -241
-            },
-            "child_css": {},
-            "css": {},
-            "id": "module-0-0-0",
-            "label": null,
-            "module_id": 1367093,
-            "name": "module-0-0-0",
-            "order": 1,
-            "smart_type": null,
-            "styles": {},
-            "type": "module"
-          },
-          "module-1-0-0": {
-            "body": {
-              "css_class": "dnd-module",
-              "html": "<p style=\"margin-bottom:10px;\">Welcome friend, thank the reader for signing up to your newsletter and welcome them on board. Below your introduction, add a few links to some popular pages or posts on your website to give the reader an idea of what\u2019s to come.<br></p><ol><li><strong>Showcase your best stories<br></strong>Give an overview of an existing blog post or a popular story from a previous newsletter. Be sure to add a <a target=\"_blank\" href=\"\">link</a> so the reader can learn more.<br><br></li><li><strong>Help people get to know you<br></strong>Share a link to your website\u2019s <a target=\"_blank\" href=\"\">about us</a> page where the reader can learn more about you and your community.<br><br></li><li><strong>Keep the conversation going<br></strong>Tell your reader how they can get in touch if they have questions.</li></ol><p style=\"margin-bottom:10px;\">Thanks,<br>The Your Company Name team</p>",
-              "i18nKey": "richText.welcome.primary",
-              "lineNumber": 47,
-              "parent_widget_container": null,
-              "path": "@hubspot/rich_text",
-              "schema_version": 2,
-              "startPosition": 19
-            },
-            "child_css": {},
-            "css": {},
-            "id": "module-1-0-0",
-            "label": null,
-            "module_id": 1155639,
-            "name": "module-1-0-0",
-            "order": 3,
-            "smart_type": null,
-            "styles": {},
-            "type": "module"
-          },
-          "module-2-0-0": {
-            "body": {
-              "align": "center",
-              "css_class": "dnd-module",
-              "font": {
-                "color": "#23496d",
-                "font": "Arial, sans-serif",
-                "size": {
-                  "units": "px",
-                  "value": 12
-                }
-              },
-              "hs_enable_module_padding": false,
-              "lineNumber": 76,
-              "link_font": {
-                "color": "#00a4bd",
-                "font": "Helvetica,Arial,sans-serif",
-                "size": {
-                  "units": "px",
-                  "value": 12
-                },
-                "styles": {
-                  "bold": false,
-                  "italic": false,
-                  "underline": true
-                }
-              },
-              "parent_widget_container": null,
-              "path": "@hubspot/email_footer",
-              "schema_version": 2,
-              "startPosition": -729,
-              "unsubscribe_link_type": "both"
-            },
-            "child_css": {},
-            "css": {},
-            "id": "module-2-0-0",
-            "label": null,
-            "module_id": 2869621,
-            "name": "module-2-0-0",
-            "order": 4,
-            "smart_type": null,
-            "styles": {},
-            "type": "module"
-          },
-          "preview_text": {
-            "body": {
-              "value": ""
-            },
-            "child_css": {},
-            "css": {},
-            "id": "preview_text",
-            "label": "Preview Text <span class=help-text>This will be used as the preview text that displays in some email clients</span>",
-            "name": "preview_text",
-            "order": 0,
-            "smart_type": null,
-            "styles": {},
-            "type": "text"
-          }
-        }
-      },
-      "createdAt": "2024-03-13T18:28:47.620Z",
-      "createdById": "51770238",
-      "deletedAt": "1970-01-01T00:00:00Z",
-      "from": {
-        "fromName": "Luis Henrique",
-        "replyTo": "leofs123@gmail.com"
-      },
-      "id": 160599935909,
-      "isPublished": false,
-      "isTransactional": false,
-      "language": "en",
-      "name": "New email",
-      "publishDate": "2024-03-13T18:28:59Z",
-      "sendOnPublish": true,
-      "state": "DRAFT",
-      "subcategory": "batch",
-      "subject": "",
-      "subscriptionDetails": {
-        "officeLocationId": "158518862992",
-        "subscriptionId": "308082190"
-      },
-      "to": {
-        "contactIds": {
-          "exclude": [],
-          "include": []
-        },
-        "contactLists": {
-          "exclude": [],
-          "include": []
-        },
-        "suppressGraymail": true
-      },
-      "type": "BATCH_EMAIL",
-      "updatedAt": "2024-03-13T18:28:59.892000Z",
-      "updatedById": "51770238"
+      "vid": "51"
     }
   ],
   [
@@ -1728,6 +459,23 @@
     }
   ],
   [
+    "acmeCo/owners",
+    {
+      "_meta": {
+        "op": "u"
+      },
+      "archived": false,
+      "createdAt": "2024-02-27T07:05:06.660Z",
+      "email": "leofs123@gmail.com",
+      "firstName": "Luis",
+      "id": 750122779,
+      "lastName": "Henrique",
+      "updatedAt": "2024-04-16T14:09:13.118000Z",
+      "userId": 51770238,
+      "userIdIncludingInactive": 51770238
+    }
+  ],
+  [
     "acmeCo/properties",
     {
       "_meta": {
@@ -1736,6 +484,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:46.048Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Short about-company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1767,6 +516,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.422Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property closedate calculated as EARLIEST_VALUE via values of closedate on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1798,6 +548,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:46.015Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Number of facebook fans",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1829,6 +580,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.392Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property first_contact_createdate calculated as EARLIEST_VALUE via values of createdate on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1860,6 +612,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:46.539Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The first conversion date across all contacts associated this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1891,6 +644,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.266Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property first_conversion_date calculated as EARLIEST_VALUE via values of first_conversion_date on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1922,6 +676,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:46.570Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The first form submitted across all contacts associated this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1953,6 +708,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.295Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property first_conversion_event_name calculated as EARLIEST_VALUE via values of first_conversion_event_name on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -1984,6 +740,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:38.092Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Date the first deal was associated with this company record.",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2015,6 +772,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:37.951Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The year the company was created. Powered by HubSpot Insights. ",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2046,6 +804,7 @@
       },
       "calculated": false,
       "createdAt": "2019-09-17T19:45:47.823Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Additional domains belonging to this company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2078,6 +837,7 @@
       },
       "calculated": false,
       "createdAt": "1970-01-01T00:00:00Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The business units this record is assigned to.",
       "displayOrder": -1,
       "externalOptions": true,
@@ -2109,6 +869,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:45.625Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The first activity for any contact associated with this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2140,6 +901,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.451Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_first_timestamp calculated as EARLIEST_VALUE via values of hs_analytics_first_timestamp on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2171,6 +933,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:37.809Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The campaign responsible for the first touch creation of the first contact associated with this company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2202,6 +965,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.633Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_first_touch_converting_campaign calculated as EARLIEST_VALUE via values of hs_analytics_first_touch_converting_campaign on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2233,6 +997,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:38.055Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Time of first session across all contacts associated with this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2264,6 +1029,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.481Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_first_visit_timestamp calculated as EARLIEST_VALUE via values of hs_analytics_first_visit_timestamp on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2295,6 +1061,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:45.694Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Time last seen across all contacts associated with this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2326,6 +1093,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.511Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_last_timestamp calculated as LATEST_VALUE via values of hs_analytics_last_timestamp on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2357,6 +1125,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:37.423Z",
+      "dataSensitivity": "non_sensitive",
       "description": "The campaign responsible for the last touch creation of the first contact associated with this company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2388,6 +1157,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.663Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_last_touch_converting_campaign calculated as LATEST_VALUE via values of hs_analytics_last_touch_converting_campaign on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2419,6 +1189,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:45.761Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Time of the last session attributed to any contacts that are associated with this company record.",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2450,6 +1221,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.544Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_last_visit_timestamp calculated as LATEST_VALUE via values of hs_analytics_last_visit_timestamp on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2481,6 +1253,7 @@
       },
       "calculated": false,
       "createdAt": "2022-04-20T13:57:49.287Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Source of the last session attributed to any contacts that are associated with this company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2576,6 +1349,7 @@
       },
       "calculated": false,
       "createdAt": "2022-04-20T15:20:39.303Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Additional source details of the last session attributed to any contacts that are associated with this company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2607,6 +1381,7 @@
       },
       "calculated": false,
       "createdAt": "2022-04-20T15:37:21.799Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Additional source details of the last session attributed to any contacts that are associated with this company",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2638,6 +1413,7 @@
       },
       "calculated": false,
       "createdAt": "2022-04-20T15:41:22.859Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Timestamp of when latest source occurred",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2669,6 +1445,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:45.532Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Total number of page views across all contacts associated with this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2700,6 +1477,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.572Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing cardinality for rollup property hs_analytics_num_page_views calculated as SUM via values of hs_analytics_num_page_views on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2731,6 +1509,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:45.566Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Total number of sessions across all contacts associated with this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2762,6 +1541,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.602Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing cardinality for rollup property hs_analytics_num_visits calculated as SUM via values of hs_analytics_num_visits on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2793,6 +1573,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:37.732Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Original source for the contact with the earliest activity for this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2889,6 +1670,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:37.915Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Additional information about the original source for the contact with the earliest activity for this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2920,6 +1702,7 @@
       },
       "calculated": false,
       "createdAt": "2019-08-06T02:41:47.754Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Calculation context property providing timestamp for rollup property hs_analytics_source_data_1 calculated as EARLIEST_VALUE via values of hs_analytics_source_data_1 on object type ObjectTypeId{legacyObjectType=CONTACT}",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2951,6 +1734,7 @@
       },
       "calculated": false,
       "createdAt": "2020-06-30T15:57:37.591Z",
+      "dataSensitivity": "non_sensitive",
       "description": "Additional information about the original source for the contact with the earliest activity for this company or organization",
       "displayOrder": -1,
       "externalOptions": false,
@@ -2971,100 +1755,6 @@
       "options": [],
       "type": "string",
       "updatedAt": "2024-02-21T13:03:12.023Z"
-    }
-  ],
-  [
-    "acmeCo/properties",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 36
-      },
-      "calculated": false,
-      "createdAt": "2019-08-06T02:41:47.783Z",
-      "description": "Calculation context property providing timestamp for rollup property hs_analytics_source_data_2 calculated as EARLIEST_VALUE via values of hs_analytics_source_data_2 on object type ObjectTypeId{legacyObjectType=CONTACT}",
-      "displayOrder": -1,
-      "externalOptions": false,
-      "fieldType": "text",
-      "formField": false,
-      "groupName": "analyticsinformation",
-      "hasUniqueValue": false,
-      "hidden": true,
-      "hubspotDefined": true,
-      "hubspotObject": "companies",
-      "label": "hs_analytics_source_data_2_timestamp_earliest_value_9b2f9400",
-      "modificationMetadata": {
-        "archivable": true,
-        "readOnlyDefinition": true,
-        "readOnlyValue": true
-      },
-      "name": "hs_analytics_source_data_2_timestamp_earliest_value_9b2f9400",
-      "options": [],
-      "type": "datetime",
-      "updatedAt": "2022-05-27T23:05:38.098Z"
-    }
-  ],
-  [
-    "acmeCo/properties",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 37
-      },
-      "calculated": false,
-      "createdAt": "2019-08-06T02:41:47.723Z",
-      "description": "Calculation context property providing timestamp for rollup property hs_analytics_source calculated as EARLIEST_VALUE via values of hs_analytics_source on object type ObjectTypeId{legacyObjectType=CONTACT}",
-      "displayOrder": -1,
-      "externalOptions": false,
-      "fieldType": "text",
-      "formField": false,
-      "groupName": "analyticsinformation",
-      "hasUniqueValue": false,
-      "hidden": true,
-      "hubspotDefined": true,
-      "hubspotObject": "companies",
-      "label": "hs_analytics_source_timestamp_earliest_value_25a3a52c",
-      "modificationMetadata": {
-        "archivable": true,
-        "readOnlyDefinition": true,
-        "readOnlyValue": true
-      },
-      "name": "hs_analytics_source_timestamp_earliest_value_25a3a52c",
-      "options": [],
-      "type": "datetime",
-      "updatedAt": "2022-05-27T23:05:53.396Z"
-    }
-  ],
-  [
-    "acmeCo/properties",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 38
-      },
-      "calculated": false,
-      "calculationFormula": "'USD'",
-      "createdAt": "2023-03-02T13:20:44.637Z",
-      "description": "The currency code associated with the annual revenue amount",
-      "displayOrder": -1,
-      "externalOptions": false,
-      "fieldType": "calculation_equation",
-      "formField": false,
-      "groupName": "companyinformation",
-      "hasUniqueValue": false,
-      "hidden": true,
-      "hubspotDefined": true,
-      "hubspotObject": "companies",
-      "label": "Annual Revenue Currency Code",
-      "modificationMetadata": {
-        "archivable": true,
-        "readOnlyDefinition": true,
-        "readOnlyValue": true
-      },
-      "name": "hs_annual_revenue_currency_code",
-      "options": [],
-      "type": "string",
-      "updatedAt": "2023-03-02T13:20:44.637Z"
     }
   ]
 ]
