@@ -36,73 +36,81 @@ properties:
     anyOf:
       - type: string
       - type: "null"
+    default: ~
     title: C
   cl:
     anyOf:
       - type: string
       - type: "null"
+    default: ~
     title: Cl
   d:
     anyOf:
-      - format: date
-        type: string
+      - type: string
       - type: "null"
+    default: ~
     title: D
   doub:
     anyOf:
       - type: number
       - type: "null"
+    default: ~
     title: Doub
+  f:
+    anyOf:
+      - type: number
+      - type: "null"
+    default: ~
+    title: F
   i:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
-    format: number
+    default: ~
     title: I
   nc:
     anyOf:
       - type: string
       - type: "null"
+    default: ~
     title: Nc
   nv2:
     anyOf:
       - type: string
       - type: "null"
+    default: ~
     title: Nv2
   sm:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
-    format: number
+    default: ~
     title: Sm
   str:
     anyOf:
       - type: string
       - type: "null"
+    default: ~
     title: Str
   t:
     anyOf:
-      - format: date-time
-        type: string
+      - type: string
       - type: "null"
+    default: ~
     title: T
+  tz:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Tz
   vc2:
     anyOf:
       - type: string
       - type: "null"
+    default: ~
     title: Vc2
 required:
   - id
-  - c
-  - cl
-  - d
-  - doub
-  - i
-  - nc
-  - nv2
-  - sm
-  - str
-  - t
-  - vc2
 title: testing
 type: object

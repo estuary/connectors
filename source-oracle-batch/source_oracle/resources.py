@@ -55,8 +55,7 @@ async def all_resources(
             model=t.create_model(),
             open=open,
             initial_state=ResourceState(
-                inc=ResourceState.Incremental(),
-                backfill=ResourceState.Backfill(),
+                backfill=ResourceState.Backfill(cutoff=datetime.now(tz=UTC)),
             ),
             initial_config=ResourceConfig(
                 name=t.table_name,
