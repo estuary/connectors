@@ -14,7 +14,7 @@ captures:
       - resource:
           name: testing
           interval: PT0S
-          cursor: []
+          cursor: ['id']
         target: acmeCo/testing
     interval: 3m
     shards:
