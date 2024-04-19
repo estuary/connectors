@@ -1,110 +1,26 @@
 ---
 collections:
-  acmeCo/campaigns:
-    schema: campaigns.schema.yaml
-    key:
-      - /id
   acmeCo/companies:
     schema: companies.schema.yaml
     key:
       - /id
-  acmeCo/contact_lists:
-    schema: contact_lists.schema.yaml
-    key:
-      - /listId
   acmeCo/contacts:
     schema: contacts.schema.yaml
     key:
       - /id
-  acmeCo/contacts_lists_subscription:
-    schema: contacts_lists_subscription.schema.yaml
-    key:
-      - /vid
-  acmeCo/deal_pipelines:
-    schema: deal_pipelines.schema.yaml
-    key:
-      - /pipelineId
   acmeCo/deals:
     schema: deals.schema.yaml
-    key:
-      - /id
-  acmeCo/email_events:
-    schema: email_events.schema.yaml
-    key:
-      - /id
-  acmeCo/email_subscriptions:
-    schema: email_subscriptions.schema.yaml
     key:
       - /id
   acmeCo/engagements:
     schema: engagements.schema.yaml
     key:
       - /id
-  acmeCo/engagements_calls:
-    schema: engagements_calls.schema.yaml
-    key:
-      - /id
-  acmeCo/engagements_emails:
-    schema: engagements_emails.schema.yaml
-    key:
-      - /id
-  acmeCo/engagements_meetings:
-    schema: engagements_meetings.schema.yaml
-    key:
-      - /id
-  acmeCo/engagements_notes:
-    schema: engagements_notes.schema.yaml
-    key:
-      - /id
-  acmeCo/engagements_tasks:
-    schema: engagements_tasks.schema.yaml
-    key:
-      - /id
-  acmeCo/feedback_submissions:
-    schema: feedback_submissions.schema.yaml
-    key:
-      - /id
-  acmeCo/goal_targets:
-    schema: goal_targets.schema.yaml
-    key:
-      - /id
-  acmeCo/line_items:
-    schema: line_items.schema.yaml
-    key:
-      - /id
-  acmeCo/marketing_emails:
-    schema: marketing_emails.schema.yaml
-    key:
-      - /id
-  acmeCo/marketing_forms:
-    schema: marketing_forms.schema.yaml
-    key:
-      - /id
-  acmeCo/owners:
-    schema: owners.schema.yaml
-    key:
-      - /id
-  acmeCo/products:
-    schema: products.schema.yaml
-    key:
-      - /id
   acmeCo/properties:
     schema: properties.schema.yaml
     key:
       - /_meta/row_id
-  acmeCo/subscription_changes:
-    schema: subscription_changes.schema.yaml
-    key:
-      - /portalId
-  acmeCo/ticket_pipelines:
-    schema: ticket_pipelines.schema.yaml
-    key:
-      - /pipelineId
   acmeCo/tickets:
     schema: tickets.schema.yaml
-    key:
-      - /id
-  acmeCo/workflows:
-    schema: workflows.schema.yaml
     key:
       - /id

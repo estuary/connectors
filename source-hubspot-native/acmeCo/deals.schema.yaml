@@ -1,7 +1,7 @@
 ---
 $defs:
   History:
-    additionalProperties: true
+    additionalProperties: false
     properties:
       _meta:
         allOf:
@@ -9,6 +9,7 @@ $defs:
         default:
           op: u
           row_id: -1
+          uuid: 00000000-0000-0000-0000-000000000000
         description: Document metadata
       timestamp:
         format: date-time
@@ -53,6 +54,12 @@ $defs:
         description: "Row ID of the Document, counting up from zero, or -1 if not known"
         title: Row Id
         type: integer
+      uuid:
+        default: 00000000-0000-0000-0000-000000000000
+        description: UUID of the Document
+        format: uuid
+        title: Uuid
+        type: string
     required:
       - op
     title: Meta
@@ -65,6 +72,7 @@ properties:
     default:
       op: u
       row_id: -1
+      uuid: 00000000-0000-0000-0000-000000000000
     description: Document metadata
   id:
     title: Id
