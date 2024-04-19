@@ -4617,6 +4617,7 @@
         "hs_date_entered_appointmentscheduled": "2024-02-08T02:34:37.283Z",
         "hs_deal_stage_probability": "0.200000000000000011102230246251565404236316680908203125",
         "hs_deal_stage_probability_shadow": "0.200000000000000011102230246251565404236316680908203125",
+        "hs_is_active_shared_deal": "false",
         "hs_is_closed_won": "false",
         "hs_is_deal_split": "false",
         "hs_lastmodifieddate": "2024-02-08T02:34:41.578Z",
@@ -4794,6 +4795,15 @@
             "timestamp": "2024-02-08T02:34:37.283000Z",
             "updatedByUserId": 63843671,
             "value": "0.200000000000000011102230246251565404236316680908203125"
+          }
+        ],
+        "hs_is_active_shared_deal": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-02-08T02:34:37.283000Z",
+            "updatedByUserId": 63843671,
+            "value": "false"
           }
         ],
         "hs_is_closed_won": [
