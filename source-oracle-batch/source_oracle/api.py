@@ -90,6 +90,8 @@ async def fetch_rows(
 ) -> AsyncGenerator[Document | str, None]:
     is_first_query = page is None
 
+    # page is in fact a json encoded object where keys are cursor fields and values
+    # are the last value for that cursor
     cursor_values = json.loads(page) if page is not None else {}
     cursor_fields = [k for (k, _) in cursor_values.items()]
     query = query_template.render(table_name=table.table_name,
@@ -105,7 +107,6 @@ async def fetch_rows(
 
     with conn.cursor() as c:
         for values in c.execute(query, bind_params):
-            log.info("got something", values)
             cols = [col[0] for col in c.description]
             row = dict(zip(cols, values))
             row = {k.lower(): v for (k, v) in row.items() if v is not None}
@@ -116,14 +117,13 @@ async def fetch_rows(
             for (k, v) in row.items():
                 setattr(doc, k, v)
 
-            log.info("document", doc)
             yield doc
-        log.info("after loop")
 
-    if last_row is not None and len(cursor) > 0:
-        yield json.dumps({k: last_row[k] for k in cursor})
-
-    return
+    if len(cursor) > 0:
+        if last_row is not None:
+            yield json.dumps({k: last_row[k] for k in cursor})
+        else:
+            yield page
 
 query_template = Template("""
 {#***********************************************************
