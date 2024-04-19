@@ -93,9 +93,8 @@ async def fetch_rows(
     # page is in fact a json encoded object where keys are cursor fields and values
     # are the last value for that cursor
     cursor_values = json.loads(page) if page is not None else {}
-    cursor_fields = [k for (k, _) in cursor_values.items()]
     query = query_template.render(table_name=table.table_name,
-                                  cursor_fields=cursor_fields,
+                                  cursor_fields=cursor,
                                   is_first_query=is_first_query)
 
     last_row = None
@@ -103,7 +102,7 @@ async def fetch_rows(
     if page is not None:
         bind_params = cursor_values
 
-    log.info(query, page, cursor_fields)
+    log.info(query, page, cursor)
 
     with conn.cursor() as c:
         for values in c.execute(query, bind_params):
@@ -111,6 +110,7 @@ async def fetch_rows(
             row = dict(zip(cols, values))
             row = {k.lower(): v for (k, v) in row.items() if v is not None}
             last_row = row
+            log.info("setting last_row to", last_row)
 
             doc = Document()
             doc.meta_ = Document.Meta(op='c')
