@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeVal
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any
 import urllib.parse
 
+import estuary_cdk.capture.common
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
     BasicAuth,
     BaseDocument,
     ResourceConfig as GenericResourceConfig,
-    BaseResourceState,
+    ResourceState as ResourceState,
 )
 
 
@@ -71,59 +72,11 @@ class ResourceConfig(GenericResourceConfig):
     )
 
 
-Cursor = dict[str, Any]
-
-
-class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
-    """ResourceState composes separate incremental, backfill, and snapshot states.
-    Inner states can be updated independently, so long as sibling states are left unset.
-    The Flow runtime will merge-patch partial checkpoint states into an aggregated state.
-    """
-
-    class Incremental(BaseModel, extra="forbid"):
-        """Partial state of a resource which is being incrementally captured"""
-
-        cursor: Cursor | None = Field(
-            description="Cursor of the last-synced document in the logical log",
-            default=None
-        )
-
-    class Backfill(BaseModel, extra="forbid"):
-        """Partial state of a resource which is being backfilled"""
-
-        cutoff: Cursor | None = Field(
-            description="Cursor at which incremental replication began",
-            default=None
-        )
-        next_page: Cursor | None = Field(
-            description="Cursor of the next page to fetch",
-            default=None
-        )
-
-    class Snapshot(BaseModel, extra="forbid"):
-        """Partial state of a resource for which periodic snapshots are taken"""
-
-        updated_at: AwareDatetime = Field(description="Time of the last snapshot")
-        last_count: int = Field(
-            description="Number of documents captured from this resource by the last snapshot"
-        )
-        last_digest: str = Field(
-            description="The xxh3_128 hex digest of documents of this resource in the last snapshot"
-        )
-
-    inc: Incremental | None = Field(
-        default=None, description="Incremental capture progress"
-    )
-
-    backfill: Backfill | None = Field(
-        default=None,
-        description="Backfill progress, or None if no backfill is occurring",
-    )
-
-    snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
-
-
 ConnectorState = GenericConnectorState[ResourceState]
+
+
+class Document(BaseDocument, extra="allow"):
+    pass
 
 
 class OracleTable(BaseModel, extra="forbid"):
@@ -158,7 +111,7 @@ class OracleColumn(BaseModel, extra="forbid"):
         NCHAR = "NCHAR"
         NVARCHAR2 = "NVARCHAR2"
         DATE = "DATE"
-        TIMESATAMP_WITH_TIMEZONE = "TIMESTAMP WITH TIMEZONE"
+        TIMESTAMP_WITH_TIMEZONE = "TIMESTAMP WITH TIMEZONE"
 
     table_name: constr(to_lower=True) = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
     column_name: constr(to_lower=True) = Field(alias="COLUMN_NAME")  # Ex 'recordid'
@@ -217,17 +170,7 @@ def build_table(
         field_zero: Any
 
         if col.data_type == col.Type.NUMBER and col.data_scale == 0:
-            if col.is_pk:
-                # We assume keyed fields are always integers. This technically
-                # is not guaranteed but is a pervasive practice.
-                field_type, field_zero = int, 0
-            else:
-                # Use Decimal to represent lossless integers OR floats.
-                # format: number has downsides within materializations
-                # (it uses extra storage & cannot represent full double range)
-                # so we don't use it if we can avoid it.
-                field_type, field_zero = Decimal, Decimal()
-                field_schema_extra = {"format": "number"}
+            field_type, field_zero = int, 0
 
         elif col.data_type in (col.Type.DOUBLE, col.Type.NUMBER, col.Type.FLOAT):
             # This field is definitely floating-point (data_scale > 0).
@@ -243,9 +186,11 @@ def build_table(
         elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type, field_zero = str, ""
         elif col.data_type.startswith(col.Type.TIMESTAMP):
+            field_type, field_zero = str, ""
+        elif col.data_type.startswith(col.Type.TIMESTAMP_WITH_TIMEZONE):
             field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
         elif col.data_type in (col.Type.DATE,):
-            field_type, field_zero = date, date(1, 1, 1)
+            field_type, field_zero = str, ""
         else:
             raise NotImplementedError(f"unsupported type {col}")
 
@@ -255,12 +200,15 @@ def build_table(
         else:
             description = ""
 
+        field_default = {"default": None} if col.nullable else {}
+
         # Finally, build the Pydantic model field.
         field_info = Field(
             description=description.strip() or None,
             json_schema_extra=field_schema_extra,
+            **field_default,
         )
-        field_info.annotation = field_type if col.is_pk else field_type | None
+        field_info.annotation = field_type | None if col.nullable else field_type
 
         # datetimes must have timezones. Use UTC.
         # TODO(johnny): add unit test coverage to confirm this works.
