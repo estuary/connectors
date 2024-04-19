@@ -18,7 +18,7 @@ from .models import (
     OracleColumn,
     EndpointConfig,
     Table,
-    Cursor,
+    Document,
 )
 
 
@@ -85,31 +85,45 @@ async def fetch_rows(
     cursor: list[str],
     # Remainder is common.FetchPageFn:
     log: Logger,
-    page: Cursor | None,
+    page: str | None,
     cutoff: datetime,
-) -> AsyncGenerator[Dict | list[str], None]:
+) -> AsyncGenerator[Document | str, None]:
     is_first_query = page is None
-    cursor_fields = [k for (k, _) in page] if page is not None else []
+
+    cursor_values = json.loads(page) if page is not None else {}
+    cursor_fields = [k for (k, _) in cursor_values.items()]
     query = query_template.render(table_name=table.table_name,
                                   cursor_fields=cursor_fields,
                                   is_first_query=is_first_query)
 
-    c = conn.cursor()
     last_row = None
     bind_params = {}
     if page is not None:
-        bind_params = page
-    log.info(query)
-    for values in c.execute(query, bind_params):
-        cols = [col[0] for col in c.description]
-        row = dict(zip(cols, values))
-        row = {k.lower(): v for (k, v) in row.items() if v is not None}
-        last_row = row
+        bind_params = cursor_values
 
-        yield row
+    log.info(query, page, cursor_fields)
+
+    with conn.cursor() as c:
+        for values in c.execute(query, bind_params):
+            log.info("got something", values)
+            cols = [col[0] for col in c.description]
+            row = dict(zip(cols, values))
+            row = {k.lower(): v for (k, v) in row.items() if v is not None}
+            last_row = row
+
+            doc = Document()
+            doc.meta_ = Document.Meta(op='c')
+            for (k, v) in row.items():
+                setattr(doc, k, v)
+
+            log.info("document", doc)
+            yield doc
+        log.info("after loop")
 
     if last_row is not None and len(cursor) > 0:
-        yield {k: last_row[k] for k in cursor}
+        yield json.dumps({k: last_row[k] for k in cursor})
+
+    return
 
 query_template = Template("""
 {#***********************************************************
@@ -141,22 +155,22 @@ query_template = Template("""
   * or it could be used to capture updated rows if the table   *
   * has an 'updated_at' timestamp.                             *
   ***********************************************************/ #}
-{% if cursor_fields|length %}
-  {% if is_first_query %}
+{%- if cursor_fields|length -%}
+  {%- if is_first_query -%}
     SELECT * FROM {{ table_name }}
-  {% else %}
+  {%- else -%}
     SELECT * FROM {{ table_name }}
-	{% for k in cursor_fields %}
-      {% set outer_loop = loop %}
-	  {% if loop.first %} WHERE ({% else %}) OR ({% endif %}
-      {% for n in cursor_fields %}
+	{% for k in cursor_fields -%}
+      {%- set outer_loop = loop -%}
+	  {%- if loop.first %} WHERE ({%- else -%}) OR ({% endif -%}
+      {%- for n in cursor_fields -%}
 		{% if loop.index < outer_loop.index %}
-          {{ n }} = :{{ n }} AND {% endif %}
+          {{ n }} = :{{ n }} AND {% endif -%}
 	  {% endfor %}
 	  {{ k }} > :{{ k }}
-	{% endfor %}
+	{%- endfor %}
 	)
-  {% endif %} ORDER BY {% for k in cursor_fields %}{% if not loop.first %}, {% endif %}{{k}}{% endfor %}
-{% else %}
+  {% endif %} ORDER BY {% for k in cursor_fields -%}{%- if not loop.first -%}, {% endif -%}{{k}}{%- endfor -%}
+{%- else -%}
   SELECT * FROM {{ table_name }}
-{% endif %}""")
+{%- endif -%}""")
