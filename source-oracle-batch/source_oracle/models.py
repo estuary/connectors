@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC, date
 from decimal import Decimal
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any
 import urllib.parse
 
@@ -11,7 +11,7 @@ from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
     ResourceConfig as GenericResourceConfig,
-    ResourceState,
+    BaseResourceState,
 )
 
 
@@ -71,7 +71,58 @@ class ResourceConfig(GenericResourceConfig):
     )
 
 
-# We use ResourceState directly, without extending it.
+Cursor = dict[str, Any]
+
+
+class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
+    """ResourceState composes separate incremental, backfill, and snapshot states.
+    Inner states can be updated independently, so long as sibling states are left unset.
+    The Flow runtime will merge-patch partial checkpoint states into an aggregated state.
+    """
+
+    class Incremental(BaseModel, extra="forbid"):
+        """Partial state of a resource which is being incrementally captured"""
+
+        cursor: Cursor | None = Field(
+            description="Cursor of the last-synced document in the logical log",
+            default=None
+        )
+
+    class Backfill(BaseModel, extra="forbid"):
+        """Partial state of a resource which is being backfilled"""
+
+        cutoff: Cursor | None = Field(
+            description="Cursor at which incremental replication began",
+            default=None
+        )
+        next_page: Cursor | None = Field(
+            description="Cursor of the next page to fetch",
+            default=None
+        )
+
+    class Snapshot(BaseModel, extra="forbid"):
+        """Partial state of a resource for which periodic snapshots are taken"""
+
+        updated_at: AwareDatetime = Field(description="Time of the last snapshot")
+        last_count: int = Field(
+            description="Number of documents captured from this resource by the last snapshot"
+        )
+        last_digest: str = Field(
+            description="The xxh3_128 hex digest of documents of this resource in the last snapshot"
+        )
+
+    inc: Incremental | None = Field(
+        default=None, description="Incremental capture progress"
+    )
+
+    backfill: Backfill | None = Field(
+        default=None,
+        description="Backfill progress, or None if no backfill is occurring",
+    )
+
+    snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
+
+
 ConnectorState = GenericConnectorState[ResourceState]
 
 
