@@ -18,6 +18,7 @@ from .models import (
     OracleColumn,
     EndpointConfig,
     Table,
+    Cursor,
 )
 
 
@@ -84,19 +85,20 @@ async def fetch_rows(
     cursor: list[str],
     # Remainder is common.FetchPageFn:
     log: Logger,
-    page: str | None,
+    page: Cursor | None,
     cutoff: datetime,
-) -> AsyncGenerator[dict | str, None]:
+) -> AsyncGenerator[Dict | list[str], None]:
     is_first_query = page is None
+    cursor_fields = [k for (k, _) in page] if page is not None else []
     query = query_template.render(table_name=table.table_name,
-                                  cursor_fields=cursor,
+                                  cursor_fields=cursor_fields,
                                   is_first_query=is_first_query)
 
     c = conn.cursor()
     last_row = None
     bind_params = {}
     if page is not None:
-        bind_params['cursor_1'] = page
+        bind_params = page
     log.info(query)
     for values in c.execute(query, bind_params):
         cols = [col[0] for col in c.description]
@@ -107,9 +109,7 @@ async def fetch_rows(
         yield row
 
     if last_row is not None and len(cursor) > 0:
-        yield str(last_row[cursor[0]])
-    else:
-        return
+        yield {k: last_row[k] for k in cursor}
 
 query_template = Template("""
 {#***********************************************************
@@ -151,9 +151,9 @@ query_template = Template("""
 	  {% if loop.first %} WHERE ({% else %}) OR ({% endif %}
       {% for n in cursor_fields %}
 		{% if loop.index < outer_loop.index %}
-          {{ n }} = :cursor_{{loop.index}} AND {% endif %}
+          {{ n }} = :{{ n }} AND {% endif %}
 	  {% endfor %}
-	  {{ k }} > :cursor_{{loop.index}}
+	  {{ k }} > :{{ k }}
 	{% endfor %}
 	)
   {% endif %} ORDER BY {% for k in cursor_fields %}{% if not loop.first %}, {% endif %}{{k}}{% endfor %}
