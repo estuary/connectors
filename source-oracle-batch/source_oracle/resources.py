@@ -26,7 +26,6 @@ from .api import (
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    started_at = datetime.now(tz=UTC)
     resources_list = []
 
     conn = connect(config)
@@ -56,8 +55,8 @@ async def all_resources(
             model=t.create_model(),
             open=open,
             initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=started_at),
-                backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+                inc=ResourceState.Incremental(),
+                backfill=ResourceState.Backfill(),
             ),
             initial_config=ResourceConfig(
                 name=t.table_name,
