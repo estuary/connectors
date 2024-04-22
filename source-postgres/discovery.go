@@ -129,6 +129,16 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 			}
 		}
 	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		for id, info := range tableMap {
+			logrus.WithFields(logrus.Fields{
+				"stream":     id,
+				"keyColumns": info.PrimaryKey,
+			}).Debug("discovered table")
+		}
+	}
+
 	return tableMap, nil
 }
 
