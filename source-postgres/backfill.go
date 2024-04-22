@@ -38,6 +38,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		args = []any{afterCTID}
 		disableParallelWorkers = true
 	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
+		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -50,11 +51,11 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
 			}).Debug("scanning subsequent table chunk")
-			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table)
 			args = resumeKey
 		} else {
 			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
 		}
 	default:
 		return fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -184,13 +185,15 @@ func (db *postgresDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, sch
 	return query.String()
 }
 
-func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
 		var quotedName = quoteColumnName(colName)
-		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
+		// If a precise backfill is requested *and* the column type requires binary ordering for precise
+		// backfill comparisons to work, add the 'COLLATE "C"' qualifier to the column name.
+		if colType, ok := columnTypes[colName].(string); ok && isPrecise && columnBinaryKeyComparison[colType] {
 			pkey = append(pkey, quotedName+` COLLATE "C"`)
 		} else {
 			pkey = append(pkey, quotedName)
