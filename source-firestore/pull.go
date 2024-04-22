@@ -952,6 +952,10 @@ func translateValue(val *firestore_pb.Value) (interface{}, error) {
 	case *firestore_pb.Value_DoubleValue:
 		if math.IsNaN(val.DoubleValue) {
 			return "NaN", nil
+		} else if math.IsInf(val.DoubleValue, +1) {
+			return "Infinity", nil
+		} else if math.IsInf(val.DoubleValue, -1) {
+			return "-Infinity", nil
 		}
 		return val.DoubleValue, nil
 	case *firestore_pb.Value_TimestampValue:
@@ -997,6 +1001,10 @@ func sanitizeValue(x interface{}) interface{} {
 	case float64:
 		if math.IsNaN(x) {
 			return "NaN"
+		} else if math.IsInf(x, +1) {
+			return "Infinity"
+		} else if math.IsInf(x, -1) {
+			return "-Infinity"
 		}
 	case []interface{}:
 		for idx, value := range x {
