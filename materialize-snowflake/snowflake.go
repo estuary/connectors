@@ -127,6 +127,7 @@ var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
 	cfg        *config
+	ep         *sql.Endpoint
 	db         *stdsql.DB
 	pipeClient *PipeClient
 
@@ -194,6 +195,7 @@ func newTransactor(
 
 	var d = &transactor{
 		cfg:         cfg,
+		ep:          ep,
 		templates:   renderTemplates(dialect),
 		db:          db,
 		pipeClient:  pipeClient,
@@ -583,6 +585,20 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	// Use a freshly initialized connection for running queries with Snowflake's async mode, as a
+	// possible workaround for https://github.com/estuary/connectors/issues/1526.
+	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.ep.Tenant, true))
+	if err != nil {
+		return nil, fmt.Errorf("acknowledge stdsql.Open: %w", err)
+	}
+	defer db.Close()
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("acknowledge db.Conn: %w", err)
+	}
+	defer conn.Close()
+
 	// Run the queries using AsyncMode, which means that `ExecContext` will not block
 	// until the query is successful, rather we will store the results of these queries
 	// in a map so that we can then call `RowsAffected` on them, blocking until
@@ -601,7 +617,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 		if len(item.Query) > 0 {
 			log.WithField("table", item.Table).Info("store: starting query")
-			if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
+			if result, err := conn.ExecContext(asyncCtx, item.Query); err != nil {
 				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
 			} else {
 				results[stateKey] = result
@@ -788,7 +804,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		checkpointClear[b.target.StateKey] = nil
 		delete(d.cp, b.target.StateKey)
 	}
-	var checkpointJSON, err = json.Marshal(checkpointClear)
+	checkpointJSON, err := json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
