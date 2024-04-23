@@ -243,10 +243,13 @@ class IncrementalTwilioStream(TwilioStream, IncrementalMixin):
                 if record[self.cursor_field] >= self.state.get(self.cursor_field, self._start_date):
                     self._cursor_value = record[self.cursor_field]
                     yield record
-        except HTTPError:
+        except HTTPError as err:
             # Catching errors similar to
             # {"code": 20404, "message": "The requested resource /2010-04-01/Accounts/XXX/Usage/Records.json was not found"}
-            pass
+            if err.response.json()["code"] == 20404:
+                pass
+            else:
+                raise err
 
 
 class TwilioNestedStream(TwilioStream):
