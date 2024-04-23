@@ -38,7 +38,7 @@ require (
 	github.com/invopop/jsonschema v0.5.0
 	github.com/jackc/pgconn v1.12.1
 	github.com/jackc/pglogrepl v0.0.0-20220516121607-70a00e46998b
-	github.com/jackc/pgproto3/v2 v2.3.0
+	github.com/jackc/pgproto3/v2 v2.3.3
 	github.com/jackc/pgtype v1.11.0
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/jmoiron/sqlx v1.3.3
