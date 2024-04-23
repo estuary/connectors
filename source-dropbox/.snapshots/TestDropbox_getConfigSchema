@@ -13,39 +13,47 @@
 			"credentials": {
 				"type": "object",
 				"title": "Credentials",
-				"oneOf": [
+				"anyOf": [
 					{
-						"auth_type": {
-							"type": "string",
-							"title": "Auth Type",
-							"description": "The type of authentication to use. For Dropbox, this should be \"refresh\".",
-							"enum": ["refresh"],
-							"default": "refresh",
-							"order": 1
+						"title": "OAuth2",
+						"type": "object",
+						"properties": {
+							"auth_type": {
+								"type": "string",
+								"title": "Auth Type",
+								"description": "The type of authentication to use. For Dropbox, this should be \"refresh\".",
+								"enum": ["refresh"],
+								"default": "refresh",
+								"order": 1
+							},
+							"client_id": {
+								"type": "string",
+								"title": "Client ID",
+								"description": "The client ID for the Dropbox app.",
+								"order": 2
+							},
+							"client_secret": {
+								"type": "string",
+								"title": "Client Secret",
+								"description": "The client secret for the Dropbox app.",
+								"order": 3
+							}
 						},
-						"client_id": {
-							"type": "string",
-							"title": "Client ID",
-							"description": "The client ID for the Dropbox app.",
-							"order": 2
-						},
-						"client_secret": {
-							"type": "string",
-							"title": "Client Secret",
-							"description": "The client secret for the Dropbox app.",
-							"order": 3
-						}
+						"required": ["auth_type", "client_id", "client_secret"]
 					},
 					{
-						"access_token": {
-							"type": "string",
-							"title": "Access Token",
-							"description": "The access token for the Dropbox app.",
-							"order": 1
+						"title": "Access Token",
+						"type": "object",
+						"properties": {
+							"access_token": {
+								"type": "string",
+								"title": "Access Token",
+								"description": "The access token for the Dropbox app.",
+								"order": 1
+							}
 						}
 					}
 				],
-				"required": ["auth_type", "client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {

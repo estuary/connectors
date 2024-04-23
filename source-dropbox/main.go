@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ type advancedConfig struct {
 
 func (c config) Validate() error {
 	requiredProperties := [][]string{
-		{"Path", c.Path},
+		// {"Path", c.Path},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -46,7 +47,22 @@ func (c config) DiscoverRoot() string {
 }
 
 func (c config) RecommendedName() string {
-	return strings.ReplaceAll(c.Path, "/", "-")
+	if c.Path == "" {
+		return "dropbox-" + generateRandomString(6)
+	}
+	if strings.HasPrefix(c.Path, "/") {
+		return c.Path[1:]
+	}
+	return c.Path
+}
+
+func generateRandomString(i int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, i)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }
 
 func (c config) FilesAreMonotonic() bool {
@@ -111,6 +127,8 @@ func (dbx *dropboxStore) check() error {
 }
 
 func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
+	log.Debug("Listing files in path: ", dbx.config.Path)
+	log.Debug("Query: ", query)
 	files, err := dbx.client.ListFolder(&files.ListFolderArg{Path: query.Prefix})
 	if err != nil {
 		return nil, err
@@ -125,13 +143,17 @@ func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (file
 }
 
 func (dbx *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
+	log.Debug("Reading object: ", obj.Path)
 	meta, reader, err := dbx.client.Download(&files.DownloadArg{Path: obj.Path})
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
 
+	obj.Path = meta.PathDisplay
 	obj.ModTime = meta.ClientModified
-	obj.ContentType = meta.ExportInfo.ExportAs
+	if meta.ExportInfo != nil {
+		obj.ContentType = meta.ExportInfo.ExportAs
+	}
 	obj.Size = int64(meta.Size)
 
 	return reader, obj, nil
@@ -145,7 +167,14 @@ type dropboxListing struct {
 }
 
 func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
-	if !l.files.HasMore {
+	log.Debug("Listing next file")
+	log.Debug(l.files.Entries)
+
+	if len(l.files.Entries) == 0 {
+		return filesource.ObjectInfo{}, io.EOF
+	}
+	if !l.files.HasMore && l.index > 0 {
+		log.Debug("No more files to list")
 		return filesource.ObjectInfo{}, io.EOF
 	}
 	entry, ok := l.files.Entries[l.index].(*files.FileMetadata)
@@ -154,10 +183,14 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 	}
 	obj := filesource.ObjectInfo{}
 
+	log.Debug("Entry: ", entry)
+
 	obj.Path = entry.PathDisplay
 	obj.ModTime = entry.ClientModified
-	obj.ContentType = entry.ExportInfo.ExportAs
-	obj.Size = int64(entry.Size) // Convert uint64 to int64
+	if entry.ExportInfo != nil {
+		obj.ContentType = entry.ExportInfo.ExportAs
+	}
+	obj.Size = int64(entry.Size)
 
 	log.Debug("Listing object: ", obj.Path)
 
@@ -183,39 +216,47 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 			"credentials": {
 				"type": "object",
 				"title": "Credentials",
-				"oneOf": [
+				"anyOf": [
 					{
-						"auth_type": {
-							"type": "string",
-							"title": "Auth Type",
-							"description": "The type of authentication to use. For Dropbox, this should be \"refresh\".",
-							"enum": ["refresh"],
-							"default": "refresh",
-							"order": 1
+						"title": "OAuth2",
+						"type": "object",
+						"properties": {
+							"auth_type": {
+								"type": "string",
+								"title": "Auth Type",
+								"description": "The type of authentication to use. For Dropbox, this should be \"refresh\".",
+								"enum": ["refresh"],
+								"default": "refresh",
+								"order": 1
+							},
+							"client_id": {
+								"type": "string",
+								"title": "Client ID",
+								"description": "The client ID for the Dropbox app.",
+								"order": 2
+							},
+							"client_secret": {
+								"type": "string",
+								"title": "Client Secret",
+								"description": "The client secret for the Dropbox app.",
+								"order": 3
+							}
 						},
-						"client_id": {
-							"type": "string",
-							"title": "Client ID",
-							"description": "The client ID for the Dropbox app.",
-							"order": 2
-						},
-						"client_secret": {
-							"type": "string",
-							"title": "Client Secret",
-							"description": "The client secret for the Dropbox app.",
-							"order": 3
-						}
+						"required": ["auth_type", "client_id", "client_secret"]
 					},
 					{
-						"access_token": {
-							"type": "string",
-							"title": "Access Token",
-							"description": "The access token for the Dropbox app.",
-							"order": 1
+						"title": "Access Token",
+						"type": "object",
+						"properties": {
+							"access_token": {
+								"type": "string",
+								"title": "Access Token",
+								"description": "The access token for the Dropbox app.",
+								"order": 1
+							}
 						}
 					}
 				],
-				"required": ["auth_type", "client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {
