@@ -476,7 +476,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 	// bindings and then re-enable them (which will cause them all to get backfilled anew, as they
 	// should after such an event).
 	if allStreamsAreNew {
-		logrus.Info("no active bindings, resetting cursor")
+		logrus.Info("all bindings are new, resetting replication cursor")
 		c.State.Cursor = ""
 	}
 
@@ -677,7 +677,7 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
 		logrus.WithFields(logrus.Fields{
-			"streams":  streams,
+			"count":    len(streams),
 			"selected": streamID,
 		}).Info("backfilling streams")
 		if err := c.backfillStream(ctx, streamID); err != nil {
@@ -730,8 +730,13 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	}
 
 	// Update stream state to reflect backfill results
+	logrus.WithFields(logrus.Fields{
+		"stream": streamID,
+		"rows":   eventCount,
+	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	if eventCount == 0 {
+		logrus.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableModeActive
 		state.Scanned = nil
 	} else {

@@ -225,7 +225,7 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 		// This can be removed after the backfill buffering changes of August 2023
 		// are complete, since once that's done results should be fully processed
 		// as soon as they're received.
-		val = append([]byte(nil), val...)
+		val = append(make([]byte, 0, len(val)), val...)
 		if typeName, ok := columnType.(string); ok {
 			switch typeName {
 			case "bit":
@@ -376,13 +376,24 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 
 	var columns []sqlcapture.ColumnInfo
 	for _, row := range results.Values {
+		var tableSchema, tableName = string(row[0].AsString()), string(row[1].AsString())
+		var columnName = string(row[3].AsString())
+		var dataType, fullColumnType = string(row[5].AsString()), string(row[6].AsString())
+		if dataType == "enum" {
+			logrus.WithFields(logrus.Fields{
+				"schema": tableSchema,
+				"table":  tableName,
+				"column": columnName,
+				"type":   fullColumnType,
+			}).Debug("parsing enum type")
+		}
 		columns = append(columns, sqlcapture.ColumnInfo{
-			TableSchema: string(row[0].AsString()),
-			TableName:   string(row[1].AsString()),
+			TableSchema: tableSchema,
+			TableName:   tableName,
 			Index:       int(row[2].AsInt64()),
-			Name:        string(row[3].AsString()),
+			Name:        columnName,
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    parseDataType(string(row[5].AsString()), string(row[6].AsString())),
+			DataType:    parseDataType(dataType, fullColumnType),
 		})
 	}
 	return columns, err
@@ -459,7 +470,7 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 // body characters and terminator so that submatch #1 is the full string body.
 // The options for string body characters are, in order, two successive quotes,
 // anything backslash-escaped, and anything that isn't a single-quote.
-var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
+var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])*)'(?:,|$)`)
 
 // enumValueReplacements contains the complete list of MySQL string escapes from
 // https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences

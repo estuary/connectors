@@ -132,6 +132,8 @@ type Database interface {
 	EmptySourceMetadata() SourceMetadata
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
 	ShouldBackfill(streamID string) bool
+	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
+	HistoryMode() bool
 
 	// The collection key which should be suggested if discovery fails to find suitable
 	// primary key. This should be some property or combination of properties in the

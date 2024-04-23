@@ -7,15 +7,17 @@
           "properties": {
             "credentials_title": {
               "const": "Private App Credentials",
-              "title": "Credentials Title"
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
             },
             "access_token": {
+              "secret": true,
               "title": "Access Token",
               "type": "string"
             }
           },
           "required": [
-            "credentials_title",
             "access_token"
           ],
           "title": "AccessToken",
@@ -25,23 +27,27 @@
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
-              "title": "Credentials Title"
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
             },
             "client_id": {
+              "secret": true,
               "title": "Client Id",
               "type": "string"
             },
             "client_secret": {
+              "secret": true,
               "title": "Client Secret",
               "type": "string"
             },
             "refresh_token": {
+              "secret": true,
               "title": "Refresh Token",
               "type": "string"
             }
           },
           "required": [
-            "credentials_title",
             "client_id",
             "client_secret",
             "refresh_token"
@@ -68,11 +74,18 @@
               "$ref": "#/$defs/AccessToken"
             }
           ],
-          "title": "Authentication"
+          "title": "Authentication",
+          "type": "object"
+        },
+        "start_date": {
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
         }
       },
       "required": [
-        "credentials"
+        "credentials",
+        "start_date"
       ],
       "title": "EndpointConfig",
       "type": "object"
@@ -100,10 +113,10 @@
       "title": "ResourceConfig",
       "type": "object"
     },
-    "documentationUrl": "https://docs.estuary.dev",
+    "documentationUrl": "https://go.estuary.dev/hubspot-real-time",
     "oauth2": {
       "provider": "hubspot",
-      "authUrlTemplate": "https://app.hubspot.com/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=crm.lists.read%20crm.objects.companies.read%20crm.objects.contacts.read%20crm.objects.deals.read%20crm.objects.owners.read%20crm.schemas.companies.read%20crm.schemas.contacts.read%20crm.schemas.deals.read%20e-commerce%20files%20files.ui_hidden.read%20forms%20forms-uploaded-files%20sales-email-read%20tickets&optional_scope=automation%20content%20crm.objects.custom.read%20crm.objects.feedback_submissions.read%20crm.objects.goals.read%20crm.schemas.custom.read&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "authUrlTemplate": "https://app.hubspot.com/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=crm.lists.read%20crm.objects.companies.read%20crm.objects.contacts.read%20crm.objects.deals.read%20crm.objects.owners.read%20crm.schemas.companies.read%20crm.schemas.contacts.read%20crm.schemas.deals.read%20e-commerce%20files%20files.ui_hidden.read%20forms%20forms-uploaded-files%20sales-email-read%20communication_preferences.read%20communication_preferences.read_write%20tickets&optional_scope=automation%20content%20crm.objects.custom.read%20crm.objects.feedback_submissions.read%20crm.objects.goals.read%20crm.schemas.custom.read&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
       "accessTokenUrlTemplate": "https://api.hubapi.com/oauth/v1/token",
       "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {

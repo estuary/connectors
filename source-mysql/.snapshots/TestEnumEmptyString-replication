@@ -1,0 +1,16 @@
+# ================================
+# Collection "acmeCo/test/test_enumemptystring_29144777": 8 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"A","id":5}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"B","id":6}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"C","id":7}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"","id":8}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"","id":200}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"","id":201}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"","id":202}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"","id":205}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FEnumEmptyString_29144777":{"backfilled":8,"key_columns":["id"],"metadata":{"schema":{"columns":["id","category"],"types":{"category":{"enum":["","","A","B","C"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

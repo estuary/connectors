@@ -36,7 +36,7 @@ The two predominant strategies for accessing logs are:
 Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
 """
 
-PageCursor = str | NonNegativeInt | None
+PageCursor = str | int | None
 """PageCursor is a cursor into a paged result set.
 These cursors are predominantly an opaque string or an internal offset integer.
 
@@ -171,6 +171,15 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
 
+@dataclass
+class AssociatedDocument(Generic[_BaseDocument]):
+    """
+    Emitting AssociatedDocument allows you to represent capturing document for other bindings.
+    You might use this if your data model requires you to load "child" documents when capturing a "parent" document,
+    instead of independently loading the child data stream.
+    """
+    doc: _BaseDocument
+    binding: int
 
 FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument, None]]
 """
@@ -184,7 +193,7 @@ not emitted by the connector.
 
 FetchPageFn = Callable[
     [Logger, PageCursor, LogCursor],
-    AsyncGenerator[_BaseDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | AssociatedDocument | PageCursor, None],
 ]
 """
 FetchPageFn fetches available checkpoints since the provided last PageCursor.
@@ -209,7 +218,7 @@ returning without yielding a final PageCursor.
 
 FetchChangesFn = Callable[
     [Logger, LogCursor],
-    AsyncGenerator[_BaseDocument | LogCursor, None],
+    AsyncGenerator[_BaseDocument | AssociatedDocument | LogCursor, None],
 ]
 """
 FetchChangesFn fetches available checkpoints since the provided last LogCursor.
@@ -267,6 +276,12 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
             int,
             ResourceState,
             Task,
+            list[
+                tuple[
+                    CaptureBinding[_ResourceConfig],
+                    "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
+                ]
+            ]
         ],
         None,
     ]
@@ -385,6 +400,7 @@ def open(
                 index,
                 state,
                 task,
+                resolved_bindings
             )
 
     return (response.Opened(explicitAcknowledgements=False), _run)
@@ -552,6 +568,9 @@ async def _binding_backfill_task(
             if isinstance(item, BaseDocument):
                 task.captured(binding_index, item)
                 done = True
+            elif isinstance(item, AssociatedDocument):
+                task.captured(item.binding, item.doc)
+                done = True
             elif item is None:
                 raise RuntimeError(
                     f"Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
@@ -594,8 +613,11 @@ async def _binding_incremental_task(
             if isinstance(item, BaseDocument):
                 task.captured(binding_index, item)
                 pending = True
+            elif isinstance(item, AssociatedDocument):
+                # TODO(jshearer): Assert that the binding index exists (and is enabled?)
+                task.captured(item.binding, item.doc)
+                pending = True
             else:
-
                 # Ensure LogCursor types match and that they're strictly increasing.
                 is_larger = False
                 if isinstance(item, int) and isinstance(state.cursor, int):

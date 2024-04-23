@@ -19,10 +19,10 @@ OAUTH2_SPEC = OAuth2Spec(
     provider="google",
     authUrlTemplate="https://accounts.google.com/o/oauth2/auth?access_type=offline&prompt=consent&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&scope=https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
     accessTokenUrlTemplate="https://oauth2.googleapis.com/token",
-    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
     accessTokenBody=(
         '{"grant_type": "authorization_code", "client_id": "{{{ client_id }}}", "client_secret": "{{{ client_secret }}}", "redirect_uri": "{{{ redirect_uri }}}", "code": "{{{ code }}}"}'
     ),
+    accessTokenHeaders={"content-type":"application/json"},
     accessTokenResponseMap={"refresh_token": "/refresh_token"},
 )
 
@@ -55,13 +55,13 @@ class NumberType(StrEnum):
     PERCENT = "PERCENT"
 
 
-class Sheet(BaseModel, extra="forbid"):
+class Sheet(BaseModel, extra="allow"):
     """
     Models a Google Spreadsheet Sheet.
     See: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets
     """
 
-    class Properties(BaseModel, extra="forbid"):
+    class Properties(BaseModel, extra="allow"):
         class Grid(BaseModel, extra="forbid"):
             rowCount: int
             columnCount: int

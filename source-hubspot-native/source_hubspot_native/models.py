@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, AliasChoices
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING
 import urllib.parse
 
@@ -29,6 +29,8 @@ scopes = [
     "forms",
     "forms-uploaded-files",
     "sales-email-read",
+    "communication_preferences.read",
+    "communication_preferences.read_write",
     "tickets",
 ]
 
@@ -78,6 +80,10 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials | AccessToken = Field(
         discriminator="credentials_title",
         title="Authentication",
+        json_schema_extra={"type": "object"}
+    )
+    start_date: AwareDatetime = Field(
+        title="Start Date",
     )
 
 
@@ -87,6 +93,7 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 # Names of things within the HubSpot API domain.
 class Names(StrEnum):
+    campaigns = auto()
     companies = auto()
     contacts = auto()
     deals = auto()
@@ -94,7 +101,53 @@ class Names(StrEnum):
     line_items = auto()
     properties = auto()
     tickets = auto()
+    contact_lists = auto()
+    engagements_calls = auto()
+    engagements_emails = auto()
+    engagements_meetings = auto()
+    engagements_notes = auto()
+    engagements_tasks = auto()
+    ticket_pipelines = auto()
+    marketing_emails = auto()
+    deal_pipelines = auto()
+    subscription_changes = auto()
+    email_events = auto()
+    marketing_forms = auto()
+    owners = auto()
+    products = auto()
+    workflows = auto()
+    goal_targets = auto()
+    feedback_submissions = auto()
+    email_subscriptions = auto()
+    contacts_lists_subscription = auto()
 
+class PropertyNames(StrEnum):
+    emails = auto()
+    companies = auto()
+    deals = auto()
+    engagements = auto()
+    tickets = auto()
+    calls = auto()
+    notes = auto()
+    tasks = auto()
+    meetings = auto()
+    contacts = auto()
+    forms = auto()
+    line_items = auto()
+    products = auto()
+    workflows = auto()
+    goal_targets = auto()
+    feedback_submissions = auto()
+    email_subscriptions = auto()
+
+class EnforceUrl(str):
+    owners = "/crm/v3/owners/"
+    forms = "/marketing/v3/forms"
+    workflows = "/automation/v3/workflows/"
+    email_subscriptions = "/communication-preferences/v3/definitions"
+    contact_subscription = "/contacts/v1/lists/all/contacts/all"
+    marketing_emails = "/marketing/v3/emails/"
+    contact_lists = "/contacts/v1/lists"
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
 # attached to a HubSpot CRM object.
@@ -113,10 +166,14 @@ class Properties(BaseDocument, extra="forbid"):
 class BaseCRMObject(BaseDocument, extra="forbid"):
     # Class-scoped metadata attached to concrete subclasses.
     NAME: ClassVar[str]
+    PRIMARY_KEY: ClassVar[list[str]] = ["/id"]
+    PROPERTY_SEARCH_NAME: ClassVar[str] = None
     ASSOCIATED_ENTITIES: ClassVar[list[str]]
     CACHED_PROPERTIES: ClassVar[Properties]
+    IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
+    ENFORCE_URL: ClassVar[str]
 
-    class History(BaseDocument, extra="forbid"):
+    class History(BaseDocument, extra="allow"):
         timestamp: datetime
         value: str
         sourceType: str
@@ -168,8 +225,61 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
 CRMObject = TypeVar("CRMObject", bound=BaseCRMObject)
 
 
+class V1CRMObject(BaseDocument, extra="allow"):
+    # Class-scoped metadata attached to concrete subclasses.
+    NAME: ClassVar[str]
+    PRIMARY_KEY: ClassVar[list[str]] = ["/id"]
+    PROPERTY_SEARCH_NAME: ClassVar[str]
+    ASSOCIATED_ENTITIES: ClassVar[list[str]]
+    CACHED_PROPERTIES: ClassVar[Properties]
+    IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
+    ENFORCE_URL: ClassVar[str]
+
+class V1CustomCRMObject(BaseDocument, extra="allow"):
+    # Class-scoped metadata attached to concrete subclasses.
+    NAME: ClassVar[str]
+    PRIMARY_KEY: ClassVar[list[str]] = ["/id"]
+    PROPERTY_SEARCH_NAME: ClassVar[str]
+    ASSOCIATED_ENTITIES: ClassVar[list[str]]
+    CACHED_PROPERTIES: ClassVar[Properties]
+    IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
+    ENFORCE_URL: ClassVar[str]
+
+    offset: int = Field(alias="vid-offset")
+    hasMore: bool = Field(alias="has-more")
+
+class V1CustomCRMObject2(BaseDocument, extra="allow"):
+    # Class-scoped metadata attached to concrete subclasses.
+    NAME: ClassVar[str]
+    PRIMARY_KEY: ClassVar[list[str]] = ["/id"]
+    PROPERTY_SEARCH_NAME: ClassVar[str]
+    ASSOCIATED_ENTITIES: ClassVar[list[str]]
+    CACHED_PROPERTIES: ClassVar[Properties]
+    IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
+    ENFORCE_URL: ClassVar[str]
+
+    hasMore: bool = Field(alias="has-more")
+
+CustomCRMObject = TypeVar("CustomCRMObject", bound=V1CRMObject)
+CustomCRMObject2 = TypeVar("CustomCRMObject2", bound=V1CustomCRMObject2)
+CustomCRMObjectV1 = TypeVar("CustomCRMObjectV1", bound=V1CustomCRMObject)
+
+class CustomObject(BaseDocument, extra="allow"):
+
+    NAME: ClassVar[str]
+    PRIMARY_KEY: ClassVar[list[str]]
+    PROPERTY_SEARCH_NAME: ClassVar[str]
+    IGNORE_PROPERTY_SEARCH: ClassVar[bool] = False
+    ASSOCIATED_ENTITIES: ClassVar[list[str]] = []
+
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+    results: list[int] = []
+
 class Company(BaseCRMObject):
     NAME = Names.companies
+    PROPERTY_SEARCH_NAME = PropertyNames.companies
+    IGNORE_PROPERTY_SEARCH = True
     ASSOCIATED_ENTITIES = [Names.contacts, Names.deals]
 
     contacts: list[int] = []
@@ -178,6 +288,8 @@ class Company(BaseCRMObject):
 
 class Contact(BaseCRMObject):
     NAME = Names.contacts
+    PROPERTY_SEARCH_NAME = PropertyNames.contacts
+    IGNORE_PROPERTY_SEARCH = True
     ASSOCIATED_ENTITIES = [Names.companies]
 
     companies: list[int] = []
@@ -185,6 +297,8 @@ class Contact(BaseCRMObject):
 
 class Deal(BaseCRMObject):
     NAME = Names.deals
+    PROPERTY_SEARCH_NAME = PropertyNames.deals
+    IGNORE_PROPERTY_SEARCH = True
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
@@ -194,6 +308,7 @@ class Deal(BaseCRMObject):
 
 class Engagement(BaseCRMObject):
     NAME = Names.engagements
+    PROPERTY_SEARCH_NAME = PropertyNames.engagements
     ASSOCIATED_ENTITIES = [Names.deals]
 
     deals: list[int] = []
@@ -201,12 +316,208 @@ class Engagement(BaseCRMObject):
 
 class Ticket(BaseCRMObject):
     NAME = Names.tickets
+    PROPERTY_SEARCH_NAME = PropertyNames.tickets
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
     engagements: list[int] = []
     line_items: list[int] = []
+    
+class ContactLists(V1CRMObject):
+    NAME = Names.contact_lists
+    PRIMARY_KEY = ["/listId"]
+    ASSOCIATED_ENTITIES = []
+    IGNORE_PROPERTY_SEARCH = True
+    ENFORCE_URL = EnforceUrl.contact_lists
 
+    listId: str
+    lists: list[int] = []
+
+class ContactSubscription(V1CRMObject):
+    NAME = Names.contacts_lists_subscription
+    ASSOCIATED_ENTITIES = []
+    PRIMARY_KEY = ["/vid"]
+    ENFORCE_URL = EnforceUrl.contact_subscription
+    IGNORE_PROPERTY_SEARCH = True
+
+    vid: str
+    contacts: list[int] = []
+
+class EngagementEmails(BaseCRMObject):
+    NAME = Names.engagements_emails
+    PROPERTY_SEARCH_NAME = PropertyNames.emails
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    contacts: list[int] = []
+    deals: list[int] = []
+    companies: list[int] = []
+    tickets: list[int] = []
+    results: list[int] = []
+
+class EngagementCalls(BaseCRMObject):
+    NAME = Names.engagements_calls
+    PROPERTY_SEARCH_NAME = PropertyNames.calls
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    contacts: list[int] = []
+    deals: list[int] = []
+    companies: list[int] = []
+    tickets: list[int] = []
+    results: list[int] = []
+
+class EngagementMeetings(BaseCRMObject):
+    NAME = Names.engagements_meetings
+    PROPERTY_SEARCH_NAME = PropertyNames.meetings
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    contacts: list[int] = []
+    deals: list[int] = []
+    companies: list[int] = []
+    tickets: list[int] = []
+    results: list[int] = []
+
+class EngagementNotes(BaseCRMObject):
+    NAME = Names.engagements_notes
+    PROPERTY_SEARCH_NAME = PropertyNames.notes
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+
+    contacts: list[int] = []
+    deals: list[int] = []
+    companies: list[int] = []
+    tickets: list[int] = []
+    results: list[int] = []
+
+class EngagementTasks(BaseCRMObject):
+    NAME = Names.engagements_tasks
+    PROPERTY_SEARCH_NAME = PropertyNames.tasks
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.deals, Names.companies, Names.tickets]
+    
+    contacts: list[int] = []
+    deals: list[int] = []
+    companies: list[int] = []
+    tickets: list[int] = []
+    results: list[int] = []
+
+class TicketPipelines(BaseCRMObject):
+    NAME = Names.ticket_pipelines
+    PRIMARY_KEY = ['/pipelineId']
+    ASSOCIATED_ENTITIES = []
+
+    pipelineId: str
+    results: list[int] = []
+
+class MarketingEmails(V1CRMObject):
+    NAME = Names.marketing_emails
+    ENFORCE_URL = EnforceUrl.marketing_emails
+    IGNORE_PROPERTY_SEARCH = True
+    ASSOCIATED_ENTITIES = []
+
+    id: int
+    updatedAt: AwareDatetime
+    results: list[  int] = []
+
+class SubscriptionChanges(V1CRMObject):
+    NAME = Names.subscription_changes
+    PRIMARY_KEY = ['/portalId']
+    ASSOCIATED_ENTITIES = []
+
+    portalId: str
+    timeline: list[int] = []
+
+class Campaigns(V1CRMObject):
+    NAME = Names.campaigns
+    ASSOCIATED_ENTITIES = []
+
+    id: str
+    timeline: list[int] = []
+
+class DealPipelines(V1CRMObject):
+    NAME = Names.deal_pipelines
+    PRIMARY_KEY = ['/pipelineId']
+    ASSOCIATED_ENTITIES = []
+
+    pipelineId: str
+    results: list[int] = []
+
+class EmailEvents(V1CRMObject):
+    NAME = Names.email_events
+    ASSOCIATED_ENTITIES = []
+
+    id: str
+    events: list[int] = []
+
+class MarketingForms(V1CRMObject):
+    NAME = Names.marketing_forms
+    ENFORCE_URL = EnforceUrl.forms
+    PROPERTY_SEARCH_NAME = PropertyNames.forms
+    IGNORE_PROPERTY_SEARCH = True
+    ASSOCIATED_ENTITIES = []
+
+    id: int
+    results: list[int] = []
+
+class Owners(V1CRMObject):
+    NAME = Names.owners
+    ENFORCE_URL = EnforceUrl.owners
+    IGNORE_PROPERTY_SEARCH = True
+    ASSOCIATED_ENTITIES = []
+
+    id: int
+    updatedAt: AwareDatetime
+    results: list[int] = []
+
+class LineItems(BaseCRMObject):
+    NAME = Names.line_items
+    IGNORE_PROPERTY_SEARCH = True
+    PROPERTY_SEARCH_NAME = PropertyNames.line_items
+    ASSOCIATED_ENTITIES = []
+
+    results: list[int] = []
+
+class Products(BaseCRMObject):
+    NAME = Names.products
+    IGNORE_PROPERTY_SEARCH = True
+    PROPERTY_SEARCH_NAME = PropertyNames.products
+    ASSOCIATED_ENTITIES = []
+
+    results: list[int] = []
+
+class Workflows(V1CRMObject):
+    NAME = Names.workflows
+    IGNORE_PROPERTY_SEARCH = True
+    ENFORCE_URL = EnforceUrl.workflows
+    ASSOCIATED_ENTITIES = []
+    PROPERTY_SEARCH_NAME = PropertyNames.workflows
+
+    id: int
+    updatedAt: AwareDatetime
+    workflows: list[int] = []
+
+class Goals(BaseCRMObject):
+    NAME = Names.goal_targets
+    ASSOCIATED_ENTITIES = []
+    PROPERTY_SEARCH_NAME = PropertyNames.goal_targets
+
+    results: list[int] = []
+
+class FeedbackSubmissions(BaseCRMObject):
+    NAME = Names.feedback_submissions
+    ASSOCIATED_ENTITIES = [Names.contacts]
+    PROPERTY_SEARCH_NAME = PropertyNames.feedback_submissions
+
+    results: list[int] = []
+
+class EmailSubscriptions(V1CRMObject):
+    NAME = Names.email_subscriptions
+    PRIMARY_KEY = ['/id']
+    ASSOCIATED_ENTITIES = []
+    ENFORCE_URL = EnforceUrl.email_subscriptions
+    IGNORE_PROPERTY_SEARCH = True
+
+    id: str
+    updatedAt: AwareDatetime
+    createdAt: AwareDatetime
+    subscriptionDefinitions: list[int] = []
 
 # An Association, as returned by the v4 associations API.
 class Association(BaseModel, extra="forbid"):
@@ -271,6 +582,12 @@ class BatchResult(BaseModel, Generic[Item], extra="forbid"):
     errors: list[Error] = []
     numErrors: int = 0
 
+class WorkflowResult(BaseModel, Generic[Item], extra="forbid"):
+    workflows: list[Item]
+
+class SubscriptionResult(BaseModel, Generic[Item], extra="forbid"):
+    subscriptionDefinitions: list[Item]
+
 
 # The following are models for HubSpot's "legacy" APIs for fetching
 # recently-changed entities. We model them because these APIs are
@@ -292,7 +609,7 @@ class OldRecentCompanies(BaseModel):
         properties: Properties
 
     results: list[Item]
-    hasMore: bool
+    hasMore: bool = Field(validation_alias=AliasChoices("hasMore", "has-more"))
     offset: int
     total: int
 
@@ -349,5 +666,138 @@ class OldRecentEngagements(BaseModel):
 
 
 class OldRecentTicket(BaseModel):
-    timestamp: int
-    objectId: int
+    class Item(BaseModel):
+        id: int
+        updatedAt: datetime
+
+    results: list[Item]
+    hasMore: bool
+    offset: str
+
+class OldRecentCampaigns(BaseModel):
+    
+    class Item(BaseModel):
+
+        id: int
+        lastUpdatedTime: int
+
+    campaigns : list[Item]
+    hasMore: bool
+    offset: str
+
+
+
+################################# v3
+
+
+
+
+class OldRecentMarketingEmails(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+    
+    results: list[Item]
+
+
+class OldRecentEngagementsEmails(BaseModel):
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentEngagementsTasks(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentEngagementsNotes(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentEngagementsCalls(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentEngagementsMeetings(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentMarketingForms(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentOwners(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+
+    results: list[Item]
+    
+class OldRecentLineItems(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentProducts(BaseModel):
+    
+    class Item(BaseModel):
+        id: int
+        createdAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentWorkflows(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+
+    workflows: list[Item]
+
+class OldRecentGoals(BaseModel):
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentFeedbackSubmissions(BaseModel):
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+
+    results: list[Item]
+
+class OldRecentEmailSubscriptions(BaseModel):
+
+    class Item(BaseModel):
+        id: int
+        updatedAt: AwareDatetime
+
+    subscriptionDefinitions: list[Item]

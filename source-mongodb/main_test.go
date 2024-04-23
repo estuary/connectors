@@ -17,7 +17,8 @@ import (
 )
 
 func TestCapture(t *testing.T) {
-	database := "test"
+	database1 := "testDb1"
+	database2 := "testDb2"
 	col1 := "collectionOne"
 	col2 := "collectionTwo"
 	col3 := "collectionThree"
@@ -26,9 +27,9 @@ func TestCapture(t *testing.T) {
 	client, cfg := testClient(t)
 
 	cleanup := func() {
-		dropCollection(ctx, t, client, database, col1)
-		dropCollection(ctx, t, client, database, col2)
-		dropCollection(ctx, t, client, database, col3)
+		dropCollection(ctx, t, client, database1, col1)
+		dropCollection(ctx, t, client, database1, col2)
+		dropCollection(ctx, t, client, database2, col3)
 	}
 	cleanup()
 	t.Cleanup(cleanup)
@@ -49,21 +50,21 @@ func TestCapture(t *testing.T) {
 		return []byte(fmt.Sprintf("pk val %d", idx))
 	}
 
-	addTestTableData(ctx, t, client, database, col1, 5, 0, stringPkVals, "onlyColumn")
-	addTestTableData(ctx, t, client, database, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
-	addTestTableData(ctx, t, client, database, col3, 5, 0, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
+	addTestTableData(ctx, t, client, database1, col1, 5, 0, stringPkVals, "onlyColumn")
+	addTestTableData(ctx, t, client, database1, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
+	addTestTableData(ctx, t, client, database2, col3, 5, 0, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
 
 	cs := &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		// Values returned from individual segment queries will appear to be a random order, but
-		// this is because of how DynamoDB hashes values from the partition key. The returned
-		// orderings are deterministic per segment, but the concurrent processing of segments makes
-		// the overall ordering non-deterministic.
-		Validator:  &st.SortedCaptureValidator{},
-		Sanitizers: commonSanitizers(),
-		Bindings:   bindings(t, database, col1, col2, col3),
+		Validator:    &st.SortedCaptureValidator{},
+		Sanitizers:   commonSanitizers(),
+		Bindings: []*flow.CaptureSpec_Binding{
+			makeBinding(t, database1, col1),
+			makeBinding(t, database1, col2),
+			makeBinding(t, database2, col3),
+		},
 	}
 
 	// Run the capture, stopping it before it has completed the entire backfill.
@@ -81,23 +82,23 @@ func TestCapture(t *testing.T) {
 
 	// Run the capture one more time, first adding more data that will be picked up from stream
 	// shards, to verify resumption from stream checkpoints.
-	addTestTableData(ctx, t, client, database, col1, 5, 5, stringPkVals, "onlyColumn")
-	addTestTableData(ctx, t, client, database, col2, 5, 5, numberPkVals, "firstColumn", "secondColumn")
-	addTestTableData(ctx, t, client, database, col3, 5, 5, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
+	addTestTableData(ctx, t, client, database1, col1, 5, 5, stringPkVals, "onlyColumn")
+	addTestTableData(ctx, t, client, database1, col2, 5, 5, numberPkVals, "firstColumn", "secondColumn")
+	addTestTableData(ctx, t, client, database2, col3, 5, 5, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
 
 	advanceCapture(ctx, t, cs)
 
 	// Delete some records
-	deleteData(ctx, t, client, database, col1, stringPkVals(0))
-	deleteData(ctx, t, client, database, col2, numberPkVals(0))
-	deleteData(ctx, t, client, database, col3, binaryPkVals(0))
+	deleteData(ctx, t, client, database1, col1, stringPkVals(0))
+	deleteData(ctx, t, client, database1, col2, numberPkVals(0))
+	deleteData(ctx, t, client, database2, col3, binaryPkVals(0))
 
 	advanceCapture(ctx, t, cs)
 
 	// Update records
-	updateData(ctx, t, client, database, col1, stringPkVals(1), "onlyColumn_new")
-	updateData(ctx, t, client, database, col2, numberPkVals(1), "thirdColumn_new")
-	updateData(ctx, t, client, database, col3, binaryPkVals(1), "forthColumn_new")
+	updateData(ctx, t, client, database1, col1, stringPkVals(1), "onlyColumn_new")
+	updateData(ctx, t, client, database1, col2, numberPkVals(1), "thirdColumn_new")
+	updateData(ctx, t, client, database2, col3, binaryPkVals(1), "forthColumn_new")
 
 	advanceCapture(ctx, t, cs)
 
@@ -106,8 +107,7 @@ func TestCapture(t *testing.T) {
 
 func commonSanitizers() map[string]*regexp.Regexp {
 	sanitizers := make(map[string]*regexp.Regexp)
-	sanitizers[`"stream_resume_token":"<STREAM_RESUME_TOKEN>"`] = regexp.MustCompile(`"stream_resume_token":"[^"]*"`)
-	sanitizers[`"started_at":"<TIMESTAMP>"`] = regexp.MustCompile(`"started_at":"((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)"`)
+	sanitizers[`"<TOKEN>"`] = regexp.MustCompile(`"[A-Za-z0-9+/=]{32,}"`)
 
 	return sanitizers
 }
@@ -121,20 +121,15 @@ func resourceSpecJson(t *testing.T, r resource) json.RawMessage {
 	return out
 }
 
-func bindings(t *testing.T, database string, collections ...string) []*flow.CaptureSpec_Binding {
+func makeBinding(t *testing.T, database string, collection string) *flow.CaptureSpec_Binding {
 	t.Helper()
 
-	out := []*flow.CaptureSpec_Binding{}
-	for _, col := range collections {
-		out = append(out, &flow.CaptureSpec_Binding{
-			ResourceConfigJson: resourceSpecJson(t, resource{Collection: col, Database: database}),
-			ResourcePath:       []string{database, col},
-			Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", col))},
-			StateKey:           url.QueryEscape(database + "/" + col),
-		})
+	return &flow.CaptureSpec_Binding{
+		ResourceConfigJson: resourceSpecJson(t, resource{Collection: collection, Database: database}),
+		ResourcePath:       []string{database, collection},
+		Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", collection))},
+		StateKey:           url.QueryEscape(database + "/" + collection),
 	}
-
-	return out
 }
 
 func advanceCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
