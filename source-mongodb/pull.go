@@ -89,27 +89,14 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}).Info("buildInfo")
 	}
 
-	// TODO(whb): Remove this migration stuff when all migrations are complete - see comment on
-	// `decodeState`.
-	global, err := globalStream(ctx, client)
-	if err != nil {
-		return err
-	}
-	prevState, globalToken, err := decodeState(global, open.StateJson, bindings)
-	if err != nil {
-		return fmt.Errorf("decoding state: %w", err)
+	var prevState captureState
+	if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
+		return fmt.Errorf("unmarshalling previous state: %w", err)
 	}
 
 	prevState, err = updateResourceStates(prevState, bindings)
 	if err != nil {
 		return fmt.Errorf("updating resource states: %w", err)
-	}
-
-	if prevState.Resources == nil {
-		prevState.Resources = make(map[boilerplate.StateKey]resourceState)
-	}
-	if prevState.DatabaseResumeTokens == nil {
-		prevState.DatabaseResumeTokens = make(map[string]bson.Raw)
 	}
 
 	var c = capture{
@@ -121,15 +108,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if err := c.output.Ready(false); err != nil {
 		return err
-	}
-
-	// TODO(whb): More migration stuff to be removed when migrations are complete. A call to
-	// populateDatabaseResumeTokens may emit documents but will not emit a checkpoint. A full
-	// checkpoint will be emitted immediately after this though.
-	if globalToken != nil {
-		if err := c.populateDatabaseResumeTokens(ctx, *globalToken); err != nil {
-			return fmt.Errorf("populating database-specific tokens from global resume token: %w", err)
-		}
 	}
 
 	// Persist the checkpoint in full, which may have been updated in updateResourceStates to remove
@@ -212,11 +190,13 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 	// included as bindings. A binding becomes inconsistent once removed from the capture
 	// because its change events will begin to be filtered out, and must start over if ever
 	// re-added.
-	for _, binding := range bindings {
-		var sk = binding.stateKey
-		if resState, ok := prevState.Resources[sk]; ok {
-			newState.Resources[sk] = resState
-			trackedDatabases[binding.resource.Database] = struct{}{}
+	if prevState.Resources != nil {
+		for _, binding := range bindings {
+			var sk = binding.stateKey
+			if resState, ok := prevState.Resources[sk]; ok {
+				newState.Resources[sk] = resState
+				trackedDatabases[binding.resource.Database] = struct{}{}
+			}
 		}
 	}
 
