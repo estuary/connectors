@@ -12,7 +12,7 @@ import (
 func TestDropbox_getConfigSchema(t *testing.T) {
 	parserJsonSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
 
-	result := getConfigSchema(parserJsonSchema)
+	result := configSchema(parserJsonSchema)
 
 	cupaloy.SnapshotT(t, string(result))
 }
@@ -20,8 +20,13 @@ func TestDropbox_newDropboxStore(t *testing.T) {
 	token := os.Getenv("DROPBOX_TOKEN")
 	ctx := context.TODO()
 	cfg := config{
-		Credentials: &Credentials{AccessToken: token},
-		Path:        "",
+		Credentials: &Credentials{
+			AccessToken:  token,
+			ClientID:     "client_id",
+			ClientSecret: "client_secret",
+			RefreshToken: "refresh_token",
+		},
+		Path: "",
 	}
 
 	store, err := newDropboxStore(ctx, cfg)
