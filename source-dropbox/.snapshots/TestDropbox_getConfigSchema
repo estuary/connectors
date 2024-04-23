@@ -13,27 +13,32 @@
 			"credentials": {
 				"type": "object",
 				"title": "Credentials",
+				"x-oauth2-provider": "dropbox",
 				"properties": {
 					"client_id": {
 						"type": "string",
+						"secret": true,
 						"title": "Client ID",
 						"description": "The client ID for the Dropbox app.",
 						"order": 1
 					},
 					"client_secret": {
 						"type": "string",
+						"secret": true,
 						"title": "Client Secret",
 						"description": "The client secret for the Dropbox app.",
 						"order": 2
 					},
 					"refresh_token": {
 						"type": "string",
+						"secret": true,
 						"title": "Refresh Token",
 						"description": "The refresh token for the Dropbox app.",
 						"order": 3
 					},
 					"access_token": {
 						"type": "string",
+						"secret": true,
 						"title": "Access Token",
 						"description": "The access token for the Dropbox app.",
 						"order": 4

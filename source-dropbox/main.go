@@ -32,7 +32,7 @@ type advancedConfig struct {
 
 func (c config) Validate() error {
 	requiredProperties := [][]string{
-		// {"Path", c.Path},
+		{"Path", c.Path},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -199,7 +199,7 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 	return obj, nil
 }
 
-func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
+func configSchema(parserSchema json.RawMessage) json.RawMessage {
 
 	return json.RawMessage(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
@@ -216,27 +216,32 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 			"credentials": {
 				"type": "object",
 				"title": "Credentials",
+				"x-oauth2-provider": "dropbox",
 				"properties": {
 					"client_id": {
 						"type": "string",
+						"secret": true,
 						"title": "Client ID",
 						"description": "The client ID for the Dropbox app.",
 						"order": 1
 					},
 					"client_secret": {
 						"type": "string",
+						"secret": true,
 						"title": "Client Secret",
 						"description": "The client secret for the Dropbox app.",
 						"order": 2
 					},
 					"refresh_token": {
 						"type": "string",
+						"secret": true,
 						"title": "Refresh Token",
 						"description": "The refresh token for the Dropbox app.",
 						"order": 3
 					},
 					"access_token": {
 						"type": "string",
+						"secret": true,
 						"title": "Access Token",
 						"description": "The access token for the Dropbox app.",
 						"order": 4
@@ -284,7 +289,7 @@ func main() {
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
 			return newDropboxStore(ctx, cfg.(config))
 		},
-		ConfigSchema:     getConfigSchema,
+		ConfigSchema:     configSchema,
 		DocumentationURL: "https://go.estuary.dev/source-dropbox",
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.

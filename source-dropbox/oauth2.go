@@ -40,7 +40,6 @@ func OAuth2Spec() *pf.OAuth2 {
 }
 
 type Credentials struct {
-	AuthType     string `json:"auth_type"`
 	ClientID     string `json:"client_id,omitempty"`
 	ClientSecret string `json:"client_secret,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
@@ -49,7 +48,10 @@ type Credentials struct {
 
 func (c *Credentials) Validate() error {
 	requiredProperties := [][]string{
-		{"AuthType", c.AuthType},
+		{"ClientID", c.ClientID},
+		{"ClientSecret", c.ClientSecret},
+		{"RefreshToken", c.RefreshToken},
+		{"AccessToken", c.AccessToken},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
