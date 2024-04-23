@@ -90,12 +90,12 @@ func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
 		}
 		return &store, nil
 	}
-	httpClient, err := cfg.Credentials.GetClient(ctx)
+	token, err := cfg.Credentials.GetAccessToken(ctx)
 	if err != nil {
 		return &dropboxStore{}, err
 	}
 	config := dropbox.Config{
-		Client:   httpClient,
+		Token:    token,
 		LogLevel: dropbox.LogDebug,
 	}
 	client := files.New(config)
@@ -216,47 +216,33 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 			"credentials": {
 				"type": "object",
 				"title": "Credentials",
-				"anyOf": [
-					{
-						"title": "OAuth2",
-						"type": "object",
-						"properties": {
-							"auth_type": {
-								"type": "string",
-								"title": "Auth Type",
-								"description": "The type of authentication to use. For Dropbox, this should be \"refresh\".",
-								"enum": ["refresh"],
-								"default": "refresh",
-								"order": 1
-							},
-							"client_id": {
-								"type": "string",
-								"title": "Client ID",
-								"description": "The client ID for the Dropbox app.",
-								"order": 2
-							},
-							"client_secret": {
-								"type": "string",
-								"title": "Client Secret",
-								"description": "The client secret for the Dropbox app.",
-								"order": 3
-							}
-						},
-						"required": ["auth_type", "client_id", "client_secret"]
+				"properties": {
+					"client_id": {
+						"type": "string",
+						"title": "Client ID",
+						"description": "The client ID for the Dropbox app.",
+						"order": 1
 					},
-					{
+					"client_secret": {
+						"type": "string",
+						"title": "Client Secret",
+						"description": "The client secret for the Dropbox app.",
+						"order": 2
+					},
+					"refresh_token": {
+						"type": "string",
+						"title": "Refresh Token",
+						"description": "The refresh token for the Dropbox app.",
+						"order": 3
+					},
+					"access_token": {
+						"type": "string",
 						"title": "Access Token",
-						"type": "object",
-						"properties": {
-							"access_token": {
-								"type": "string",
-								"title": "Access Token",
-								"description": "The access token for the Dropbox app.",
-								"order": 1
-							}
-						}
+						"description": "The access token for the Dropbox app.",
+						"order": 4
 					}
-				],
+				},
+				"required": ["client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {

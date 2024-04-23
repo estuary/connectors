@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
-	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"golang.org/x/oauth2"
@@ -61,9 +59,9 @@ func (c *Credentials) Validate() error {
 	return nil
 }
 
-func (c *Credentials) GetClient(ctx context.Context) (*http.Client, error) {
+func (c *Credentials) GetAccessToken(ctx context.Context) (string, error) {
 	if err := c.Validate(); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	oauthConfig := &oauth2.Config{
@@ -75,17 +73,11 @@ func (c *Credentials) GetClient(ctx context.Context) (*http.Client, error) {
 		},
 		Scopes: GetScopes(),
 	}
-
-	token := &oauth2.Token{
-		RefreshToken: c.RefreshToken,
-		Expiry:       time.Now(),
-	}
-	tokenSource := oauthConfig.TokenSource(ctx, token)
-	token, err := tokenSource.Token()
+	verifier := oauth2.GenerateVerifier()
+	token, err := oauthConfig.Exchange(ctx, c.AccessToken, oauth2.VerifierOption(verifier))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	client := oauthConfig.Client(ctx, token)
 
-	return client, nil
+	return token.AccessToken, nil
 }
