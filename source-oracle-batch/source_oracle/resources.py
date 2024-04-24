@@ -19,7 +19,8 @@ from .api import (
     connect,
     fetch_tables,
     fetch_columns,
-    fetch_rows,
+    fetch_page,
+    fetch_changes,
 )
 
 
@@ -32,9 +33,20 @@ async def all_resources(
     oracle_tables = await fetch_tables(log, conn)
     oracle_columns = await fetch_columns(log, conn)
 
+    current_scn = None
+    with conn.cursor() as c:
+        c.execute("SELECT current_scn FROM V$DATABASE")
+        current_scn = c.fetchone()[0]
+
     for ot in oracle_tables:
         columns = [col for col in oracle_columns if col.table_name == ot.table_name]
         t = build_table(config.advanced, ot.table_name, columns)
+
+        max_rowid = None
+        # FIXME: can't use string as cursor
+        # with conn.cursor() as c:
+        #    c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
+        #    max_rowid = c.fetchone()[0]
 
         def open(
             binding: CaptureBinding[ResourceConfig],
@@ -47,7 +59,8 @@ async def all_resources(
                 binding_index,
                 state,
                 task,
-                fetch_page=functools.partial(fetch_rows, t, conn, binding.resourceConfig.cursor),
+                fetch_page=functools.partial(fetch_page, t, conn),
+                fetch_changes=functools.partial(fetch_changes, t, conn),
             )
         resources_list.append(common.Resource(
             name=t.table_name,
@@ -56,6 +69,7 @@ async def all_resources(
             open=open,
             initial_state=ResourceState(
                 backfill=ResourceState.Backfill(cutoff=datetime.now(tz=UTC)),
+                inc=ResourceState.Incremental(cursor=current_scn),
             ),
             initial_config=ResourceConfig(
                 name=t.table_name,
