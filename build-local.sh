@@ -21,8 +21,6 @@ else
 fi
 
 docker buildx build \
-  --cache-to=type=local,dest=.docker-cache \
-  --cache-from=type=local,src=.docker-cache \
   --platform linux/amd64 \
   --build-arg CONNECTOR_NAME="$1" \
   --build-arg CONNECTOR_TYPE="$CONNECTOR_TYPE" \

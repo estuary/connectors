@@ -78,18 +78,6 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
-	if cfg.Credentials.AccessToken != "" {
-		config := dropbox.Config{
-			Token:    cfg.Credentials.AccessToken,
-			LogLevel: dropbox.LogDebug,
-		}
-		client := files.New(config)
-		store := dropboxStore{client: client, config: cfg}
-		if err := store.check(); err != nil {
-			return &dropboxStore{}, err
-		}
-		return &store, nil
-	}
 	token, err := cfg.Credentials.GetAccessToken(ctx)
 	if err != nil {
 		return &dropboxStore{}, err
