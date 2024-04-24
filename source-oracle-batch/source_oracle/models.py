@@ -13,7 +13,18 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     ResourceConfig as GenericResourceConfig,
     ResourceState,
+    OrderedCursor,
 )
+
+
+class BackfillCursor(OrderedCursor):
+    cursor: dict
+
+    def cmp(self, other) -> int:
+        a = self.cursor['rowid']
+        b = other.cursor['rowid']
+
+        return (a > b) - (a < b)
 
 
 class EndpointConfig(BaseModel):
@@ -56,10 +67,6 @@ class EndpointConfig(BaseModel):
 
 
 class ResourceConfig(GenericResourceConfig):
-    cursor: list[str] = Field(
-        title="Cursor Columns",
-        description="The names of columns which should be persisted between query executions as a cursor.",
-    )
     query_limit: int = Field(
         title="Query Limit",
         description="Maximum number of rows to fetch in a query. Typically left as the default.",
