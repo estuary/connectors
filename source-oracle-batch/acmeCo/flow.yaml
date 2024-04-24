@@ -1,6 +1,6 @@
 ---
 collections:
-  acmeCo/testing:
-    schema: testing.schema.yaml
+  acmeCo/TESTING:
+    schema: TESTING.schema.yaml
     key:
-      - /id
+      - /ID

@@ -28,89 +28,83 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  id:
+  ID:
     description: Primary Key
     title: Id
     type: integer
-  c:
+  C:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: C
-  cl:
+  CL:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: Cl
-  d:
+  D:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: D
-  doub:
+  DOUB:
     anyOf:
       - type: number
       - type: "null"
     default: ~
     title: Doub
-  f:
+  F:
     anyOf:
       - type: number
       - type: "null"
     default: ~
     title: F
-  i:
+  I:
     anyOf:
       - type: integer
       - type: "null"
     default: ~
     title: I
-  nc:
+  NC:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: Nc
-  nv2:
+  NV2:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: Nv2
-  sm:
+  SM:
     anyOf:
       - type: integer
       - type: "null"
     default: ~
     title: Sm
-  str:
+  STR:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: Str
-  t:
+  T:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: T
-  tz:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Tz
-  vc2:
+  VC2:
     anyOf:
       - type: string
       - type: "null"
     default: ~
     title: Vc2
 required:
-  - id
-title: testing
+  - ID
+title: TESTING
 type: object
