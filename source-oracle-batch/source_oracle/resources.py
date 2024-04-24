@@ -14,6 +14,7 @@ from .models import (
     build_table,
     ResourceState,
     ResourceConfig,
+    BackfillCursor,
 )
 from .api import (
     connect,
@@ -43,10 +44,10 @@ async def all_resources(
         t = build_table(config.advanced, ot.table_name, columns)
 
         max_rowid = None
-        # FIXME: can't use string as cursor
-        # with conn.cursor() as c:
-        #    c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
-        #    max_rowid = c.fetchone()[0]
+        with conn.cursor() as c:
+            c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
+            max_rowid = c.fetchone()[0]
+        backfill_cutoff = BackfillCursor(cursor={'rowid': max_rowid})
 
         def open(
             binding: CaptureBinding[ResourceConfig],
@@ -68,13 +69,12 @@ async def all_resources(
             model=t.create_model(),
             open=open,
             initial_state=ResourceState(
-                backfill=ResourceState.Backfill(cutoff=datetime.now(tz=UTC)),
+                backfill=ResourceState.Backfill(cutoff=backfill_cutoff),
                 inc=ResourceState.Incremental(cursor=current_scn),
             ),
             initial_config=ResourceConfig(
                 name=t.table_name,
                 interval=timedelta(seconds=0),
-                cursor=[],
             ),
             schema_inference=False,
         ))
