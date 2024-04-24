@@ -228,7 +228,6 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 						"order": 4
 					}
 				},
-				"required": ["client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {
