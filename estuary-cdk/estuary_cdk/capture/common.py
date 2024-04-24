@@ -13,6 +13,7 @@ from typing import (
     Iterable,
     Literal,
     TypeVar,
+    Tuple,
 )
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
@@ -28,13 +29,14 @@ from ..flow import (
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
 
-LogCursor = AwareDatetime | NonNegativeInt
+LogCursor = Tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.
  b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal). 
 
-Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
+Note that `str` cannot be added to this type union, as it makes parsing states ambiguous, however
+the tuple type allows for str or integer values to be used
 """
 
 PageCursor = str | int | None
