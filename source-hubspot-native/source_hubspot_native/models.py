@@ -1,11 +1,9 @@
+import urllib.parse
 from datetime import datetime
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator
-from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING
-import urllib.parse
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeVar
 
 from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
     AccessToken,
     BaseDocument,
     BaseOAuth2Credentials,
@@ -13,6 +11,10 @@ from estuary_cdk.capture.common import (
     ResourceConfig,
     ResourceState,
 )
+from estuary_cdk.capture.common import (
+    ConnectorState as GenericConnectorState,
+)
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 scopes = [
     "crm.lists.read",
@@ -121,6 +123,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
         value: str
         sourceType: str
         sourceId: str | None = None
+        sourceLabel: str | None = None
         updatedByUserId: int | None = None
 
     id: int
