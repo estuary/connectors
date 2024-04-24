@@ -13,18 +13,7 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     ResourceConfig as GenericResourceConfig,
     ResourceState,
-    OrderedCursor,
 )
-
-
-class BackfillCursor(OrderedCursor):
-    cursor: dict
-
-    def cmp(self, other) -> int:
-        a = self.cursor['rowid']
-        b = other.cursor['rowid']
-
-        return (a > b) - (a < b)
 
 
 class EndpointConfig(BaseModel):
