@@ -4,28 +4,7 @@ credentials:
     client_secret_sops: ENC[AES256_GCM,data:MTa+Cv+YH7v8gy/LTsviFW9oocCDWp86g7aB5OVnO6OJLPChbNAuC7qtAzNKiZu2DVKof9tmrjqQcWxhdVEMJA==,iv:oZg6cFFx9Oq3AZCGsGRtusXEZKyMVMKbG6SCANxjwWg=,tag:iyHdLX2mUFKQfo3oJRCneg==,type:str]
     refresh_token_sops: ENC[AES256_GCM,data:ao4MuPvTWERkVyPieScomGZnryhEedaVizY1tOIGIXDewe9DD4dvXbBS3s+uMMG1j8mH2QWM5s7ta3LqChAZ+Tq3+o8KktMZ6D/PR7CjNfumrUrXeVgZ,iv:dHVIGWMkalxkcjCCvzeS/wPsJ5SVgfUNoRIKYoq2eTk=,tag:lWOpuMjSZVHn4nFb/UnpjQ==,type:str]
 is_sandbox: false
-discover_streams:
-    - Account
-    - Contact
-    - User
-    - OpportunityFilledHistory
-    - LeadHistory
-    - Opportunity
-    - Campaign
-    - Case
-    - ContactLineItem
-    - Entitlement
-    - Lead
-    - LiveChatTranscript
-    - MessagingSession
-    - Quote
-    - QuoteLineItem
-    - ServiceAppointment
-    - ServiceContract
-    - Task
-    - UserServicePresence
-    - WorkOrder
-    - WorkOrderLineItem
+discover_streams: Account,Contact,User,OpportunityFilledHistory,LeadHistory,Opportunity,Campaign,Case,ContactLineItem,Entitlement,Lead,LiveChatTranscript,MessagingSession,Quote,QuoteLineItem,ServiceAppointment,ServiceContract,Task,UserServicePresence,WorkOrder,WorkOrderLineItem
 start_date: "2020-01-01"
 sops:
     kms: []
@@ -36,8 +15,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-04-23T19:26:32Z"
-    mac: ENC[AES256_GCM,data:VAShvPeIxynwVnaAvemGelu8VZcbEQI2C5Li6QCqlAVgs4r+e6ryvuqpGteqxuSUPa40j10bGdNaeyUgHKx79/jgvjByzB/I3YPzuJoNjotMBJOmvi9HiqIojRE4S/E98XXk9lkb/ASiyMQVuGe9z/rHljiHh9K4r8FHQfIHe84=,iv:xjddvkt3Es53JfEYqy9kW/3wmYYDrRvSm2KL2qzvJwI=,tag:TgZ4a1SFvoOzvLpNDJMvxg==,type:str]
+    lastmodified: "2024-04-24T12:55:29Z"
+    mac: ENC[AES256_GCM,data:I4p9mMwcLDjM+rv7gAmqpg6we8poKRL6/yssJS3aE77x6BqsO9yEhuTTvmRRj5/WYRqYSJ2MBtojrX8lW82AsSb6Va/6cpwyP3r8ditUCDjLy57v7j9jEGPwg33PZR2Wg3nBu78nr4HL6pzFhmL67mc6f+/wbMzhJl0N0vf38n4=,iv:XQBwgr8IxaajIiHng7QcUT2ZhCNnNHNk6qtXo1ehZVo=,tag:VxvFaf9cli0imvYQ9QR5CA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
