@@ -13,6 +13,7 @@ from typing import (
     Iterable,
     Literal,
     TypeVar,
+    Tuple,
 )
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
@@ -27,34 +28,7 @@ from ..flow import (
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
 
-
-class OrderedCursor(BaseModel, abc.ABC):
-    cursor: dict
-
-    @abc.abstractmethod
-    def cmp(self, other) -> int:
-        # Must return -1 if self < other
-        # 0 if self == other
-        # 1 if self > other
-        pass
-
-    def __lt__(self, other) -> bool:
-        return self.cmp(other) == -1
-
-    def __gt__(self, other) -> bool:
-        return self.cmp(other) == 1
-
-    def __le__(self, other) -> bool:
-        return self.cmp(other) <= 0
-
-    def __ge__(self, other) -> bool:
-        return self.cmp(other) >= 0
-
-    def __eq__(self, other) -> bool:
-        return self.cmp(other) == 0
-
-
-LogCursor = OrderedCursor | AwareDatetime | NonNegativeInt
+LogCursor = Tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.
