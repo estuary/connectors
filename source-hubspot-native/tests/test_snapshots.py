@@ -21,16 +21,17 @@ def test_capture(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
 
     for l in lines:
-        typ, rec = l[0], l[1]
+        _collection, record = l[0], l[1]
 
-        if typ == "acmeCo/contacts":
-            rec["properties"]["hs_time_in_lead"] = "redacted"
-            rec["properties"]["hs_time_in_opportunity"] = "redacted"
-            rec["propertiesWithHistory"]["hs_time_in_lead"] = "redacted"
-            rec["propertiesWithHistory"]["hs_time_in_opportunity"] = "redacted"
-        elif typ == "acmeCo/deals":
-            rec["properties"]["hs_time_in_appointmentscheduled"] = "redacted"
-            rec["propertiesWithHistory"]["hs_time_in_appointmentscheduled"] = "redacted"
+        for m in ["properties", "propertiesWithHistory"]:
+            for prop in [
+                "hs_time_in_lead",
+                "hs_time_in_opportunity",
+                "hs_time_in_appointmentscheduled",
+                "hs_time_in_1",
+            ]:
+                if record[m].get(prop):
+                    record[m][prop] = "redacted"
 
     assert snapshot("stdout.json") == lines
 

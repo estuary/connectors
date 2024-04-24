@@ -1,13 +1,10 @@
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, UTC
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
-import json
-import pytz
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict
+from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import asyncio
 import itertools
-from copy import deepcopy
 
 from estuary_cdk.capture.common import (
     PageCursor,
@@ -18,32 +15,11 @@ from .models import (
     Association,
     BatchResult,
     CRMObject,
-    BaseCRMObject,
-    SubscriptionResult,
-    EmailSubscriptions,
-    WorkflowResult,
-    V1CustomCRMObject,
-    V1CustomCRMObject2,
-    V1CRMObject,
     OldRecentCompanies,
     OldRecentContacts,
     OldRecentDeals,
     OldRecentEngagements,
     OldRecentTicket,
-    OldRecentEngagementsCalls,
-    OldRecentEngagementsEmails,
-    OldRecentEngagementsMeetings,
-    OldRecentEngagementsNotes,
-    OldRecentEngagementsTasks,
-    OldRecentMarketingEmails,
-    OldRecentMarketingForms,
-    OldRecentOwners,
-    OldRecentLineItems,
-    OldRecentProducts,
-    OldRecentWorkflows,
-    OldRecentGoals,
-    OldRecentFeedbackSubmissions,
-    OldRecentEmailSubscriptions,
     PageResult,
     Properties,
 )
@@ -57,21 +33,12 @@ async def fetch_properties(
     if p := getattr(cls, "CACHED_PROPERTIES", None):
         return p
 
-    url = f"{HUB}/crm/v3/properties/{cls.PROPERTY_SEARCH_NAME}"
+    url = f"{HUB}/crm/v3/properties/{cls.NAME}"
     cls.CACHED_PROPERTIES = Properties.model_validate_json(await http.request(log, url))
     for p in cls.CACHED_PROPERTIES.results:
         p.hubspotObject = cls.NAME
 
     return cls.CACHED_PROPERTIES
-
-async def fetch_custom_objects(
-    log: Logger, http: HTTPSession
-) -> Dict:
-
-    url = f"{HUB}/crm/v3/schemas"
-    result = await http.request(log, url)
-
-    return json.loads(result)
 
 
 async def fetch_page(
@@ -84,15 +51,16 @@ async def fetch_page(
     cutoff: datetime,
 ) -> AsyncGenerator[CRMObject | str, None]:
 
-    url = f"{HUB}/crm/v3/objects/{cls.PROPERTY_SEARCH_NAME}"
+    url = f"{HUB}/crm/v3/objects/{cls.NAME}"
+    properties = await fetch_properties(log, cls, http)
+    property_names = ",".join(p.name for p in properties.results if not p.calculated)
 
     input = {
-    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
+        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        "properties": property_names,
+        "propertiesWithHistory": property_names,
     }
-    if len(cls.ASSOCIATED_ENTITIES) == 0:
-        del input['associations']
-
     if page:
         input["after"] = page
 
@@ -103,197 +71,10 @@ async def fetch_page(
 
     for doc in result.results:
         if doc.updatedAt < cutoff:
-            doc.meta_ = _cls.Meta(op="u")
             yield doc
 
     if result.paging:
         yield result.paging.next.after
-
-
-async def fetch_page_incremental(
-    cls: type[CRMObject],
-    http: HTTPSession,
-    log: Logger,
-    log_cursor: LogCursor,
-) -> AsyncGenerator[CRMObject | LogCursor, None]:
-    # Runs V3 API queries and formats the execution to match
-    # the CDK's fetch_changes requirements 
-    assert isinstance(log_cursor, datetime)
-
-    url = f"{HUB}/crm/v3/objects/{cls.PROPERTY_SEARCH_NAME}"
-
-    input = {
-    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-    }
-    if len(cls.ASSOCIATED_ENTITIES) == 0:
-        del input['associations']
-
-    recent_log_cursors = []
-    while True:
-
-        _cls: Any = cls  # Silence mypy false-positive.
-        result: PageResult[CRMObject] = PageResult[_cls].model_validate_json(
-            await http.request(log, url, method="GET", params=input)
-        )
-
-        for doc in result.results:
-            if doc.updatedAt > log_cursor:
-                recent_log_cursors.append(doc.updatedAt)
-                doc.meta_ = _cls.Meta(op="u")
-                yield doc
-
-        if result.paging:
-            input["after"] = result.paging.next.after
-        else:
-            break
-
-    if len(recent_log_cursors) > 0:
-        recent_log_cursors.sort()
-        yield recent_log_cursors[-1] 
-    else:
-        return
-
-
-
-async def fetch_page_custom_incremental(
-    cls: type[CRMObject],
-    http: HTTPSession,
-    log: Logger,
-    log_cursor: LogCursor,
-) -> AsyncGenerator[CRMObject | LogCursor, None]:
-
-    # Runs V3 API queries and formats the execution to match
-    # the CDK's fetch_changes requirements 
-    url = f"{HUB}{cls.ENFORCE_URL}"
- 
-    input = {
-    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-    }
-    if len(cls.ASSOCIATED_ENTITIES) == 0:
-        del input['associations'] 
-
-    recent_log_cursors = []
-    while True:
-
-        data = json.loads(await http.request(log, url, method="GET", params=input))
-        if data.get('total') is not None:
-            del data['total']
-        _cls: Any = cls  # Silence mypy false-positive.
-        result: PageResult[V1CRMObject] = PageResult[_cls].model_validate_json(
-            json.dumps(data)
-        )
-
-        for doc in result.results:
-            if doc.updatedAt > log_cursor:
-                recent_log_cursors.append(doc.updatedAt)
-                doc.meta_ = V1CRMObject.Meta(op="u")
-                yield doc
-
-        if result.paging:
-            input["after"] = result.paging.next.after
-        else:
-            break
-
-    if len(recent_log_cursors) > 0:
-        recent_log_cursors.sort()
-        yield recent_log_cursors[-1] 
-    else:
-        return
-
-async def fetch_page_custom(
-    # Closed over via functools.partial:
-    cls: type[V1CRMObject],
-    http: HTTPSession,
-    # Remainder is common.FetchPageFn:
-    log: Logger,
-    page: str | None,
-    cutoff: datetime,
-) -> AsyncGenerator[CRMObject | str, None]:
-
-    url = f"{HUB}{cls.ENFORCE_URL}"
-
-    input = {
-    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-    }
-    if len(cls.ASSOCIATED_ENTITIES) == 0:
-        del input['associations'] 
-
-    if page:
-        input["after"] = page
-
-
-    data = json.loads(await http.request(log, url, method="GET", params=input))
-    if data.get('total') is not None:
-        del data['total']
-    _cls: Any = cls  # Silence mypy false-positive.
-    result: PageResult[V1CRMObject] = PageResult[_cls].model_validate_json(
-        json.dumps(data)
-    )
-
-
-    for doc in result.results:
-        if doc.updatedAt < cutoff:
-            doc.meta_ = V1CRMObject.Meta(op="u")
-            yield doc
-
-    if result.paging:
-        yield result.paging.next.after
-
-async def fetch_page_workflow(
-    # Closed over via functools.partial:
-    cls: type[V1CRMObject],
-    http: HTTPSession,
-    # Remainder is common.FetchPageFn:
-    log: Logger,
-    page: str | None,
-    cutoff: datetime,
-) -> AsyncGenerator[CRMObject | str, None]:
-
-    url = f"{HUB}{cls.ENFORCE_URL}"
-
-    input = {
-    "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-    "limit": 10,  # 50, # Maximum when requesting history. TODO(johnny).
-    }
-    if len(cls.ASSOCIATED_ENTITIES) == 0:
-        del input['associations'] 
-
-    if page:
-        input["after"] = page
-
-    _cls: Any = cls  # Silence mypy false-positive.
-    result: WorkflowResult[V1CRMObject] = WorkflowResult[_cls].model_validate_json(
-        await http.request(log, url, method="GET", params=input)
-    )
-
-    for doc in result.workflows:
-        if doc.updatedAt < cutoff:
-            doc.meta_ = V1CRMObject.Meta(op="u")
-            yield doc
-
-async def fetch_page_subscriptions(
-    # Closed over via functools.partial:
-    cls: type[V1CRMObject],
-    http: HTTPSession,
-    # Remainder is common.FetchPageFn:
-    log: Logger,
-    page: str | None,
-    cutoff: datetime,
-) -> AsyncGenerator[CRMObject | str, None]:
-
-    url = f"{HUB}{cls.ENFORCE_URL}"
-    _cls: Any = cls  # Silence mypy false-positive.
-    result: SubscriptionResult[EmailSubscriptions] = SubscriptionResult[_cls].model_validate_json(
-        await http.request(log, url, method="GET", params=None)
-    )
-
-    for doc in result.subscriptionDefinitions:
-        if doc.updatedAt < cutoff:
-            doc.meta_ = EmailSubscriptions.Meta(op="u")
-            yield doc
 
 
 async def fetch_batch(
@@ -409,104 +190,17 @@ async def fetch_changes(
 
     recent.sort()  # Oldest updates first.
 
-    for batch_it in itertools.batched(recent, 50):
+    for batch_it in itertools.batched(recent, 100):
         batch = list(batch_it)
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
             log, cls, http, [id for _, id in batch]
         )
         for doc in documents.results:
-            doc.meta_ = BaseCRMObject.Meta(op="u")
             yield doc
 
     if recent:
         yield recent[-1][0]
-    else:
-        return
-
-async def fetch_batch_backfill(
-    cls: type[V1CRMObject],
-    fetch_recent: FetchRecentFn,
-    http: HTTPSession,
-    log: Logger,
-    page: str | None,
-    cutoff: datetime,
-) -> AsyncGenerator[CRMObject | str, None]:
-    # Runs V3 API batch queries and formats the execution to match
-    # the CDK's fetch_page requirements 
-    # FetchRecentFn queries the recent data endpoint and returns 
-    # Ids and timefields for the batch queries
-
-    recent: list[tuple[datetime, str]] = []
-
-    iter, next_page = await fetch_recent(log, http, cutoff, page)
-
-    for ts, id in iter:
-        if ts < cutoff:
-            recent.append((ts, id))
-
-    if len(recent) > 0:
-        recent.sort()  # Oldest updates first.
-
-        for batch_it in itertools.batched(recent, 50):
-            batch = list(batch_it)
-
-            documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-                log, cls, http, [id for _, id in batch]
-            )
-            for doc in documents.results:
-                doc.meta_ = BaseCRMObject.Meta(op="u")
-                yield doc
-    if next_page:
-        yield next_page
-
-
-
-async def fetch_changes_no_batch(
-    # Closed over via functools.partial:
-    cls: type[CRMObject],
-    fetch_recent: FetchRecentFn,
-    http: HTTPSession,
-    # Remainder is common.FetchChangesFn:
-    log: Logger,
-    log_cursor: LogCursor,
-) -> AsyncGenerator[CRMObject | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
-
-    """
-    This functions differs of the base 'fetch_changes' function
-    by not using batch_result. (This is required because some
-    API endpoints do have a similar pagination, but do not have
-    a batch query endpoint ).
-    It works by getting the fetch_recent_X function defined in resources. 
-    This function will return the actual API result within its 'iter'
-    This result is then passed on the V1CRMObject model as a json
-    to be validated
-
-    """
-
-    recent: list[tuple[datetime, str]] = []
-    next_page: PageCursor = None
-    _cls = cls
-
-    while True:
-        iter, next_page = await fetch_recent(log, http, log_cursor, next_page)
-        
-        for ts, id, result in iter:
-            recent.append((ts, id)) # Used later to update log_cursor value
-            doc = V1CRMObject.model_validate_json(json.dumps(result))
-            doc.meta_= V1CRMObject.Meta(op="u") 
-            yield  doc
-
-
-        if not next_page:
-            break
-
-    if recent:
-        recent.sort() # Oldest updates first.
-        yield recent[-1][0] # Updates log_cursor value
-    else:
-        return
 
 
 async def fetch_recent_companies(
@@ -514,7 +208,7 @@ async def fetch_recent_companies(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/companies/v2/companies/recent/modified"
-    params = {"count": 100, "offset": page, "since": int(since.timestamp())} if page else {"count": 100}
+    params = {"count": 100, "offset": page} if page else {"count": 1}
 
     result = OldRecentCompanies.model_validate_json(
         await http.request(log, url, params=params)
@@ -546,18 +240,11 @@ async def fetch_recent_deals(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/deals/v1/deal/recent/modified"
-    params = {"count": 100, "offset": page, "since": int(since.timestamp())} if page else {"count": 100}
+    params = {"count": 100, "offset": page} if page else {"count": 1}
 
     result = OldRecentDeals.model_validate_json(
         await http.request(log, url, params=params)
     )
-    if page:
-        if page == 9800:
-            return (
-        (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
-        for r in result.results
-    ), None
-
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
         for r in result.results
@@ -569,269 +256,29 @@ async def fetch_recent_engagements(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
     url = f"{HUB}/engagements/v1/engagements/recent/modified"
-    params = {"count": 100, "offset": page, "since": int(since.timestamp())} if page else {"count": 100}
+    params = {"count": 100, "offset": page} if page else {"count": 1}
 
     result = OldRecentEngagements.model_validate_json(
         await http.request(log, url, params=params)
     )
-    if page:
-        if page == 9800:
-            return(
-        (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
-        for r in result.results
-    ), None
-
     return (
         (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
         for r in result.results
     ), result.hasMore and result.offset
 
 
-async def fetch_recent_contacts_lists(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
+async def fetch_recent_tickets(
+    log: Logger, http: HTTPSession, since: datetime, cursor: PageCursor
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
 
-    url = f"{HUB}/contacts/v1/lists"
-    params = {"count": 100, "offset": page} if page else {"count": 250}
+    url = f"{HUB}/crm-objects/v1/change-log/tickets"
+    params = {"timestamp": int(since.timestamp() * 1000) - 1}
 
-    data = await http.request(log, url, params=params)
-
-
-    result = V1CustomCRMObject2.model_validate_json(
-        data
-    )
-
-    for item in result.lists:
-        item['listId'] = str(item['listId'])
-
-    if result.hasMore is False:
-        return (
-            (_ms_to_dt(r['updatedAt']), str(r['listId']), r)
-            for r in result.lists if _ms_to_dt(r['updatedAt']) > since
-        ), None
-    else: 
-        return (
-            (_ms_to_dt(r['updatedAt']), str(r['listId']), r)
-            for r in result.lists if _ms_to_dt(r['updatedAt']) > since
-        ), result.offset
-
-#same as the ticket_pipeline
-async def fetch_recent_deal_pipelines(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
-
-    url = f"{HUB}/crm-pipelines/v1/pipelines/deals"
-
-    result = V1CRMObject.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-
-    # we want new deals
-    # plus updatedAt can be null
-    # and can compromise selection
-    return (
-        (_ms_to_dt(r['createdAt']), str(r["pipelineId"]), r)
-        for r in result.results if _ms_to_dt(r['createdAt']) > since
-    ), None
-
-async def fetch_recent_ticket_pipelines(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
-
-    url = f"{HUB}/crm-pipelines/v1/pipelines/tickets"
-
-    result = V1CRMObject.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-
-    # we want new tickets
-    # plus updatedAt can be null
-    # and can compromise selection
-    return (
-        (_ms_to_dt(r['createdAt']), str(r["pipelineId"]), r) 
-        for r in result.results if _ms_to_dt(r['createdAt']) > since
-    ), None
-
-async def fetch_recent_email_events(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
-
-    url = f"{HUB}/email/public/v1/events"
-    params = {"offset": page} if page else None
-
-    result = V1CRMObject.model_validate_json(
+    result = TypeAdapter(list[OldRecentTicket]).validate_json(
         await http.request(log, url, params=params)
     )
-    
-    if result.hasMore is False:
-        return (
-            (_ms_to_dt(r["created"]), str(r["id"]), r) 
-            for r in result.events if _ms_to_dt(r["created"]) > since), None
+    return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 
-    else:
-        return (
-            (_ms_to_dt(r['created']), str(r['id']), r)
-            for r in result.events if _ms_to_dt(r["created"]) > since), result.offset
-
-async def fetch_recent_marketing_emails(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/marketing/v3/emails/"
-
-    result = OldRecentMarketingEmails.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-    
-    return (
-        ((r.updatedAt), str(r.id))
-        for r in result.results
-    ), None and None # This endpoint does not have pagination.
-
-async def fetch_recent_subscription_changes(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
-
-    url = f"{HUB}/email/public/v1/subscriptions/timeline"
-    params = {"limit": 100, "offset": page} if page else {"limit": 1}
-
-    data = await http.request(log, url, params=params)
-
-    result = V1CRMObject.model_validate_json(
-        data
-    )
-
-    for item in result.timeline:
-        item["portalId"] = str(item["portalId"])
-
-    if result.hasMore is False:
-        return (
-            (_ms_to_dt(r["timestamp"]), str(r["portalId"]), r)
-            for r in result.timeline if _ms_to_dt(r["timestamp"]) > since
-    ), None
-
-    else:
-        return (
-            (_ms_to_dt(r["timestamp"]), str(r["portalId"]), r)
-            for r in result.timeline if _ms_to_dt(r["timestamp"]) > since
-        ), result.offset
-
-async def fetch_email_subscriptions(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/communication-preferences/v3/definitions"
-    
-
-    result = OldRecentEmailSubscriptions.model_validate_json(
-        await http.request(log, url, params=None)
-    )
-
-    return (
-        ((r.updatedAt), str(r.id))
-        for r in result.subscriptionDefinitions
-    ), None and None # This endpoint does not have pagination.
-
-async def fetch_contacts_lists_subscription(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
-
-    url = f"{HUB}/contacts/v1/lists/all/contacts/all"
-    params = {"count": 100, "offset": page,"showListMemberships": "true"} if page else {"count": 1, "showListMemberships": "true"}
-
-    data = await http.request(log, url, params=params)
-
-    result = V1CustomCRMObject.model_validate_json(
-        data
-    )
-
-    for item in result.contacts:
-        item["vid"] = str(item["vid"])
-
-
-    if result.hasMore is False:
-        return (
-        (_ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])), str(r["vid"]), r)
-        for r in result.contacts if _ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])) > since
-    ), None
-    
-    else:
-        return (
-            (_ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])), str(r["vid"]), r)
-            for r in result.contacts if _ms_to_dt(int(r["properties"]["lastmodifieddate"]["value"])) > since
-        ), result.offset
-
-async def fetch_campaigns(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-    ) -> tuple[Iterable[tuple[datetime, str, Any]], PageCursor]:
-
-    url = f"{HUB}/email/public/v1/campaigns"
-    params = {"offset": page} if page else None
-
-    data = await http.request(log, url, params=params)
-
-    result = V1CRMObject.model_validate_json(
-        data
-    )
-    for item in result.campaigns:
-        item["id"] = str(item["id"])
-
-    if result.hasMore is False:
-        return (
-        (_ms_to_dt(int(r["lastUpdatedTime"])), str(r["id"]), r)
-        for r in result.campaigns if _ms_to_dt(int(r["lastUpdatedTime"])) > since
-    ), None
-    
-    else:
-        return (
-            (_ms_to_dt(int(r["lastUpdatedTime"])), str(r["id"]), r)
-            for r in result.campaigns if _ms_to_dt(int(r["lastUpdatedTime"])) > since
-        ), result.offset
 
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
-
-
-## V3
-
-async def fetch_marketing_forms(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/marketing/v3/forms"
-
-    result = OldRecentMarketingForms.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.updatedAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_owners(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/crm/v3/owners"
-
-    result = OldRecentOwners.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.updatedAt, str(r.id))
-        for r in result.results
-    ), None and None
-
-async def fetch_workflows(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
-    url = f"{HUB}/automation/v3/workflows"
-
-    result = OldRecentWorkflows.model_validate_json(
-         await http.request(log, url, params=None)
-    )
-    return (
-        (r.updatedAt, str(r.id))
-        for r in result.workflows
-    ), None and None

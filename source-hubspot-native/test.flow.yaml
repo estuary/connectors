@@ -7,118 +7,35 @@ captures:
       local:
         command:
           - python
+          # - "-m"
+          # - "debugpy"
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
           - "-m"
           - source_hubspot_native
         config: config.yaml
     bindings:
       - resource:
           name: companies
-          interval: PT0S
         target: acmeCo/companies
       - resource:
           name: contacts
-          interval: PT0S
         target: acmeCo/contacts
       - resource:
           name: deals
-          interval: PT0S
         target: acmeCo/deals
       - resource:
           name: engagements
-          interval: PT0S
         target: acmeCo/engagements
       - resource:
-          name: contact_lists
-          interval: PT0S
-        target: acmeCo/contact_lists
-      - resource:
-          name: contacts_lists_subscription
-          interval: PT0S
-        target: acmeCo/contacts_lists_subscription
-      - resource:
-          name: campaigns
-          interval: PT0S
-        target: acmeCo/campaigns
-      - resource:
-          name: subscription_changes
-          interval: PT0S
-        target: acmeCo/subscription_changes
-      - resource:
-          name: email_events
-          interval: PT0S
-        target: acmeCo/email_events
-      - resource:
-          name: ticket_pipelines
-          interval: PT0S
-        target: acmeCo/ticket_pipelines
-      - resource:
-          name: deal_pipelines
-          interval: PT0S
-        target: acmeCo/deal_pipelines
-      - resource:
-          name: engagements_calls
-          interval: PT0S
-        target: acmeCo/engagements_calls
-      - resource:
-          name: engagements_emails
-          interval: PT0S
-        target: acmeCo/engagements_emails
-      - resource:
-          name: engagements_meetings
-          interval: PT0S
-        target: acmeCo/engagements_meetings
-      - resource:
-          name: engagements_notes
-          interval: PT0S
-        target: acmeCo/engagements_notes
-      - resource:
-          name: engagements_tasks
-          interval: PT0S
-        target: acmeCo/engagements_tasks
-      - resource:
-          name: goal_targets
-          interval: PT0S
-        target: acmeCo/goal_targets
-      - resource:
-          name: feedback_submissions
-          interval: PT0S
-        target: acmeCo/feedback_submissions
-      - resource:
-          name: line_items
-          interval: PT0S
-        target: acmeCo/line_items
-      - resource:
-          name: products
-          interval: PT0S
-        target: acmeCo/products
-      - resource:
           name: tickets
-          interval: PT0S
         target: acmeCo/tickets
-      - resource:
-          name: marketing_emails
-          interval: PT0S
-        target: acmeCo/marketing_emails
-      - resource:
-          name: email_subscriptions
-          interval: PT0S
-        target: acmeCo/email_subscriptions
-      - resource:
-          name: marketing_forms
-          interval: PT0S
-        target: acmeCo/marketing_forms
-      - resource:
-          name: owners
-          interval: PT0S
-        target: acmeCo/owners
-      - resource:
-          name: workflows
-          interval: PT0S
-        target: acmeCo/workflows
       - resource:
           name: properties
           interval: P1D
         target: acmeCo/properties
+        disable: true
     interval: 3m
     shards:
       logLevel: debug
