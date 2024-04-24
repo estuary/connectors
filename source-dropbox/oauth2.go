@@ -21,7 +21,7 @@ func GetScopes() []string {
 // the info on https://developers.dropbox.com/oauth-guide
 func OAuth2Spec() *pf.OAuth2 {
 	// Docs: https://www.dropbox.com/developers/documentation/http/documentation#oauth2-authorize
-	AUTH_URL_TEMPLATE_FORMAT_STR := "https://www.dropbox.com/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&response_type=code&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{{ state }}}&scope={{#urlencode}}%s{{/urlencode}}"
+	AUTH_URL_TEMPLATE_FORMAT_STR := "https://www.dropbox.com/oauth2/authorize?token_access_type=offline&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&response_type=code&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{{ state }}}&scope={{#urlencode}}%s{{/urlencode}}"
 
 	scopes := GetScopes()
 
@@ -35,7 +35,11 @@ func OAuth2Spec() *pf.OAuth2 {
 		AccessTokenBody:           "client_id={{{ client_id }}}&client_secret={{{ client_secret }}}&code={{{ code }}}&grant_type=authorization_code&redirect_uri={{{ redirect_uri }}}",
 		AccessTokenResponseJsonMap: map[string]json.RawMessage{
 			"access_token": json.RawMessage(`"/access_token"`),
+			"token_type":   json.RawMessage(`"/token_type"`),
 			"expires_in":   json.RawMessage(`"/expires_in"`),
+			"scope":        json.RawMessage(`"/scope"`),
+			"uid":          json.RawMessage(`"/uid"`),
+			"account_id":   json.RawMessage(`"/account_id"`),
 		},
 	}
 
@@ -66,24 +70,5 @@ func (c *Credentials) Validate() error {
 }
 
 func (c *Credentials) GetAccessToken(ctx context.Context) (string, error) {
-	// if err := c.Validate(); err != nil {
-	// 	return "", err
-	// }
-
-	// oauthConfig := &oauth2.Config{
-	// 	ClientID:     c.ClientID,
-	// 	ClientSecret: c.ClientSecret,
-	// 	Endpoint: oauth2.Endpoint{
-	// 		AuthURL:  "https://www.dropbox.com/oauth2/authorize",
-	// 		TokenURL: "https://api.dropboxapi.com/oauth2/token",
-	// 	},
-	// 	Scopes: GetScopes(),
-	// }
-	// verifier := oauth2.GenerateVerifier()
-	// token, err := oauthConfig.Exchange(ctx, c.AccessToken, oauth2.VerifierOption(verifier))
-	// if err != nil {
-	// 	return "", err
-	// }
-
 	return c.AccessToken, nil
 }
