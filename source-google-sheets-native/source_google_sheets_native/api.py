@@ -4,6 +4,7 @@ from estuary_cdk.http import HTTPSession
 from logging import Logger
 from typing import Iterable, Any
 from zoneinfo import ZoneInfo
+import json
 
 from .models import (
     NumberType,
@@ -38,8 +39,15 @@ async def fetch_rows(
         "fields": "properties,sheets.properties,sheets.data(rowData.values(effectiveFormat(numberFormat(type)),effectiveValue))",
     }
 
+    # checking if sheet is empty before model eval
+    # since the rowData field wont be returned 
+    sheet_info = json.loads(await http.request(log, url, params=params))
+    if len(sheet_info["sheets"][0]["data"][0]) == 0:
+        raise RuntimeError(f"Spreedsheet sheet '{sheet.properties.title}' is empty!")
+
+
     spreadsheet = Spreadsheet.model_validate_json(
-        await http.request(log, url, params=params)
+        json.dumps(sheet_info)
     )
 
     if len(spreadsheet.sheets) == 0:
