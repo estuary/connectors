@@ -1,15 +1,15 @@
-from datetime import datetime, UTC
-from estuary_cdk.http import HTTPSession
-from logging import Logger
-from pydantic import TypeAdapter
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import asyncio
 import itertools
+from datetime import UTC, datetime
+from logging import Logger
+from typing import Any, AsyncGenerator, Awaitable, Callable, Iterable
 
 from estuary_cdk.capture.common import (
-    PageCursor,
     LogCursor,
+    PageCursor,
 )
+from estuary_cdk.http import HTTPSession
+from pydantic import TypeAdapter
 
 from .models import (
     Association,
@@ -57,7 +57,7 @@ async def fetch_page(
 
     input = {
         "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 2,  # 50, # Maximum when requesting history. TODO(johnny).
+        "limit": 50, # Maximum when requesting history.
         "properties": property_names,
         "propertiesWithHistory": property_names,
     }

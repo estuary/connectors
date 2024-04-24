@@ -14,6 +14,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
@@ -25,7 +26,6 @@ from ..flow import (
 )
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
-
 
 LogCursor = AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -49,7 +49,8 @@ class BaseDocument(BaseModel):
 
     class Meta(BaseModel):
         op: Literal["c", "u", "d"] = Field(
-            description="Operation type (c: Create, u: Update, d: Delete)"
+            default="u",
+            description="Operation type (c: Create, u: Update, d: Delete)",
         )
         row_id: int = Field(
             default=-1,

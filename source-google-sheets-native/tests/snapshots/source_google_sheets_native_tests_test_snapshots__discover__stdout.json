@@ -10,6 +10,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -26,9 +27,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -67,6 +65,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -83,9 +82,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
