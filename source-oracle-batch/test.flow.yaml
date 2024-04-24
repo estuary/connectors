@@ -12,10 +12,10 @@ captures:
         config: config.yaml
     bindings:
       - resource:
-          name: testing
-          interval: PT0S
-          cursor: ['id']
-        target: acmeCo/testing
+          name: TESTING
+          interval: PT5S
+          cursor: []
+        target: acmeCo/TESTING
     interval: 3m
     shards:
       logLevel: debug
