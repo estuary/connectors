@@ -66,7 +66,9 @@ func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
 		// escaped, so here we allow an escape hatch to parse these PEM files
 		var pkString = strings.ReplaceAll(c.PrivateKey, "\\n", "\n")
 		var block, _ = pem.Decode([]byte(pkString))
-		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
+		if block == nil {
+			return nil, fmt.Errorf("invalid private key: must be PEM format")
+		} else if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 			return nil, fmt.Errorf("parsing private key: %w", err)
 		} else {
 			return key.(*rsa.PrivateKey), nil
