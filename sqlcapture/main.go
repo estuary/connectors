@@ -265,11 +265,6 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	migrated, err := migrateState(&state, open.Capture.Bindings)
-	if err != nil {
-		return fmt.Errorf("migrating state: %w", err)
-	}
-
 	var ctx = stream.Context()
 	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
@@ -326,24 +321,6 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	// Notify Flow that we're ready and would like to receive acknowledgements.
 	if err := c.Output.Ready(true); err != nil {
 		return err
-	}
-
-	if migrated {
-		// Write out a new state if the state was migrated.
-		if cp, err := json.Marshal(state); err != nil {
-			return fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if err = c.Output.Checkpoint(cp, false); err != nil {
-			return fmt.Errorf("outputting checkpoint: %w", err)
-		}
-
-		// Read the acknowledgement of the migration state update.
-		if request, err := stream.Recv(); err != nil {
-			return fmt.Errorf("receiving ack for migration state update: %w", err)
-		} else if err = request.Validate_(); err != nil {
-			return fmt.Errorf("validating request for migration state update: %w", err)
-		} else if request.Acknowledge == nil {
-			return fmt.Errorf("unexpected message when receiving ack for migration state update %#v", request)
-		}
 	}
 
 	err = c.Run(ctx)
