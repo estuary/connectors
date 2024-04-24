@@ -67,10 +67,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	}
 
-	if err := migrateState(&prevState, open.Capture.Bindings); err != nil {
-		return fmt.Errorf("migrating previous state: %w", err)
-	}
-
 	updatedResourceStates, err := initResourceStates(prevState.Resources, open.Capture.Bindings)
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
@@ -108,51 +104,8 @@ type capture struct {
 
 type captureState struct {
 	sync.RWMutex
-	Resources    map[boilerplate.StateKey]*resourceState `json:"bindingStateV1,omitempty"`
-	OldResources map[string]*resourceState               `json:"Resources,omitempty"` // TODO(whb): Remove once all captures have migrated.
-	stateKeys    map[string]boilerplate.StateKey         // Allow for lookups of the stateKey from a document path.
-}
-
-func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) error {
-	if state.Resources != nil && state.OldResources != nil {
-		return fmt.Errorf("application error: both Resources and OldResources were non-nil")
-	} else if state.Resources != nil {
-		log.Info("skipping state migration since it's already done")
-		return nil
-	}
-
-	state.Resources = make(map[boilerplate.StateKey]*resourceState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		ll := log.WithFields(log.Fields{
-			"stateKey": b.StateKey,
-			"path":     res.Path,
-		})
-
-		stateFromOld, ok := state.OldResources[res.Path]
-		if !ok {
-			// This may happen if the connector has never emitted any checkpoints with data for this
-			// binding.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Resources[boilerplate.StateKey(b.StateKey)] = stateFromOld
-		ll.Info("migrated binding state")
-	}
-
-	state.OldResources = nil
-
-	return nil
+	Resources map[boilerplate.StateKey]*resourceState `json:"bindingStateV1,omitempty"`
+	stateKeys map[string]boilerplate.StateKey         // Allow for lookups of the stateKey from a document path.
 }
 
 type resourceState struct {
