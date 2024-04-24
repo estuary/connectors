@@ -157,9 +157,7 @@ func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_
 	}
 
 	var endpointSchema = src.ConfigSchema(parserSpec)
-	if err != nil {
-		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
-	}
+
 	resourceSchema, err := schemagen.GenerateSchema("Resource Spec", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
@@ -245,12 +243,13 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 	var conn = connector{config: cfg, store: store}
 
 	var captureState CaptureState
-	var migrated bool
 	if open.StateJson != nil {
-		captureState, migrated, err = unmarshalState(open.StateJson, open.Capture.Bindings)
-		if err != nil {
-			return fmt.Errorf("parsing state checkpoint: %w", err)
+		if err := pf.UnmarshalStrict(open.StateJson, &captureState); err != nil {
+			return fmt.Errorf("unmarshalling state: %w", err)
 		}
+	}
+	if captureState.States == nil {
+		captureState.States = make(map[boilerplate.StateKey]State)
 	}
 
 	// Time horizon used for identifying files which fall within a modification time window.
@@ -265,14 +264,6 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 
 	if err := stream.Ready(false); err != nil {
 		return err
-	}
-
-	if migrated {
-		if encodedCheckpoint, err := json.Marshal(captureState); err != nil {
-			return err
-		} else if err := stream.Checkpoint(encodedCheckpoint, false); err != nil {
-			return err
-		}
 	}
 
 	grp, ctx := errgroup.WithContext(ctx)
