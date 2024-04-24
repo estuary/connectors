@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go"
@@ -109,34 +108,17 @@ func newDatabricksDriver() *sql.Driver {
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
-	cfg *config
-
-	cp checkpoint
-	// is this checkpoint a recovered checkpoint?
-	cpRecovery bool
-	// Guard for concurrent access for cp.
-	mu sync.Mutex
-
-	wsClient *databricks.WorkspaceClient
-
+	cfg              *config
+	cp               checkpoint
+	cpRecovery       bool // is this checkpoint a recovered checkpoint?
+	wsClient         *databricks.WorkspaceClient
 	localStagingPath string
-
-	bindings []*binding
-
-	updateDelay time.Duration
+	bindings         []*binding
+	updateDelay      time.Duration
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	// A connector running on the "old" state may not have emitted an ack yet. We don't support
-	// migrating states so hopefully this is nothing but an empty checkpoint.
-	var oldCp oldCheckpoint
-	if err := json.Unmarshal(state, &oldCp); err != nil {
-		log.WithField("oldCheckpoint", oldCp).WithError(err).Warn("failed to unmarshal state into oldCheckpoint")
-	} else if len(oldCp.Queries) > 0 || len(oldCp.ToDelete) > 0 {
-		return fmt.Errorf("UnmarshalState application logic error: oldCp was not empty: %#v", oldCp)
-	}
-
-	if err := json.Unmarshal(state, &d.cp); err != nil {
+	if err := pf.UnmarshalStrict(state, &d.cp); err != nil {
 		return err
 	}
 	d.cpRecovery = true
@@ -354,12 +336,8 @@ type checkpointItem struct {
 
 type checkpoint map[string]*checkpointItem
 
-// TODO: Remove once all tasks have migrated to using the new checkpoint.
-type oldCheckpoint struct {
-	Queries []string
-
-	// List of files to cleanup after committing the queries
-	ToDelete []string
+func (c *checkpoint) Validate() error {
+	return nil
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
