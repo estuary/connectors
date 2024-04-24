@@ -2,7 +2,10 @@
 captures:
   acmeCo/source-salesforce:
     endpoint:
-        connector:
-          image: "ghcr.io/estuary/source-salesforce:v1"
-          config: config.yaml
+      local:
+        command:
+          - python
+          - "-m"
+          - source_salesforce
+        config: config.yaml
     bindings: []

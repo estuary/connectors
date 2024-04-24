@@ -116,8 +116,15 @@ class SourceSalesforce(AbstractSource):
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
         sf = self._get_sf_object(config)
         stream_objects = sf.get_validated_streams(config=config, catalog=self.catalog)
-        streams = self.generate_streams(config, stream_objects, sf)
-        streams.append(Describe(sf_api=sf, catalog=self.catalog))
+        discover_streams = list(filter(None,config.get("discover_streams").split(',')))
+        if len(discover_streams) is not 0:
+            streams_to_discover = {}
+            for stream_name, sobject_options in stream_objects.items():
+                if stream_name in discover_streams:
+                    streams_to_discover[stream_name] = stream_objects[stream_name]
+            streams = self.generate_streams(config, streams_to_discover, sf)
+        else:
+            streams = self.generate_streams(config, stream_objects, sf)
         return streams
 
     def read(

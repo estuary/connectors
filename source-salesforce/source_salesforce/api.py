@@ -4,7 +4,7 @@
 
 import concurrent.futures
 import logging
-from typing import Any, List, Mapping, Optional, Tuple
+from typing import Any, List, Mapping, Optional, Tuple, Dict
 
 import requests  # type: ignore[import]
 from airbyte_cdk.models import ConfiguredAirbyteCatalog
@@ -214,18 +214,16 @@ class Salesforce:
 
     def __init__(
         self,
-        refresh_token: str = None,
         token: str = None,
-        client_id: str = None,
-        client_secret: str = None,
+        credentials: Dict = None,
         is_sandbox: bool = None,
         start_date: str = None,
         **kwargs: Any,
     ) -> None:
-        self.refresh_token = refresh_token
+        self.refresh_token = credentials.get("refresh_token")
         self.token = token
-        self.client_id = client_id
-        self.client_secret = client_secret
+        self.client_id = credentials.get("client_id")
+        self.client_secret = credentials.get("client_secret")
         self.access_token = None
         self.instance_url = ""
         self.session = requests.Session()
@@ -333,6 +331,11 @@ class Salesforce:
         schema = {"$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "additionalProperties": True, "properties": {}}
         for field in response["fields"]:
             schema["properties"][field["name"]] = self.field_to_property_schema(field)  # type: ignore[index]
+            if field["name"] == "Id":
+                schema["properties"]['Id'] = {"type": "string"}
+                schema.update({"required": ["Id"]})
+        schema.update({"reduce": {"strategy": "merge"},})
+
         return schema
 
     def generate_schemas(self, stream_objects: Mapping[str, Any]) -> Mapping[str, Any]:

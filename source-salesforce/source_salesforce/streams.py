@@ -78,7 +78,30 @@ class SalesforceStream(HttpStream, ABC):
         return properties_length > self.max_properties_length
 
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
-        yield from response.json()["records"]
+        response_data = response.json()["records"]
+        fields_to_parse = []
+        fields_to_null = []
+
+        for field, item in self.schema["properties"].items():
+            if item.get('format') == 'date-time':
+                fields_to_parse.append(field)
+            elif item.get("format") == 'date':
+                fields_to_null.append(field)
+
+            
+        for record in response_data:
+            if len(fields_to_parse) > 0:
+                for field in fields_to_parse:
+                    if record[field] == None:
+                        continue
+                    else:
+                        record[field] = pendulum.parse(record[field]).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if len(fields_to_null) > 0:
+                for field in fields_to_null:
+                    record[field] = None
+
+
+        yield from response_data
 
     def get_json_schema(self) -> Mapping[str, Any]:
         if not self.schema:

@@ -1,50 +1,65 @@
-documentationUrl: https://docs.airbyte.com/integrations/sources/salesforce
+documentationUrl: https://go.estuary.dev/AyWXIh
 connectionSpecification:
   $schema: http://json-schema.org/draft-07/schema#
   title: Salesforce Source Spec
   type: object
   required:
-    - client_id
-    - client_secret
-    - refresh_token
+    - credentials
+    - start_date
   additionalProperties: true
   properties:
+    credentials:
+      type: object
+      x-oauth2-provider: salesforce
+      required:
+        - client_id
+        - client_secret
+        - refresh_token
+      properties:
+        auth_type:
+          type: string
+          default: Client
+          const: Client
+        client_id:
+          title: Client ID
+          description: Enter your Salesforce developer application's <a
+            href="https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG">Client ID</a>
+          type: string
+          airbyte_secret: true
+          order: 2
+        client_secret:
+          title: Client Secret
+          description: Enter your Salesforce developer application's <a
+            href="https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG">Client secret</a>
+          type: string
+          airbyte_secret: true
+          order: 3
+        refresh_token:
+          title: Refresh Token
+          description: >-
+            Enter your application's <a
+            href="https://developer.salesforce.com/docs/atlas.en-us.mobile_sdk.meta/mobile_sdk/oauth_refresh_token_flow.htm">Salesforce Refresh Token</a> used to access your Salesforce account.
+          type: string
+          airbyte_secret: true
+          order: 4
     is_sandbox:
-      title: Sandbox
-      description: >-
-        Toggle if you're using a <a
-        href="https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5">Salesforce Sandbox</a>
-      type: boolean
-      default: false
-      order: 1
-    auth_type:
+          title: Sandbox
+          description: >-
+            Toggle if you're using a <a
+            href="https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5">Salesforce Sandbox</a>
+          type: boolean
+          default: false
+          order: 1
+    discover_streams:
+      title: Streams to Discover
+      description: Name of streams to discover
+      default: Account,Contact,User,OpportunityFilledHistory,LeadHistory,Opportunity,Campaign,Case,ContactLineItem,Entitlement,Lead,LiveChatTranscript,MessagingSession,Quote,QuoteLineItem,ServiceAppointment,ServiceContract,Task,UserServicePresence,WorkOrder,WorkOrderLineItem
       type: string
-      const: Client
-    client_id:
-      title: Client ID
-      description: Enter your Salesforce developer application's <a
-        href="https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG">Client ID</a>
-      type: string
-      order: 2
-    client_secret:
-      title: Client Secret
-      description: Enter your Salesforce developer application's <a
-        href="https://developer.salesforce.com/forums/?id=9062I000000DLgbQAG">Client secret</a>
-      type: string
-      airbyte_secret: true
-      order: 3
-    refresh_token:
-      title: Refresh Token
-      description: >-
-        Enter your application's <a
-        href="https://developer.salesforce.com/docs/atlas.en-us.mobile_sdk.meta/mobile_sdk/oauth_refresh_token_flow.htm">Salesforce Refresh Token</a> used for Airbyte to access your Salesforce account.
-      type: string
-      airbyte_secret: true
-      order: 4
+      order: 5
     start_date:
       title: Start Date
       description: >-
-        Enter the date in the YYYY-MM-DD format. Airbyte will replicate the data added on and after this date. If this field is blank, Airbyte will replicate the data for last two years.
+        Enter the date in the YYYY-MM-DD format. We will replicate the data added on and after this date. If this field is blank, We will replicate the data for last two years.
       type: string
       pattern: >-
         ^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?)$

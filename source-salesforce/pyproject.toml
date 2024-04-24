@@ -5,9 +5,10 @@ description = ""
 authors = ["Luishfs <luish1980@hotmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
-flow-sdk = {path="../python", develop=true}
-airbyte-cdk = "0.51.14"
+python = "^3.12"
+estuary-cdk = {path="../estuary-cdk", develop=true}
+airbyte-cdk = "^0.52"
+pydantic = "1.10.14"
 backoff = "^1.11"
 pendulum = "^3.0.0"
 pandas = "^2.2.1"
