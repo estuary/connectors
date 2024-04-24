@@ -4,7 +4,7 @@ from logging import Logger
 from pydantic import TypeAdapter
 import json
 import pytz
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict
+from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict, Tuple
 import asyncio
 import itertools
 from copy import deepcopy
@@ -23,7 +23,6 @@ from .models import (
     EndpointConfig,
     Table,
     Document,
-    BackfillCursor,
 )
 
 
@@ -90,7 +89,7 @@ async def fetch_page(
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
-    cutoff: BackfillCursor,
+    cutoff: Tuple[str],
 ) -> AsyncGenerator[Document | str, None]:
     is_first_query = False
     if page is None:
@@ -99,7 +98,7 @@ async def fetch_page(
             c.execute(f"select min(ROWID) from {table.table_name}")
             page = c.fetchone()[0]
 
-    query = backfill_query_template.render(table=table, rowid=page, max_rowid=cutoff.cursor['rowid'], is_first_query=is_first_query)
+    query = backfill_query_template.render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
 
     log.info(query, page)
 

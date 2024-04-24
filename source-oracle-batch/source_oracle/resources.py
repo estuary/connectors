@@ -14,7 +14,6 @@ from .models import (
     build_table,
     ResourceState,
     ResourceConfig,
-    BackfillCursor,
 )
 from .api import (
     connect,
@@ -47,7 +46,7 @@ async def all_resources(
         with conn.cursor() as c:
             c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
             max_rowid = c.fetchone()[0]
-        backfill_cutoff = BackfillCursor(cursor={'rowid': max_rowid})
+        backfill_cutoff = (max_rowid,)
 
         def open(
             binding: CaptureBinding[ResourceConfig],
