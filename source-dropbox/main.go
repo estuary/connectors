@@ -232,13 +232,6 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 						"description": "The client secret for the Dropbox app.",
 						"order": 2
 					},
-					"refresh_token": {
-						"type": "string",
-						"secret": true,
-						"title": "Refresh Token",
-						"description": "The refresh token for the Dropbox app.",
-						"order": 3
-					},
 					"access_token": {
 						"type": "string",
 						"secret": true,
