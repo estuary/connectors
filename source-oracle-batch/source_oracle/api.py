@@ -23,6 +23,7 @@ from .models import (
     EndpointConfig,
     Table,
     Document,
+    BackfillCursor,
 )
 
 
@@ -89,7 +90,7 @@ async def fetch_page(
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
-    cutoff: datetime,
+    cutoff: BackfillCursor,
 ) -> AsyncGenerator[Document | str, None]:
     is_first_query = False
     if page is None:
@@ -98,9 +99,9 @@ async def fetch_page(
             c.execute(f"select min(ROWID) from {table.table_name}")
             page = c.fetchone()[0]
 
-    query = backfill_query_template.render(table=table, rowid=page, is_first_query=is_first_query)
+    query = backfill_query_template.render(table=table, rowid=page, max_rowid=cutoff.cursor['rowid'], is_first_query=is_first_query)
 
-    # log.info(query, page)
+    log.info(query, page)
 
     last_rowid = None
     with conn.cursor() as c:
@@ -109,7 +110,6 @@ async def fetch_page(
             row = dict(zip(cols, values))
             row = {k: v for (k, v) in row.items() if v is not None}
             last_rowid = row[rowid_column_name]
-            # log.info("setting last_rowid to", last_rowid)
 
             doc = Document()
             doc.meta_ = Document.Meta(op='c')
@@ -183,6 +183,7 @@ SELECT ROWID, {% for c in table.columns -%}
 {{ c.column_name }}
 {%- endfor %} FROM {{ table.table_name }}
     WHERE ROWID >{% if is_first_query %}={% endif %} '{{ rowid }}'
+      AND ROWID <= '{{ max_rowid }}'
     ORDER BY ROWID ASC
 """)
 

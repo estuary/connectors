@@ -14,7 +14,6 @@ captures:
       - resource:
           name: TESTING
           interval: PT5S
-          cursor: []
         target: acmeCo/TESTING
     interval: 3m
     shards:

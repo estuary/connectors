@@ -173,6 +173,7 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
 
+
 @dataclass
 class AssociatedDocument(Generic[_BaseDocument]):
     """
@@ -182,6 +183,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     """
     doc: _BaseDocument
     binding: int
+
 
 FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument, None]]
 """
