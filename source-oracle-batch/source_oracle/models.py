@@ -12,7 +12,7 @@ from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
     ResourceConfig as GenericResourceConfig,
-    ResourceState as ResourceState,
+    ResourceState,
 )
 
 
@@ -30,7 +30,7 @@ class EndpointConfig(BaseModel):
         connection_limit: int = Field(
             description="Number of concurrent connections to open to suiteanalytics", default=5
         )
-        cursor_fields: list[Annotated[str, StringConstraints(to_lower=True)]] = Field(
+        cursor_fields: list[str] = Field(
             default=[
                 "last_modified_date_gmt",
                 "last_modified_date",
@@ -84,8 +84,8 @@ class OracleTable(BaseModel, extra="forbid"):
     Oracle all_tables records. docs: https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_TABLES.html
     """
 
-    tablespace_name: constr(to_lower=True) = Field(alias="TABLESPACE_NAME")  # "SYSTEM", or "AcmeCo"
-    table_name: constr(to_lower=True) = Field(alias="TABLE_NAME")  # "OA_FOOBAR" for system tables, or e.x. "Account"
+    tablespace_name: str = Field(alias="TABLESPACE_NAME")  # "SYSTEM", or "AcmeCo"
+    table_name: str = Field(alias="TABLE_NAME")  # "OA_FOOBAR" for system tables, or e.x. "Account"
 
 
 class OracleColumn(BaseModel, extra="forbid"):
@@ -113,8 +113,8 @@ class OracleColumn(BaseModel, extra="forbid"):
         DATE = "DATE"
         TIMESTAMP_WITH_TIMEZONE = "TIMESTAMP WITH TIMEZONE"
 
-    table_name: constr(to_lower=True) = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
-    column_name: constr(to_lower=True) = Field(alias="COLUMN_NAME")  # Ex 'recordid'
+    table_name: str = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
+    column_name: str = Field(alias="COLUMN_NAME")  # Ex 'recordid'
 
     # The timestamp type and various other types in Oracle have precision / size as part
     # of their DATA_TYPE, so they are not easily made into an enum, e.g. we have
