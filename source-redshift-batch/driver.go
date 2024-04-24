@@ -626,11 +626,6 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		}
 	}
 
-	migrated, err := migrateState(&state, open.Capture.Bindings)
-	if err != nil {
-		return fmt.Errorf("migrating binding states: %w", err)
-	}
-
 	state, err = updateResourceStates(state, bindings)
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
@@ -638,14 +633,6 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 
 	if err := stream.Ready(false); err != nil {
 		return err
-	}
-
-	if migrated {
-		if cp, err := json.Marshal(state); err != nil {
-			return fmt.Errorf("error serializing checkpoint: %w", err)
-		} else if err := stream.Checkpoint(cp, false); err != nil {
-			return fmt.Errorf("updating migrated checkpoint: %w", err)
-		}
 	}
 
 	var capture = &capture{
@@ -699,49 +686,7 @@ type bindingInfo struct {
 }
 
 type captureState struct {
-	Streams    map[boilerplate.StateKey]*streamState `json:"bindingStateV1,omitempty"`
-	OldStreams map[string]*streamState               `json:"Streams,omitempty"` // TODO(whb): Remove once all captures have migrated.
-}
-
-func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
-	if state.Streams != nil && state.OldStreams != nil {
-		return false, fmt.Errorf("application error: both Streams and OldStreams were non-nil")
-	} else if state.Streams != nil {
-		log.Info("skipping state migration since it's already done")
-		return false, nil
-	}
-
-	state.Streams = make(map[boilerplate.StateKey]*streamState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res Resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return false, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		ll := log.WithFields(log.Fields{
-			"stateKey": b.StateKey,
-			"name":     res.Name,
-		})
-
-		stateFromOldStreams, ok := state.OldStreams[res.Name]
-		if !ok {
-			// This may happen if the connector has never emitted any checkpoints.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Streams[boilerplate.StateKey(b.StateKey)] = stateFromOldStreams
-		ll.Info("migrated binding state")
-	}
-
-	state.OldStreams = nil
-
-	return true, nil
+	Streams map[boilerplate.StateKey]*streamState `json:"bindingStateV1,omitempty"`
 }
 
 type streamState struct {
