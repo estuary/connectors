@@ -1,38 +1,38 @@
-from datetime import datetime, UTC, timedelta
-from typing import AsyncGenerator, Awaitable, Iterable
-from logging import Logger
 import functools
+from datetime import UTC, datetime, timedelta
+from logging import Logger
+from typing import AsyncGenerator, Awaitable, Iterable
 
-from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import Resource, LogCursor, PageCursor, open_binding
-from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
+from estuary_cdk.capture.common import LogCursor, PageCursor, Resource, open_binding
+from estuary_cdk.flow import CaptureBinding
+from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 
-from .models import (
-    BaseCRMObject,
-    CRMObject,
-    Company,
-    Contact,
-    Deal,
-    EndpointConfig,
-    Engagement,
-    Names,
-    OAUTH2_SPEC,
-    Property,
-    ResourceConfig,
-    ResourceState,
-    Ticket,
-)
 from .api import (
     FetchRecentFn,
+    fetch_changes,
     fetch_page,
     fetch_properties,
-    fetch_changes,
     fetch_recent_companies,
     fetch_recent_contacts,
     fetch_recent_deals,
     fetch_recent_engagements,
     fetch_recent_tickets,
+)
+from .models import (
+    OAUTH2_SPEC,
+    BaseCRMObject,
+    Company,
+    Contact,
+    CRMObject,
+    Deal,
+    EndpointConfig,
+    Engagement,
+    Names,
+    Property,
+    ResourceConfig,
+    ResourceState,
+    Ticket,
 )
 
 

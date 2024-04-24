@@ -30,7 +30,7 @@ class Connector(
 
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
-            documentationUrl="https://docs.estuary.dev",
+            documentationUrl="https://go.estuary.dev/hubspot-real-time",
             configSchema=EndpointConfig.model_json_schema(),
             oauth2=OAUTH2_SPEC,
             resourceConfigSchema=ResourceConfig.model_json_schema(),
