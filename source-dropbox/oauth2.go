@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"golang.org/x/oauth2"
 )
 
 func GetScopes() []string {
@@ -31,26 +30,30 @@ func OAuth2Spec() *pf.OAuth2 {
 		AuthUrlTemplate: fmt.Sprintf(AUTH_URL_TEMPLATE_FORMAT_STR, strings.Join(scopes, " ")),
 		// Dropbox Docs: you’ll need to include `token_access_type=offline`` as a parameter on your
 		// Authorization URL in order to return a refresh_token inside your access token payload.
-		AccessTokenUrlTemplate:     "https://api.dropboxapi.com/oauth2/token?token_access_type=offline",
-		AccessTokenBody:            `{"grant_type": "authorization_code", "client_id": "{{{ client_id }}}", "client_secret": "{{{ client_secret }}}", "redirect_uri": "{{{ redirect_uri }}}", "code": "{{{ code }}}"}`,
-		AccessTokenResponseJsonMap: map[string]json.RawMessage{"refresh_token": json.RawMessage(`"/refresh_token"`)},
+		AccessTokenUrlTemplate:    "https://api.dropboxapi.com/oauth2/token", //"https://b6b837c0-fc5a-4498-ac2a-d6a7c907d9e8.mock.pstmn.io/oauth",
+		AccessTokenHeadersJsonMap: map[string]json.RawMessage{"Content-Type": json.RawMessage(`"application/x-www-form-urlencoded"`)},
+		AccessTokenBody:           "client_id={{{ client_id }}}&client_secret={{{ client_secret }}}&code={{{ code }}}&grant_type=authorization_code&redirect_uri={{{ redirect_uri }}}",
+		AccessTokenResponseJsonMap: map[string]json.RawMessage{
+			"refresh_token": json.RawMessage(`"/refresh_token"`),
+			"access_token":  json.RawMessage(`"/access_token"`),
+			"expires_in":    json.RawMessage(`"/expires_in"`),
+		},
 	}
 
 	return &spec
 }
 
 type Credentials struct {
-	ClientID     string `json:"client_id,omitempty"`
-	ClientSecret string `json:"client_secret,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	AccessToken  string `json:"access_token,omitempty"`
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpireTime  int    `json:"expires_in"`
+	Scope       string `json:"scope"`
+	UID         string `json:"uid"`
+	AccountID   string `json:"account_id"`
 }
 
 func (c *Credentials) Validate() error {
 	requiredProperties := [][]string{
-		{"ClientID", c.ClientID},
-		{"ClientSecret", c.ClientSecret},
-		{"RefreshToken", c.RefreshToken},
 		{"AccessToken", c.AccessToken},
 	}
 	for _, req := range requiredProperties {
@@ -62,24 +65,5 @@ func (c *Credentials) Validate() error {
 }
 
 func (c *Credentials) GetAccessToken(ctx context.Context) (string, error) {
-	if err := c.Validate(); err != nil {
-		return "", err
-	}
-
-	oauthConfig := &oauth2.Config{
-		ClientID:     c.ClientID,
-		ClientSecret: c.ClientSecret,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://www.dropbox.com/oauth2/authorize",
-			TokenURL: "https://api.dropboxapi.com/oauth2/token",
-		},
-		Scopes: GetScopes(),
-	}
-	verifier := oauth2.GenerateVerifier()
-	token, err := oauthConfig.Exchange(ctx, c.AccessToken, oauth2.VerifierOption(verifier))
-	if err != nil {
-		return "", err
-	}
-
-	return token.AccessToken, nil
+	return c.AccessToken, nil
 }

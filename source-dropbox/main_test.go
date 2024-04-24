@@ -21,10 +21,7 @@ func TestDropbox_newDropboxStore(t *testing.T) {
 	ctx := context.TODO()
 	cfg := config{
 		Credentials: &Credentials{
-			AccessToken:  token,
-			ClientID:     "client_id",
-			ClientSecret: "client_secret",
-			RefreshToken: "refresh_token",
+			AccessToken: token,
 		},
 		Path: "",
 	}
