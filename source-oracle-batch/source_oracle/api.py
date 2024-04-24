@@ -12,6 +12,10 @@ import oracledb
 import inspect
 from jinja2 import Template
 
+from estuary_cdk.capture.common import (
+    PageCursor,
+    LogCursor,
+)
 
 from .models import (
     OracleTable,
@@ -78,99 +82,117 @@ async def fetch_columns(
     return columns
 
 
-async def fetch_rows(
+async def fetch_page(
     # Closed over via functools.partial:
     table: Table,
     conn: oracledb.Connection,
-    cursor: list[str],
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
     cutoff: datetime,
 ) -> AsyncGenerator[Document | str, None]:
-    is_first_query = page is None
+    is_first_query = False
+    if page is None:
+        is_first_query = True
+        with conn.cursor() as c:
+            c.execute(f"select min(ROWID) from {table.table_name}")
+            page = c.fetchone()[0]
 
-    # page is in fact a json encoded object where keys are cursor fields and values
-    # are the last value for that cursor
-    cursor_values = json.loads(page) if page is not None else {}
-    query = query_template.render(table_name=table.table_name,
-                                  cursor_fields=cursor,
-                                  is_first_query=is_first_query)
+    query = backfill_query_template.render(table=table, rowid=page, is_first_query=is_first_query)
 
-    last_row = None
-    bind_params = {}
-    if page is not None:
-        bind_params = cursor_values
+    # log.info(query, page)
 
-    log.info(query, page, cursor)
-
+    last_rowid = None
     with conn.cursor() as c:
-        for values in c.execute(query, bind_params):
+        for values in c.execute(query):
             cols = [col[0] for col in c.description]
             row = dict(zip(cols, values))
-            row = {k.lower(): v for (k, v) in row.items() if v is not None}
-            last_row = row
-            log.info("setting last_row to", last_row)
+            row = {k: v for (k, v) in row.items() if v is not None}
+            last_rowid = row[rowid_column_name]
+            # log.info("setting last_rowid to", last_rowid)
 
             doc = Document()
             doc.meta_ = Document.Meta(op='c')
             for (k, v) in row.items():
+                if k == rowid_column_name:
+                    continue
                 setattr(doc, k, v)
 
             yield doc
 
-    if len(cursor) > 0:
-        if last_row is not None:
-            yield json.dumps({k: last_row[k] for k in cursor})
-        else:
-            yield page
+    if last_rowid is not None:
+        yield last_rowid
 
-query_template = Template("""
-{#***********************************************************
-  * This is a generic query template which is provided so that *
-  * discovered bindings can have a vaguely reasonable default  *
-  * behavior.                                                  *
-  *                                                            *
-  * You are entirely free to delete this template and replace  *
-  * it with whatever query you want to execute. Just be aware  *
-  * that this query will be executed over and over every poll  *
-  * interval, and if you intend to lower the polling interval  *
-  * from its default of 24h you should probably try and use a  *
-  * cursor to capture only new rows each time.                 *
-  *                                                            *
-  * By default this template generates a 'SELECT * FROM table' *
-  * query which will read the whole table on each poll.        *
-  *                                                            *
-  * If the table has a suitable "cursor" column (or columns)   *
-  * which can be used to identify only changed rows, add the   *
-  * name(s) to the "Cursor" property of this binding. If you   *
-  * do that, the generated query will have the form:           *
-  *                                                            *
-  *     SELECT * FROM table                                    *
-  *       WHERE (ka > :0) OR (ka = :0 AND kb > :1)             *
-  *       ORDER BY ka, kb;                                     *
-  *                                                            *
-  * This can be used to incrementally capture new rows if the  *
-  * table has a serial ID column or a 'created_at' timestamp,  *
-  * or it could be used to capture updated rows if the table   *
-  * has an 'updated_at' timestamp.                             *
-  ***********************************************************/ #}
-{%- if cursor_fields|length -%}
-  {%- if is_first_query -%}
-    SELECT * FROM {{ table_name }}
-  {%- else -%}
-    SELECT * FROM {{ table_name }}
-	{% for k in cursor_fields -%}
-      {%- set outer_loop = loop -%}
-	  {%- if loop.first %} WHERE ({%- else -%}) OR ({% endif -%}
-      {%- for n in cursor_fields -%}
-		{% if loop.index < outer_loop.index %}
-          {{ n }} = :{{ n }} AND {% endif -%}
-	  {% endfor %}
-	  {{ k }} > :{{ k }}
-	{%- endfor %}
-	)
-  {% endif %} ORDER BY {% for k in cursor_fields -%}{%- if not loop.first -%}, {% endif -%}{{k}}{%- endfor -%}
-{%- else -%}
-  SELECT * FROM {{ table_name }}
-{%- endif -%}""")
+
+op_mapping = {
+    'I': 'c',
+    'D': 'd',
+    'U': 'u',
+}
+
+
+async def fetch_changes(
+    # Closed over via functools.partial:
+    table: Table,
+    conn: oracledb.Connection,
+    # Remainder is common.FetchPageFn:
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Document | LogCursor, None]:
+    query = inc_query_template.render(table=table, cursor=log_cursor)
+
+    log.info(query, log_cursor)
+
+    last_scn = log_cursor
+    with conn.cursor() as c:
+        for values in c.execute(query):
+            cols = [col[0] for col in c.description]
+            row = dict(zip(cols, values))
+            row = {k: v for (k, v) in row.items() if v is not None}
+
+            if scn_column_name not in row or op_column_name not in row:
+                continue
+
+            if row[scn_column_name] > last_scn:
+                last_scn = row[scn_column_name] + 1
+            elif last_scn == log_cursor:
+                last_scn = last_scn + 1
+            log.info("setting last_scn to", last_scn)
+
+            op = row[op_column_name]
+
+            doc = Document()
+            doc.meta_ = Document.Meta(op=op_mapping[op])
+            for (k, v) in row.items():
+                if k in (scn_column_name, op_column_name):
+                    continue
+                setattr(doc, k, v)
+
+            yield doc
+
+    if last_scn != log_cursor:
+        yield last_scn
+
+# an all-uppercase ROWID is a reserved keyword that cannot be used
+# as a column identifier, however other casings of the same word
+# can be used as a column name.
+rowid_column_name = "ROWID"
+backfill_query_template = Template("""
+SELECT ROWID, {% for c in table.columns -%}
+{%- if not loop.first %}, {% endif -%}
+{{ c.column_name }}
+{%- endfor %} FROM {{ table.table_name }}
+    WHERE ROWID >{% if is_first_query %}={% endif %} '{{ rowid }}'
+    ORDER BY ROWID ASC
+""")
+
+scn_column_name = "VERSIONS_STARTSCN"
+op_column_name = "VERSIONS_OPERATION"
+inc_query_template = Template("""
+SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, {% for c in table.columns -%}
+{%- if not loop.first %}, {% endif -%}
+{{ c.column_name }}
+{%- endfor %} FROM {{ table.table_name }}
+    VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
+    ORDER BY VERSIONS_STARTSCN ASC
+""")
