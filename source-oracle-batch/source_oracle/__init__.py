@@ -1,5 +1,6 @@
 from logging import Logger
 from typing import Callable, Awaitable
+import oracledb
 
 from estuary_cdk.flow import ConnectorSpec
 from estuary_cdk.capture import (
