@@ -43,7 +43,8 @@ async def fetch_rows(
     # since the rowData field wont be returned 
     sheet_info = json.loads(await http.request(log, url, params=params))
     if len(sheet_info["sheets"][0]["data"][0]) == 0:
-        raise RuntimeError(f"Spreedsheet sheet '{sheet.properties.title}' is empty!")
+        log.warn(f"Spreadsheet sheet '{sheet.properties.title}' is empty!")
+        return ([])
 
 
     spreadsheet = Spreadsheet.model_validate_json(
