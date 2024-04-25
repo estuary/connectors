@@ -10,7 +10,7 @@ import itertools
 from copy import deepcopy
 import oracledb
 import inspect
-from jinja2 import Template
+from jinja2 import Template, Environment, DictLoader
 
 from estuary_cdk.capture.common import (
     PageCursor,
@@ -80,7 +80,7 @@ async def fetch_columns(
 ) -> list[OracleColumn]:
     async with pool.acquire() as conn:
         with conn.cursor() as c:
-            sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK'])
+            sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK' and not f.exclude])
 
             query = f"""
             SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM user_tab_columns t
@@ -123,7 +123,7 @@ async def fetch_page(
                 await c.execute(f"select min(ROWID) from {table.table_name}")
                 page = (await c.fetchone())[0]
 
-    query = backfill_query_template.render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
+    query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
 
     log.info(query, page)
 
@@ -165,7 +165,7 @@ async def fetch_changes(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Document | LogCursor, None]:
-    query = inc_query_template.render(table=table, cursor=log_cursor)
+    query = template_env.get_template("inc").render(table=table, cursor=log_cursor)
 
     log.info(query, log_cursor)
 
@@ -201,49 +201,59 @@ async def fetch_changes(
     if last_scn != log_cursor:
         yield last_scn
 
-# an all-uppercase ROWID is a reserved keyword that cannot be used
-# as a column identifier, however other casings of the same word
-# can be used as a column name.
+
+def cast_column(c: OracleColumn) -> str:
+    needs_cast = c.is_ts or c.cast_to_string
+
+    if not needs_cast:
+        return c.column_name
+
+    out = "TO_CHAR(" + c.column_name
+    fmt = ""
+    if c.is_ts and c.has_tz:
+        fmt = """'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"'"""
+    elif c.is_ts and c.data_scale > 0:
+        fmt = """'YYYY-MM-DD"T"HH24:MI:SS.FF'"""
+    elif c.is_ts:
+        fmt = """'YYYY-MM-DD"T"HH24:MI:SS'"""
+
+    if c.is_ts and c.has_tz:
+        out = out + f" AT TIME ZONE 'UTC', {fmt})"
+    elif c.is_ts:
+        out = out + f", {fmt})"
+    else:
+        out = out + ")"
+
+    out = out + " AS " + c.column_name
+
+    return out
+
+
 rowid_column_name = "ROWID"
-backfill_query_template = Template("""
+scn_column_name = "VERSIONS_STARTSCN"
+op_column_name = "VERSIONS_OPERATION"
+
+template_env = Environment(loader=DictLoader({
+    # an all-uppercase ROWID is a reserved keyword that cannot be used
+    # as a column identifier, however other casings of the same word
+    # can be used as a column name.
+    'backfill': """
 SELECT ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
-
-{%- if c._is_ts or c._cast_to_string -%}TO_CHAR({%- endif -%}
-
-{{ c.column_name }}
-
-{%- if c._is_ts and c._has_tz %} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS {{ c.column_name }}
-{%- elif c._is_ts -%}
-, 'YYYY-MM-DD"T"HH24:MI:SS') AS {{ c.column_name }}
-{%- elif c._cast_to_string -%}
-) AS {{ c.column_name }}
-{%- endif -%}
-
+{{ c | cast }}
 {%- endfor %} FROM {{ table.table_name }}
     WHERE ROWID >{% if is_first_query %}={% endif %} '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
     ORDER BY ROWID ASC
-""")
-
-scn_column_name = "VERSIONS_STARTSCN"
-op_column_name = "VERSIONS_OPERATION"
-inc_query_template = Template("""
+""",
+    'inc': """
 SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
-
-{%- if c._is_ts or c._cast_to_string -%}TO_CHAR({%- endif -%}
-
-{{ c.column_name }}
-
-{%- if c._is_ts and c._has_tz %} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS {{ c.column_name }}
-{%- elif c._is_ts -%}
-, 'YYYY-MM-DD"T"HH24:MI:SS') AS {{ c.column_name }}
-{%- elif c._cast_to_string -%}
-) AS {{ c.column_name }}
-{%- endif -%}
-
+{{ c | cast }}
 {%- endfor %} FROM {{ table.table_name }}
     VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
     ORDER BY VERSIONS_STARTSCN ASC
-""")
+"""
+}))
+
+template_env.filters['cast'] = cast_column
