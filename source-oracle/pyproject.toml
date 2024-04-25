@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "source_oracle_batch"
+name = "source_oracle"
 version = "0.1.0"
 description = ""
-authors = ["Johnny Graettinger <johnny@estuary.dev>"]
+authors = ["Mahdi <mahdi@estuary.dev>"]
 
 [tool.poetry.dependencies]
 estuary-cdk = {path="../estuary-cdk", develop = true}
