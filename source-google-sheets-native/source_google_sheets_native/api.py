@@ -42,6 +42,7 @@ async def fetch_rows(
     # checking if sheet is empty before model eval
     # since the rowData field wont be returned 
     sheet_info = json.loads(await http.request(log, url, params=params))
+
     if len(sheet_info["sheets"][0]["data"][0]) == 0:
         log.warn(f"Spreadsheet sheet '{sheet.properties.title}' is empty!")
         return ([])
@@ -55,7 +56,7 @@ async def fetch_rows(
         raise RuntimeError(f"Spreadsheet sheet '{sheet}' was not found")
 
     sheet = spreadsheet.sheets[0]
-    assert sheet.data
+
     rows = sheet.data[0].rowData
 
     headers = default_column_headers(sheet.properties.gridProperties.columnCount)
