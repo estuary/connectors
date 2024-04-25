@@ -26,11 +26,9 @@ func OAuth2Spec() *pf.OAuth2 {
 	scopes := GetScopes()
 
 	spec := pf.OAuth2{
-		Provider:        "dropbox",
-		AuthUrlTemplate: fmt.Sprintf(AUTH_URL_TEMPLATE_FORMAT_STR, strings.Join(scopes, " ")),
-		// Dropbox Docs: you’ll need to include `token_access_type=offline`` as a parameter on your
-		// Authorization URL in order to return a refresh_token inside your access token payload.
-		AccessTokenUrlTemplate:    "https://api.dropboxapi.com/oauth2/token", //"https://b6b837c0-fc5a-4498-ac2a-d6a7c907d9e8.mock.pstmn.io/oauth",
+		Provider:                  "dropbox",
+		AuthUrlTemplate:           fmt.Sprintf(AUTH_URL_TEMPLATE_FORMAT_STR, strings.Join(scopes, " ")),
+		AccessTokenUrlTemplate:    "https://api.dropboxapi.com/oauth2/token",
 		AccessTokenHeadersJsonMap: map[string]json.RawMessage{"Content-Type": json.RawMessage(`"application/x-www-form-urlencoded"`)},
 		AccessTokenBody:           "client_id={{{ client_id }}}&client_secret={{{ client_secret }}}&code={{{ code }}}&grant_type=authorization_code&redirect_uri={{{ redirect_uri }}}",
 		AccessTokenResponseJsonMap: map[string]json.RawMessage{
@@ -55,12 +53,10 @@ type Credentials struct {
 	AccountID    string `json:"account_id"`
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
-	// RefreshToken string `json:"refresh_token"`
 }
 
 func (c *Credentials) Validate() error {
 	requiredProperties := [][]string{
-		// {"RefreshToken", c.RefreshToken},
 		{"AccessToken", c.AccessToken},
 	}
 	for _, req := range requiredProperties {
