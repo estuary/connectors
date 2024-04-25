@@ -16,10 +16,6 @@
 				"type": "object",
 				"x-oauth2-provider": "dropbox",
 				"properties": {
-					"access_token": {
-						"type": "string",
-						"secret": true
-					},
 					"client_id": {
 						"type": "string",
 						"secret": true
@@ -28,23 +24,12 @@
 						"type": "string",
 						"secret": true
 					},
-					"token_type": {
-						"type": "string"
-					},
-					"expires_in": {
-						"type": "integer"
-					},
-					"scope": {
-						"type": "string"
-					},
-					"uid": {
-						"type": "string"
-					},
-					"account_id": {
-						"type": "string"
+					"refresh_token": {
+						"type": "string",
+						"secret": true
 					}
 				},
-				"required": ["access_token"],
+				"required": ["client_id", "client_secret", "refresh_token"],
 				"order": 2
 			},
 			"matchKeys": {
@@ -52,7 +37,7 @@
 				"title": "Match Keys",
 				"format": "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 2
+				"order": 3
 			},
 			"advanced": {
 				"properties": {
@@ -67,7 +52,7 @@
 				"type": "object",
 				"description": "Options for advanced users. You should not typically need to modify these.",
 				"advanced": true,
-				"order": 3
+				"order": 4
 			},
 			"parser": {"type": "object", "properties": {"name": {"type": "string"}}}
 		}

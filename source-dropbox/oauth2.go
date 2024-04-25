@@ -4,26 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
+	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"golang.org/x/oauth2"
 )
 
-func GetScopes() []string {
-	return []string{
-		"files.metadata.read",
-		"files.content.read",
-		// "account_info.read",  // Not sure if we need this
-	}
-}
+var scopes = []string{"files.metadata.read", "files.content.read"}
 
 // Most of this code was converted from the Google Auth specification updating with
 // the info on https://developers.dropbox.com/oauth-guide
-func OAuth2Spec() *pf.OAuth2 {
+func oauth2spec() *pf.OAuth2 {
 	// Docs: https://www.dropbox.com/developers/documentation/http/documentation#oauth2-authorize
 	AUTH_URL_TEMPLATE_FORMAT_STR := "https://www.dropbox.com/oauth2/authorize?token_access_type=offline&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&response_type=code&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{{ state }}}&scope={{#urlencode}}%s{{/urlencode}}"
-
-	scopes := GetScopes()
 
 	spec := pf.OAuth2{
 		Provider:                  "dropbox",
@@ -32,12 +28,7 @@ func OAuth2Spec() *pf.OAuth2 {
 		AccessTokenHeadersJsonMap: map[string]json.RawMessage{"Content-Type": json.RawMessage(`"application/x-www-form-urlencoded"`)},
 		AccessTokenBody:           "client_id={{{ client_id }}}&client_secret={{{ client_secret }}}&code={{{ code }}}&grant_type=authorization_code&redirect_uri={{{ redirect_uri }}}",
 		AccessTokenResponseJsonMap: map[string]json.RawMessage{
-			"access_token": json.RawMessage(`"/access_token"`),
-			"token_type":   json.RawMessage(`"/token_type"`),
-			"expires_in":   json.RawMessage(`"/expires_in"`),
-			"scope":        json.RawMessage(`"/scope"`),
-			"uid":          json.RawMessage(`"/uid"`),
-			"account_id":   json.RawMessage(`"/account_id"`),
+			"refresh_token": json.RawMessage(`"/refresh_token"`),
 		},
 	}
 
@@ -45,19 +36,16 @@ func OAuth2Spec() *pf.OAuth2 {
 }
 
 type Credentials struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpireTime   int    `json:"expires_in"`
-	Scope        string `json:"scope"`
-	UID          string `json:"uid"`
-	AccountID    string `json:"account_id"`
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 func (c *Credentials) Validate() error {
 	requiredProperties := [][]string{
-		{"AccessToken", c.AccessToken},
+		{"client_id", c.ClientID},
+		{"client_secret", c.ClientSecret},
+		{"refresh_token", c.RefreshToken},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -67,6 +55,18 @@ func (c *Credentials) Validate() error {
 	return nil
 }
 
-func (c *Credentials) GetAccessToken(ctx context.Context) (string, error) {
-	return c.AccessToken, nil
+func (c *Credentials) client(ctx context.Context) *http.Client {
+	oauthConfig := &oauth2.Config{
+		ClientID:     c.ClientID,
+		ClientSecret: c.ClientSecret,
+		Endpoint:     dropbox.OAuthEndpoint(""),
+		Scopes:       scopes,
+	}
+
+	token := &oauth2.Token{
+		RefreshToken: c.RefreshToken,
+		Expiry:       time.Now(), // Require a new access token to be obtained.
+	}
+
+	return oauth2.NewClient(ctx, oauthConfig.TokenSource(ctx, token))
 }

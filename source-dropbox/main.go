@@ -61,23 +61,20 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
-	token, err := cfg.Credentials.GetAccessToken(ctx)
-	if err != nil {
-		return &dropboxStore{}, err
-	}
-	config := dropbox.Config{
-		Token:    token,
+	client := files.New(dropbox.Config{
 		LogLevel: dropbox.LogDebug,
-	}
-	client := files.New(config)
+		Client:   cfg.Credentials.client(ctx),
+	})
 
 	store := dropboxStore{
 		client: client,
 		config: cfg,
 	}
+
 	if err := store.check(); err != nil {
 		return &dropboxStore{}, err
 	}
+
 	return &store, nil
 }
 
@@ -190,10 +187,6 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 				"type": "object",
 				"x-oauth2-provider": "dropbox",
 				"properties": {
-					"access_token": {
-						"type": "string",
-						"secret": true
-					},
 					"client_id": {
 						"type": "string",
 						"secret": true
@@ -202,23 +195,12 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 						"type": "string",
 						"secret": true
 					},
-					"token_type": {
-						"type": "string"
-					},
-					"expires_in": {
-						"type": "integer"
-					},
-					"scope": {
-						"type": "string"
-					},
-					"uid": {
-						"type": "string"
-					},
-					"account_id": {
-						"type": "string"
+					"refresh_token": {
+						"type": "string",
+						"secret": true
 					}
 				},
-				"required": ["access_token"],
+				"required": ["client_id", "client_secret", "refresh_token"],
 				"order": 2
 			},
 			"matchKeys": {
@@ -226,7 +208,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 				"title": "Match Keys",
 				"format": "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 2
+				"order": 3
 			},
 			"advanced": {
 				"properties": {
@@ -241,7 +223,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 				"type": "object",
 				"description": "Options for advanced users. You should not typically need to modify these.",
 				"advanced": true,
-				"order": 3
+				"order": 4
 			},
 			"parser": ` + string(parserSchema) + `
 		}
@@ -265,7 +247,7 @@ func main() {
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
 		TimeHorizonDelta: time.Second * -30,
-		Oauth2:           OAuth2Spec(),
+		Oauth2:           oauth2spec(),
 	}
 
 	src.Main()
