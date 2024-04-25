@@ -32,79 +32,119 @@ properties:
     description: Primary Key
     title: Id
     type: integer
-  C:
+  DATETIME:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: C
-  CL:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Cl
-  D:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: D
-  DOUB:
+    title: Datetime
+  DOUBLE_PRECISION:
     anyOf:
       - type: number
       - type: "null"
     default: ~
-    title: Doub
-  F:
+    title: Double Precision
+  FLOAT_126:
     anyOf:
       - type: number
       - type: "null"
     default: ~
-    title: F
-  I:
+    title: Float 126
+  INTERVAL_DAY:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Interval Day
+  INTERVAL_YEAR:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Interval Year
+  NUM:
+    anyOf:
+      - type: number
+      - type: "null"
+    default: ~
+    title: Num
+  NVCHAR2:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Nvchar2
+  REAL_NUM:
+    anyOf:
+      - type: number
+      - type: "null"
+    default: ~
+    title: Real Num
+  SINGLE_NCHAR:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Single Nchar
+  SMALL_INT:
     anyOf:
       - type: integer
       - type: "null"
     default: ~
-    title: I
-  NC:
+    title: Small Int
+  TS:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Nc
-  NV2:
+    title: Ts
+  TS_LOCAL_TZ:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    default: ~
+    title: Ts Local Tz
+  TS_LOCAL_TZ_NINE:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    default: ~
+    title: Ts Local Tz Nine
+  TS_NINE:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Nv2
-  SM:
+    title: Ts Nine
+  TS_TZ:
     anyOf:
-      - type: integer
+      - format: date-time
+        type: string
       - type: "null"
     default: ~
-    title: Sm
-  STR:
+    title: Ts Tz
+  TS_TZ_NINE:
     anyOf:
-      - type: string
+      - format: date-time
+        type: string
       - type: "null"
     default: ~
-    title: Str
-  T:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: T
-  VC2:
+    title: Ts Tz Nine
+  VCHAR:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Vc2
+    title: Vchar
+  VCHAR2:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Vchar2
 required:
   - ID
-title: TESTING
+title: TEST_ALL_TYPES
 type: object
