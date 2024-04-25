@@ -18,6 +18,9 @@ func TestDropbox_getConfigSchema(t *testing.T) {
 }
 func TestDropbox_newDropboxStore(t *testing.T) {
 	token := os.Getenv("DROPBOX_TOKEN")
+	if token == "" {
+		t.Skip("DROPBOX token not set")
+	}
 	ctx := context.TODO()
 	cfg := config{
 		Credentials: &Credentials{
