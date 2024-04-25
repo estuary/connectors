@@ -226,6 +226,29 @@ func TestDiscovery(t *testing.T) {
 	simpleCapture(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
 }
 
+func TestNestedCollections(t *testing.T) {
+	var ctx = testContext(t, 300*time.Second)
+	var client = testFirestoreClient(ctx, t)
+	var capture = simpleCapture(t, "nested_users", "nested_users/*/docs")
+
+	client.Upsert(ctx, t, "nested_users/B1", `{"name": "Alice"}`)
+	client.Upsert(ctx, t, "nested_users/B2", `{"name": "Bob"}`)
+	client.Upsert(ctx, t, "nested_users/B1/docs/1", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "nested_users/B1/docs/2", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "nested_users/B2/docs/3", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "nested_users/B2/docs/4", `{"foo": "baz", "asdf": 1000}`)
+	t.Run("init", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	client.Upsert(ctx, t, "nested_users/R3", `{"name": "Carol"}`)
+	client.Upsert(ctx, t, "nested_users/R4", `{"name": "Dave"}`)
+	client.Upsert(ctx, t, "nested_users/R3/docs/5", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "nested_users/R3/docs/6", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "nested_users/R4/docs/7", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "nested_users/R4/docs/8", `{"foo": "baz", "asdf": 1000}`)
+	t.Run("repl", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+}
+
 func testContext(t testing.TB, duration time.Duration) context.Context {
 	t.Helper()
 	if testing.Short() && duration > 10*time.Second {
@@ -281,7 +304,7 @@ func simpleBindings(names ...string) []*flow.CaptureSpec_Binding {
 func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 1000 * time.Millisecond
+	const shutdownDelay = 2000 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {

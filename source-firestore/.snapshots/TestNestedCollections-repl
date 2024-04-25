@@ -1,0 +1,17 @@
+# ================================
+# Collection "flow_source_tests/*/nested_users": 2 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/R3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"name":"Carol"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/R4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"name":"Dave"}
+# ================================
+# Collection "flow_source_tests/*/nested_users/*/docs": 4 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/R3/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"asdf":123,"foo":"bar"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/R3/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"asdf":456,"foo":"bar"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/R4/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"asdf":789,"foo":"baz"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/R4/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"asdf":1000,"foo":"baz"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"flow_source_tests%2F%2A%2Fnested_users":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests%2F%2A%2Fnested_users%2F%2A%2Fdocs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
+
