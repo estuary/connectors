@@ -201,11 +201,11 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 				return nil, fmt.Errorf("invalid backfill mode %q for %q", res.BackfillMode, res.Path)
 			}
 			if res.InitTimestamp != "" {
-				if ts, err := time.Parse(time.RFC3339Nano, res.InitTimestamp); err != nil {
+				var ts, err = time.Parse(time.RFC3339Nano, res.InitTimestamp)
+				if err != nil {
 					return nil, fmt.Errorf("invalid initTimestamp value %q: %w", res.InitTimestamp, err)
-				} else {
-					state.ReadTime = ts
 				}
+				state.ReadTime = ts
 			}
 		}
 		states[stateKey] = state
