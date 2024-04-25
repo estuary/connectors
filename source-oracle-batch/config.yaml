@@ -4,6 +4,8 @@ credentials:
     password: P^X9DY74e3iz7a
 address: (DESCRIPTION=(RETRY_COUNT=20)(RETRY_DELAY=3)(ADDRESS=(PROTOCOL=TCPS)(PORT=1521)(HOST=ADB.EU-FRANKFURT-1.ORACLECLOUD.COM))(CONNECT_DATA=(SERVICE_NAME=GCB2A4E9E921DD0_L6TEOA4HLL74YXRA_HIGH.ADB.ORACLECLOUD.COM))(SECURITY=(SSL_SERVER_DN_MATCH=YES)))
 start_date: "2024-04-09T12:12:34.898765Z"
+advanced:
+    skip_flashback_retention_checks: true
 sops:
     kms: []
     gcp_kms:
@@ -13,8 +15,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-04-17T13:11:31Z"
-    mac: ENC[AES256_GCM,data:+oSFnv52sGhyql6Vl5U5/sesL7yJA9U0Js3Lp3z+KxkcB0a7QRjWEFAnRt4+Xpgxop0t2askqc58VJ6vggYOSkop5KfOp2eZ3gjHJiMYi7+5ppUxgb9AKAn1Mztgk/M4T5obIgOp4IGmjsv7FmBDB33DWDEUTe1213tufI4H1X4=,iv:BEDK4cxeJx2UXKrVjQr3HZE8xtHaLgxh8+LUtIeMQC4=,tag:HIv81woYLANiinOYRHgUnQ==,type:str]
+    lastmodified: "2024-04-25T12:01:38Z"
+    mac: ENC[AES256_GCM,data:4KCkxaYmlNDU5wlXVdk57cJeTfxCukXwrz1dcdbqd8NEeeWd4f3Ut7T79522dwH20Nt+uH1FDl+wNRcvE/rHLHPFdSyRktW5pU0r9sg3Odj9n67zmKMy9LGroGZmoOJRnbOZjC2wBRQOcQ9gyOndLIICOdMo02y9liCAVpptPJc=,iv:Tkgy/hI0gR9vYg4hRR1GfbCGYRwHx9QIM/ctAllQOWA=,tag:FTWb2VQKhxKla7WDlA+kzQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
