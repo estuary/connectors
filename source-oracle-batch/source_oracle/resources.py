@@ -23,6 +23,62 @@ from .api import (
     fetch_changes,
 )
 
+one_week_seconds = 60 * 60 * 24 * 7
+
+
+async def validate_flashback(
+    log: Logger, config: EndpointConfig
+):
+    conn = connect(config)
+    with conn.cursor() as c:
+        c.execute("SELECT flashback_on FROM V$DATABASE")
+        flashback_on = c.fetchone()[0] == "YES"
+
+        if not flashback_on:
+            raise Exception("Flashback must be enabled on the database. See go.estuary.dev/source-oracle for more information.")
+
+        c.execute("SELECT name, value FROM V$PARAMETER WHERE NAME IN ('undo_tablespace', 'undo_management', 'undo_retention')")
+        params = dict(c.fetchall())
+        undo_tablespace = params['undo_tablespace']
+        undo_management = params['undo_management']
+        undo_retention_seconds = int(params['undo_retention'])
+
+        if undo_retention_seconds < one_week_seconds:
+            raise Exception(f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {
+                            undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION.")
+
+        c.execute("SELECT max_size, retention FROM dba_tablespaces WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
+        max_size, retention_mode = c.fetchone()
+
+        c.execute("SELECT autoextensible FROM dba_data_files WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
+        autoextensible = c.fetchone()[0] == "YES"
+
+        if not autoextensible:
+            log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle for more information.")
+
+        if retention_mode != 'GUARANTEE':
+            log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
+
+        avg_retention = None
+        if params['undo_management'] == 'AUTO':
+            c.execute("SELECT AVG(tuned_undoretention) from v$undostat")
+            avg_retention_seconds = int(c.fetchone()[0])
+
+            if avg_retention_seconds < one_week_seconds:
+                raise Exception(f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {
+                                avg_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION.")
+
+        log.info("flashback configuration", {
+            "undo_tablespace": undo_tablespace,
+            "undo_management": undo_management,
+            "undo_retention_seconds": undo_retention_seconds,
+            "max_size": max_size,
+            "retention_mode": retention_mode,
+            "autoextensible": autoextensible,
+            "flashback_on": flashback_on,
+            "avg_retention_seconds": avg_retention_seconds,
+        })
+
 
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
