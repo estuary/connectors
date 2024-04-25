@@ -1,12 +1,12 @@
 # ================================
 # Collection "flow_source_tests/*/docs": 6 Documents
 # ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":1}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":2}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":5}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":3}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":4}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":6}
 # ================================
 # Final State Checkpoint
 # ================================

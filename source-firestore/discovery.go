@@ -68,6 +68,7 @@ type documentMetadata struct {
 	CreateTime *time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was created. Unset if the document is deleted."`
 	UpdateTime *time.Time `json:"mtime" jsonschema:"title=Update Time,description=The time at which the document was most recently updated (or deleted)."`
 	Deleted    bool       `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
+	Backfill   bool       `json:"backfill,omitempty" jsonschema:"title=Backfill Flag,description=True if this document was captured via a backfill."`
 }
 
 // minimalSchema is the maximally-permissive schema which just specifies the

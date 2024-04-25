@@ -36,6 +36,11 @@ Binding 0:
               "type": "boolean",
               "title": "Delete Flag",
               "description": "True if the document has been deleted"
+            },
+            "backfill": {
+              "type": "boolean",
+              "title": "Backfill Flag",
+              "description": "True if this document was captured via a backfill."
             }
           },
           "type": "object",
@@ -95,6 +100,11 @@ Binding 1:
               "type": "boolean",
               "title": "Delete Flag",
               "description": "True if the document has been deleted"
+            },
+            "backfill": {
+              "type": "boolean",
+              "title": "Backfill Flag",
+              "description": "True if this document was captured via a backfill."
             }
           },
           "type": "object",
@@ -154,6 +164,11 @@ Binding 2:
               "type": "boolean",
               "title": "Delete Flag",
               "description": "True if the document has been deleted"
+            },
+            "backfill": {
+              "type": "boolean",
+              "title": "Backfill Flag",
+              "description": "True if this document was captured via a backfill."
             }
           },
           "type": "object",
