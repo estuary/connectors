@@ -22,29 +22,12 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
-    start_date: AwareDatetime = Field(
-        title="start_date",
-    )
 
     class Advanced(BaseModel):
-        connection_limit: int = Field(
-            description="Number of concurrent connections to open to suiteanalytics", default=5
-        )
-        cursor_fields: list[str] = Field(
-            default=[
-                "last_modified_date_gmt",
-                "last_modified_date",
-                "lastmodifieddate",
-                "date_last_modified_gmt",
-                "date_last_modified",
-                "datelastmodified",
-                "lastmodifieddate",
-            ],
-            description="Columns to use as cursor for incremental replication, in order of preference. Case insensitive.",
-        )
-        enable_auto_cursor: bool = Field(
+        skip_flashback_retention_checks: bool = Field(
             default=False,
-            description="Enable automatic cursor field selection. If enabled, will walk through the list of candidate cursors and select the first one with no null values, otherwise select the cursor with the least nulls.",
+            title="Skip Flashback Retention Checks",
+            description="Skip Flashback retention checks. Use this cautiously as we cannot guarantee consistency if Flashback retention is not sufficient.",
         )
 
     advanced: Advanced = Field(
