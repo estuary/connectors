@@ -12,9 +12,9 @@ captures:
         config: config.yaml
     bindings:
       - resource:
-          name: TESTING
-          interval: PT5S
-        target: acmeCo/TESTING
+          name: TEST_ALL_TYPES
+          interval: PT0S
+        target: acmeCo/TEST_ALL_TYPES
     interval: 3m
     shards:
       logLevel: debug

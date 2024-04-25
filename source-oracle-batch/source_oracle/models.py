@@ -39,16 +39,7 @@ class EndpointConfig(BaseModel):
 
 
 class ResourceConfig(GenericResourceConfig):
-    query_limit: int = Field(
-        title="Query Limit",
-        description="Maximum number of rows to fetch in a query. Typically left as the default.",
-        default=100_000,
-    )
-    query_timeout: timedelta = Field(
-        title="Query Timeout",
-        description="Timeout for queries. Typically left as the default.",
-        default=timedelta(minutes=10),
-    )
+    pass
 
 
 ConnectorState = GenericConnectorState[ResourceState]
@@ -90,7 +81,9 @@ class OracleColumn(BaseModel, extra="forbid"):
         NCHAR = "NCHAR"
         NVARCHAR2 = "NVARCHAR2"
         DATE = "DATE"
-        TIMESTAMP_WITH_TIMEZONE = "TIMESTAMP WITH TIMEZONE"
+        WITH_TIMEZONE = "WITH TIME ZONE"
+        WITH_LOCAL_TIMEZONE = "WITH LOCAL TIME ZONE"
+        INTERVAL = "INTERVAL"
 
     table_name: str = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
     column_name: str = Field(alias="COLUMN_NAME")  # Ex 'recordid'
@@ -147,6 +140,7 @@ def build_table(
         field_type: type[int | str | datetime | float | Decimal]
         field_schema_extra: dict | None = None
         field_zero: Any
+        import sys
 
         if col.data_type == col.Type.NUMBER and col.data_scale == 0:
             field_type, field_zero = int, 0
@@ -164,10 +158,14 @@ def build_table(
             field_type, field_zero = int, 0
         elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type, field_zero = str, ""
+        elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_TIMEZONE) > -1:
+            field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
+        elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_LOCAL_TIMEZONE) > -1:
+            field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
         elif col.data_type.startswith(col.Type.TIMESTAMP):
             field_type, field_zero = str, ""
-        elif col.data_type.startswith(col.Type.TIMESTAMP_WITH_TIMEZONE):
-            field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
+        elif col.data_type.startswith(col.Type.INTERVAL):
+            field_type, field_zero = str, ""
         elif col.data_type in (col.Type.DATE,):
             field_type, field_zero = str, ""
         else:
