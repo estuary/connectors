@@ -32,7 +32,6 @@ async def init_session(connection, _requested_tag):
             """
             alter session set
                 time_zone = 'UTC'
-                nls_date_format = 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
             """
         )
 
@@ -209,7 +208,16 @@ rowid_column_name = "ROWID"
 backfill_query_template = Template("""
 SELECT ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
+
+{%- if c._is_ts -%}TO_CHAR({%- endif -%}
+
 {{ c.column_name }}
+
+{%- if c._is_ts and c._has_tz %} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+{%- elif c._is_ts -%}
+, 'YYYY-MM-DD"T"HH24:MI:SS')
+{%- endif -%}
+
 {%- endfor %} FROM {{ table.table_name }}
     WHERE ROWID >{% if is_first_query %}={% endif %} '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
