@@ -26,9 +26,9 @@ from .models import (
 )
 
 
-def init_session(connection, _requested_tag):
+async def init_session(connection, _requested_tag):
     with connection.cursor() as cursor:
-        cursor.execute(
+        await cursor.execute(
             """
             alter session set
                 time_zone = 'UTC'
@@ -37,10 +37,10 @@ def init_session(connection, _requested_tag):
         )
 
 
-def create_pool(config: EndpointConfig) -> oracledb.ConnectionPool:
+def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
     # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
     # the pool contains 4 connections, which will allow 4 concurrent users.
-    pool = oracledb.create_pool(
+    pool = oracledb.create_pool_async(
         user=config.credentials.username,
         password=config.credentials.password,
         dsn=config.address,
@@ -56,57 +56,61 @@ def create_pool(config: EndpointConfig) -> oracledb.ConnectionPool:
 
 
 async def fetch_tables(
-    log: Logger, pool: oracledb.ConnectionPool,
+    log: Logger, pool: oracledb.AsyncConnectionPool,
 ) -> list[OracleTable]:
-    with pool.acquire() as conn, conn.cursor() as c:
-        sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
 
-        query = f"SELECT {sql_columns} FROM user_tables"
+            query = f"SELECT {sql_columns} FROM user_tables"
 
-        tables = []
-        for values in c.execute(query):
-            cols = [col[0] for col in c.description]
-            row = dict(zip(cols, values))
-            tables.append(
-                OracleTable(**row)
-            )
+            tables = []
+            await c.execute(query)
+            async for values in c:
+                cols = [col[0] for col in c.description]
+                row = dict(zip(cols, values))
+                tables.append(
+                    OracleTable(**row)
+                )
 
-        return tables
+            return tables
 
 
 async def fetch_columns(
-    log: Logger, pool: oracledb.ConnectionPool,
+    log: Logger, pool: oracledb.AsyncConnectionPool,
 ) -> list[OracleColumn]:
-    with pool.acquire() as conn, conn.cursor() as c:
-        sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK'])
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK'])
 
-        query = f"""
-        SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM user_tab_columns t
-            LEFT JOIN (
-                    SELECT c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
-                        INNER JOIN all_cons_columns ac ON (
-                            c.constraint_name = ac.constraint_name
-                            AND c.table_name = ac.table_name
-                            AND c.constraint_type = 'P'
-                        )
-                    ) c
-            ON (t.table_name = c.table_name AND t.column_name = c.column_name)
-        """
+            query = f"""
+            SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM user_tab_columns t
+                LEFT JOIN (
+                        SELECT c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
+                            INNER JOIN all_cons_columns ac ON (
+                                c.constraint_name = ac.constraint_name
+                                AND c.table_name = ac.table_name
+                                AND c.constraint_type = 'P'
+                            )
+                        ) c
+                ON (t.table_name = c.table_name AND t.column_name = c.column_name)
+            """
 
-        columns = []
-        for values in c.execute(query):
-            cols = [col[0] for col in c.description]
-            row = dict(zip(cols, values))
-            row = {k: v for (k, v) in row.items() if v is not None}
-            columns.append(OracleColumn(**row))
+            columns = []
+            await c.execute(query)
+            async for values in c:
+                cols = [col[0] for col in c.description]
+                row = dict(zip(cols, values))
+                row = {k: v for (k, v) in row.items() if v is not None}
+                columns.append(OracleColumn(**row))
 
-        return columns
+            return columns
 
 
 async def fetch_page(
     # Closed over via functools.partial:
     table: Table,
-    pool: oracledb.ConnectionPool,
+    pool: oracledb.AsyncConnectionPool,
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
@@ -115,30 +119,33 @@ async def fetch_page(
     is_first_query = False
     if page is None:
         is_first_query = True
-        with pool.acquire() as conn, conn.cursor() as c:
-            c.execute(f"select min(ROWID) from {table.table_name}")
-            page = c.fetchone()[0]
+        async with pool.acquire() as conn:
+            with conn.cursor() as c:
+                await c.execute(f"select min(ROWID) from {table.table_name}")
+                page = (await c.fetchone())[0]
 
     query = backfill_query_template.render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
 
     log.info(query, page)
 
     last_rowid = None
-    with pool.acquire() as conn, conn.cursor() as c:
-        for values in c.execute(query):
-            cols = [col[0] for col in c.description]
-            row = dict(zip(cols, values))
-            row = {k: v for (k, v) in row.items() if v is not None}
-            last_rowid = row[rowid_column_name]
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            await c.execute(query)
+            async for values in c:
+                cols = [col[0] for col in c.description]
+                row = dict(zip(cols, values))
+                row = {k: v for (k, v) in row.items() if v is not None}
+                last_rowid = row[rowid_column_name]
 
-            doc = Document()
-            doc.meta_ = Document.Meta(op='c')
-            for (k, v) in row.items():
-                if k == rowid_column_name:
-                    continue
-                setattr(doc, k, v)
+                doc = Document()
+                doc.meta_ = Document.Meta(op='c')
+                for (k, v) in row.items():
+                    if k == rowid_column_name:
+                        continue
+                    setattr(doc, k, v)
 
-            yield doc
+                yield doc
 
     if last_rowid is not None:
         yield last_rowid
@@ -154,7 +161,7 @@ op_mapping = {
 async def fetch_changes(
     # Closed over via functools.partial:
     table: Table,
-    pool: oracledb.ConnectionPool,
+    pool: oracledb.AsyncConnectionPool,
     # Remainder is common.FetchPageFn:
     log: Logger,
     log_cursor: LogCursor,
@@ -164,31 +171,33 @@ async def fetch_changes(
     log.info(query, log_cursor)
 
     last_scn = log_cursor
-    with pool.acquire() as conn, conn.cursor() as c:
-        for values in c.execute(query):
-            cols = [col[0] for col in c.description]
-            row = dict(zip(cols, values))
-            row = {k: v for (k, v) in row.items() if v is not None}
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            await c.execute(query)
+            async for values in c:
+                cols = [col[0] for col in c.description]
+                row = dict(zip(cols, values))
+                row = {k: v for (k, v) in row.items() if v is not None}
 
-            if scn_column_name not in row or op_column_name not in row:
-                continue
-
-            if row[scn_column_name] > last_scn:
-                last_scn = row[scn_column_name] + 1
-            elif last_scn == log_cursor:
-                last_scn = last_scn + 1
-            log.info("setting last_scn to", last_scn)
-
-            op = row[op_column_name]
-
-            doc = Document()
-            doc.meta_ = Document.Meta(op=op_mapping[op])
-            for (k, v) in row.items():
-                if k in (scn_column_name, op_column_name):
+                if scn_column_name not in row or op_column_name not in row:
                     continue
-                setattr(doc, k, v)
 
-            yield doc
+                if row[scn_column_name] > last_scn:
+                    last_scn = row[scn_column_name] + 1
+                elif last_scn == log_cursor:
+                    last_scn = last_scn + 1
+                log.info("setting last_scn to", last_scn)
+
+                op = row[op_column_name]
+
+                doc = Document()
+                doc.meta_ = Document.Meta(op=op_mapping[op])
+                for (k, v) in row.items():
+                    if k in (scn_column_name, op_column_name):
+                        continue
+                    setattr(doc, k, v)
+
+                yield doc
 
     if last_scn != log_cursor:
         yield last_scn

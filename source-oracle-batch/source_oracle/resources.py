@@ -27,68 +27,69 @@ one_week_seconds = 60 * 60 * 24 * 7
 
 
 async def validate_flashback(
-    log: Logger, config: EndpointConfig, pool: oracledb.ConnectionPool,
+    log: Logger, config: EndpointConfig, pool: oracledb.AsyncConnectionPool,
 ):
     skip_retention_checks = config.advanced.skip_flashback_retention_checks
     conn = pool.acquire()
-    with conn.cursor() as c:
-        c.execute("SELECT flashback_on FROM V$DATABASE")
-        flashback_on = c.fetchone()[0] == "YES"
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            await c.execute("SELECT flashback_on FROM V$DATABASE")
+            flashback_on = (await c.fetchone())[0] == "YES"
 
-        c.execute("SELECT name, value FROM V$PARAMETER WHERE NAME IN ('undo_tablespace', 'undo_management', 'undo_retention')")
-        params = dict(c.fetchall())
-        undo_tablespace = params['undo_tablespace']
-        undo_management = params['undo_management']
-        undo_retention_seconds = int(params['undo_retention'])
+            await c.execute("SELECT name, value FROM V$PARAMETER WHERE NAME IN ('undo_tablespace', 'undo_management', 'undo_retention')")
+            params = dict(await c.fetchall())
+            undo_tablespace = params['undo_tablespace']
+            undo_management = params['undo_management']
+            undo_retention_seconds = int(params['undo_retention'])
 
-        c.execute("SELECT max_size, retention FROM dba_tablespaces WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
-        max_size, retention_mode = c.fetchone()
+            await c.execute("SELECT max_size, retention FROM dba_tablespaces WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
+            max_size, retention_mode = await c.fetchone()
 
-        c.execute("SELECT autoextensible FROM dba_data_files WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
-        autoextensible = c.fetchone()[0] == "YES"
+            await c.execute("SELECT autoextensible FROM dba_data_files WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
+            autoextensible = (await c.fetchone())[0] == "YES"
 
-        avg_retention = None
-        if params['undo_management'] == 'AUTO':
-            c.execute("SELECT AVG(tuned_undoretention) from v$undostat")
-            avg_retention_seconds = int(c.fetchone()[0])
+            avg_retention = None
+            if params['undo_management'] == 'AUTO':
+                await c.execute("SELECT AVG(tuned_undoretention) from v$undostat")
+                avg_retention_seconds = int((await c.fetchone())[0])
 
-        log.info("flashback configuration", {
-            "undo_tablespace": undo_tablespace,
-            "undo_management": undo_management,
-            "undo_retention_seconds": undo_retention_seconds,
-            "max_size": max_size,
-            "retention_mode": retention_mode,
-            "autoextensible": autoextensible,
-            "flashback_on": flashback_on,
-            "avg_retention_seconds": avg_retention_seconds,
-        })
+            log.info("flashback configuration", {
+                "undo_tablespace": undo_tablespace,
+                "undo_management": undo_management,
+                "undo_retention_seconds": undo_retention_seconds,
+                "max_size": max_size,
+                "retention_mode": retention_mode,
+                "autoextensible": autoextensible,
+                "flashback_on": flashback_on,
+                "avg_retention_seconds": avg_retention_seconds,
+            })
 
-        if not flashback_on:
-            raise Exception("Flashback must be enabled on the database. See go.estuary.dev/source-oracle for more information.")
+            if not flashback_on:
+                raise Exception("Flashback must be enabled on the database. See go.estuary.dev/source-oracle for more information.")
 
-        if undo_retention_seconds < one_week_seconds:
-            msg = f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
-            if skip_retention_checks:
-                log.warn(msg)
-            else:
-                raise Exception(msg)
+            if undo_retention_seconds < one_week_seconds:
+                msg = f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
+                if skip_retention_checks:
+                    log.warn(msg)
+                else:
+                    raise Exception(msg)
 
-        if avg_retention_seconds < one_week_seconds:
-            msg = f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {avg_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
-            if skip_retention_checks:
-                log.warn(msg)
-            else:
-                raise Exception(msg)
+            if avg_retention_seconds < one_week_seconds:
+                msg = f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {avg_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
+                if skip_retention_checks:
+                    log.warn(msg)
+                else:
+                    raise Exception(msg)
 
-        if not autoextensible:
-            log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle for more information.")
+            if not autoextensible:
+                log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle for more information.")
 
-        if retention_mode != 'GUARANTEE':
-            log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
+            if retention_mode != 'GUARANTEE':
+                log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
 
 
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.ConnectionPool,
+    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool,
 ) -> list[common.Resource]:
     resources_list = []
 
@@ -96,18 +97,20 @@ async def all_resources(
     oracle_columns = await fetch_columns(log, pool)
 
     current_scn = None
-    with pool.acquire() as conn, conn.cursor() as c:
-        c.execute("SELECT current_scn FROM V$DATABASE")
-        current_scn = c.fetchone()[0]
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            await c.execute("SELECT current_scn FROM V$DATABASE")
+            current_scn = (await c.fetchone())[0]
 
     for ot in oracle_tables:
         columns = [col for col in oracle_columns if col.table_name == ot.table_name]
         t = build_table(config.advanced, ot.table_name, columns)
 
         max_rowid = None
-        with pool.acquire() as conn, conn.cursor() as c:
-            c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
-            max_rowid = c.fetchone()[0]
+        async with pool.acquire() as conn:
+            with conn.cursor() as c:
+                await c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
+                max_rowid = (await c.fetchone())[0]
         backfill_cutoff = (max_rowid,)
 
         def open(
