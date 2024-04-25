@@ -2,6 +2,7 @@ from datetime import datetime, UTC, timedelta
 from typing import AsyncGenerator, Awaitable, Iterable, Dict
 from logging import Logger
 import functools
+import oracledb
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
@@ -16,7 +17,6 @@ from .models import (
     ResourceConfig,
 )
 from .api import (
-    connect,
     fetch_tables,
     fetch_columns,
     fetch_page,
@@ -27,10 +27,10 @@ one_week_seconds = 60 * 60 * 24 * 7
 
 
 async def validate_flashback(
-    log: Logger, config: EndpointConfig
+    log: Logger, config: EndpointConfig, pool: oracledb.ConnectionPool,
 ):
     skip_retention_checks = config.advanced.skip_flashback_retention_checks
-    conn = connect(config)
+    conn = pool.acquire()
     with conn.cursor() as c:
         c.execute("SELECT flashback_on FROM V$DATABASE")
         flashback_on = c.fetchone()[0] == "YES"
@@ -88,16 +88,15 @@ async def validate_flashback(
 
 
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.ConnectionPool,
 ) -> list[common.Resource]:
     resources_list = []
 
-    conn = connect(config)
-    oracle_tables = await fetch_tables(log, conn)
-    oracle_columns = await fetch_columns(log, conn)
+    oracle_tables = await fetch_tables(log, pool)
+    oracle_columns = await fetch_columns(log, pool)
 
     current_scn = None
-    with conn.cursor() as c:
+    with pool.acquire() as conn, conn.cursor() as c:
         c.execute("SELECT current_scn FROM V$DATABASE")
         current_scn = c.fetchone()[0]
 
@@ -106,7 +105,7 @@ async def all_resources(
         t = build_table(config.advanced, ot.table_name, columns)
 
         max_rowid = None
-        with conn.cursor() as c:
+        with pool.acquire() as conn, conn.cursor() as c:
             c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
             max_rowid = c.fetchone()[0]
         backfill_cutoff = (max_rowid,)
@@ -122,8 +121,8 @@ async def all_resources(
                 binding_index,
                 state,
                 task,
-                fetch_page=functools.partial(fetch_page, t, conn),
-                fetch_changes=functools.partial(fetch_changes, t, conn),
+                fetch_page=functools.partial(fetch_page, t, pool),
+                fetch_changes=functools.partial(fetch_changes, t, pool),
             )
         resources_list.append(common.Resource(
             name=t.table_name,
