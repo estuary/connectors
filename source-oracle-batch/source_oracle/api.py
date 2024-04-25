@@ -216,7 +216,7 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- if c._is_ts and c._has_tz %} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS {{ c.column_name }}
 {%- elif c._is_ts -%}
 , 'YYYY-MM-DD"T"HH24:MI:SS') AS {{ c.column_name }}
-{% elif c._cast_to_string %}
+{%- elif c._cast_to_string -%}
 ) AS {{ c.column_name }}
 {%- endif -%}
 
@@ -231,7 +231,18 @@ op_column_name = "VERSIONS_OPERATION"
 inc_query_template = Template("""
 SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
+
+{%- if c._is_ts or c._cast_to_string -%}TO_CHAR({%- endif -%}
+
 {{ c.column_name }}
+
+{%- if c._is_ts and c._has_tz %} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS {{ c.column_name }}
+{%- elif c._is_ts -%}
+, 'YYYY-MM-DD"T"HH24:MI:SS') AS {{ c.column_name }}
+{%- elif c._cast_to_string -%}
+) AS {{ c.column_name }}
+{%- endif -%}
+
 {%- endfor %} FROM {{ table.table_name }}
     VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
     ORDER BY VERSIONS_STARTSCN ASC
