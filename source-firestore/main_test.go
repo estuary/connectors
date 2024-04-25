@@ -140,7 +140,7 @@ func TestAddedBindingSameGroup(t *testing.T) {
 		)
 		verifyCapture(ctx, t, capture)
 	})
-	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
+	capture.Bindings = append(capture.Bindings, simpleBindings("groups/*/docs")...)
 	t.Run("two", func(t *testing.T) {
 		client.Upsert(ctx, t,
 			"users/1/docs/3", `{"data": 3}`,
@@ -207,9 +207,9 @@ func TestBindingDeletion(t *testing.T) {
 
 	var capture = simpleCapture(t, "docs")
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
-	capture.Bindings = simpleBindings(t, "other")
+	capture.Bindings = simpleBindings("other")
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
-	capture.Bindings = simpleBindings(t, "docs")
+	capture.Bindings = simpleBindings("docs")
 	t.Run("three", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -255,13 +255,13 @@ func simpleCapture(t testing.TB, names ...string) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
-		Bindings:     simpleBindings(t, names...),
+		Bindings:     simpleBindings(names...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   DefaultSanitizers,
 	}
 }
 
-func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
+func simpleBindings(names ...string) []*flow.CaptureSpec_Binding {
 	var bindings []*flow.CaptureSpec_Binding
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
