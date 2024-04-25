@@ -1,0 +1,111 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "skip_flashback_retention_checks": {
+              "default": false,
+              "description": "Skip Flashback retention checks. Use this cautiously as we cannot guarantee consistency if Flashback retention is not sufficient.",
+              "title": "Skip Flashback Retention Checks",
+              "type": "boolean"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "BasicAuth": {
+          "properties": {
+            "credentials_title": {
+              "const": "Username & Password",
+              "enum": [
+                "Username & Password"
+              ],
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "title": "Username",
+              "type": "string"
+            },
+            "password": {
+              "title": "Password",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentials_title",
+            "username",
+            "password"
+          ],
+          "title": "BasicAuth",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "address": {
+          "description": "Address",
+          "title": "Address",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Username & Password": "#/$defs/BasicAuth"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BasicAuth"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "advanced": {
+          "advanced": true,
+          "allOf": [
+            {
+              "$ref": "#/$defs/Advanced"
+            }
+          ],
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "address",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-oracle-batch",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

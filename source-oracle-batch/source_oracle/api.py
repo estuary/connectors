@@ -26,66 +26,87 @@ from .models import (
 )
 
 
-def connect(config: EndpointConfig) -> oracledb.Connection:
-    return oracledb.connect(user=config.credentials.username,
-                            password=config.credentials.password,
-                            dsn=config.address)
+def init_session(connection, _requested_tag):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            alter session set
+                time_zone = 'UTC'
+                nls_date_format = 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+            """
+        )
+
+
+def create_pool(config: EndpointConfig) -> oracledb.ConnectionPool:
+    # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
+    # the pool contains 4 connections, which will allow 4 concurrent users.
+    pool = oracledb.create_pool(
+        user=config.credentials.username,
+        password=config.credentials.password,
+        dsn=config.address,
+        min=4,
+        max=4,
+        increment=0,
+        session_callback=init_session,
+        cclass="ESTUARY",
+        purity=oracledb.ATTR_PURITY_SELF,
+    )
+
+    return pool
 
 
 async def fetch_tables(
-    log: Logger, conn: oracledb.Connection,
+    log: Logger, pool: oracledb.ConnectionPool,
 ) -> list[OracleTable]:
-    cursor = conn.cursor()
+    with pool.acquire() as conn, conn.cursor() as c:
+        sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
 
-    sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
+        query = f"SELECT {sql_columns} FROM user_tables"
 
-    query = f"SELECT {sql_columns} FROM user_tables"
+        tables = []
+        for values in c.execute(query):
+            cols = [col[0] for col in c.description]
+            row = dict(zip(cols, values))
+            tables.append(
+                OracleTable(**row)
+            )
 
-    tables = []
-    for values in cursor.execute(query):
-        cols = [col[0] for col in cursor.description]
-        row = dict(zip(cols, values))
-        tables.append(
-            OracleTable(**row)
-        )
-
-    return tables
+        return tables
 
 
 async def fetch_columns(
-    log: Logger, conn: oracledb.Connection,
+    log: Logger, pool: oracledb.ConnectionPool,
 ) -> list[OracleColumn]:
-    cursor = conn.cursor()
+    with pool.acquire() as conn, conn.cursor() as c:
+        sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK'])
 
-    sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK'])
+        query = f"""
+        SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM user_tab_columns t
+            LEFT JOIN (
+                    SELECT c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
+                        INNER JOIN all_cons_columns ac ON (
+                            c.constraint_name = ac.constraint_name
+                            AND c.table_name = ac.table_name
+                            AND c.constraint_type = 'P'
+                        )
+                    ) c
+            ON (t.table_name = c.table_name AND t.column_name = c.column_name)
+        """
 
-    query = f"""
-    SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM user_tab_columns t
-        LEFT JOIN (
-                SELECT c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
-                    INNER JOIN all_cons_columns ac ON (
-                        c.constraint_name = ac.constraint_name
-                        AND c.table_name = ac.table_name
-                        AND c.constraint_type = 'P'
-                    )
-                ) c
-        ON (t.table_name = c.table_name AND t.column_name = c.column_name)
-    """
+        columns = []
+        for values in c.execute(query):
+            cols = [col[0] for col in c.description]
+            row = dict(zip(cols, values))
+            row = {k: v for (k, v) in row.items() if v is not None}
+            columns.append(OracleColumn(**row))
 
-    columns = []
-    for values in cursor.execute(query):
-        cols = [col[0] for col in cursor.description]
-        row = dict(zip(cols, values))
-        row = {k: v for (k, v) in row.items() if v is not None}
-        columns.append(OracleColumn(**row))
-
-    return columns
+        return columns
 
 
 async def fetch_page(
     # Closed over via functools.partial:
     table: Table,
-    conn: oracledb.Connection,
+    pool: oracledb.ConnectionPool,
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
@@ -94,7 +115,7 @@ async def fetch_page(
     is_first_query = False
     if page is None:
         is_first_query = True
-        with conn.cursor() as c:
+        with pool.acquire() as conn, conn.cursor() as c:
             c.execute(f"select min(ROWID) from {table.table_name}")
             page = c.fetchone()[0]
 
@@ -103,7 +124,7 @@ async def fetch_page(
     log.info(query, page)
 
     last_rowid = None
-    with conn.cursor() as c:
+    with pool.acquire() as conn, conn.cursor() as c:
         for values in c.execute(query):
             cols = [col[0] for col in c.description]
             row = dict(zip(cols, values))
@@ -133,7 +154,7 @@ op_mapping = {
 async def fetch_changes(
     # Closed over via functools.partial:
     table: Table,
-    conn: oracledb.Connection,
+    pool: oracledb.ConnectionPool,
     # Remainder is common.FetchPageFn:
     log: Logger,
     log_cursor: LogCursor,
@@ -143,7 +164,7 @@ async def fetch_changes(
     log.info(query, log_cursor)
 
     last_scn = log_cursor
-    with conn.cursor() as c:
+    with pool.acquire() as conn, conn.cursor() as c:
         for values in c.execute(query):
             cols = [col[0] for col in c.description]
             row = dict(zip(cols, values))

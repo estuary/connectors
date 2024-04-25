@@ -12,6 +12,14 @@ from estuary_cdk.capture import (
 )
 from estuary_cdk.http import HTTPMixin
 
+from .api import (
+    create_pool,
+    fetch_tables,
+    fetch_columns,
+    fetch_page,
+    fetch_changes,
+)
+
 from .resources import (
     all_resources,
     validate_flashback
@@ -42,7 +50,8 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
-        resources = await all_resources(log, self, discover.config)
+        pool = create_pool(discover.config)
+        resources = await all_resources(log, self, discover.config, pool)
         return common.discovered(resources)
 
     async def validate(
@@ -50,8 +59,9 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
-        await validate_flashback(log, validate.config)
-        resources = await all_resources(log, self, validate.config)
+        pool = create_pool(validate.config)
+        await validate_flashback(log, validate.config, pool)
+        resources = await all_resources(log, self, validate.config, pool)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
@@ -60,6 +70,7 @@ class Connector(
         log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-        resources = await all_resources(log, self, open.capture.config)
+        pool = create_pool(open.capture.config)
+        resources = await all_resources(log, self, open.capture.config, pool)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
