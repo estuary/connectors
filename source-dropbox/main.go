@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
@@ -47,22 +45,7 @@ func (c config) DiscoverRoot() string {
 }
 
 func (c config) RecommendedName() string {
-	if c.Path == "" {
-		return "dropbox-" + generateRandomString(6)
-	}
-	if strings.HasPrefix(c.Path, "/") {
-		return c.Path[1:]
-	}
-	return c.Path
-}
-
-func generateRandomString(i int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, i)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
+	return c.Path[1:]
 }
 
 func (c config) FilesAreMonotonic() bool {
