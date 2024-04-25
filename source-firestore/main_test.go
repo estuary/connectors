@@ -157,21 +157,26 @@ func TestManySmallWrites(t *testing.T) {
 	var capture = simpleCapture(t, "users/*/docs")
 	var client = testFirestoreClient(ctx, t)
 
-	go func(ctx context.Context) {
-		for user := 0; user < 10; user++ {
-			for doc := 0; doc < 5; doc++ {
-				var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
-				var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
-				client.Upsert(ctx, t, docName, docData)
-				time.Sleep(100 * time.Millisecond)
-			}
-			if user == 4 {
-				time.Sleep(1500 * time.Millisecond)
-			}
+	for user := 0; user < 5; user++ {
+		for doc := 0; doc < 5; doc++ {
+			var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
+			var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
+			client.Upsert(ctx, t, docName, docData)
+			time.Sleep(100 * time.Millisecond)
 		}
-	}(ctx)
-
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 5; user < 10; user++ {
+		for doc := 0; doc < 5; doc++ {
+			var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
+			var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
+			client.Upsert(ctx, t, docName, docData)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -180,20 +185,24 @@ func TestMultipleWatches(t *testing.T) {
 	var capture = simpleCapture(t, "users/*/docs", "users/*/notes", "users/*/tasks")
 	var client = testFirestoreClient(ctx, t)
 
-	go func(ctx context.Context) {
-		for user := 0; user < 10; user++ {
-			for item := 0; item < 5; item++ {
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
-			}
-			if user == 4 {
-				time.Sleep(1500 * time.Millisecond)
-			}
+	for user := 0; user < 5; user++ {
+		for item := 0; item < 5; item++ {
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
 		}
-	}(ctx)
-
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 5; user < 10; user++ {
+		for item := 0; item < 5; item++ {
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
+		}
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -203,7 +212,7 @@ func TestBindingDeletion(t *testing.T) {
 	for idx := 0; idx < 20; idx++ {
 		client.Upsert(ctx, t, fmt.Sprintf("docs/%d", idx), `{"data": "placeholder"}`)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	var capture = simpleCapture(t, "docs")
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
