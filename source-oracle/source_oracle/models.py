@@ -101,9 +101,9 @@ class OracleColumn(BaseModel, extra="forbid"):
     )
     nullable: bool = Field(default=True, alias="NULLABLE")
 
-    _is_ts: bool
-    _cast_to_string: bool
-    _has_tz: bool
+    is_ts: bool = Field(exclude=True, default=False)
+    cast_to_string: bool = Field(exclude=True, default=False)
+    has_tz: bool = Field(exclude=True, default=False)
 
     is_pk: bool = Field(default=False, alias="COL_IS_PK", description="Calculated by join on all_constraints and all_cons_columns")
 
@@ -163,23 +163,23 @@ def build_table(
         elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type, field_zero = str, ""
         elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_TIMEZONE) > -1:
-            col._is_ts = True
-            col._has_tz = True
+            col.is_ts = True
+            col.has_tz = True
             field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
         elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_LOCAL_TIMEZONE) > -1:
-            col._is_ts = True
-            col._has_tz = True
+            col.is_ts = True
+            col.has_tz = True
             field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
         elif col.data_type.startswith(col.Type.TIMESTAMP):
-            col._is_ts = True
-            col._has_tz = False
+            col.is_ts = True
+            col.has_tz = False
             field_type, field_zero = str, ""
         elif col.data_type.startswith(col.Type.INTERVAL):
-            col._cast_to_string = True
+            col.cast_to_string = True
             field_type, field_zero = str, ""
         elif col.data_type in (col.Type.DATE,):
-            col._is_ts = True
-            col._has_tz = False
+            col.is_ts = True
+            col.has_tz = False
             field_type, field_zero = str, ""
         else:
             raise NotImplementedError(f"unsupported type {col}")
