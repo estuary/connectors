@@ -198,36 +198,44 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 				"type": "string",
 				"title": "Path",
 				"format": "string",
+				"pattern": "^/.+",
 				"description": "The path to the Dropbox folder to read from. For example, \"/my-folder\".",
 				"order": 1
 			},
 			"credentials": {
-				"type": "object",
 				"title": "Credentials",
+				"type": "object",
 				"x-oauth2-provider": "dropbox",
 				"properties": {
+					"access_token": {
+						"type": "string",
+						"secret": true
+					},
 					"client_id": {
 						"type": "string",
-						"secret": true,
-						"title": "Client ID",
-						"description": "The client ID for the Dropbox app.",
-						"order": 1
+						"secret": true
 					},
 					"client_secret": {
 						"type": "string",
-						"secret": true,
-						"title": "Client Secret",
-						"description": "The client secret for the Dropbox app.",
-						"order": 2
+						"secret": true
 					},
-					"access_token": {
-						"type": "string",
-						"secret": true,
-						"title": "Access Token",
-						"description": "The access token for the Dropbox app.",
-						"order": 4
+					"token_type": {
+						"type": "string"
+					},
+					"expires_in": {
+						"type": "integer"
+					},
+					"scope": {
+						"type": "string"
+					},
+					"uid": {
+						"type": "string"
+					},
+					"account_id": {
+						"type": "string"
 					}
 				},
+				"required": ["access_token"],
 				"order": 2
 			},
 			"matchKeys": {
