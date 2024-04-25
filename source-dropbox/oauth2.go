@@ -47,12 +47,14 @@ func OAuth2Spec() *pf.OAuth2 {
 }
 
 type Credentials struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpireTime  int    `json:"expires_in"`
-	Scope       string `json:"scope"`
-	UID         string `json:"uid"`
-	AccountID   string `json:"account_id"`
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpireTime   int    `json:"expires_in"`
+	Scope        string `json:"scope"`
+	UID          string `json:"uid"`
+	AccountID    string `json:"account_id"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
 	// RefreshToken string `json:"refresh_token"`
 }
 
