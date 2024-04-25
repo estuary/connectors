@@ -29,13 +29,11 @@ one_week_seconds = 60 * 60 * 24 * 7
 async def validate_flashback(
     log: Logger, config: EndpointConfig
 ):
+    skip_retention_checks = config.advanced.skip_flashback_retention_checks
     conn = connect(config)
     with conn.cursor() as c:
         c.execute("SELECT flashback_on FROM V$DATABASE")
         flashback_on = c.fetchone()[0] == "YES"
-
-        if not flashback_on:
-            raise Exception("Flashback must be enabled on the database. See go.estuary.dev/source-oracle for more information.")
 
         c.execute("SELECT name, value FROM V$PARAMETER WHERE NAME IN ('undo_tablespace', 'undo_management', 'undo_retention')")
         params = dict(c.fetchall())
@@ -43,30 +41,16 @@ async def validate_flashback(
         undo_management = params['undo_management']
         undo_retention_seconds = int(params['undo_retention'])
 
-        if undo_retention_seconds < one_week_seconds:
-            raise Exception(f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {
-                            undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION.")
-
         c.execute("SELECT max_size, retention FROM dba_tablespaces WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
         max_size, retention_mode = c.fetchone()
 
         c.execute("SELECT autoextensible FROM dba_data_files WHERE tablespace_name=:tablespace", tablespace=undo_tablespace)
         autoextensible = c.fetchone()[0] == "YES"
 
-        if not autoextensible:
-            log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle for more information.")
-
-        if retention_mode != 'GUARANTEE':
-            log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
-
         avg_retention = None
         if params['undo_management'] == 'AUTO':
             c.execute("SELECT AVG(tuned_undoretention) from v$undostat")
             avg_retention_seconds = int(c.fetchone()[0])
-
-            if avg_retention_seconds < one_week_seconds:
-                raise Exception(f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {
-                                avg_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION.")
 
         log.info("flashback configuration", {
             "undo_tablespace": undo_tablespace,
@@ -78,6 +62,29 @@ async def validate_flashback(
             "flashback_on": flashback_on,
             "avg_retention_seconds": avg_retention_seconds,
         })
+
+        if not flashback_on:
+            raise Exception("Flashback must be enabled on the database. See go.estuary.dev/source-oracle for more information.")
+
+        if undo_retention_seconds < one_week_seconds:
+            msg = f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
+            if skip_retention_checks:
+                log.warn(msg)
+            else:
+                raise Exception(msg)
+
+        if avg_retention_seconds < one_week_seconds:
+            msg = f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {avg_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
+            if skip_retention_checks:
+                log.warn(msg)
+            else:
+                raise Exception(msg)
+
+        if not autoextensible:
+            log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle for more information.")
+
+        if retention_mode != 'GUARANTEE':
+            log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
 
 
 async def all_resources(
