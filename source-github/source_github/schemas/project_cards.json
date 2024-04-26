@@ -1,49 +1,9 @@
 {
-  "$schema": "https://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["id"],
   "properties": {
-    "url": {
-      "type": ["null", "string"]
-    },
-    "project_url": {
-      "type": ["null", "string"]
-    },
     "id": {
-      "type": ["null", "integer"]
-    },
-    "node_id": {
-      "type": ["null", "string"]
-    },
-    "note": {
-      "type": ["null", "string"]
-    },
-    "archived": {
-      "type": ["null", "boolean"]
-    },
-    "creator": {
-      "$ref": "user.json"
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "updated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "column_url": {
-      "type": ["null", "string"]
-    },
-    "content_url": {
-      "type": ["null", "string"]
-    },
-    "repository": {
-      "type": "string"
-    },
-    "project_id": {
-      "type": "integer"
-    },
-    "column_id": {
       "type": "integer"
     }
   }

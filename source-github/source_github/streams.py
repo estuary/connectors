@@ -382,7 +382,7 @@ class Branches(GithubStream):
     API docs: https://docs.github.com/en/rest/branches/branches?apiVersion=2022-11-28#list-branches
     """
 
-    primary_key = ["repository", "name"]
+    primary_key = ["name"]
 
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
         return f"repos/{stream_slice['repository']}/branches"
@@ -461,7 +461,7 @@ class Tags(GithubStream):
     API docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repository-tags
     """
 
-    primary_key = ["repository", "name"]
+    primary_key = ["name"]
 
     def path(self, stream_slice: Mapping[str, Any] = None, **kwargs) -> str:
         return f"repos/{stream_slice['repository']}/tags"
@@ -1681,7 +1681,7 @@ class IssueTimelineEvents(GithubStream):
     API docs https://docs.github.com/en/rest/issues/timeline?apiVersion=2022-11-28#list-timeline-events-for-an-issue
     """
 
-    primary_key = ["repository", "issue_number"]
+    primary_key = ["issue_number"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

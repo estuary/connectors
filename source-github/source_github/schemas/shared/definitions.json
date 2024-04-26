@@ -1,0 +1,254 @@
+{
+  "id": {
+    "type": "integer"
+  },
+  "node_id": {
+    "type": ["null", "string"]
+  },
+  "url": {
+    "type": ["null", "string"]
+  },
+  "actor": {
+    "title": "Simple User",
+    "description": "A GitHub user.",
+    "type": ["null", "object"],
+    "properties": {
+      "name": {
+        "type": ["string", "null"]
+      },
+      "email": {
+        "type": ["string", "null"]
+      },
+      "login": {
+        "type": "string"
+      },
+      "id": {
+        "type": "integer"
+      },
+      "node_id": {
+        "type": "string"
+      },
+      "avatar_url": {
+        "type": "string"
+      },
+      "gravatar_id": {
+        "type": ["string", "null"]
+      },
+      "url": {
+        "type": "string"
+      },
+      "html_url": {
+        "type": "string"
+      },
+      "followers_url": {
+        "type": "string"
+      },
+      "following_url": {
+        "type": "string"
+      },
+      "gists_url": {
+        "type": "string"
+      },
+      "starred_url": {
+        "type": "string"
+      },
+      "subscriptions_url": {
+        "type": "string"
+      },
+      "organizations_url": {
+        "type": "string"
+      },
+      "repos_url": {
+        "type": "string"
+      },
+      "events_url": {
+        "type": "string"
+      },
+      "received_events_url": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "site_admin": {
+        "type": "boolean"
+      },
+      "starred_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  },
+  "event": {
+    "type": ["null", "string"]
+  },
+  "commit_id": {
+    "type": ["string", "null"]
+  },
+  "commit_url": {
+    "type": ["string", "null"]
+  },
+  "created_at": {
+    "type": ["null", "string"],
+    "format": "date-time"
+  },
+  "performed_via_github_app": {
+    "anyOf": [
+      {
+        "type": "null"
+      },
+      {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": ["string", "null"]
+                  },
+                  "email": {
+                    "type": ["string", "null"]
+                  },
+                  "login": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "integer"
+                  },
+                  "node_id": {
+                    "type": "string"
+                  },
+                  "avatar_url": {
+                    "type": "string"
+                  },
+                  "gravatar_id": {
+                    "type": ["string", "null"]
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "html_url": {
+                    "type": "string"
+                  },
+                  "followers_url": {
+                    "type": "string"
+                  },
+                  "following_url": {
+                    "type": "string"
+                  },
+                  "gists_url": {
+                    "type": "string"
+                  },
+                  "starred_url": {
+                    "type": "string"
+                  },
+                  "subscriptions_url": {
+                    "type": "string"
+                  },
+                  "organizations_url": {
+                    "type": "string"
+                  },
+                  "repos_url": {
+                    "type": "string"
+                  },
+                  "events_url": {
+                    "type": "string"
+                  },
+                  "received_events_url": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "site_admin": {
+                    "type": "boolean"
+                  },
+                  "starred_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": ["string", "null"]
+          },
+          "external_url": {
+            "type": "string"
+          },
+          "html_url": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "permissions": {
+            "type": "object",
+            "properties": {
+              "issues": {
+                "type": "string"
+              },
+              "checks": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "string"
+              },
+              "contents": {
+                "type": "string"
+              },
+              "deployments": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "installations_count": {
+            "type": "integer"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string"
+          },
+          "webhook_secret": {
+            "type": ["string", "null"]
+          },
+          "pem": {
+            "type": "string"
+          }
+        }
+      }
+    ]
+  }
+}
