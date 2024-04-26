@@ -1,29 +1,47 @@
 ---
+type: object
+required:
+  - id
 properties:
-  comment_id:
-    type: integer
-  content:
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type: string
   id:
     type: integer
   node_id:
     type:
       - "null"
       - string
-  repository:
+  content:
+    type:
+      - "null"
+      - string
+  created_at:
     type: string
+    format: date-time
   user:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -39,42 +57,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -83,18 +65,38 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
-      url:
+      site_admin:
         type:
           - "null"
-          - string
-    type:
-      - "null"
-      - object
-required:
-  - id
-type:
-  - object
+          - boolean
+  repository:
+    type: string
+  comment_id:
+    type: integer
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

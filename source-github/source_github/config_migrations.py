@@ -30,13 +30,11 @@ class MigrateStringToArray(ABC):
 
     @property
     @abc.abstractmethod
-    def migrate_from_key(self) -> str:
-        ...
+    def migrate_from_key(self) -> str: ...
 
     @property
     @abc.abstractmethod
-    def migrate_to_key(self) -> str:
-        ...
+    def migrate_to_key(self) -> str: ...
 
     @classmethod
     def _should_migrate(cls, config: Mapping[str, Any]) -> bool:
@@ -51,15 +49,21 @@ class MigrateStringToArray(ABC):
         return False
 
     @classmethod
-    def _transform_to_array(cls, config: Mapping[str, Any], source: SourceGithub = None) -> Mapping[str, Any]:
+    def _transform_to_array(
+        cls, config: Mapping[str, Any], source: SourceGithub = None
+    ) -> Mapping[str, Any]:
         # assign old values to new property that will be used within the new version
-        config[cls.migrate_to_key] = config[cls.migrate_to_key] if cls.migrate_to_key in config else []
+        config[cls.migrate_to_key] = (
+            config[cls.migrate_to_key] if cls.migrate_to_key in config else []
+        )
         data = set(filter(None, config.get(cls.migrate_from_key).split(" ")))
         config[cls.migrate_to_key] = list(data | set(config[cls.migrate_to_key]))
         return config
 
     @classmethod
-    def _modify_and_save(cls, config_path: str, source: SourceGithub, config: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _modify_and_save(
+        cls, config_path: str, source: SourceGithub, config: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         # modify the config
         migrated_config = cls._transform_to_array(config, source)
         # save the config
@@ -70,7 +74,9 @@ class MigrateStringToArray(ABC):
     @classmethod
     def _emit_control_message(cls, migrated_config: Mapping[str, Any]) -> None:
         # add the Airbyte Control Message to message repo
-        cls.message_repository.emit_message(create_connector_config_control_message(migrated_config))
+        cls.message_repository.emit_message(
+            create_connector_config_control_message(migrated_config)
+        )
         # emit the Airbyte Control Message from message queue to stdout
         for message in cls.message_repository._message_queue:
             print(message.json(exclude_unset=True))
@@ -95,12 +101,10 @@ class MigrateStringToArray(ABC):
 
 
 class MigrateRepository(MigrateStringToArray):
-
     migrate_from_key: str = "repository"
     migrate_to_key: str = "repositories"
 
 
 class MigrateBranch(MigrateStringToArray):
-
     migrate_from_key: str = "branch"
     migrate_to_key: str = "branches"

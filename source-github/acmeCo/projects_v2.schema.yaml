@@ -4,25 +4,73 @@ type: object
 required:
   - id
 properties:
-  organization:
+  closed:
+    type:
+      - "null"
+      - boolean
+  created_at:
     type:
       - "null"
       - string
-  login:
+    format: date-time
+  creator:
+    type:
+      - "null"
+      - object
+    properties:
+      avatarUrl:
+        type:
+          - "null"
+          - string
+      login:
+        type:
+          - "null"
+          - string
+      resourcePath:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+  closed_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  updated_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  node_id:
     type:
       - "null"
       - string
   id:
     type: integer
-  node_id:
+  number:
+    type:
+      - "null"
+      - integer
+  public:
+    type:
+      - "null"
+      - boolean
+  readme:
     type:
       - "null"
       - string
-  avatar_url:
+  short_description:
     type:
       - "null"
       - string
-  gravatar_id:
+  template:
+    type:
+      - "null"
+      - boolean
+  title:
     type:
       - "null"
       - string
@@ -30,54 +78,24 @@ properties:
     type:
       - "null"
       - string
-  html_url:
-    type:
-      - "null"
-      - string
-  followers_url:
-    type:
-      - "null"
-      - string
-  following_url:
-    type:
-      - "null"
-      - string
-  gists_url:
-    type:
-      - "null"
-      - string
-  starred_url:
-    type:
-      - "null"
-      - string
-  subscriptions_url:
-    type:
-      - "null"
-      - string
-  organizations_url:
-    type:
-      - "null"
-      - string
-  repos_url:
-    type:
-      - "null"
-      - string
-  events_url:
-    type:
-      - "null"
-      - string
-  received_events_url:
-    type:
-      - "null"
-      - string
-  type:
-    type:
-      - "null"
-      - string
-  site_admin:
+  viewerCanClose:
     type:
       - "null"
       - boolean
+  viewerCanReopen:
+    type:
+      - "null"
+      - boolean
+  viewerCanUpdate:
+    type:
+      - "null"
+      - boolean
+  owner_id:
+    type:
+      - "null"
+      - string
+  repository:
+    type: string
   _meta:
     type: object
     properties:

@@ -2,6 +2,10 @@
   [
     "acmeCo/assignees",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "avatar_url": "https://avatars.githubusercontent.com/u/168158797?v=4",
       "events_url": "https://api.github.com/users/sourcegithub1/events{/privacy}",
       "followers_url": "https://api.github.com/users/sourcegithub1/followers",
@@ -26,6 +30,10 @@
   [
     "acmeCo/branches",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "commit": {
         "sha": "1e4df82f4ae52fabec8c693c44d0e10877816829",
         "url": "https://api.github.com/repos/sourcegithub1/testsource/commits/1e4df82f4ae52fabec8c693c44d0e10877816829"
@@ -47,6 +55,10 @@
   [
     "acmeCo/collaborators",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "avatar_url": "https://avatars.githubusercontent.com/u/168158797?v=4",
       "events_url": "https://api.github.com/users/sourcegithub1/events{/privacy}",
       "followers_url": "https://api.github.com/users/sourcegithub1/followers",
@@ -79,6 +91,10 @@
   [
     "acmeCo/commit_comments",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "author_association": "OWNER",
       "body": "comment for a0f73cb397a48afc587af027122fd4fbbdc52560 branch",
       "commit_id": "a0f73cb397a48afc587af027122fd4fbbdc52560",
@@ -129,6 +145,99 @@
   [
     "acmeCo/commits",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "author": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/168158797?v=4",
+        "events_url": "https://api.github.com/users/sourcegithub1/events{/privacy}",
+        "followers_url": "https://api.github.com/users/sourcegithub1/followers",
+        "following_url": "https://api.github.com/users/sourcegithub1/following{/other_user}",
+        "gists_url": "https://api.github.com/users/sourcegithub1/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/sourcegithub1",
+        "id": 168158797,
+        "login": "sourcegithub1",
+        "node_id": "U_kgDOCgXmTQ",
+        "organizations_url": "https://api.github.com/users/sourcegithub1/orgs",
+        "received_events_url": "https://api.github.com/users/sourcegithub1/received_events",
+        "repos_url": "https://api.github.com/users/sourcegithub1/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/sourcegithub1/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/sourcegithub1/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/sourcegithub1"
+      },
+      "branch": "main",
+      "comments_url": "https://api.github.com/repos/sourcegithub1/testsource/commits/1e4df82f4ae52fabec8c693c44d0e10877816829/comments",
+      "commit": {
+        "author": {
+          "date": "2024-05-06T18:25:02Z",
+          "email": "168158797+sourcegithub1@users.noreply.github.com",
+          "name": "sourcegithub1"
+        },
+        "comment_count": 0,
+        "committer": {
+          "date": "2024-05-06T18:25:02Z",
+          "email": "noreply@github.com",
+          "name": "GitHub"
+        },
+        "message": "Upload random test data",
+        "tree": {
+          "sha": "fb0f8444cfc24520345828a03dcd4530e6613276",
+          "url": "https://api.github.com/repos/sourcegithub1/testsource/git/trees/fb0f8444cfc24520345828a03dcd4530e6613276"
+        },
+        "url": "https://api.github.com/repos/sourcegithub1/testsource/git/commits/1e4df82f4ae52fabec8c693c44d0e10877816829",
+        "verification": {
+          "payload": "tree fb0f8444cfc24520345828a03dcd4530e6613276\nparent a0f73cb397a48afc587af027122fd4fbbdc52560\nauthor sourcegithub1 <168158797+sourcegithub1@users.noreply.github.com> 1715019902 -0300\ncommitter GitHub <noreply@github.com> 1715019902 -0300\n\nUpload random test data",
+          "reason": "valid",
+          "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJmOSCLCRC1aQ7uu5UhlAAAfbAQAAHWkAFuVIW7+CHmxrE0dn8l\nBAO58VMe5lEbaRVXbvhc8L2fmBoeNmKm4gj8UEDqk+hsL+M7xUGMxK5JpxcO2P1t\no8wBlAlHH7XCZp7N58G8iYxvzuFRGvx/Vcmy7WSfdhf2a8PX/nMya1hzFAprmmv7\nIU/peExcf6zF9bIsLTIzSQ814wkFUKr5qd49GfE4s//nkrE+HKmTEuCsx5CyouRR\niR3eddTOEL6u7KLw/r45uBTVL0ECEnc4ybijdRtsa4lwBu8L6vQwADbYktsC0MZL\n4HOXWxmonDzGnSziKPc8t7leRiBOONEEqf+O73FILm+Dricj1xkMR2ZMmfSgqWMf\neYBHjmrEoiqTqvOBeqAc5KXXL3AJEKUc881Fx8yNEd4dOuEN7bMRE2x0GlQ+2mqp\n9KA54Q/EVJ1mLFwThmbsLAIzSLPk2yjhJiGbuTAubtGSL1yhaDXS9tWhNaZwFAdu\nEAXJxM4R592DLjqgR2RqVqar6oK6Bf8K4onBWGMtXApC4No/zFVpr/8hNShGrzxC\nCeSqmxAjwqveYAFx7/6o302wxD/fg4MvsZ2NbKiJNYWu4amkSXG2oCdOP1Vyxw6K\nqji1e8/WY4vID8dTJhoNaWzkxAHQdgA2R8Ijt2wYyV5cAEFpNZdk6zPw6V9QB/2O\n1OCwROmCCwYOOkyEghJV\n=BZBr\n-----END PGP SIGNATURE-----\n",
+          "verified": true
+        }
+      },
+      "committer": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+        "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+        "followers_url": "https://api.github.com/users/web-flow/followers",
+        "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+        "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/web-flow",
+        "id": 19864447,
+        "login": "web-flow",
+        "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+        "organizations_url": "https://api.github.com/users/web-flow/orgs",
+        "received_events_url": "https://api.github.com/users/web-flow/received_events",
+        "repos_url": "https://api.github.com/users/web-flow/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/web-flow"
+      },
+      "created_at": "2024-05-06T18:25:02Z",
+      "html_url": "https://github.com/sourcegithub1/testsource/commit/1e4df82f4ae52fabec8c693c44d0e10877816829",
+      "node_id": "C_kwDOLzc5q9oAKDFlNGRmODJmNGFlNTJmYWJlYzhjNjkzYzQ0ZDBlMTA4Nzc4MTY4Mjk",
+      "parents": [
+        {
+          "html_url": "https://github.com/sourcegithub1/testsource/commit/a0f73cb397a48afc587af027122fd4fbbdc52560",
+          "sha": "a0f73cb397a48afc587af027122fd4fbbdc52560",
+          "url": "https://api.github.com/repos/sourcegithub1/testsource/commits/a0f73cb397a48afc587af027122fd4fbbdc52560"
+        }
+      ],
+      "repository": "sourcegithub1/testsource",
+      "sha": "1e4df82f4ae52fabec8c693c44d0e10877816829",
+      "url": "https://api.github.com/repos/sourcegithub1/testsource/commits/1e4df82f4ae52fabec8c693c44d0e10877816829"
+    }
+  ],
+  [
+    "acmeCo/commits",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "author": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?v=4",
         "events_url": "https://api.github.com/users/sourcegithub1/events{/privacy}",
@@ -291,8 +400,79 @@
     }
   ],
   [
+    "acmeCo/contributor_activity",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "avatar_url": "https://avatars.githubusercontent.com/u/168158797?v=4",
+      "events_url": "https://api.github.com/users/sourcegithub1/events{/privacy}",
+      "followers_url": "https://api.github.com/users/sourcegithub1/followers",
+      "following_url": "https://api.github.com/users/sourcegithub1/following{/other_user}",
+      "gists_url": "https://api.github.com/users/sourcegithub1/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/sourcegithub1",
+      "id": 168158797,
+      "login": "sourcegithub1",
+      "node_id": "U_kgDOCgXmTQ",
+      "organizations_url": "https://api.github.com/users/sourcegithub1/orgs",
+      "received_events_url": "https://api.github.com/users/sourcegithub1/received_events",
+      "repos_url": "https://api.github.com/users/sourcegithub1/repos",
+      "repository": "sourcegithub1/testsource",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/sourcegithub1/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/sourcegithub1/subscriptions",
+      "total": 2,
+      "type": "User",
+      "url": "https://api.github.com/users/sourcegithub1",
+      "weeks": [
+        {
+          "a": 2,
+          "c": 1,
+          "d": 0,
+          "w": 1713657600
+        },
+        {
+          "a": 0,
+          "c": 0,
+          "d": 0,
+          "w": 1714262400
+        },
+        {
+          "a": 99000,
+          "c": 1,
+          "d": 0,
+          "w": 1714867200
+        },
+        {
+          "a": 0,
+          "c": 0,
+          "d": 0,
+          "w": 1715472000
+        },
+        {
+          "a": 0,
+          "c": 0,
+          "d": 0,
+          "w": 1716076800
+        },
+        {
+          "a": 0,
+          "c": 0,
+          "d": 0,
+          "w": 1716681600
+        }
+      ]
+    }
+  ],
+  [
     "acmeCo/events",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
       "actor": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?",
         "display_login": "sourcegithub1",
@@ -323,6 +503,10 @@
   [
     "acmeCo/events",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "actor": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?",
         "display_login": "sourcegithub1",
@@ -353,6 +537,10 @@
   [
     "acmeCo/events",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "actor": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?",
         "display_login": "sourcegithub1",
@@ -397,6 +585,10 @@
   [
     "acmeCo/events",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "actor": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?",
         "display_login": "sourcegithub1",
@@ -468,6 +660,10 @@
   [
     "acmeCo/events",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "actor": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?",
         "display_login": "sourcegithub1",
@@ -554,6 +750,10 @@
   [
     "acmeCo/events",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "actor": {
         "avatar_url": "https://avatars.githubusercontent.com/u/168158797?",
         "display_login": "sourcegithub1",
@@ -598,6 +798,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "color": "d73a4a",
       "default": true,
       "description": "Something isn't working",
@@ -611,6 +815,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
       "color": "0075ca",
       "default": true,
       "description": "Improvements or additions to documentation",
@@ -624,6 +832,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 2
+      },
       "color": "cfd3d7",
       "default": true,
       "description": "This issue or pull request already exists",
@@ -637,6 +849,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 3
+      },
       "color": "a2eeef",
       "default": true,
       "description": "New feature or request",
@@ -650,6 +866,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 5
+      },
       "color": "008672",
       "default": true,
       "description": "Extra attention is needed",
@@ -663,6 +883,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 4
+      },
       "color": "7057ff",
       "default": true,
       "description": "Good for newcomers",
@@ -676,6 +900,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 6
+      },
       "color": "e4e669",
       "default": true,
       "description": "This doesn't seem right",
@@ -689,6 +917,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 7
+      },
       "color": "d876e3",
       "default": true,
       "description": "Further information is requested",
@@ -702,6 +934,10 @@
   [
     "acmeCo/issue_labels",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 8
+      },
       "color": "ffffff",
       "default": true,
       "description": "This will not be worked on",
@@ -715,6 +951,10 @@
   [
     "acmeCo/issues",
     {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "active_lock_reason": null,
       "assignee": null,
       "assignees": [],

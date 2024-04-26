@@ -1,94 +1,99 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  _links:
-    properties:
-      comments:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      commits:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      html:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      issue:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      review_comment:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      review_comments:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      self:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      statuses:
-        properties:
-          href:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-    type:
-      - "null"
-      - object
-  active_lock_reason:
+  repository:
+    type: string
+  url:
     type:
       - "null"
       - string
-  assignee:
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
+  diff_url:
+    type:
+      - "null"
+      - string
+  patch_url:
+    type:
+      - "null"
+      - string
+  issue_url:
+    type:
+      - "null"
+      - string
+  commits_url:
+    type:
+      - "null"
+      - string
+  review_comments_url:
+    type:
+      - "null"
+      - string
+  review_comment_url:
+    type:
+      - "null"
+      - string
+  comments_url:
+    type:
+      - "null"
+      - string
+  statuses_url:
+    type:
+      - "null"
+      - string
+  number:
+    type:
+      - "null"
+      - integer
+  state:
+    type:
+      - "null"
+      - string
+  locked:
+    type:
+      - "null"
+      - boolean
+  title:
+    type:
+      - "null"
+      - string
+  user:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -104,42 +109,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -148,85 +117,48 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
-      url:
+      site_admin:
         type:
           - "null"
-          - string
+          - boolean
+  body:
     type:
       - "null"
-      - object
-  assignees:
+      - string
+  labels:
+    type:
+      - "null"
+      - array
     items:
+      type:
+        - "null"
+        - object
       properties:
-        avatar_url:
-          type:
-            - "null"
-            - string
-        events_url:
-          type:
-            - "null"
-            - string
-        followers_url:
-          type:
-            - "null"
-            - string
-        following_url:
-          type:
-            - "null"
-            - string
-        gists_url:
-          type:
-            - "null"
-            - string
-        gravatar_id:
-          type:
-            - "null"
-            - string
-        html_url:
-          type:
-            - "null"
-            - string
         id:
           type:
             - "null"
             - integer
-        login:
-          type:
-            - "null"
-            - string
         node_id:
-          type:
-            - "null"
-            - string
-        organizations_url:
-          type:
-            - "null"
-            - string
-        received_events_url:
-          type:
-            - "null"
-            - string
-        repos_url:
-          type:
-            - "null"
-            - string
-        site_admin:
-          type:
-            - "null"
-            - boolean
-        starred_url:
-          type:
-            - "null"
-            - string
-        subscriptions_url:
-          type:
-            - "null"
-            - string
-        type:
           type:
             - "null"
             - string
@@ -234,203 +166,14 @@ properties:
           type:
             - "null"
             - string
-      type:
-        - "null"
-        - object
-    type:
-      - "null"
-      - array
-  author_association:
-    type:
-      - "null"
-      - string
-  auto_merge:
-    properties:
-      commit_message:
-        type:
-          - "null"
-          - string
-      commit_title:
-        type:
-          - "null"
-          - string
-      enabled_by:
-        properties:
-          avatar_url:
-            type:
-              - "null"
-              - string
-          events_url:
-            type:
-              - "null"
-              - string
-          followers_url:
-            type:
-              - "null"
-              - string
-          following_url:
-            type:
-              - "null"
-              - string
-          gists_url:
-            type:
-              - "null"
-              - string
-          gravatar_id:
-            type:
-              - "null"
-              - string
-          html_url:
-            type:
-              - "null"
-              - string
-          id:
-            type:
-              - "null"
-              - integer
-          login:
-            type:
-              - "null"
-              - string
-          node_id:
-            type:
-              - "null"
-              - string
-          organizations_url:
-            type:
-              - "null"
-              - string
-          received_events_url:
-            type:
-              - "null"
-              - string
-          repos_url:
-            type:
-              - "null"
-              - string
-          site_admin:
-            type:
-              - "null"
-              - boolean
-          starred_url:
-            type:
-              - "null"
-              - string
-          subscriptions_url:
-            type:
-              - "null"
-              - string
+        name:
           type:
-            type:
-              - "null"
-              - string
-          url:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      merge_method:
-        type:
-          - "null"
-          - string
-    type:
-      - "null"
-      - object
-  base:
-    properties:
-      label:
-        type:
-          - "null"
-          - string
-      ref:
-        type:
-          - "null"
-          - string
-      repo_id:
-        type:
-          - "null"
-          - integer
-      sha:
-        type:
-          - "null"
-          - string
-      user_id:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
-  body:
-    type:
-      - "null"
-      - string
-  closed_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  comments_url:
-    type:
-      - "null"
-      - string
-  commits_url:
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  diff_url:
-    type:
-      - "null"
-      - string
-  draft:
-    type:
-      - "null"
-      - boolean
-  head:
-    properties:
-      label:
-        type:
-          - "null"
-          - string
-      ref:
-        type:
-          - "null"
-          - string
-      repo_id:
-        type:
-          - "null"
-          - integer
-      sha:
-        type:
-          - "null"
-          - string
-      user_id:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
-  html_url:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  issue_url:
-    type:
-      - "null"
-      - string
-  labels:
-    items:
-      properties:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
         color:
           type:
             - "null"
@@ -439,144 +182,12 @@ properties:
           type:
             - "null"
             - boolean
-        description:
-          type:
-            - "null"
-            - string
-        id:
-          type:
-            - "null"
-            - integer
-        name:
-          type:
-            - "null"
-            - string
-        node_id:
-          type:
-            - "null"
-            - string
-        url:
-          type:
-            - "null"
-            - string
-      type:
-        - "null"
-        - object
-    type:
-      - "null"
-      - array
-  locked:
-    type:
-      - "null"
-      - boolean
-  merge_commit_sha:
-    type:
-      - "null"
-      - string
-  merged_at:
-    format: date-time
-    type:
-      - "null"
-      - string
   milestone:
+    type:
+      - "null"
+      - object
     properties:
-      closed_at:
-        format: date-time
-        type:
-          - "null"
-          - string
-      closed_issues:
-        type:
-          - "null"
-          - integer
-      created_at:
-        format: date-time
-        type:
-          - "null"
-          - string
-      creator:
-        properties:
-          avatar_url:
-            type:
-              - "null"
-              - string
-          events_url:
-            type:
-              - "null"
-              - string
-          followers_url:
-            type:
-              - "null"
-              - string
-          following_url:
-            type:
-              - "null"
-              - string
-          gists_url:
-            type:
-              - "null"
-              - string
-          gravatar_id:
-            type:
-              - "null"
-              - string
-          html_url:
-            type:
-              - "null"
-              - string
-          id:
-            type:
-              - "null"
-              - integer
-          login:
-            type:
-              - "null"
-              - string
-          node_id:
-            type:
-              - "null"
-              - string
-          organizations_url:
-            type:
-              - "null"
-              - string
-          received_events_url:
-            type:
-              - "null"
-              - string
-          repos_url:
-            type:
-              - "null"
-              - string
-          site_admin:
-            type:
-              - "null"
-              - boolean
-          starred_url:
-            type:
-              - "null"
-              - string
-          subscriptions_url:
-            type:
-              - "null"
-              - string
-          type:
-            type:
-              - "null"
-              - string
-          url:
-            type:
-              - "null"
-              - string
-        type:
-          - "null"
-          - object
-      description:
-        type:
-          - "null"
-          - string
-      due_on:
-        format: date-time
+      url:
         type:
           - "null"
           - string
@@ -584,23 +195,19 @@ properties:
         type:
           - "null"
           - string
-      id:
-        type:
-          - "null"
-          - integer
       labels_url:
         type:
           - "null"
           - string
+      id:
+        type:
+          - "null"
+          - integer
       node_id:
         type:
           - "null"
           - string
       number:
-        type:
-          - "null"
-          - integer
-      open_issues:
         type:
           - "null"
           - integer
@@ -612,41 +219,236 @@ properties:
         type:
           - "null"
           - string
-      updated_at:
+      description:
+        type:
+          - "null"
+          - string
+      creator:
+        type: object
+        properties:
+          login:
+            type:
+              - "null"
+              - string
+          id:
+            type: integer
+          node_id:
+            type:
+              - "null"
+              - string
+          avatar_url:
+            type:
+              - "null"
+              - string
+          gravatar_id:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+          html_url:
+            type:
+              - "null"
+              - string
+          followers_url:
+            type:
+              - "null"
+              - string
+          following_url:
+            type:
+              - "null"
+              - string
+          gists_url:
+            type:
+              - "null"
+              - string
+          starred_url:
+            type:
+              - "null"
+              - string
+          subscriptions_url:
+            type:
+              - "null"
+              - string
+          organizations_url:
+            type:
+              - "null"
+              - string
+          repos_url:
+            type:
+              - "null"
+              - string
+          events_url:
+            type:
+              - "null"
+              - string
+          received_events_url:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          site_admin:
+            type:
+              - "null"
+              - boolean
+      open_issues:
+        type:
+          - "null"
+          - integer
+      closed_issues:
+        type:
+          - "null"
+          - integer
+      created_at:
+        type: string
         format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      closed_at:
         type:
           - "null"
           - string
-      url:
+        format: date-time
+      due_on:
         type:
           - "null"
           - string
-    type:
-      - "null"
-      - object
-  node_id:
-    type:
-      - "null"
-      - string
-  number:
-    type:
-      - "null"
-      - integer
-  patch_url:
+        format: date-time
+  active_lock_reason:
     type:
       - "null"
       - string
-  repository:
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  closed_at:
     type:
+      - "null"
       - string
-  requested_reviewers:
+    format: date-time
+  merged_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  merge_commit_sha:
+    type:
+      - "null"
+      - string
+  assignee:
+    anyOf:
+      - type: "null"
+      - type: object
+        properties:
+          login:
+            type:
+              - "null"
+              - string
+          id:
+            type: integer
+          node_id:
+            type:
+              - "null"
+              - string
+          avatar_url:
+            type:
+              - "null"
+              - string
+          gravatar_id:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+          html_url:
+            type:
+              - "null"
+              - string
+          followers_url:
+            type:
+              - "null"
+              - string
+          following_url:
+            type:
+              - "null"
+              - string
+          gists_url:
+            type:
+              - "null"
+              - string
+          starred_url:
+            type:
+              - "null"
+              - string
+          subscriptions_url:
+            type:
+              - "null"
+              - string
+          organizations_url:
+            type:
+              - "null"
+              - string
+          repos_url:
+            type:
+              - "null"
+              - string
+          events_url:
+            type:
+              - "null"
+              - string
+          received_events_url:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          site_admin:
+            type:
+              - "null"
+              - boolean
+  assignees:
+    type:
+      - "null"
+      - array
     items:
+      type: object
       properties:
+        login:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        node_id:
+          type:
+            - "null"
+            - string
         avatar_url:
           type:
             - "null"
             - string
-        events_url:
+        gravatar_id:
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        html_url:
           type:
             - "null"
             - string
@@ -662,42 +464,6 @@ properties:
           type:
             - "null"
             - string
-        gravatar_id:
-          type:
-            - "null"
-            - string
-        html_url:
-          type:
-            - "null"
-            - string
-        id:
-          type:
-            - "null"
-            - integer
-        login:
-          type:
-            - "null"
-            - string
-        node_id:
-          type:
-            - "null"
-            - string
-        organizations_url:
-          type:
-            - "null"
-            - string
-        received_events_url:
-          type:
-            - "null"
-            - string
-        repos_url:
-          type:
-            - "null"
-            - string
-        site_admin:
-          type:
-            - "null"
-            - boolean
         starred_url:
           type:
             - "null"
@@ -706,24 +472,56 @@ properties:
           type:
             - "null"
             - string
+        organizations_url:
+          type:
+            - "null"
+            - string
+        repos_url:
+          type:
+            - "null"
+            - string
+        events_url:
+          type:
+            - "null"
+            - string
+        received_events_url:
+          type:
+            - "null"
+            - string
         type:
           type:
             - "null"
             - string
-        url:
+        site_admin:
           type:
             - "null"
-            - string
-      type:
-        - "null"
-        - object
+            - boolean
+  requested_reviewers:
     type:
       - "null"
       - array
-  requested_teams:
     items:
+      type: object
       properties:
-        description:
+        login:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        node_id:
+          type:
+            - "null"
+            - string
+        avatar_url:
+          type:
+            - "null"
+            - string
+        gravatar_id:
+          type:
+            - "null"
+            - string
+        url:
           type:
             - "null"
             - string
@@ -731,40 +529,64 @@ properties:
           type:
             - "null"
             - string
+        followers_url:
+          type:
+            - "null"
+            - string
+        following_url:
+          type:
+            - "null"
+            - string
+        gists_url:
+          type:
+            - "null"
+            - string
+        starred_url:
+          type:
+            - "null"
+            - string
+        subscriptions_url:
+          type:
+            - "null"
+            - string
+        organizations_url:
+          type:
+            - "null"
+            - string
+        repos_url:
+          type:
+            - "null"
+            - string
+        events_url:
+          type:
+            - "null"
+            - string
+        received_events_url:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+        site_admin:
+          type:
+            - "null"
+            - boolean
+  requested_teams:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
         id:
           type:
             - "null"
             - integer
-        members_url:
-          type:
-            - "null"
-            - string
-        name:
-          type:
-            - "null"
-            - string
         node_id:
-          type:
-            - "null"
-            - string
-        parent:
-          properties: {}
-          type:
-            - "null"
-            - object
-        permission:
-          type:
-            - "null"
-            - string
-        privacy:
-          type:
-            - "null"
-            - string
-        repositories_url:
-          type:
-            - "null"
-            - string
-        slug:
           type:
             - "null"
             - string
@@ -772,118 +594,422 @@ properties:
           type:
             - "null"
             - string
-      type:
-        - "null"
-        - object
-    type:
-      - "null"
-      - array
-  review_comment_url:
-    type:
-      - "null"
-      - string
-  review_comments_url:
-    type:
-      - "null"
-      - string
-  state:
-    type:
-      - "null"
-      - string
-  statuses_url:
-    type:
-      - "null"
-      - string
-  title:
-    type:
-      - "null"
-      - string
-  updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  url:
-    type:
-      - "null"
-      - string
-  user:
-    properties:
-      avatar_url:
-        type:
-          - "null"
-          - string
-      events_url:
-        type:
-          - "null"
-          - string
-      followers_url:
-        type:
-          - "null"
-          - string
-      following_url:
-        type:
-          - "null"
-          - string
-      gists_url:
-        type:
-          - "null"
-          - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
-      starred_url:
-        type:
-          - "null"
-          - string
-      subscriptions_url:
-        type:
-          - "null"
-          - string
-      type:
-        type:
-          - "null"
-          - string
-      url:
-        type:
-          - "null"
-          - string
+        html_url:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        slug:
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
+        privacy:
+          type:
+            - "null"
+            - string
+        permission:
+          type:
+            - "null"
+            - string
+        members_url:
+          type:
+            - "null"
+            - string
+        repositories_url:
+          type:
+            - "null"
+            - string
+        parent:
+          type:
+            - "null"
+            - object
+          properties: {}
+  head:
     type:
       - "null"
       - object
-required:
-  - id
-type: object
+    properties:
+      label:
+        type:
+          - "null"
+          - string
+      ref:
+        type:
+          - "null"
+          - string
+      sha:
+        type:
+          - "null"
+          - string
+      user_id:
+        type:
+          - "null"
+          - integer
+      repo_id:
+        type:
+          - "null"
+          - integer
+      user:
+        type: object
+        properties:
+          login:
+            type:
+              - "null"
+              - string
+          id:
+            type: integer
+          node_id:
+            type:
+              - "null"
+              - string
+          avatar_url:
+            type:
+              - "null"
+              - string
+          gravatar_id:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+          html_url:
+            type:
+              - "null"
+              - string
+          followers_url:
+            type:
+              - "null"
+              - string
+          following_url:
+            type:
+              - "null"
+              - string
+          gists_url:
+            type:
+              - "null"
+              - string
+          starred_url:
+            type:
+              - "null"
+              - string
+          subscriptions_url:
+            type:
+              - "null"
+              - string
+          organizations_url:
+            type:
+              - "null"
+              - string
+          repos_url:
+            type:
+              - "null"
+              - string
+          events_url:
+            type:
+              - "null"
+              - string
+          received_events_url:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          site_admin:
+            type:
+              - "null"
+              - boolean
+  base:
+    type:
+      - "null"
+      - object
+    properties:
+      label:
+        type:
+          - "null"
+          - string
+      ref:
+        type:
+          - "null"
+          - string
+      sha:
+        type:
+          - "null"
+          - string
+      user_id:
+        type:
+          - "null"
+          - integer
+      repo_id:
+        type:
+          - "null"
+          - integer
+      repo:
+        type:
+          - "null"
+          - object
+      user:
+        type: object
+        properties:
+          login:
+            type:
+              - "null"
+              - string
+          id:
+            type: integer
+          node_id:
+            type:
+              - "null"
+              - string
+          avatar_url:
+            type:
+              - "null"
+              - string
+          gravatar_id:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+          html_url:
+            type:
+              - "null"
+              - string
+          followers_url:
+            type:
+              - "null"
+              - string
+          following_url:
+            type:
+              - "null"
+              - string
+          gists_url:
+            type:
+              - "null"
+              - string
+          starred_url:
+            type:
+              - "null"
+              - string
+          subscriptions_url:
+            type:
+              - "null"
+              - string
+          organizations_url:
+            type:
+              - "null"
+              - string
+          repos_url:
+            type:
+              - "null"
+              - string
+          events_url:
+            type:
+              - "null"
+              - string
+          received_events_url:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          site_admin:
+            type:
+              - "null"
+              - boolean
+  _links:
+    type:
+      - "null"
+      - object
+    properties:
+      self:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      html:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      issue:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      comments:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      review_comments:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      review_comment:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      commits:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      statuses:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+  author_association:
+    type:
+      - "null"
+      - string
+  auto_merge:
+    type:
+      - "null"
+      - object
+    properties:
+      enabled_by:
+        type: object
+        properties:
+          login:
+            type:
+              - "null"
+              - string
+          id:
+            type: integer
+          node_id:
+            type:
+              - "null"
+              - string
+          avatar_url:
+            type:
+              - "null"
+              - string
+          gravatar_id:
+            type:
+              - "null"
+              - string
+          url:
+            type:
+              - "null"
+              - string
+          html_url:
+            type:
+              - "null"
+              - string
+          followers_url:
+            type:
+              - "null"
+              - string
+          following_url:
+            type:
+              - "null"
+              - string
+          gists_url:
+            type:
+              - "null"
+              - string
+          starred_url:
+            type:
+              - "null"
+              - string
+          subscriptions_url:
+            type:
+              - "null"
+              - string
+          organizations_url:
+            type:
+              - "null"
+              - string
+          repos_url:
+            type:
+              - "null"
+              - string
+          events_url:
+            type:
+              - "null"
+              - string
+          received_events_url:
+            type:
+              - "null"
+              - string
+          type:
+            type:
+              - "null"
+              - string
+          site_admin:
+            type:
+              - "null"
+              - boolean
+      commit_title:
+        type:
+          - "null"
+          - string
+      merge_method:
+        type:
+          - "null"
+          - string
+      commit_message:
+        type:
+          - "null"
+          - string
+  draft:
+    type:
+      - "null"
+      - boolean
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

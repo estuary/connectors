@@ -1,30 +1,57 @@
 ---
 $schema: "https://json-schema.org/schema#"
+type: object
+required:
+  - id
 properties:
+  url:
+    type:
+      - "null"
+      - string
+  project_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  note:
+    type:
+      - "null"
+      - string
   archived:
     type:
       - "null"
       - boolean
-  column_id:
-    type:
-      - "null"
-      - integer
-  column_url:
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
   creator:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -40,42 +67,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -84,46 +75,54 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
-      url:
+      site_admin:
         type:
           - "null"
-          - string
-    type: object
-  id:
-    type: integer
-  node_id:
+          - boolean
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  column_url:
     type:
       - "null"
       - string
-  note:
-    type:
-      - "null"
-      - string
-  project_id:
-    type:
-      - "null"
-      - integer
-  project_url:
+  content_url:
     type:
       - "null"
       - string
   repository:
-    type:
-      - "null"
-      - string
-  updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  url:
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+    type: string
+  project_id:
+    type: integer
+  column_id:
+    type: integer
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

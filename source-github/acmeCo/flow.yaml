@@ -29,6 +29,10 @@ collections:
     schema: commits.schema.yaml
     key:
       - /sha
+  acmeCo/contributor_activity:
+    schema: contributor_activity.schema.yaml
+    key:
+      - /id
   acmeCo/deployments:
     schema: deployments.schema.yaml
     key:
@@ -48,7 +52,30 @@ collections:
   acmeCo/issue_labels:
     schema:
       $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
       properties:
+        repository:
+          type: string
+        id:
+          type: integer
+        node_id:
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
         color:
           type:
             - "null"
@@ -57,30 +84,13 @@ collections:
           type:
             - "null"
             - boolean
-        description:
-          type:
-            - "null"
-            - string
-        id:
-          type: integer
-        name:
-          type:
-            - "null"
-            - string
-        node_id:
-          type:
-            - "null"
-            - string
-        repository:
-          type:
-            - string
-        url:
-          type:
-            - "null"
-            - string
-      required:
-        - id
-      type: object
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
     key:
       - /id
   acmeCo/issue_milestones:
@@ -111,6 +121,10 @@ collections:
     schema: projects.schema.yaml
     key:
       - /id
+  acmeCo/projects_v2:
+    schema: projects_v2.schema.yaml
+    key:
+      - /id
   acmeCo/pull_request_comment_reactions:
     schema: pull_request_comment_reactions.schema.yaml
     key:
@@ -135,6 +149,10 @@ collections:
     schema: repositories.schema.yaml
     key:
       - /id
+  acmeCo/repository_contents:
+    schema: repository_contents.schema.yaml
+    key:
+      - /path
   acmeCo/review_comments:
     schema: review_comments.schema.yaml
     key:
@@ -148,42 +166,7 @@ collections:
     key:
       - /user_id
   acmeCo/tags:
-    schema:
-      $schema: "https://json-schema.org/draft-07/schema#"
-      properties:
-        commit:
-          properties:
-            sha:
-              type:
-                - "null"
-                - string
-            url:
-              type:
-                - "null"
-                - string
-          type:
-            - "null"
-            - object
-        name:
-          type: string
-        node_id:
-          type:
-            - "null"
-            - string
-        repository:
-          type: string
-        tarball_url:
-          type:
-            - "null"
-            - string
-        zipball_url:
-          type:
-            - "null"
-            - string
-      required:
-        - repository
-        - name
-      type: object
+    schema: tags.schema.yaml
     key:
       - /repository
       - /name
@@ -195,26 +178,33 @@ collections:
   acmeCo/team_memberships:
     schema:
       $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - url
       properties:
-        organization:
-          type: string
-        role:
-          type:
-            - "null"
-            - string
         state:
           type:
             - "null"
             - string
-        team_slug:
-          type: string
+        role:
+          type:
+            - "null"
+            - string
         url:
+          type: string
+        organization:
+          type: string
+        team_slug:
           type: string
         username:
           type: string
-      required:
-        - url
-      type: object
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
     key:
       - /url
   acmeCo/teams:

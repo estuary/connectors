@@ -4,28 +4,24 @@ import:
 captures:
   acmeCo/source-github:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-github:dev"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_github
         config: config.yaml
     bindings:
       - resource:
           stream: assignees
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/assignees
       - resource:
           stream: branches
           syncMode: full_refresh
-          cursorField:
-            - repository
-            - name
         target: acmeCo/branches
       - resource:
           stream: collaborators
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/collaborators
       - resource:
           stream: comments
@@ -51,6 +47,10 @@ captures:
           cursorField:
             - created_at
         target: acmeCo/commits
+      - resource:
+          stream: contributor_activity
+          syncMode: full_refresh
+        target: acmeCo/contributor_activity
       - resource:
           stream: deployments
           syncMode: incremental
@@ -78,8 +78,6 @@ captures:
       - resource:
           stream: issue_labels
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/issue_labels
       - resource:
           stream: issue_milestones
@@ -102,8 +100,6 @@ captures:
       - resource:
           stream: organizations
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/organizations
       - resource:
           stream: project_cards
@@ -132,8 +128,6 @@ captures:
       - resource:
           stream: pull_request_commits
           syncMode: full_refresh
-          cursorField:
-            - sha
         target: acmeCo/pull_request_commits
       - resource:
           stream: pull_request_stats
@@ -141,6 +135,12 @@ captures:
           cursorField:
             - updated_at
         target: acmeCo/pull_request_stats
+      - resource:
+          stream: projects_v2
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/projects_v2
       - resource:
           stream: pull_requests
           syncMode: incremental
@@ -159,6 +159,10 @@ captures:
           cursorField:
             - updated_at
         target: acmeCo/repositories
+      - resource:
+          stream: repository_contents
+          syncMode: full_refresh
+        target: acmeCo/repository_contents
       - resource:
           stream: review_comments
           syncMode: incremental
@@ -180,28 +184,18 @@ captures:
       - resource:
           stream: tags
           syncMode: full_refresh
-          cursorField:
-            - repository
-            - name
         target: acmeCo/tags
       - resource:
           stream: teams
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/teams
       - resource:
           stream: team_members
           syncMode: full_refresh
-          cursorField:
-            - id
-            - team_slug
         target: acmeCo/team_members
       - resource:
           stream: users
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/users
       - resource:
           stream: workflows
@@ -224,8 +218,4 @@ captures:
       - resource:
           stream: team_memberships
           syncMode: full_refresh
-          cursorField:
-            - url
         target: acmeCo/team_memberships
-    shards:
-      logLevel: debug
