@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC, date
 from decimal import Decimal
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt, computed_field
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any
 import urllib.parse
 
@@ -130,9 +130,20 @@ class OracleColumn(BaseModel, extra="forbid"):
     )
     nullable: bool = Field(default=True, alias="NULLABLE")
 
-    is_ts: bool = Field(exclude=True, default=False)
-    cast_to_string: bool = Field(exclude=True, default=False)
-    has_tz: bool = Field(exclude=True, default=False)
+    @property
+    @computed_field
+    def is_datetime(self):
+        return self.data_type.startswith(self.Type.TIMESTAMP) or self.data_type == col.Type.DATE
+
+    @property
+    @computed_field
+    def has_timezone(self):
+        return self.data_type.find(self.Type.WITH_TIMEZONE) > -1 or self.data_type.find(self.Type.WITH_LOCAL_TIMEZONE) > -1
+
+    @property
+    @computed_field
+    def cast_to_string(self):
+        return self.data_type.startswith(self.Type.INTERVAL)
 
     is_pk: bool = Field(default=False, alias="COL_IS_PK", description="Calculated by join on all_constraints and all_cons_columns")
 
@@ -145,7 +156,6 @@ class Table:
     columns: list[OracleColumn]
     primary_key: list[OracleColumn]
     model_fields: dict[str, Any]
-    history_mode: bool
 
     def create_model(self) -> type[Document]:
         return create_model(
@@ -190,24 +200,12 @@ def build_table(
             field_type = int
         elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type = str
-        elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_TIMEZONE) > -1:
-            col.is_ts = True
-            col.has_tz = True
+        elif col.is_datetime and col.has_timmezone:
             field_type = datetime
-        elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_LOCAL_TIMEZONE) > -1:
-            col.is_ts = True
-            col.has_tz = True
-            field_type = datetime
-        elif col.data_type.startswith(col.Type.TIMESTAMP):
-            col.is_ts = True
-            col.has_tz = False
+        elif col.is_datetime:
             field_type = str
         elif col.data_type.startswith(col.Type.INTERVAL):
             col.cast_to_string = True
-            field_type = str
-        elif col.data_type in (col.Type.DATE,):
-            col.is_ts = True
-            col.has_tz = False
             field_type = str
         else:
             raise NotImplementedError(f"unsupported type {col}")
@@ -243,5 +241,4 @@ def build_table(
         columns,
         primary_key,
         model_fields,
-        history_mode=config.history_mode,
     )

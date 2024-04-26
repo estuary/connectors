@@ -22,7 +22,11 @@
       "VCHAR": "varchar value",
       "VCHAR2": "varchar2 value",
       "_meta": {
-        "op": "c"
+        "op": "c",
+        "source": {
+          "row_id": "<row_id>",
+          "table": "TEST_ALL_TYPES"
+        }
       }
     }
   ],
@@ -32,27 +36,11 @@
       "ID": 1,
       "STR": "record 1",
       "_meta": {
-        "op": "c"
-      }
-    }
-  ],
-  [
-    "acmeCo/TEST_CHANGES",
-    {
-      "ID": 1,
-      "STR": "updated str",
-      "_meta": {
-        "op": "u"
-      }
-    }
-  ],
-  [
-    "acmeCo/TEST_CHANGES",
-    {
-      "ID": 2,
-      "STR": "record 2",
-      "_meta": {
-        "op": "c"
+        "op": "c",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
       }
     }
   ],
@@ -62,7 +50,11 @@
       "ID": 2,
       "STR": "record 2",
       "_meta": {
-        "op": "d"
+        "op": "c",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
       }
     }
   ],
@@ -72,7 +64,53 @@
       "ID": 3,
       "STR": "record 3",
       "_meta": {
-        "op": "c"
+        "op": "c",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 1,
+      "STR": "updated str",
+      "_meta": {
+        "op": "u",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 2,
+      "STR": "record 2",
+      "_meta": {
+        "op": "d",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "updated str",
+      "_meta": {
+        "op": "u",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
       }
     }
   ],
@@ -82,7 +120,11 @@
       "ID": 3,
       "STR": "updated str 2",
       "_meta": {
-        "op": "u"
+        "op": "u",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
       }
     }
   ]
