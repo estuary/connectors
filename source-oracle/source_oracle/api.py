@@ -2,6 +2,7 @@ from datetime import datetime, UTC
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
+import tempfile
 import json
 import pytz
 from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict, Tuple
@@ -15,6 +16,7 @@ from jinja2 import Template, Environment, DictLoader
 from estuary_cdk.capture.common import (
     PageCursor,
     LogCursor,
+    BasicAuth,
 )
 
 from .models import (
@@ -23,6 +25,7 @@ from .models import (
     EndpointConfig,
     Table,
     Document,
+    Wallet,
 )
 
 
@@ -39,6 +42,20 @@ async def init_session(connection, _requested_tag):
 def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
     # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
     # the pool contains 4 connections, which will allow 4 concurrent users.
+    credentials = {}
+    if isinstance(config.credentials, Wallet):
+        tmpdir = tempfile.TemporaryDirectory(delete=False)
+        with open(f"{tmpdir.name}/tnsnames.ora", 'w') as f:
+            f.write(config.credentials.tnsnames)
+
+        with open(f"{tmpdir.name}/ewallet.pem", 'w') as f:
+            f.write(config.credentials.ewallet)
+
+        credentials = {
+            'config_dir': tmpdir.name,
+            'wallet_location': tmpdir.name,
+            'wallet_password': config.credentials.wallet_password,
+        }
     pool = oracledb.create_pool_async(
         user=config.credentials.username,
         password=config.credentials.password,
@@ -49,6 +66,7 @@ def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
         session_callback=init_session,
         cclass="ESTUARY",
         purity=oracledb.ATTR_PURITY_SELF,
+        **credentials,
     )
 
     return pool
