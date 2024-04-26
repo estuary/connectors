@@ -1,0 +1,239 @@
+---
+collections:
+  acmeCo/assignees:
+    schema: assignees.schema.yaml
+    key:
+      - /id
+  acmeCo/branches:
+    schema: branches.schema.yaml
+    key:
+      - /repository
+      - /name
+  acmeCo/collaborators:
+    schema: collaborators.schema.yaml
+    key:
+      - /id
+  acmeCo/comments:
+    schema: comments.schema.yaml
+    key:
+      - /id
+  acmeCo/commit_comment_reactions:
+    schema: commit_comment_reactions.schema.yaml
+    key:
+      - /id
+  acmeCo/commit_comments:
+    schema: commit_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/commits:
+    schema: commits.schema.yaml
+    key:
+      - /sha
+  acmeCo/deployments:
+    schema: deployments.schema.yaml
+    key:
+      - /id
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_comment_reactions:
+    schema: issue_comment_reactions.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_events:
+    schema: issue_events.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_labels:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      properties:
+        color:
+          type:
+            - "null"
+            - string
+        default:
+          type:
+            - "null"
+            - boolean
+        description:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        name:
+          type:
+            - "null"
+            - string
+        node_id:
+          type:
+            - "null"
+            - string
+        repository:
+          type:
+            - string
+        url:
+          type:
+            - "null"
+            - string
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/issue_milestones:
+    schema: issue_milestones.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_reactions:
+    schema: issue_reactions.schema.yaml
+    key:
+      - /id
+  acmeCo/issues:
+    schema: issues.schema.yaml
+    key:
+      - /id
+  acmeCo/organizations:
+    schema: organizations.schema.yaml
+    key:
+      - /id
+  acmeCo/project_cards:
+    schema: project_cards.schema.yaml
+    key:
+      - /id
+  acmeCo/project_columns:
+    schema: project_columns.schema.yaml
+    key:
+      - /id
+  acmeCo/projects:
+    schema: projects.schema.yaml
+    key:
+      - /id
+  acmeCo/pull_request_comment_reactions:
+    schema: pull_request_comment_reactions.schema.yaml
+    key:
+      - /id
+  acmeCo/pull_request_commits:
+    schema: pull_request_commits.schema.yaml
+    key:
+      - /sha
+  acmeCo/pull_request_stats:
+    schema: pull_request_stats.schema.yaml
+    key:
+      - /id
+  acmeCo/pull_requests:
+    schema: pull_requests.schema.yaml
+    key:
+      - /id
+  acmeCo/releases:
+    schema: releases.schema.yaml
+    key:
+      - /id
+  acmeCo/repositories:
+    schema: repositories.schema.yaml
+    key:
+      - /id
+  acmeCo/review_comments:
+    schema: review_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/reviews:
+    schema: reviews.schema.yaml
+    key:
+      - /id
+  acmeCo/stargazers:
+    schema: stargazers.schema.yaml
+    key:
+      - /user_id
+  acmeCo/tags:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      properties:
+        commit:
+          properties:
+            sha:
+              type:
+                - "null"
+                - string
+            url:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        name:
+          type: string
+        node_id:
+          type:
+            - "null"
+            - string
+        repository:
+          type: string
+        tarball_url:
+          type:
+            - "null"
+            - string
+        zipball_url:
+          type:
+            - "null"
+            - string
+      required:
+        - repository
+        - name
+      type: object
+    key:
+      - /repository
+      - /name
+  acmeCo/team_members:
+    schema: team_members.schema.yaml
+    key:
+      - /id
+      - /team_slug
+  acmeCo/team_memberships:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      properties:
+        organization:
+          type: string
+        role:
+          type:
+            - "null"
+            - string
+        state:
+          type:
+            - "null"
+            - string
+        team_slug:
+          type: string
+        url:
+          type: string
+        username:
+          type: string
+      required:
+        - url
+      type: object
+    key:
+      - /url
+  acmeCo/teams:
+    schema: teams.schema.yaml
+    key:
+      - /id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id
+  acmeCo/workflow_jobs:
+    schema: workflow_jobs.schema.yaml
+    key:
+      - /id
+  acmeCo/workflow_runs:
+    schema: workflow_runs.schema.yaml
+    key:
+      - /id
+  acmeCo/workflows:
+    schema: workflows.schema.yaml
+    key:
+      - /id

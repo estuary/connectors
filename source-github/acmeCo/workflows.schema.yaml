@@ -1,0 +1,47 @@
+---
+$schema: "https://json-schema.org/draft-04/schema#"
+properties:
+  badge_url:
+    type:
+      - "null"
+      - string
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  name:
+    type:
+      - "null"
+      - string
+  node_id:
+    type:
+      - "null"
+      - string
+  path:
+    type:
+      - "null"
+      - string
+  repository:
+    type: string
+  state:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type: string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

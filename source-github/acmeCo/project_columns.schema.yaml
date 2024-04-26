@@ -1,0 +1,46 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  cards_url:
+    type:
+      - "null"
+      - string
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  name:
+    type:
+      - "null"
+      - string
+  node_id:
+    type:
+      - "null"
+      - string
+  project_id:
+    type:
+      - "null"
+      - integer
+  project_url:
+    type:
+      - "null"
+      - string
+  repository:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object
