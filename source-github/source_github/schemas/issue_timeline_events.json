@@ -1,262 +1,7 @@
 {
-  "definitions": {
-    "base_event": {
-      "id": {
-        "type": ["null", "integer"]
-      },
-      "node_id": {
-        "type": ["null", "string"]
-      },
-      "url": {
-        "type": ["null", "string"]
-      },
-      "actor": {
-        "title": "Simple User",
-        "description": "A GitHub user.",
-        "type": ["null", "object"],
-        "properties": {
-          "name": {
-            "type": ["string", "null"]
-          },
-          "email": {
-            "type": ["string", "null"]
-          },
-          "login": {
-            "type": "string"
-          },
-          "id": {
-            "type": "integer"
-          },
-          "node_id": {
-            "type": "string"
-          },
-          "avatar_url": {
-            "type": "string"
-          },
-          "gravatar_id": {
-            "type": ["string", "null"]
-          },
-          "url": {
-            "type": "string"
-          },
-          "html_url": {
-            "type": "string"
-          },
-          "followers_url": {
-            "type": "string"
-          },
-          "following_url": {
-            "type": "string"
-          },
-          "gists_url": {
-            "type": "string"
-          },
-          "starred_url": {
-            "type": "string"
-          },
-          "subscriptions_url": {
-            "type": "string"
-          },
-          "organizations_url": {
-            "type": "string"
-          },
-          "repos_url": {
-            "type": "string"
-          },
-          "events_url": {
-            "type": "string"
-          },
-          "received_events_url": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "site_admin": {
-            "type": "boolean"
-          },
-          "starred_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "event": {
-        "type": ["null", "string"]
-      },
-      "commit_id": {
-        "type": ["string", "null"]
-      },
-      "commit_url": {
-        "type": ["string", "null"]
-      },
-      "created_at": {
-        "type": ["null", "string"],
-        "format": "date-time"
-      },
-      "performed_via_github_app": {
-        "anyOf": [
-          {
-            "type": "null"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "slug": {
-                "type": "string"
-              },
-              "node_id": {
-                "type": "string"
-              },
-              "owner": {
-                "anyOf": [
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": ["string", "null"]
-                      },
-                      "email": {
-                        "type": ["string", "null"]
-                      },
-                      "login": {
-                        "type": "string"
-                      },
-                      "id": {
-                        "type": "integer"
-                      },
-                      "node_id": {
-                        "type": "string"
-                      },
-                      "avatar_url": {
-                        "type": "string"
-                      },
-                      "gravatar_id": {
-                        "type": ["string", "null"]
-                      },
-                      "url": {
-                        "type": "string"
-                      },
-                      "html_url": {
-                        "type": "string"
-                      },
-                      "followers_url": {
-                        "type": "string"
-                      },
-                      "following_url": {
-                        "type": "string"
-                      },
-                      "gists_url": {
-                        "type": "string"
-                      },
-                      "starred_url": {
-                        "type": "string"
-                      },
-                      "subscriptions_url": {
-                        "type": "string"
-                      },
-                      "organizations_url": {
-                        "type": "string"
-                      },
-                      "repos_url": {
-                        "type": "string"
-                      },
-                      "events_url": {
-                        "type": "string"
-                      },
-                      "received_events_url": {
-                        "type": "string"
-                      },
-                      "type": {
-                        "type": "string"
-                      },
-                      "site_admin": {
-                        "type": "boolean"
-                      },
-                      "starred_at": {
-                        "type": "string",
-                        "format": "date-time"
-                      }
-                    }
-                  }
-                ]
-              },
-              "name": {
-                "type": "string"
-              },
-              "description": {
-                "type": ["string", "null"]
-              },
-              "external_url": {
-                "type": "string"
-              },
-              "html_url": {
-                "type": "string"
-              },
-              "created_at": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "updated_at": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "permissions": {
-                "type": "object",
-                "properties": {
-                  "issues": {
-                    "type": "string"
-                  },
-                  "checks": {
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "string"
-                  },
-                  "contents": {
-                    "type": "string"
-                  },
-                  "deployments": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": true
-              },
-              "events": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "installations_count": {
-                "type": "integer"
-              },
-              "client_id": {
-                "type": "string"
-              },
-              "client_secret": {
-                "type": "string"
-              },
-              "webhook_secret": {
-                "type": ["string", "null"]
-              },
-              "pem": {
-                "type": "string"
-              }
-            }
-          }
-        ]
-      }
-    }
-  },
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["repository","issue_number"],
   "additionalProperties": true,
   "properties": {
     "repository": {
@@ -266,7 +11,10 @@
       "type": "integer"
     },
     "labeled": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "label": {
         "type": ["null", "object"],
         "properties": {
@@ -278,9 +26,12 @@
           }
         }
       }
-    },
+    }},
     "unlabeled": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "label": {
         "type": "object",
         "properties": {
@@ -292,9 +43,12 @@
           }
         }
       }
-    },
+    }},
     "milestoned": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "milestone": {
         "type": "object",
         "properties": {
@@ -303,9 +57,12 @@
           }
         }
       }
-    },
+    }},
     "demilestoned": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "milestone": {
         "type": "object",
         "properties": {
@@ -314,9 +71,12 @@
           }
         }
       }
-    },
+    }},
     "renamed": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "rename": {
         "type": "object",
         "properties": {
@@ -328,9 +88,12 @@
           }
         }
       }
-    },
+    }},
     "review_requested": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "review_requester": {
         "type": "object",
         "properties": {
@@ -581,9 +344,12 @@
           }
         }
       }
-    },
+    }},
     "review_request_removed": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "review_requester": {
         "type": "object",
         "properties": {
@@ -834,9 +600,12 @@
           }
         }
       }
-    },
+    }},
     "review_dismissed": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "dismissed_review": {
         "type": "object",
         "properties": {
@@ -854,15 +623,21 @@
           }
         }
       }
-    },
+    }},
     "locked": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "lock_reason": {
         "type": ["string", "null"]
       }
-    },
+    }},
     "added_to_project": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "project_card": {
         "type": "object",
         "properties": {
@@ -874,9 +649,12 @@
           "previous_column_name": { "type": "string" }
         }
       }
-    },
+    }},
     "moved_columns_in_project": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "project_card": {
         "type": "object",
         "properties": {
@@ -902,9 +680,12 @@
           }
         }
       }
-    },
+    }},
     "removed_from_project": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "project_card": {
         "type": "object",
         "properties": {
@@ -930,9 +711,12 @@
           }
         }
       }
-    },
+    }},
     "converted_note_to_issue": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "project_card": {
         "type": "object",
         "properties": {
@@ -944,28 +728,37 @@
           "previous_column_name": { "type": "string" }
         }
       }
-    },
+    }},
     "comment": {
       "$ref": "events/comment.json"
-    },
-    "cross-referenced": {
-      "$ref": "events/cross_referenced.json"
     },
     "committed": {
       "$ref": "events/committed.json"
     },
     "closed": {
-      "$ref": "#/definitions/base_event"
-    },
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
+    }},
     "head_ref_deleted": {
-      "$ref": "#/definitions/base_event"
-    },
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
+    }},
     "head_ref_restored": {
-      "$ref": "#/definitions/base_event"
-    },
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
+    }},
     "reopened": {
-      "$ref": "#/definitions/base_event"
-    },
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
+    }},
     "reviewed": {
       "$ref": "events/reviewed.json"
     },
@@ -976,7 +769,10 @@
       "$ref": "events/commented.json"
     },
     "assigned": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "assignee": {
         "title": "Simple User",
         "description": "A GitHub user.",
@@ -1005,9 +801,12 @@
           "starred_at": { "type": "string", "format": "date-time" }
         }
       }
-    },
+    }},
     "unassigned": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "assignee": {
         "title": "Simple User",
         "description": "A GitHub user.",
@@ -1036,21 +835,33 @@
           "starred_at": { "type": "string", "format": "date-time" }
         }
       }
-    },
+    }},
     "state_change": {
-      "$ref": "#/definitions/base_event",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json",
       "state_reason": {
         "type": ["string", "null"]
       }
-    },
+    }},
     "connected": {
-      "$ref": "#/definitions/base_event"
-    },
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
+    }},
     "auto_squash_enabled": {
-      "$ref": "#/definitions/base_event"
-    },
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
+    }},
     "merged": {
-      "$ref": "#/definitions/base_event"
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+      "$ref": "definitions.json"
     }
-  }
+  }}
 }

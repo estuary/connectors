@@ -1,11 +1,34 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
+  repository:
+    type: string
+  login:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
   avatar_url:
     type:
       - "null"
       - string
-  events_url:
+  gravatar_id:
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+  html_url:
     type:
       - "null"
       - string
@@ -21,60 +44,6 @@ properties:
     type:
       - "null"
       - string
-  gravatar_id:
-    type:
-      - "null"
-      - string
-  html_url:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  login:
-    type:
-      - "null"
-      - string
-  node_id:
-    type:
-      - "null"
-      - string
-  organizations_url:
-    type:
-      - "null"
-      - string
-  permissions:
-    properties:
-      admin:
-        type:
-          - "null"
-          - boolean
-      pull:
-        type:
-          - "null"
-          - boolean
-      push:
-        type:
-          - "null"
-          - boolean
-    type:
-      - "null"
-      - object
-  received_events_url:
-    type:
-      - "null"
-      - string
-  repos_url:
-    type:
-      - "null"
-      - string
-  repository:
-    type:
-      - string
-  site_admin:
-    type:
-      - "null"
-      - boolean
   starred_url:
     type:
       - "null"
@@ -83,14 +52,63 @@ properties:
     type:
       - "null"
       - string
+  organizations_url:
+    type:
+      - "null"
+      - string
+  repos_url:
+    type:
+      - "null"
+      - string
+  events_url:
+    type:
+      - "null"
+      - string
+  received_events_url:
+    type:
+      - "null"
+      - string
   type:
     type:
       - "null"
       - string
-  url:
+  site_admin:
+    type:
+      - "null"
+      - boolean
+  role_name:
     type:
       - "null"
       - string
-required:
-  - id
-type: object
+  permissions:
+    type:
+      - "null"
+      - object
+    properties:
+      admin:
+        type:
+          - "null"
+          - boolean
+      maintain:
+        type:
+          - "null"
+          - boolean
+      push:
+        type:
+          - "null"
+          - boolean
+      pull:
+        type:
+          - "null"
+          - boolean
+      triage:
+        type:
+          - "null"
+          - boolean
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

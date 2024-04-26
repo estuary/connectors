@@ -1,7 +1,18 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - repository
+  - name
 properties:
+  repository:
+    type: string
+  name:
+    type: string
   commit:
+    type:
+      - "null"
+      - object
     properties:
       sha:
         type:
@@ -11,44 +22,59 @@ properties:
         type:
           - "null"
           - string
-    type:
-      - "null"
-      - object
-  name:
-    type: string
   protected:
     type:
       - "null"
       - boolean
   protection:
+    type:
+      - "null"
+      - object
     properties:
+      enabled:
+        type:
+          - "null"
+          - boolean
       required_status_checks:
+        type:
+          - "null"
+          - object
         properties:
-          contexts:
-            items:
-              type:
-                - "null"
-                - string
-            type:
-              - "null"
-              - array
           enforcement_level:
             type:
               - "null"
               - string
-        type:
-          - "null"
-          - object
-    type:
-      - "null"
-      - object
+          contexts:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - string
+          checks:
+            type:
+              - "null"
+              - array
+            items:
+              type: object
+              properties:
+                context:
+                  type:
+                    - "null"
+                    - string
+                app_id:
+                  type:
+                    - "null"
+                    - integer
   protection_url:
     type:
       - "null"
       - string
-  repository:
-    type: string
-required:
-  - repository
-  - name
-type: object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

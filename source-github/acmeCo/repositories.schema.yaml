@@ -1,14 +1,120 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  full_name:
+    type:
+      - "null"
+      - string
+  owner:
+    type: object
+    properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      avatar_url:
+        type:
+          - "null"
+          - string
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
+        type:
+          - "null"
+          - string
+      followers_url:
+        type:
+          - "null"
+          - string
+      following_url:
+        type:
+          - "null"
+          - string
+      gists_url:
+        type:
+          - "null"
+          - string
+      starred_url:
+        type:
+          - "null"
+          - string
+      subscriptions_url:
+        type:
+          - "null"
+          - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+  private:
+    type:
+      - "null"
+      - boolean
+  html_url:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  fork:
+    type:
+      - "null"
+      - boolean
+  url:
+    type:
+      - "null"
+      - string
   archive_url:
     type:
       - "null"
       - string
-  archived:
-    type:
-      - "null"
-      - boolean
   assignees_url:
     type:
       - "null"
@@ -18,10 +124,6 @@ properties:
       - "null"
       - string
   branches_url:
-    type:
-      - "null"
-      - string
-  clone_url:
     type:
       - "null"
       - string
@@ -49,27 +151,10 @@ properties:
     type:
       - "null"
       - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  default_branch:
-    type:
-      - "null"
-      - string
   deployments_url:
     type:
       - "null"
       - string
-  description:
-    type:
-      - "null"
-      - string
-  disabled:
-    type:
-      - "null"
-      - boolean
   downloads_url:
     type:
       - "null"
@@ -78,19 +163,7 @@ properties:
     type:
       - "null"
       - string
-  fork:
-    type:
-      - "null"
-      - boolean
-  forks_count:
-    type:
-      - "null"
-      - integer
   forks_url:
-    type:
-      - "null"
-      - string
-  full_name:
     type:
       - "null"
       - string
@@ -110,44 +183,6 @@ properties:
     type:
       - "null"
       - string
-  has_downloads:
-    type:
-      - "null"
-      - boolean
-  has_issues:
-    type:
-      - "null"
-      - boolean
-  has_pages:
-    type:
-      - "null"
-      - boolean
-  has_projects:
-    type:
-      - "null"
-      - boolean
-  has_wiki:
-    type:
-      - "null"
-      - boolean
-  homepage:
-    type:
-      - "null"
-      - string
-  hooks_url:
-    type:
-      - "null"
-      - string
-  html_url:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  is_template:
-    type:
-      - "null"
-      - boolean
   issue_comment_url:
     type:
       - "null"
@@ -168,43 +203,10 @@ properties:
     type:
       - "null"
       - string
-  language:
-    type:
-      - "null"
-      - string
   languages_url:
     type:
       - "null"
       - string
-  license:
-    properties:
-      html_url:
-        type:
-          - "null"
-          - string
-      key:
-        type:
-          - "null"
-          - string
-      name:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      spdx_id:
-        type:
-          - "null"
-          - string
-      url:
-        type:
-          - "null"
-          - string
-    type:
-      - "null"
-      - object
   merges_url:
     type:
       - "null"
@@ -213,130 +215,11 @@ properties:
     type:
       - "null"
       - string
-  mirror_url:
-    type:
-      - "null"
-      - string
-  name:
-    type:
-      - "null"
-      - string
-  node_id:
-    type:
-      - "null"
-      - string
   notifications_url:
     type:
       - "null"
       - string
-  open_issues_count:
-    type:
-      - "null"
-      - integer
-  owner:
-    properties:
-      avatar_url:
-        type:
-          - "null"
-          - string
-      events_url:
-        type:
-          - "null"
-          - string
-      followers_url:
-        type:
-          - "null"
-          - string
-      following_url:
-        type:
-          - "null"
-          - string
-      gists_url:
-        type:
-          - "null"
-          - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
-      starred_url:
-        type:
-          - "null"
-          - string
-      subscriptions_url:
-        type:
-          - "null"
-          - string
-      type:
-        type:
-          - "null"
-          - string
-      url:
-        type:
-          - "null"
-          - string
-    type:
-      - "null"
-      - object
-  permissions:
-    properties:
-      admin:
-        type:
-          - "null"
-          - boolean
-      pull:
-        type:
-          - "null"
-          - boolean
-      push:
-        type:
-          - "null"
-          - boolean
-    type:
-      - "null"
-      - object
-  private:
-    type:
-      - "null"
-      - boolean
   pulls_url:
-    type:
-      - "null"
-      - string
-  pushed_at:
-    format: date-time
     type:
       - "null"
       - string
@@ -344,18 +227,10 @@ properties:
     type:
       - "null"
       - string
-  size:
-    type:
-      - "null"
-      - integer
   ssh_url:
     type:
       - "null"
       - string
-  stargazers_count:
-    type:
-      - "null"
-      - integer
   stargazers_url:
     type:
       - "null"
@@ -372,10 +247,6 @@ properties:
     type:
       - "null"
       - string
-  svn_url:
-    type:
-      - "null"
-      - string
   tags_url:
     type:
       - "null"
@@ -384,33 +255,238 @@ properties:
     type:
       - "null"
       - string
-  topics:
-    items:
-      type:
-        - "null"
-        - string
-    type:
-      - "null"
-      - array
   trees_url:
     type:
       - "null"
       - string
-  updated_at:
-    format: date-time
-    type: string
-  url:
+  clone_url:
     type:
       - "null"
       - string
-  visibility:
+  mirror_url:
     type:
       - "null"
       - string
+  hooks_url:
+    type:
+      - "null"
+      - string
+  svn_url:
+    type:
+      - "null"
+      - string
+  homepage:
+    type:
+      - "null"
+      - string
+  language:
+    type:
+      - "null"
+      - string
+  forks_count:
+    type:
+      - "null"
+      - integer
+  stargazers_count:
+    type:
+      - "null"
+      - integer
   watchers_count:
     type:
       - "null"
       - integer
-required:
-  - id
-type: object
+  size:
+    type:
+      - "null"
+      - integer
+  default_branch:
+    type:
+      - "null"
+      - string
+  open_issues_count:
+    type:
+      - "null"
+      - integer
+  is_template:
+    type:
+      - "null"
+      - boolean
+  topics:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - string
+  license:
+    type:
+      - "null"
+      - object
+    properties:
+      key:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      spdx_id:
+        type:
+          - "null"
+          - string
+      node_id:
+        type:
+          - "null"
+          - string
+      html_url:
+        type:
+          - "null"
+          - string
+  has_issues:
+    type:
+      - "null"
+      - boolean
+  has_projects:
+    type:
+      - "null"
+      - boolean
+  has_wiki:
+    type:
+      - "null"
+      - boolean
+  has_pages:
+    type:
+      - "null"
+      - boolean
+  has_downloads:
+    type:
+      - "null"
+      - boolean
+  archived:
+    type:
+      - "null"
+      - boolean
+  disabled:
+    type:
+      - "null"
+      - boolean
+  visibility:
+    type:
+      - "null"
+      - string
+  pushed_at:
+    type: string
+    format: date-time
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  permissions:
+    type:
+      - "null"
+      - object
+    properties:
+      admin:
+        type:
+          - "null"
+          - boolean
+      push:
+        type:
+          - "null"
+          - boolean
+      pull:
+        type:
+          - "null"
+          - boolean
+      maintain:
+        type:
+          - "null"
+          - boolean
+      triage:
+        type:
+          - "null"
+          - boolean
+  allow_forking:
+    type:
+      - "null"
+      - boolean
+  forks:
+    type:
+      - "null"
+      - integer
+  has_discussions:
+    type:
+      - "null"
+      - boolean
+  open_issues:
+    type:
+      - "null"
+      - integer
+  organization:
+    type:
+      - "null"
+      - string
+  watchers:
+    type:
+      - "null"
+      - integer
+  web_commit_signoff_required:
+    type:
+      - "null"
+      - boolean
+  security_and_analysis:
+    type:
+      - "null"
+      - object
+    properties:
+      secret_scanning:
+        type:
+          - "null"
+          - object
+        properties:
+          status:
+            type:
+              - "null"
+              - string
+      secret_scanning_push_protection:
+        type:
+          - "null"
+          - object
+        properties:
+          status:
+            type:
+              - "null"
+              - string
+      secret_scanning_validity_checks:
+        type:
+          - "null"
+          - object
+        properties:
+          status:
+            type:
+              - "null"
+              - string
+      dependabot_security_updates:
+        type:
+          - "null"
+          - object
+        properties:
+          status:
+            type:
+              - "null"
+              - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

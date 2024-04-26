@@ -1,44 +1,24 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  avatar_url:
+  login:
     type:
       - "null"
       - string
-  billing_email:
+  id:
+    type: integer
+  node_id:
     type:
       - "null"
       - string
-  blog:
+  url:
     type:
       - "null"
       - string
-  collaborators:
-    type:
-      - "null"
-      - integer
-  company:
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  default_repository_permission:
-    type:
-      - "null"
-      - string
-  description:
-    type:
-      - "null"
-      - string
-  disk_usage:
-    type:
-      - "null"
-      - integer
-  email:
+  repos_url:
     type:
       - "null"
       - string
@@ -46,14 +26,58 @@ properties:
     type:
       - "null"
       - string
-  followers:
+  hooks_url:
     type:
       - "null"
-      - integer
-  following:
+      - string
+  issues_url:
     type:
       - "null"
-      - integer
+      - string
+  members_url:
+    type:
+      - "null"
+      - string
+  public_members_url:
+    type:
+      - "null"
+      - string
+  avatar_url:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  company:
+    type:
+      - "null"
+      - string
+  blog:
+    type:
+      - "null"
+      - string
+  location:
+    type:
+      - "null"
+      - string
+  email:
+    type:
+      - "null"
+      - string
+  twitter_username:
+    type:
+      - "null"
+      - string
+  is_verified:
+    type:
+      - "null"
+      - boolean
   has_organization_projects:
     type:
       - "null"
@@ -62,90 +86,7 @@ properties:
     type:
       - "null"
       - boolean
-  hooks_url:
-    type:
-      - "null"
-      - string
-  html_url:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  is_verified:
-    type:
-      - "null"
-      - boolean
-  issues_url:
-    type:
-      - "null"
-      - string
-  location:
-    type:
-      - "null"
-      - string
-  login:
-    type:
-      - "null"
-      - string
-  members_can_create_pages:
-    type:
-      - "null"
-      - boolean
-  members_can_create_private_pages:
-    type:
-      - "null"
-      - boolean
-  members_can_create_public_pages:
-    type:
-      - "null"
-      - boolean
-  members_can_create_repositories:
-    type:
-      - "null"
-      - boolean
-  members_url:
-    type:
-      - "null"
-      - string
-  name:
-    type:
-      - "null"
-      - string
-  node_id:
-    type:
-      - "null"
-      - string
-  owned_private_repos:
-    type:
-      - "null"
-      - integer
-  plan:
-    properties:
-      filled_seats:
-        type:
-          - "null"
-          - integer
-      name:
-        type:
-          - "null"
-          - string
-      private_repos:
-        type:
-          - "null"
-          - integer
-      seats:
-        type:
-          - "null"
-          - integer
-      space:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
-  private_gists:
+  public_repos:
     type:
       - "null"
       - integer
@@ -153,15 +94,30 @@ properties:
     type:
       - "null"
       - integer
-  public_members_url:
-    type:
-      - "null"
-      - string
-  public_repos:
+  followers:
     type:
       - "null"
       - integer
-  repos_url:
+  following:
+    type:
+      - "null"
+      - integer
+  html_url:
+    type:
+      - "null"
+      - string
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  archived_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  type:
     type:
       - "null"
       - string
@@ -169,27 +125,135 @@ properties:
     type:
       - "null"
       - integer
-  twitter_username:
+  owned_private_repos:
+    type:
+      - "null"
+      - integer
+  private_gists:
+    type:
+      - "null"
+      - integer
+  disk_usage:
+    type:
+      - "null"
+      - integer
+  collaborators:
+    type:
+      - "null"
+      - integer
+  billing_email:
     type:
       - "null"
       - string
+  default_repository_permission:
+    type:
+      - "null"
+      - string
+  members_can_create_repositories:
+    type:
+      - "null"
+      - boolean
   two_factor_requirement_enabled:
     type:
       - "null"
       - boolean
-  type:
+  members_allowed_repository_creation_type:
     type:
       - "null"
       - string
-  updated_at:
-    format: date-time
+  members_can_create_public_repositories:
+    type:
+      - "null"
+      - boolean
+  members_can_create_private_repositories:
+    type:
+      - "null"
+      - boolean
+  members_can_create_internal_repositories:
+    type:
+      - "null"
+      - boolean
+  members_can_create_pages:
+    type:
+      - "null"
+      - boolean
+  members_can_fork_private_repositories:
+    type:
+      - "null"
+      - boolean
+  web_commit_signoff_required:
+    type:
+      - "null"
+      - boolean
+  members_can_create_public_pages:
+    type:
+      - "null"
+      - boolean
+  members_can_create_private_pages:
+    type:
+      - "null"
+      - boolean
+  plan:
+    type:
+      - "null"
+      - object
+    properties:
+      name:
+        type:
+          - "null"
+          - string
+      space:
+        type:
+          - "null"
+          - integer
+      private_repos:
+        type:
+          - "null"
+          - integer
+      filled_seats:
+        type:
+          - "null"
+          - integer
+      seats:
+        type:
+          - "null"
+          - integer
+  advanced_security_enabled_for_new_repositories:
+    type:
+      - "null"
+      - boolean
+  dependabot_alerts_enabled_for_new_repositories:
+    type:
+      - "null"
+      - boolean
+  dependabot_security_updates_enabled_for_new_repositories:
+    type:
+      - "null"
+      - boolean
+  dependency_graph_enabled_for_new_repositories:
+    type:
+      - "null"
+      - boolean
+  secret_scanning_enabled_for_new_repositories:
+    type:
+      - "null"
+      - boolean
+  secret_scanning_push_protection_enabled_for_new_repositories:
+    type:
+      - "null"
+      - boolean
+  secret_scanning_push_protection_custom_link_enabled:
+    type:
+      - "null"
+      - boolean
+  secret_scanning_push_protection_custom_link:
     type:
       - "null"
       - string
-  url:
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

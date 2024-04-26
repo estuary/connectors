@@ -1,9 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft-04/schema#",
   "type": "object",
+  "required": ["id"],
   "properties": {
     "id": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "name": {
       "type": ["null", "string"]
@@ -118,7 +119,7 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": ["null", "string"]
+          "type": "string"
         },
         "tree_id": {
           "type": ["null", "string"]
@@ -157,7 +158,7 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": ["null", "integer"]
+          "type": "integer"
         },
         "node_id": {
           "type": ["null", "string"]
@@ -300,7 +301,7 @@
       "type": ["null", "object"],
       "properties": {
         "id": {
-          "type": ["null", "integer"]
+          "type": "integer"
         },
         "node_id": {
           "type": ["null", "string"]

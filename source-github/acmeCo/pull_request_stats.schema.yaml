@@ -1,81 +1,13 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  additions:
-    type:
-      - "null"
-      - integer
-  can_be_rebased:
-    type:
-      - "null"
-      - boolean
-  changed_files:
-    type:
-      - "null"
-      - integer
-  comments:
-    type:
-      - "null"
-      - integer
-  commits:
-    type:
-      - "null"
-      - integer
-  deletions:
-    type:
-      - "null"
-      - integer
+  repository:
+    type: string
   id:
     type: integer
-  maintainer_can_modify:
-    type:
-      - "null"
-      - boolean
-  merge_state_status:
-    type:
-      - "null"
-      - string
-  mergeable:
-    type:
-      - "null"
-      - string
-  merged:
-    type:
-      - "null"
-      - boolean
-  merged_by:
-    properties:
-      avatar_url:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
-      type:
-        type:
-          - "null"
-          - string
-    type:
-      - "null"
-      - object
   node_id:
     type:
       - "null"
@@ -84,18 +16,90 @@ properties:
     type:
       - "null"
       - integer
-  repository:
+  merged:
     type:
+      - "null"
+      - boolean
+  mergeable:
+    type:
+      - "null"
       - string
+  can_be_rebased:
+    type:
+      - "null"
+      - boolean
+  merge_state_status:
+    type:
+      - "null"
+      - string
+  merged_by:
+    type:
+      - "null"
+      - object
+    properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - integer
+      node_id:
+        type:
+          - "null"
+          - string
+      avatar_url:
+        type:
+          - "null"
+          - string
+      html_url:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+  comments:
+    type:
+      - "null"
+      - integer
   review_comments:
     type:
       - "null"
       - integer
-  updated_at:
-    format: date-time
+  maintainer_can_modify:
     type:
       - "null"
-      - string
-required:
-  - id
-type: object
+      - boolean
+  commits:
+    type:
+      - "null"
+      - integer
+  additions:
+    type:
+      - "null"
+      - integer
+  deletions:
+    type:
+      - "null"
+      - integer
+  changed_files:
+    type:
+      - "null"
+      - integer
+  updated_at:
+    type: string
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

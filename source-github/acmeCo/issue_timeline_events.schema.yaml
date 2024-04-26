@@ -1,0 +1,5491 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - repository
+  - issue_number
+additionalProperties: true
+properties:
+  repository:
+    type: string
+  issue_number:
+    type: integer
+  labeled:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  unlabeled:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  milestoned:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  demilestoned:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  renamed:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  review_requested:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  review_request_removed:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  review_dismissed:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  locked:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  added_to_project:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  moved_columns_in_project:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  removed_from_project:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  converted_note_to_issue:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  comment:
+    title: Timeline Comment Event
+    description: Timeline Comment Event
+    type: object
+    properties:
+      event:
+        type: string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type: object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      id:
+        description: Unique identifier of the issue comment
+        type: integer
+      node_id:
+        type: string
+      url:
+        description: URL for the issue comment
+        type: string
+      body:
+        description: Contents of the issue comment
+        type: string
+      body_text:
+        type: string
+      body_html:
+        type: string
+      html_url:
+        type: string
+      user:
+        title: Simple User
+        description: A GitHub user.
+        type: object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      issue_url:
+        type: string
+      author_association:
+        type: string
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - title: GitHub app
+            description: GitHub apps are a new way to extend GitHub. They can be installed directly on organizations and user accounts and granted access to specific repositories. They come with granular permissions and built-in webhooks. GitHub apps are first class actors within GitHub.
+            type: object
+            properties:
+              id:
+                description: Unique identifier of the GitHub app
+                type: integer
+              slug:
+                description: The slug name of the GitHub app
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - title: Simple User
+                    description: A GitHub user.
+                    type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                description: The name of the GitHub app
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                description: The set of permissions for the GitHub app
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+              events:
+                description: The list of events for the GitHub app
+                type: array
+                items:
+                  type: string
+              installations_count:
+                description: The number of installations associated with the GitHub app
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+      reactions:
+        title: Reaction Rollup
+        type: object
+        properties:
+          url:
+            type: string
+          total_count:
+            type: integer
+          "+1":
+            type: integer
+          "-1":
+            type: integer
+          laugh:
+            type: integer
+          confused:
+            type: integer
+          heart:
+            type: integer
+          hooray:
+            type: integer
+          eyes:
+            type: integer
+          rocket:
+            type: integer
+  committed:
+    title: Timeline Committed Event
+    description: Timeline Committed Event
+    type: object
+    properties:
+      event:
+        type: string
+      sha:
+        type: string
+      node_id:
+        type: string
+      url:
+        type: string
+      author:
+        type: object
+        properties:
+          date:
+            format: date-time
+            type: string
+          email:
+            type: string
+          name:
+            type: string
+      committer:
+        type: object
+        properties:
+          date:
+            format: date-time
+            type: string
+          email:
+            type: string
+          name:
+            type: string
+      message:
+        type: string
+      tree:
+        type: object
+        properties:
+          sha:
+            type: string
+          url:
+            type: string
+      parents:
+        type: array
+        items:
+          type: object
+          properties:
+            sha:
+              type: string
+            url:
+              type: string
+            html_url:
+              type: string
+      verification:
+        type: object
+        properties:
+          verified:
+            type: boolean
+          reason:
+            type: string
+          signature:
+            type:
+              - string
+              - "null"
+          payload:
+            type:
+              - string
+              - "null"
+      html_url:
+        type: string
+  closed:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  head_ref_deleted:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  head_ref_restored:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  reopened:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  reviewed:
+    title: Timeline Reviewed Event
+    description: Timeline Reviewed Event
+    type: object
+    properties:
+      event:
+        type: string
+      id:
+        type: integer
+      node_id:
+        type: string
+      user:
+        title: Simple User
+        description: A GitHub user.
+        type: object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      body:
+        type:
+          - string
+          - "null"
+      state:
+        type: string
+      html_url:
+        type: string
+      pull_request_url:
+        type: string
+      _links:
+        type: object
+        properties:
+          html:
+            type: object
+            properties:
+              href:
+                type: string
+            required:
+              - href
+          pull_request:
+            type: object
+            properties:
+              href:
+                type: string
+            required:
+              - href
+        required:
+          - html
+          - pull_request
+      submitted_at:
+        type: string
+        format: date-time
+      commit_id:
+        type: string
+      body_html:
+        type: string
+      body_text:
+        type: string
+      author_association:
+        type: string
+  commented:
+    title: Timeline Comment Event
+    description: Timeline Comment Event
+    type: object
+    properties:
+      event:
+        type: string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type: object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      id:
+        description: Unique identifier of the issue comment
+        type: integer
+      node_id:
+        type: string
+      url:
+        description: URL for the issue comment
+        type: string
+      body:
+        description: Contents of the issue comment
+        type: string
+      body_text:
+        type: string
+      body_html:
+        type: string
+      html_url:
+        type: string
+      user:
+        title: Simple User
+        description: A GitHub user.
+        type: object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      issue_url:
+        type: string
+      author_association:
+        type: string
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - title: GitHub app
+            description: GitHub apps are a new way to extend GitHub. They can be installed directly on organizations and user accounts and granted access to specific repositories. They come with granular permissions and built-in webhooks. GitHub apps are first class actors within GitHub.
+            type: object
+            properties:
+              id:
+                description: Unique identifier of the GitHub app
+                type: integer
+              slug:
+                description: The slug name of the GitHub app
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - title: Simple User
+                    description: A GitHub user.
+                    type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                description: The name of the GitHub app
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                description: The set of permissions for the GitHub app
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+              events:
+                description: The list of events for the GitHub app
+                type: array
+                items:
+                  type: string
+              installations_count:
+                description: The number of installations associated with the GitHub app
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+      reactions:
+        title: Reaction Rollup
+        type: object
+        properties:
+          url:
+            type: string
+          total_count:
+            type: integer
+          "+1":
+            type: integer
+          "-1":
+            type: integer
+          laugh:
+            type: integer
+          confused:
+            type: integer
+          heart:
+            type: integer
+          hooray:
+            type: integer
+          eyes:
+            type: integer
+          rocket:
+            type: integer
+  commit_commented:
+    title: Timeline Line Commented Event
+    description: Timeline Line Commented Event
+    type: object
+    properties:
+      event:
+        type: string
+      node_id:
+        type: string
+      comments:
+        type: array
+        items:
+          title: Pull Request Review Comment
+          type: object
+          properties:
+            url:
+              type: string
+            pull_request_review_id:
+              type:
+                - integer
+                - "null"
+            id:
+              type: integer
+            node_id:
+              type: string
+            diff_hunk:
+              type: string
+            path:
+              type: string
+            position:
+              type: integer
+            original_position:
+              type: integer
+            commit_id:
+              type: string
+            original_commit_id:
+              type: string
+            in_reply_to_id:
+              type: integer
+            user:
+              type: object
+              properties:
+                name:
+                  type:
+                    - string
+                    - "null"
+                email:
+                  type:
+                    - string
+                    - "null"
+                login:
+                  type: string
+                id:
+                  type: integer
+                node_id:
+                  type: string
+                avatar_url:
+                  type: string
+                gravatar_id:
+                  type:
+                    - string
+                    - "null"
+                url:
+                  type: string
+                html_url:
+                  type: string
+                followers_url:
+                  type: string
+                following_url:
+                  type: string
+                gists_url:
+                  type: string
+                starred_url:
+                  type: string
+                subscriptions_url:
+                  type: string
+                organizations_url:
+                  type: string
+                repos_url:
+                  type: string
+                events_url:
+                  type: string
+                received_events_url:
+                  type: string
+                type:
+                  type: string
+                site_admin:
+                  type: boolean
+                starred_at:
+                  type: string
+                  format: date-time
+            body:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            html_url:
+              type: string
+            pull_request_url:
+              type: string
+            author_association:
+              type: string
+            _links:
+              type: object
+              properties:
+                self:
+                  type: object
+                  properties:
+                    href:
+                      type: string
+                html:
+                  type: object
+                  properties:
+                    href:
+                      type: string
+                pull_request:
+                  type: object
+                  properties:
+                    href:
+                      type: string
+            start_line:
+              type:
+                - integer
+                - "null"
+            original_start_line:
+              type:
+                - integer
+                - "null"
+            start_side:
+              type:
+                - string
+                - "null"
+            line:
+              type: integer
+            original_line:
+              type: integer
+            side:
+              type: string
+            subject_type:
+              type: string
+            reactions:
+              type: object
+              properties:
+                url:
+                  type: string
+                total_count:
+                  type: integer
+                "+1":
+                  type: integer
+                "-1":
+                  type: integer
+                laugh:
+                  type: integer
+                confused:
+                  type: integer
+                heart:
+                  type: integer
+                hooray:
+                  type: integer
+                eyes:
+                  type: integer
+                rocket:
+                  type: integer
+            body_html:
+              type: string
+            body_text:
+              type: string
+  assigned:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  unassigned:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  state_change:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  connected:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  auto_squash_enabled:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  merged:
+    type: object
+    additionalProperties: true
+    properties:
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      actor:
+        title: Simple User
+        description: A GitHub user.
+        type:
+          - "null"
+          - object
+        properties:
+          name:
+            type:
+              - string
+              - "null"
+          email:
+            type:
+              - string
+              - "null"
+          login:
+            type: string
+          id:
+            type: integer
+          node_id:
+            type: string
+          avatar_url:
+            type: string
+          gravatar_id:
+            type:
+              - string
+              - "null"
+          url:
+            type: string
+          html_url:
+            type: string
+          followers_url:
+            type: string
+          following_url:
+            type: string
+          gists_url:
+            type: string
+          starred_url:
+            type: string
+          subscriptions_url:
+            type: string
+          organizations_url:
+            type: string
+          repos_url:
+            type: string
+          events_url:
+            type: string
+          received_events_url:
+            type: string
+          type:
+            type: string
+          site_admin:
+            type: boolean
+          starred_at:
+            type: string
+            format: date-time
+      event:
+        type:
+          - "null"
+          - string
+      commit_id:
+        type:
+          - string
+          - "null"
+      commit_url:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      performed_via_github_app:
+        anyOf:
+          - type: "null"
+          - type: object
+            properties:
+              id:
+                type: integer
+              slug:
+                type: string
+              node_id:
+                type: string
+              owner:
+                anyOf:
+                  - type: "null"
+                  - type: object
+                    properties:
+                      name:
+                        type:
+                          - string
+                          - "null"
+                      email:
+                        type:
+                          - string
+                          - "null"
+                      login:
+                        type: string
+                      id:
+                        type: integer
+                      node_id:
+                        type: string
+                      avatar_url:
+                        type: string
+                      gravatar_id:
+                        type:
+                          - string
+                          - "null"
+                      url:
+                        type: string
+                      html_url:
+                        type: string
+                      followers_url:
+                        type: string
+                      following_url:
+                        type: string
+                      gists_url:
+                        type: string
+                      starred_url:
+                        type: string
+                      subscriptions_url:
+                        type: string
+                      organizations_url:
+                        type: string
+                      repos_url:
+                        type: string
+                      events_url:
+                        type: string
+                      received_events_url:
+                        type: string
+                      type:
+                        type: string
+                      site_admin:
+                        type: boolean
+                      starred_at:
+                        type: string
+                        format: date-time
+              name:
+                type: string
+              description:
+                type:
+                  - string
+                  - "null"
+              external_url:
+                type: string
+              html_url:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              permissions:
+                type: object
+                properties:
+                  issues:
+                    type: string
+                  checks:
+                    type: string
+                  metadata:
+                    type: string
+                  contents:
+                    type: string
+                  deployments:
+                    type: string
+                additionalProperties: true
+              events:
+                type: array
+                items:
+                  type: string
+              installations_count:
+                type: integer
+              client_id:
+                type: string
+              client_secret:
+                type: string
+              webhook_secret:
+                type:
+                  - string
+                  - "null"
+              pem:
+                type: string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

@@ -1,80 +1,99 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  assets:
-    items:
-      properties:
-        browser_download_url:
-          type:
-            - "null"
-            - string
-        content_type:
-          type:
-            - "null"
-            - string
-        created_at:
-          format: date-time
-          type:
-            - "null"
-            - string
-        download_count:
-          type:
-            - "null"
-            - integer
-        id:
-          type:
-            - "null"
-            - integer
-        label:
-          type:
-            - "null"
-            - string
-        name:
-          type:
-            - "null"
-            - string
-        node_id:
-          type:
-            - "null"
-            - string
-        size:
-          type:
-            - "null"
-            - integer
-        state:
-          type:
-            - "null"
-            - string
-        updated_at:
-          format: date-time
-          type:
-            - "null"
-            - string
-        uploader_id:
-          type:
-            - "null"
-            - integer
-        url:
-          type:
-            - "null"
-            - string
-      type:
-        - "null"
-        - object
+  repository:
+    type: string
+  url:
     type:
       - "null"
-      - array
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
   assets_url:
     type:
       - "null"
       - string
+  upload_url:
+    type:
+      - "null"
+      - string
+  tarball_url:
+    type:
+      - "null"
+      - string
+  zipball_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  tag_name:
+    type:
+      - "null"
+      - string
+  target_commitish:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  body:
+    type:
+      - "null"
+      - string
+  draft:
+    type:
+      - "null"
+      - boolean
+  prerelease:
+    type:
+      - "null"
+      - boolean
+  created_at:
+    type: string
+    format: date-time
+  published_at:
+    type:
+      - "null"
+      - string
+    format: date-time
   author:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -90,42 +109,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -134,80 +117,152 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+  assets:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        url:
+          type:
+            - "null"
+            - string
+        browser_download_url:
+          type:
+            - "null"
+            - string
+        id:
+          type:
+            - "null"
+            - integer
+        node_id:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        label:
+          type:
+            - "null"
+            - string
+        state:
+          type:
+            - "null"
+            - string
+        content_type:
+          type:
+            - "null"
+            - string
+        size:
+          type:
+            - "null"
+            - integer
+        download_count:
+          type:
+            - "null"
+            - integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        uploader_id:
+          type:
+            - "null"
+            - integer
+  body_html:
+    type:
+      - "null"
+      - string
+  body_text:
+    type:
+      - "null"
+      - string
+  mentions_count:
+    type:
+      - "null"
+      - integer
+  discussion_url:
+    type:
+      - "null"
+      - string
+  reactions:
+    type: object
+    properties:
       url:
         type:
           - "null"
           - string
-    type:
-      - "null"
-      - object
-  body:
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  draft:
-    type:
-      - "null"
-      - boolean
-  html_url:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  name:
-    type:
-      - "null"
-      - string
-  node_id:
-    type:
-      - "null"
-      - string
-  prerelease:
-    type:
-      - "null"
-      - boolean
-  published_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  repository:
-    type:
-      - string
-  tag_name:
-    type:
-      - "null"
-      - string
-  tarball_url:
-    type:
-      - "null"
-      - string
-  target_commitish:
-    type:
-      - "null"
-      - string
-  upload_url:
-    type:
-      - "null"
-      - string
-  url:
-    type:
-      - "null"
-      - string
-  zipball_url:
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+      total_count:
+        type:
+          - "null"
+          - integer
+      "+1":
+        type:
+          - "null"
+          - integer
+      "-1":
+        type:
+          - "null"
+          - integer
+      laugh:
+        type:
+          - "null"
+          - integer
+      hooray:
+        type:
+          - "null"
+          - integer
+      confused:
+        type:
+          - "null"
+          - integer
+      heart:
+        type:
+          - "null"
+          - integer
+      rocket:
+        type:
+          - "null"
+          - integer
+      eyes:
+        type:
+          - "null"
+          - integer
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
