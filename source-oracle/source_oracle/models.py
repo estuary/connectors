@@ -16,9 +16,33 @@ from estuary_cdk.capture.common import (
 )
 
 
+class Wallet(BaseModel):
+    credentials_title: Literal["Wallet"]
+    username: str
+    password: str = Field(
+        title="Password",
+        json_schema_extra={"secret": True},
+    )
+    tnsnames: str = Field(
+        title="tnsnames.ora file",
+        description="tnsnames.ora file from the wallet zip file",
+        json_schema_extra={"multiline": True},
+    )
+    ewallet: str = Field(
+        title="ewallet.pem file",
+        description="ewallet.pem file from the wallet zip file",
+        json_schema_extra={"secret": True, "multiline": True},
+    )
+    wallet_password: str = Field(
+        title="Password",
+        description="Wallet's password",
+        json_schema_extra={"secret": True},
+    )
+
+
 class EndpointConfig(BaseModel):
     address: str = Field(description="Address")
-    credentials: BasicAuth = Field(
+    credentials: BasicAuth | Wallet = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
@@ -56,10 +80,12 @@ class Document(BaseDocument, extra="allow"):
                 description="Database table of the event"
             )
             row_id: str | None = Field(
+                title='Row ID',
                 default=None,
                 description="Row ID of the Document, available for backfilled documents",
             )
             scn: int | None = Field(
+                title='SCN',
                 default=None,
                 description="Database System Change Number, available for incremental events"
             )

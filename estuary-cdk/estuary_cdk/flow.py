@@ -103,7 +103,10 @@ class AccessToken(BaseModel):
 class BasicAuth(BaseModel):
     credentials_title: Literal["Username & Password"]
     username: str
-    password: str
+    password: str = Field(
+        title="Password",
+        json_schema_extra={"secret": True},
+    )
 
 
 @dataclass
