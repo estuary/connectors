@@ -39,9 +39,9 @@ def test_capture(request, snapshot):
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
-            "1",
+            "1,1,1",
             "--delay",
-            "10s",
+            "1s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -55,20 +55,30 @@ def test_capture(request, snapshot):
         c.execute("INSERT INTO test_changes(id, str) VALUES (3, 'record 3')")
     conn.commit()
 
-    time.sleep(2)
+    time.sleep(1)
 
     with conn.cursor() as c:
         c.execute("DELETE FROM test_changes WHERE id=2")
         c.execute("UPDATE test_changes SET str='updated str'")
     conn.commit()
 
+    time.sleep(1)
+
     with conn.cursor() as c:
         c.execute("UPDATE test_changes SET str='updated str 2' WHERE id=3")
     conn.commit()
 
-    out, err = p.communicate(timeout=20)
+    out, _ = p.communicate(timeout=20)
     assert p.returncode == 0
     lines = [json.loads(l) for l in out.splitlines()[:50]]
+
+    # clean up snapshot from non-deterministic values
+    for _, doc in lines:
+        source = doc['_meta']['source']
+        if 'row_id' in source:
+            source['row_id'] = '<row_id>'
+        if 'scn' in source:
+            source['scn'] = '<scn>'
 
     assert snapshot("stdout.json") == lines
 
