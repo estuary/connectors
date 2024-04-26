@@ -76,14 +76,14 @@ def test_capture(request, snapshot):
         c.execute("INSERT INTO test_changes(id, str) VALUES (3, 'record 3')")
     conn.commit()
 
-    time.sleep(1)
+    time.sleep(5)
 
     with conn.cursor() as c:
         c.execute("DELETE FROM test_changes WHERE id=2")
         c.execute("UPDATE test_changes SET str='updated str'")
     conn.commit()
 
-    time.sleep(1)
+    time.sleep(5)
 
     with conn.cursor() as c:
         c.execute("UPDATE test_changes SET str='updated str 2' WHERE id=3")
