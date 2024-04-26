@@ -19,17 +19,62 @@
               "title": "Op",
               "type": "string"
             },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Source"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
-            "op"
+            "op",
+            "source"
           ],
           "title": "Meta",
+          "type": "object"
+        },
+        "Source": {
+          "properties": {
+            "table": {
+              "description": "Database table of the event",
+              "title": "Table",
+              "type": "string"
+            },
+            "row_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Row ID of the Document, available for backfilled documents",
+              "title": "Row ID"
+            },
+            "scn": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Database System Change Number, available for incremental events",
+              "title": "SCN"
+            }
+          },
+          "required": [
+            "table"
+          ],
+          "title": "Source",
           "type": "object"
         }
       },
@@ -43,7 +88,7 @@
           ],
           "default": {
             "op": "u",
-            "row_id": -1
+            "source": null
           },
           "description": "Document metadata"
         },
@@ -303,17 +348,62 @@
               "title": "Op",
               "type": "string"
             },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Source"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
-            "op"
+            "op",
+            "source"
           ],
           "title": "Meta",
+          "type": "object"
+        },
+        "Source": {
+          "properties": {
+            "table": {
+              "description": "Database table of the event",
+              "title": "Table",
+              "type": "string"
+            },
+            "row_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Row ID of the Document, available for backfilled documents",
+              "title": "Row ID"
+            },
+            "scn": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Database System Change Number, available for incremental events",
+              "title": "SCN"
+            }
+          },
+          "required": [
+            "table"
+          ],
+          "title": "Source",
           "type": "object"
         }
       },
@@ -327,7 +417,7 @@
           ],
           "default": {
             "op": "u",
-            "row_id": -1
+            "source": null
           },
           "description": "Document metadata"
         },

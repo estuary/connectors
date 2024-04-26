@@ -112,8 +112,9 @@ async def all_resources(
             with conn.cursor() as c:
                 await c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
                 max_rowid = (await c.fetchone())[0]
-        backfill_cutoff = (max_rowid,)
-        backfill = ResourceState.Backfill(cutoff=backfill_cutoff) if max_rowid is not None else None
+        # if max_rowid is None, that maens there are no rows in the table, so we
+        # skip backfill
+        backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
 
         def open(
             table: Table,
