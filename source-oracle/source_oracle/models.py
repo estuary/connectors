@@ -22,6 +22,11 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
+    history_mode: bool = Field(
+        default=False,
+        title="History Mode",
+        description="Capture change events without reducing them to a final state.",
+    )
 
     class Advanced(BaseModel):
         skip_flashback_retention_checks: bool = Field(
@@ -46,6 +51,30 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 class Document(BaseDocument, extra="allow"):
+    class Meta(BaseModel):
+        op: Literal["c", "u", "d"] = Field(
+            description="Operation type (c: Create, u: Update, d: Delete)"
+        )
+
+        class Source(BaseModel):
+            table: str = Field(
+                description="Database table of the event"
+            )
+            row_id: str | None = Field(
+                default=None,
+                description="Row ID of the Document, available for backfilled documents",
+            )
+            scn: int | None = Field(
+                default=None,
+                description="Database System Change Number, available for incremental events"
+            )
+
+        source: Source | None = Field(alias="source")
+
+    meta_: Meta = Field(
+        default=Meta(op="u", source=None), alias="_meta", description="Document metadata"
+    )
+
     pass
 
 
@@ -116,18 +145,19 @@ class Table:
     columns: list[OracleColumn]
     primary_key: list[OracleColumn]
     model_fields: dict[str, Any]
+    history_mode: bool
 
-    def create_model(self) -> type[BaseDocument]:
+    def create_model(self) -> type[Document]:
         return create_model(
             self.table_name,
-            __base__=BaseDocument,
+            __base__=Document,
             __cls_kwargs__={"extra": "forbid"},
             **self.model_fields,
         )
 
 
 def build_table(
-    config: EndpointConfig.Advanced,
+    config: EndpointConfig,
     table_name: str,
     columns: list[OracleColumn],
 ) -> Table:
@@ -143,44 +173,42 @@ def build_table(
         # First, pick a type for this field.
         field_type: type[int | str | datetime | float | Decimal]
         field_schema_extra: dict | None = None
-        field_zero: Any
-        import sys
 
         if col.data_type == col.Type.NUMBER and col.data_scale == 0:
-            field_type, field_zero = int, 0
+            field_type = int
 
         elif col.data_type in (col.Type.DOUBLE, col.Type.NUMBER, col.Type.FLOAT):
             # This field is definitely floating-point (data_scale > 0).
             if col.is_pk:
                 # Floats cannot be used as keys, so use {type: string, format: number}.
-                field_type, field_zero = Decimal, Decimal()
+                field_type = Decimal, Decimal()
                 field_schema_extra = {"format": "number"}
             else:
-                field_type, field_zero = float, 0.0
+                field_type = float
 
         elif col.data_type in (col.Type.INTEGER, col.Type.SMALLINT):
-            field_type, field_zero = int, 0
+            field_type = int
         elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
-            field_type, field_zero = str, ""
+            field_type = str
         elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_TIMEZONE) > -1:
             col.is_ts = True
             col.has_tz = True
-            field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
+            field_type = datetime
         elif col.data_type.startswith(col.Type.TIMESTAMP) and col.data_type.find(col.Type.WITH_LOCAL_TIMEZONE) > -1:
             col.is_ts = True
             col.has_tz = True
-            field_type, field_zero = datetime, datetime(1, 1, 1, tzinfo=UTC)
+            field_type = datetime
         elif col.data_type.startswith(col.Type.TIMESTAMP):
             col.is_ts = True
             col.has_tz = False
-            field_type, field_zero = str, ""
+            field_type = str
         elif col.data_type.startswith(col.Type.INTERVAL):
             col.cast_to_string = True
-            field_type, field_zero = str, ""
+            field_type = str
         elif col.data_type in (col.Type.DATE,):
             col.is_ts = True
             col.has_tz = False
-            field_type, field_zero = str, ""
+            field_type = str
         else:
             raise NotImplementedError(f"unsupported type {col}")
 
@@ -201,7 +229,7 @@ def build_table(
         field_info.annotation = field_type | None if col.nullable else field_type
 
         # datetimes must have timezones. Use UTC.
-        # TODO(johnny): add unit test coverage to confirm this works.
+        # TODO: add unit test coverage to confirm this works.
         if field_type is datetime:
             field_info.annotation = Annotated[
                 field_info.annotation,
@@ -215,4 +243,5 @@ def build_table(
         columns,
         primary_key,
         model_fields,
+        history_mode=config.history_mode,
     )

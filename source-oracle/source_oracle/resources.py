@@ -13,6 +13,7 @@ from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 from .models import (
     EndpointConfig,
     build_table,
+    Table,
     ResourceState,
     ResourceConfig,
 )
@@ -104,7 +105,7 @@ async def all_resources(
 
     for ot in oracle_tables:
         columns = [col for col in oracle_columns if col.table_name == ot.table_name]
-        t = build_table(config.advanced, ot.table_name, columns)
+        t = build_table(config, ot.table_name, columns)
 
         max_rowid = None
         async with pool.acquire() as conn:
@@ -112,8 +113,10 @@ async def all_resources(
                 await c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
                 max_rowid = (await c.fetchone())[0]
         backfill_cutoff = (max_rowid,)
+        backfill = ResourceState.Backfill(cutoff=backfill_cutoff) if max_rowid is not None else None
 
         def open(
+            table: Table,
             binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
@@ -124,16 +127,16 @@ async def all_resources(
                 binding_index,
                 state,
                 task,
-                fetch_page=functools.partial(fetch_page, t, pool),
-                fetch_changes=functools.partial(fetch_changes, t, pool),
+                fetch_page=functools.partial(fetch_page, table, pool),
+                fetch_changes=functools.partial(fetch_changes, table, pool),
             )
         resources_list.append(common.Resource(
             name=t.table_name,
             key=[f"/{c.column_name}" for c in t.primary_key],
             model=t.create_model(),
-            open=open,
+            open=functools.partial(open, t),
             initial_state=ResourceState(
-                backfill=ResourceState.Backfill(cutoff=backfill_cutoff),
+                backfill=backfill,
                 inc=ResourceState.Incremental(cursor=current_scn),
             ),
             initial_config=ResourceConfig(
