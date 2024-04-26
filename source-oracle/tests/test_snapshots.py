@@ -1,19 +1,40 @@
 import os
 import time
+import yaml
 import json
 import subprocess
 import oracledb
+import tempfile
 from pathlib import Path
 
 
 def test_capture(request, snapshot):
-    user = os.environ['ORACLE_USER']
-    password = os.environ['ORACLE_PASSWORD']
-    dsn = os.environ['ORACLE_DSN']
+    sops = subprocess.run(['sops', '--decrypt', request.fspath.dirname + "/../config.yaml"], capture_output=True, text=True)
+    config = yaml.safe_load(sops.stdout)
+
+    dsn = config['address']
+    creds = config['credentials']
+    user = creds['username']
+    password = creds['password_sops']
+    credentials = {}
+    if creds['credentials_title'] == 'Wallet':
+        tmpdir = tempfile.TemporaryDirectory(delete=False)
+        with open(f"{tmpdir.name}/tnsnames.ora", 'w') as f:
+            f.write(creds['tnsnames'])
+
+        with open(f"{tmpdir.name}/ewallet.pem", 'w') as f:
+            f.write(creds['ewallet_sops'])
+
+        credentials = {
+            'config_dir': tmpdir.name,
+            'wallet_location': tmpdir.name,
+            'wallet_password': creds['wallet_password_sops'],
+        }
     conn = oracledb.connect(
         user=user,
         password=password,
         dsn=dsn,
+        **credentials,
     )
 
     # seed the test database first
