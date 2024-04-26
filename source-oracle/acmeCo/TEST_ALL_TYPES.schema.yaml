@@ -10,14 +10,38 @@ $defs:
           - d
         title: Op
         type: string
-      row_id:
-        default: -1
-        description: "Row ID of the Document, counting up from zero, or -1 if not known"
-        title: Row Id
-        type: integer
+      source:
+        anyOf:
+          - $ref: "#/$defs/Source"
+          - type: "null"
     required:
       - op
+      - source
     title: Meta
+    type: object
+  Source:
+    properties:
+      table:
+        description: Database table of the event
+        title: Table
+        type: string
+      row_id:
+        anyOf:
+          - type: string
+          - type: "null"
+        default: ~
+        description: "Row ID of the Document, available for backfilled documents"
+        title: Row Id
+      scn:
+        anyOf:
+          - type: integer
+          - type: "null"
+        default: ~
+        description: "Database System Change Number, available for incremental events"
+        title: Scn
+    required:
+      - table
+    title: Source
     type: object
 additionalProperties: false
 properties:
@@ -26,7 +50,7 @@ properties:
       - $ref: "#/$defs/Meta"
     default:
       op: u
-      row_id: -1
+      source: ~
     description: Document metadata
   ID:
     description: Primary Key
