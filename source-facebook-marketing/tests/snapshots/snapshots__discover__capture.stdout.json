@@ -38731,6 +38731,9 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "id"
       ]
     },
     "key": [
