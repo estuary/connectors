@@ -22,11 +22,6 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
-    history_mode: bool = Field(
-        default=False,
-        title="History Mode",
-        description="Capture change events without reducing them to a final state.",
-    )
 
     class Advanced(BaseModel):
         skip_flashback_retention_checks: bool = Field(
