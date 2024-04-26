@@ -1,0 +1,54 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  commit:
+    properties:
+      sha:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  name:
+    type: string
+  protected:
+    type:
+      - "null"
+      - boolean
+  protection:
+    properties:
+      required_status_checks:
+        properties:
+          contexts:
+            items:
+              type:
+                - "null"
+                - string
+            type:
+              - "null"
+              - array
+          enforcement_level:
+            type:
+              - "null"
+              - string
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  protection_url:
+    type:
+      - "null"
+      - string
+  repository:
+    type: string
+required:
+  - repository
+  - name
+type: object

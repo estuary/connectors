@@ -1,0 +1,87 @@
+---
+$schema: "https://json-schema.org/draft-04/schema#"
+properties:
+  check_run_url:
+    type: string
+  completed_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  conclusion:
+    type:
+      - string
+      - "null"
+  head_sha:
+    type: string
+  html_url:
+    type:
+      - string
+      - "null"
+  id:
+    type: integer
+  labels:
+    items:
+      type: string
+    type: array
+  name:
+    type: string
+  node_id:
+    type: string
+  run_attempt:
+    type: integer
+  run_id:
+    type: integer
+  run_url:
+    type: string
+  runner_group_id:
+    type:
+      - integer
+      - "null"
+  runner_group_name:
+    type:
+      - string
+      - "null"
+  runner_id:
+    type:
+      - integer
+      - "null"
+  runner_name:
+    type:
+      - string
+      - "null"
+  started_at:
+    format: date-time
+    type: string
+  status:
+    type: string
+  steps:
+    items:
+      properties:
+        completed_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        conclusion:
+          type:
+            - string
+            - "null"
+        name:
+          type: string
+        number:
+          type: integer
+        started_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        status:
+          type: string
+      type: object
+    type: array
+  url:
+    type: string
+required:
+  - id
+type: object

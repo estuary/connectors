@@ -1,0 +1,195 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  avatar_url:
+    type:
+      - "null"
+      - string
+  billing_email:
+    type:
+      - "null"
+      - string
+  blog:
+    type:
+      - "null"
+      - string
+  collaborators:
+    type:
+      - "null"
+      - integer
+  company:
+    type:
+      - "null"
+      - string
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  default_repository_permission:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  disk_usage:
+    type:
+      - "null"
+      - integer
+  email:
+    type:
+      - "null"
+      - string
+  events_url:
+    type:
+      - "null"
+      - string
+  followers:
+    type:
+      - "null"
+      - integer
+  following:
+    type:
+      - "null"
+      - integer
+  has_organization_projects:
+    type:
+      - "null"
+      - boolean
+  has_repository_projects:
+    type:
+      - "null"
+      - boolean
+  hooks_url:
+    type:
+      - "null"
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  is_verified:
+    type:
+      - "null"
+      - boolean
+  issues_url:
+    type:
+      - "null"
+      - string
+  location:
+    type:
+      - "null"
+      - string
+  login:
+    type:
+      - "null"
+      - string
+  members_can_create_pages:
+    type:
+      - "null"
+      - boolean
+  members_can_create_private_pages:
+    type:
+      - "null"
+      - boolean
+  members_can_create_public_pages:
+    type:
+      - "null"
+      - boolean
+  members_can_create_repositories:
+    type:
+      - "null"
+      - boolean
+  members_url:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  node_id:
+    type:
+      - "null"
+      - string
+  owned_private_repos:
+    type:
+      - "null"
+      - integer
+  plan:
+    properties:
+      filled_seats:
+        type:
+          - "null"
+          - integer
+      name:
+        type:
+          - "null"
+          - string
+      private_repos:
+        type:
+          - "null"
+          - integer
+      seats:
+        type:
+          - "null"
+          - integer
+      space:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  private_gists:
+    type:
+      - "null"
+      - integer
+  public_gists:
+    type:
+      - "null"
+      - integer
+  public_members_url:
+    type:
+      - "null"
+      - string
+  public_repos:
+    type:
+      - "null"
+      - integer
+  repos_url:
+    type:
+      - "null"
+      - string
+  total_private_repos:
+    type:
+      - "null"
+      - integer
+  twitter_username:
+    type:
+      - "null"
+      - string
+  two_factor_requirement_enabled:
+    type:
+      - "null"
+      - boolean
+  type:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

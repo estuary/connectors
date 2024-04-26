@@ -1,0 +1,209 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  creator:
+    properties:
+      avatar_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      followers_url:
+        type:
+          - "null"
+          - string
+      following_url:
+        type:
+          - "null"
+          - string
+      gists_url:
+        type:
+          - "null"
+          - string
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      html_url:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - integer
+      login:
+        type:
+          - "null"
+          - string
+      node_id:
+        type:
+          - "null"
+          - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+      starred_url:
+        type:
+          - "null"
+          - string
+      subscriptions_url:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+    type: object
+  description:
+    type:
+      - "null"
+      - string
+  environment:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  original_environment:
+    type:
+      - "null"
+      - string
+  payload:
+    oneOf:
+      - additionalProperties: true
+        properties: {}
+        type: object
+      - type: string
+      - type: "null"
+  performed_via_github_app:
+    properties:
+      description:
+        type:
+          - "null"
+          - string
+      events:
+        type:
+          - array
+          - "null"
+      external_url:
+        type:
+          - string
+          - "null"
+      html_url:
+        type:
+          - string
+          - "null"
+      id:
+        type:
+          - integer
+          - "null"
+      name:
+        type:
+          - string
+          - "null"
+      node_id:
+        type:
+          - string
+          - "null"
+      owner:
+        properties:
+          id:
+            format: integer
+            type:
+              - string
+              - integer
+              - "null"
+          type:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      slug:
+        type:
+          - string
+          - "null"
+      updated_at:
+        format: date-time
+        type:
+          - string
+          - "null"
+    type:
+      - "null"
+      - object
+  production_environment:
+    type:
+      - "null"
+      - boolean
+  ref:
+    type:
+      - "null"
+      - string
+  repository:
+    type:
+      - "null"
+      - string
+  repository_url:
+    type:
+      - "null"
+      - string
+  sha:
+    type:
+      - "null"
+      - string
+  statuses_url:
+    type:
+      - "null"
+      - string
+  task:
+    type:
+      - "null"
+      - string
+  transient_environment:
+    type:
+      - "null"
+      - boolean
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

@@ -1,0 +1,62 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  description:
+    type:
+      - "null"
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  members_url:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  node_id:
+    type:
+      - "null"
+      - string
+  organization:
+    type:
+      - "null"
+      - string
+  parent:
+    additionalProperties: true
+    properties: {}
+    type:
+      - "null"
+      - object
+  permission:
+    type:
+      - "null"
+      - string
+  privacy:
+    type:
+      - "null"
+      - string
+  repositories_url:
+    type:
+      - "null"
+      - string
+  repository:
+    type:
+      - "null"
+      - string
+  slug:
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object
