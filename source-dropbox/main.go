@@ -194,6 +194,10 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 						"type": "string",
 						"secret": true
 					},
+					"refresh_token": {
+						"type": "string",
+						"secret": true
+					},
 					"client_id": {
 						"type": "string",
 						"secret": true

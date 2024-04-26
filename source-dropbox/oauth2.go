@@ -32,12 +32,13 @@ func OAuth2Spec() *pf.OAuth2 {
 		AccessTokenHeadersJsonMap: map[string]json.RawMessage{"Content-Type": json.RawMessage(`"application/x-www-form-urlencoded"`)},
 		AccessTokenBody:           "client_id={{{ client_id }}}&client_secret={{{ client_secret }}}&code={{{ code }}}&grant_type=authorization_code&redirect_uri={{{ redirect_uri }}}",
 		AccessTokenResponseJsonMap: map[string]json.RawMessage{
-			"access_token": json.RawMessage(`"/access_token"`),
-			"token_type":   json.RawMessage(`"/token_type"`),
-			"expires_in":   json.RawMessage(`"/expires_in"`),
-			"scope":        json.RawMessage(`"/scope"`),
-			"uid":          json.RawMessage(`"/uid"`),
-			"account_id":   json.RawMessage(`"/account_id"`),
+			"access_token":  json.RawMessage(`"/access_token"`),
+			"refresh_token": json.RawMessage(`"/refresh_token"`),
+			"token_type":    json.RawMessage(`"/token_type"`),
+			"expires_in":    json.RawMessage(`"/expires_in"`),
+			"scope":         json.RawMessage(`"/scope"`),
+			"uid":           json.RawMessage(`"/uid"`),
+			"account_id":    json.RawMessage(`"/account_id"`),
 		},
 	}
 
@@ -46,6 +47,7 @@ func OAuth2Spec() *pf.OAuth2 {
 
 type Credentials struct {
 	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 	TokenType    string `json:"token_type"`
 	ExpireTime   int    `json:"expires_in"`
 	Scope        string `json:"scope"`
