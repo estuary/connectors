@@ -4,3 +4,7 @@ collections:
     schema: TEST_ALL_TYPES.schema.yaml
     key:
       - /ID
+  acmeCo/TEST_CHANGES:
+    schema: TEST_CHANGES.schema.yaml
+    key:
+      - /ID

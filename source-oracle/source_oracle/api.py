@@ -138,7 +138,11 @@ async def fetch_page(
                 last_rowid = row[rowid_column_name]
 
                 doc = Document()
-                doc.meta_ = Document.Meta(op='c')
+                source = Document.Meta.Source(
+                    table=table.table_name,
+                    row_id=row[rowid_column_name]
+                )
+                doc.meta_ = Document.Meta(op='c', source=source)
                 for (k, v) in row.items():
                     if k == rowid_column_name:
                         continue
@@ -167,7 +171,7 @@ async def fetch_changes(
 ) -> AsyncGenerator[Document | LogCursor, None]:
     query = template_env.get_template("inc").render(table=table, cursor=log_cursor)
 
-    log.info(query, log_cursor)
+    log.warn(query, log_cursor)
 
     last_scn = log_cursor
     async with pool.acquire() as conn:
@@ -177,6 +181,7 @@ async def fetch_changes(
                 cols = [col[0] for col in c.description]
                 row = dict(zip(cols, values))
                 row = {k: v for (k, v) in row.items() if v is not None}
+                log.warn("change", row)
 
                 if scn_column_name not in row or op_column_name not in row:
                     continue
@@ -185,12 +190,16 @@ async def fetch_changes(
                     last_scn = row[scn_column_name] + 1
                 elif last_scn == log_cursor:
                     last_scn = last_scn + 1
-                log.info("setting last_scn to", last_scn)
+                log.warn("setting last_scn to", last_scn)
 
                 op = row[op_column_name]
 
                 doc = Document()
-                doc.meta_ = Document.Meta(op=op_mapping[op])
+                source = Document.Meta.Source(
+                    table=table.table_name,
+                    scn=row[scn_column_name]
+                )
+                doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
                 for (k, v) in row.items():
                     if k in (scn_column_name, op_column_name):
                         continue

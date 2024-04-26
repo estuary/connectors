@@ -15,7 +15,7 @@ from typing import (
     TypeVar,
     Tuple,
 )
-from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
+from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt, ConfigDict
 
 from ..flow import (
     AccessToken,
@@ -47,7 +47,6 @@ and "no pages remain" in a response context.
 
 
 class BaseDocument(BaseModel):
-
     class Meta(BaseModel):
         op: Literal["c", "u", "d"] = Field(
             description="Operation type (c: Create, u: Update, d: Delete)"
