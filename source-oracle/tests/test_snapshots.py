@@ -92,6 +92,7 @@ def test_capture(request, snapshot):
     out, _ = p.communicate(timeout=5*60)
     assert p.returncode == 0
     lines = [json.loads(l) for l in out.splitlines()[:50]]
+    # sort the items to make snapshots more deterministic
     lines.sort(key=lambda doc: (doc[0], doc[1]['_meta'].get('scn', 0)))
 
     # clean up snapshot from non-deterministic values
