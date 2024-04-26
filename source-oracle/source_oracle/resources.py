@@ -122,6 +122,7 @@ async def all_resources(
             binding_index: int,
             state: ResourceState,
             task: Task,
+            _all_bindings,
         ):
             common.open_binding(
                 binding,
