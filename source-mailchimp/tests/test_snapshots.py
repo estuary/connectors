@@ -32,6 +32,9 @@ def test_capture(request, snapshot):
         elif typ == "acmeCo/segment_members":
             rec["ip_opt"] = "redacted"
 
+        elif typ == "acmeCo/reports":
+            rec["timeseries"] = "redacted"
+
     assert snapshot("capture.stdout.json") == lines
 
 def test_discover(request, snapshot):

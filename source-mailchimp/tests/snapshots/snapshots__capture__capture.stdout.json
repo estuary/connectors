@@ -1,122 +1,88 @@
 [
   [
+    "acmeCo/campaigns",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "archive_url": "http://eepurl.com/iO2fCY",
+      "content_type": "multichannel",
+      "create_time": "2024-04-29T14:56:01+00:00",
+      "delivery_status": {
+        "enabled": false
+      },
+      "emails_sent": 2,
+      "id": "52b74e95ee",
+      "long_archive_url": "https://mailchi.mp/30fdc4b30708/teste",
+      "needs_block_refresh": false,
+      "recipients": {
+        "list_id": "7a1cbe4b72",
+        "list_is_active": true,
+        "list_name": "Penguins",
+        "recipient_count": 2,
+        "segment_text": null
+      },
+      "report_summary": {
+        "click_rate": 0,
+        "clicks": 0,
+        "ecommerce": {
+          "total_orders": 0,
+          "total_revenue": 0,
+          "total_spent": 0
+        },
+        "open_rate": 0,
+        "opens": 0,
+        "subscriber_clicks": 0,
+        "unique_opens": 0
+      },
+      "resendable": true,
+      "send_time": "2024-04-29T14:57:00+00:00",
+      "settings": {
+        "authenticate": true,
+        "auto_footer": false,
+        "auto_tweet": false,
+        "drag_and_drop": false,
+        "fb_comments": true,
+        "folder_id": null,
+        "from_name": "Estu",
+        "inline_css": false,
+        "preview_text": "Teste",
+        "reply_to": "leofs123@gmail.com",
+        "subject_line": "Teste",
+        "template_id": 13,
+        "timewarp": false,
+        "title": null,
+        "to_name": null,
+        "use_conversation": false
+      },
+      "status": "sent",
+      "tracking": {
+        "clicktale": null,
+        "ecomm360": false,
+        "goal_tracking": false,
+        "google_analytics": null,
+        "html_clicks": true,
+        "opens": true,
+        "text_clicks": false
+      },
+      "type": "regular",
+      "web_id": 6290
+    }
+  ],
+  [
     "acmeCo/lists",
     {
-      "_links": [
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
-          "method": "GET",
-          "rel": "self",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Response.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists",
-          "method": "GET",
-          "rel": "parent",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
-          "method": "PATCH",
-          "rel": "update",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/PATCH.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Response.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
-          "method": "POST",
-          "rel": "batch-sub-unsub-members",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/BatchPOST.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/BatchPOST-Response.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
-          "method": "DELETE",
-          "rel": "delete"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/abuse-reports",
-          "method": "GET",
-          "rel": "abuse-reports",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Abuse/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Abuse/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/activity",
-          "method": "GET",
-          "rel": "activity",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Activity/Response.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/clients",
-          "method": "GET",
-          "rel": "clients",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Clients/Response.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/growth-history",
-          "method": "GET",
-          "rel": "growth-history",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Growth/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Growth/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/interest-categories",
-          "method": "GET",
-          "rel": "interest-categories",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/InterestCategories/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/InterestCategories/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/members",
-          "method": "GET",
-          "rel": "members",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Members/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Members/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/merge-fields",
-          "method": "GET",
-          "rel": "merge-fields",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/MergeFields/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/MergeFields/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/segments",
-          "method": "GET",
-          "rel": "segments",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Segments/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Segments/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/webhooks",
-          "method": "GET",
-          "rel": "webhooks",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Webhooks/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Webhooks/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/signup-forms",
-          "method": "GET",
-          "rel": "signup-forms",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/SignupForms/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/SignupForms/CollectionResponse.json"
-        },
-        {
-          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/locations",
-          "method": "GET",
-          "rel": "locations",
-          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Locations/Collection.json",
-          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Locations/CollectionResponse.json"
-        }
-      ],
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
       "beamer_address": "us22-eb203924dd-18076968e2@inbound.mailchimp.com",
       "campaign_defaults": {
         "from_email": "leofs123@gmail.com",
         "from_name": "Estu",
         "language": "en",
-        "subject": ""
+        "subject": null
       },
       "contact": "redacted",
       "date_created": "2024-03-22T20:01:48+00:00",
@@ -128,21 +94,21 @@
       "marketing_permissions": false,
       "modules": [],
       "name": "Penguins",
-      "notify_on_subscribe": "",
-      "notify_on_unsubscribe": "",
+      "notify_on_subscribe": null,
+      "notify_on_unsubscribe": null,
       "permission_reminder": "Voc\u00ea est\u00e1 recebendo este e-mail porque se inscreveu em nosso site.",
       "stats": {
         "avg_sub_rate": 0,
         "avg_unsub_rate": 0,
-        "campaign_count": 0,
-        "campaign_last_sent": "",
+        "campaign_count": 1,
+        "campaign_last_sent": null,
         "cleaned_count": 0,
         "cleaned_count_since_send": 0,
         "click_rate": 0,
         "last_sub_date": "redacted",
-        "last_unsub_date": "",
+        "last_unsub_date": null,
         "member_count": 2,
-        "member_count_since_send": 2,
+        "member_count_since_send": 0,
         "merge_field_count": 5,
         "open_rate": 0,
         "target_sub_rate": 0,
@@ -154,6 +120,250 @@
       "use_archive_bar": true,
       "visibility": "prv",
       "web_id": 1174
+    }
+  ],
+  [
+    "acmeCo/list_members",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "consents_to_one_to_one_messaging": true,
+      "contact_id": "857bca141e5cc997988fa0ce172ece26",
+      "email_address": "leofs123@gmail.com",
+      "email_client": null,
+      "email_type": "html",
+      "full_name": "Estu",
+      "id": "65eb1560cc6c0c8156369f06e143f3db",
+      "ip_opt": "177.34.243.176",
+      "ip_signup": null,
+      "language": null,
+      "last_changed": "2024-03-22T20:01:48+00:00",
+      "list_id": "7a1cbe4b72",
+      "location": {
+        "country_code": null,
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "region": null,
+        "timezone": null
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": {
+          "addr1": "Penguins\nRua Neo Alves Martins, 1552\nMaringa, PR 87013-060\nBrazil",
+          "addr2": null,
+          "city": null,
+          "country": "US",
+          "state": null,
+          "zip": null
+        },
+        "BIRTHDAY": null,
+        "FNAME": "Estu",
+        "LNAME": "Ary",
+        "PHONE": null
+      },
+      "sms_phone_number": null,
+      "sms_subscription_last_updated": null,
+      "sms_subscription_status": null,
+      "source": "Admin Add",
+      "stats": {
+        "avg_click_rate": 0,
+        "avg_open_rate": 0
+      },
+      "status": "subscribed",
+      "tags": [],
+      "tags_count": 0,
+      "timestamp_opt": "2024-03-22T20:01:48+00:00",
+      "timestamp_signup": null,
+      "unique_email_id": "024245a424",
+      "vip": false,
+      "web_id": 557562
+    }
+  ],
+  [
+    "acmeCo/list_members",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 1
+      },
+      "consents_to_one_to_one_messaging": true,
+      "contact_id": "354277a363e306205348a85112c500bc",
+      "email_address": "luish1980@hotmail.com",
+      "email_client": null,
+      "email_type": "html",
+      "full_name": "Luis",
+      "id": "8b04baf128b1c48ff4bb18dbb6bba2ce",
+      "ip_opt": "177.34.243.176",
+      "ip_signup": null,
+      "language": null,
+      "last_changed": "2024-04-26T02:19:01+00:00",
+      "list_id": "7a1cbe4b72",
+      "location": {
+        "country_code": null,
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "region": null,
+        "timezone": null
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": null,
+        "BIRTHDAY": "11/23",
+        "FNAME": "Luis",
+        "LNAME": "Salomao",
+        "PHONE": "+55 44 0000-0000"
+      },
+      "sms_phone_number": null,
+      "sms_subscription_last_updated": null,
+      "sms_subscription_status": null,
+      "source": "Admin Add",
+      "stats": {
+        "avg_click_rate": 0,
+        "avg_open_rate": 0
+      },
+      "status": "subscribed",
+      "tags": [
+        {
+          "id": 3389,
+          "name": "test_tag"
+        }
+      ],
+      "tags_count": 1,
+      "timestamp_opt": "2024-04-26T02:19:01+00:00",
+      "timestamp_signup": null,
+      "unique_email_id": "3942f2eb78",
+      "vip": false,
+      "web_id": 1970495
+    }
+  ],
+  [
+    "acmeCo/reports",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "abuse_reports": 0,
+      "bounces": {
+        "hard_bounces": 0,
+        "soft_bounces": 0,
+        "syntax_errors": 0
+      },
+      "campaign_title": null,
+      "clicks": {
+        "click_rate": 0,
+        "clicks_total": 0,
+        "last_click": null,
+        "unique_clicks": 0,
+        "unique_subscriber_clicks": 0
+      },
+      "delivery_status": {
+        "enabled": false
+      },
+      "ecommerce": {
+        "currency_code": "USD",
+        "total_orders": 0,
+        "total_revenue": 0,
+        "total_spent": 0
+      },
+      "emails_sent": 2,
+      "facebook_likes": {
+        "facebook_likes": 0,
+        "recipient_likes": 0,
+        "unique_likes": 0
+      },
+      "forwards": {
+        "forwards_count": 0,
+        "forwards_opens": 0
+      },
+      "id": "52b74e95ee",
+      "list_id": "7a1cbe4b72",
+      "list_is_active": true,
+      "list_name": "Penguins",
+      "list_stats": {
+        "click_rate": 0,
+        "open_rate": 0,
+        "sub_rate": 0,
+        "unsub_rate": 0
+      },
+      "opens": {
+        "last_open": null,
+        "open_rate": 0,
+        "opens_total": 0,
+        "unique_opens": 0
+      },
+      "preview_text": "Teste",
+      "send_time": "2024-04-29T14:57:00+00:00",
+      "subject_line": "Teste",
+      "timeseries": "redacted",
+      "type": "regular",
+      "unsubscribed": 0
+    }
+  ],
+  [
+    "acmeCo/segment_members",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "email_address": "luish1980@hotmail.com",
+      "email_client": null,
+      "email_type": "html",
+      "id": "8b04baf128b1c48ff4bb18dbb6bba2ce",
+      "ip_opt": "redacted",
+      "ip_signup": null,
+      "language": null,
+      "last_changed": "2024-04-26T02:19:01+00:00",
+      "list_id": "7a1cbe4b72",
+      "location": {
+        "country_code": null,
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "timezone": null
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": null,
+        "BIRTHDAY": "11/23",
+        "FNAME": "Luis",
+        "LNAME": "Salomao",
+        "PHONE": "+55 44 0000-0000"
+      },
+      "segment_id": 3389,
+      "stats": {
+        "avg_click_rate": 0,
+        "avg_open_rate": 0
+      },
+      "status": "subscribed",
+      "timestamp_opt": "2024-04-26T02:19:01+00:00",
+      "timestamp_signup": null,
+      "unique_email_id": "3942f2eb78",
+      "vip": false
+    }
+  ],
+  [
+    "acmeCo/segments",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0
+      },
+      "created_at": "2024-04-26T02:17:50+00:00",
+      "id": 3389,
+      "list_id": "7a1cbe4b72",
+      "member_count": 1,
+      "name": "test_tag",
+      "type": "static",
+      "updated_at": "2024-04-26T02:17:50+00:00"
     }
   ]
 ]
