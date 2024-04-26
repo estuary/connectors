@@ -24,7 +24,7 @@ from source_mailchimp.streams import (
     Tags,
     Unsubscribes,
 )
-from utils import read_full_refresh, read_incremental
+from .utils import read_full_refresh, read_incremental
 
 
 @pytest.mark.parametrize(

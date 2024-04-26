@@ -3,19 +3,18 @@
   "type": "object",
   "title": "Automations",
   "additionalProperties": true,
+  "required": ["id"],
   "properties": {
     "id": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "create_time": {
       "type": ["null", "string"],
-      "format": "date-time",
-      "airbyte-type": "timestamp_with_timezone"
+      "format": "date-time"
     },
     "start_time": {
       "type": ["null", "string"],
-      "format": "date-time",
-      "airbyte_type": "timestamp_with_timezone"
+      "format": "date-time"
     },
     "status": {
       "type": ["null", "string"]

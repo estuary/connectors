@@ -4,16 +4,19 @@ import:
 captures:
   acmeCo/source-mailchimp:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-mailchimp:v2"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_mailchimp
         config: config.yaml
     bindings:
       - resource:
-          stream: lists
+          stream: automations
           syncMode: incremental
           cursorField:
-            - date_created
-        target: acmeCo/lists
+            - create_time
+        target: acmeCo/automations
       - resource:
           stream: campaigns
           syncMode: incremental
@@ -27,8 +30,50 @@ captures:
             - timestamp
         target: acmeCo/email_activity
       - resource:
+          stream: interest_categories
+          syncMode: full_refresh
+        target: acmeCo/interest_categories
+      - resource:
+          stream: interests
+          syncMode: full_refresh
+        target: acmeCo/interests
+      - resource:
+          stream: lists
+          syncMode: incremental
+          cursorField:
+            - date_created
+        target: acmeCo/lists
+      - resource:
+          stream: list_members
+          syncMode: incremental
+          cursorField:
+            - last_changed
+        target: acmeCo/list_members
+      - resource:
           stream: reports
           syncMode: incremental
           cursorField:
             - send_time
         target: acmeCo/reports
+      - resource:
+          stream: segment_members
+          syncMode: incremental
+          cursorField:
+            - last_changed
+        target: acmeCo/segment_members
+      - resource:
+          stream: segments
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/segments
+      - resource:
+          stream: tags
+          syncMode: full_refresh
+        target: acmeCo/tags
+      - resource:
+          stream: unsubscribes
+          syncMode: incremental
+          cursorField:
+            - timestamp
+        target: acmeCo/unsubscribes

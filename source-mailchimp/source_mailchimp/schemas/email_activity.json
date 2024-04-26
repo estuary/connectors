@@ -2,6 +2,7 @@
   "type": "object",
   "title": "Email Activity",
   "description": "A list of member's subscriber activity in a specific campaign.",
+  "required": ["timestamp", "email_id", "action"],
   "properties": {
     "campaign_id": {
       "type": "string",
@@ -29,7 +30,7 @@
       "description": "Email address for a subscriber."
     },
     "action": {
-      "type": ["string", "null"],
+      "type": "string",
       "title": "action",
       "enum": ["open", "click", "bounce"],
       "description": "One of the following actions: 'open', 'click', or 'bounce'"
@@ -41,11 +42,10 @@
       "description": "If the action is a 'bounce', the type of bounce received: 'hard', 'soft'."
     },
     "timestamp": {
-      "type": ["string", "null"],
+      "type": "string",
       "title": "Action date and time",
       "description": "The date and time recorded for the action in ISO 8601 format.",
-      "format": "date-time",
-      "airbyte_type": "timestamp_with_timezone"
+      "format": "date-time"
     },
     "url": {
       "type": ["string", "null"],

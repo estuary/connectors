@@ -2,6 +2,7 @@
   "type": "object",
   "title": "Subscriber List",
   "description": "Information about a specific list.",
+  "required": ["id"],
   "properties": {
     "id": {
       "type": "string",
@@ -108,21 +109,17 @@
     "notify_on_subscribe": {
       "type": ["null", "string"],
       "title": "Notify on Subscribe",
-      "description": "The email address to send [subscribe notifications](https://mailchimp.com/help/change-subscribe-and-unsubscribe-notifications/) to.",
-      "default": false
+      "description": "The email address to send [subscribe notifications](https://mailchimp.com/help/change-subscribe-and-unsubscribe-notifications/) to."
     },
     "notify_on_unsubscribe": {
       "type": ["null", "string"],
       "title": "Notify on Unsubscribe",
-      "description": "The email address to send [unsubscribe notifications](https://mailchimp.com/help/change-subscribe-and-unsubscribe-notifications/) to.",
-      "default": false
-    },
+      "description": "The email address to send [unsubscribe notifications](https://mailchimp.com/help/change-subscribe-and-unsubscribe-notifications/) to."    },
     "date_created": {
       "type": "string",
       "title": "Creation Date",
       "description": "The date and time that this list was created in ISO 8601 format.",
       "format": "date-time",
-      "airbyte_type": "timestamp_with_timezone",
       "readOnly": true
     },
     "list_rating": {
@@ -247,8 +244,7 @@
           "title": "Campaign Last Sent",
           "description": "The date and time the last campaign was sent to this list in ISO 8601 format. This is updated when a campaign is sent to 10 or more recipients.",
           "readOnly": true,
-          "format": "date-time",
-          "airbyte_type": "timestamp_with_timezone"
+          "format": "date-time"
         },
         "merge_field_count": {
           "type": "integer",
@@ -291,16 +287,14 @@
           "title": "Date of Last List Subscribe",
           "description": "The date and time of the last time someone subscribed to this list in ISO 8601 format.",
           "readOnly": true,
-          "format": "date-time",
-          "airbyte_type": "timestamp_with_timezone"
+          "format": "date-time"
         },
         "last_unsub_date": {
           "type": ["null", "string"],
           "title": "Date of Last List Unsubscribe",
           "description": "The date and time of the last time someone unsubscribed from this list in ISO 8601 format.",
           "readOnly": true,
-          "format": "date-time",
-          "airbyte_type": "timestamp_with_timezone"
+          "format": "date-time"
         }
       }
     }

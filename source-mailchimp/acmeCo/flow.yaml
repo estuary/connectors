@@ -1,5 +1,9 @@
 ---
 collections:
+  acmeCo/automations:
+    schema: automations.schema.yaml
+    key:
+      - /id
   acmeCo/campaigns:
     schema: campaigns.schema.yaml
     key:
@@ -10,6 +14,82 @@ collections:
       - /timestamp
       - /email_id
       - /action
+  acmeCo/interest_categories:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        list_id:
+          type:
+            - "null"
+            - string
+        id:
+          type: string
+        title:
+          type:
+            - "null"
+            - string
+        display_order:
+          type:
+            - "null"
+            - integer
+        type:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+    key:
+      - /id
+  acmeCo/interests:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        category_id:
+          type:
+            - "null"
+            - string
+        list_id:
+          type:
+            - "null"
+            - string
+        id:
+          type: string
+        name:
+          type:
+            - "null"
+            - string
+        subscriber_count:
+          type:
+            - "null"
+            - string
+        display_order:
+          type:
+            - "null"
+            - integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+    key:
+      - /id
+  acmeCo/list_members:
+    schema: list_members.schema.yaml
+    key:
+      - /id
   acmeCo/lists:
     schema: lists.schema.yaml
     key:
@@ -18,3 +98,43 @@ collections:
     schema: reports.schema.yaml
     key:
       - /id
+  acmeCo/segment_members:
+    schema: segment_members.schema.yaml
+    key:
+      - /id
+  acmeCo/segments:
+    schema: segments.schema.yaml
+    key:
+      - /id
+  acmeCo/tags:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        name:
+          type:
+            - "null"
+            - string
+        list_id:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+    key:
+      - /id
+  acmeCo/unsubscribes:
+    schema: unsubscribes.schema.yaml
+    key:
+      - /campaign_id
+      - /email_id
+      - /timestamp

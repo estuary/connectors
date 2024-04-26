@@ -1,0 +1,48 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+additionalProperties: true
+required:
+  - campaign_id
+  - email_id
+  - timestamp
+properties:
+  email_id:
+    type: string
+  email_address:
+    type:
+      - "null"
+      - string
+  merge_fields:
+    type:
+      - "null"
+      - object
+    additionalProperties: true
+  vip:
+    type:
+      - "null"
+      - boolean
+  timestamp:
+    type: string
+    format: date-time
+  reason:
+    type:
+      - "null"
+      - string
+  campaign_id:
+    type: string
+  list_id:
+    type:
+      - "null"
+      - string
+  list_is_active:
+    type:
+      - "null"
+      - boolean
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
