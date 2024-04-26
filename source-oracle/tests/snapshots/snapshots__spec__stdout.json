@@ -30,6 +30,7 @@
               "type": "string"
             },
             "password": {
+              "secret": true,
               "title": "Password",
               "type": "string"
             }
@@ -40,6 +41,56 @@
             "password"
           ],
           "title": "BasicAuth",
+          "type": "object"
+        },
+        "Wallet": {
+          "properties": {
+            "credentials_title": {
+              "const": "Wallet",
+              "enum": [
+                "Wallet"
+              ],
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "title": "Username",
+              "type": "string"
+            },
+            "password": {
+              "secret": true,
+              "title": "Password",
+              "type": "string"
+            },
+            "tnsnames": {
+              "description": "tnsnames.ora file from the wallet zip file",
+              "multiline": true,
+              "title": "tnsnames.ora file",
+              "type": "string"
+            },
+            "ewallet": {
+              "description": "ewallet.pem file from the wallet zip file",
+              "multiline": true,
+              "secret": true,
+              "title": "ewallet.pem file",
+              "type": "string"
+            },
+            "wallet_password": {
+              "description": "Wallet's password",
+              "secret": true,
+              "title": "Password",
+              "type": "string"
+            }
+          },
+          "required": [
+            "credentials_title",
+            "username",
+            "password",
+            "tnsnames",
+            "ewallet",
+            "wallet_password"
+          ],
+          "title": "Wallet",
           "type": "object"
         }
       },
@@ -52,13 +103,17 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "Username & Password": "#/$defs/BasicAuth"
+              "Username & Password": "#/$defs/BasicAuth",
+              "Wallet": "#/$defs/Wallet"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/BasicAuth"
+            },
+            {
+              "$ref": "#/$defs/Wallet"
             }
           ],
           "title": "Authentication"

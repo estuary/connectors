@@ -47,6 +47,34 @@
   [
     "acmeCo/TEST_CHANGES",
     {
+      "ID": 2,
+      "STR": "record 2",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "record 3",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
       "ID": 1,
       "STR": "updated str",
       "_meta": {
@@ -64,35 +92,7 @@
       "ID": 2,
       "STR": "record 2",
       "_meta": {
-        "op": "c",
-        "source": {
-          "scn": "<scn>",
-          "table": "TEST_CHANGES"
-        }
-      }
-    }
-  ],
-  [
-    "acmeCo/TEST_CHANGES",
-    {
-      "ID": 2,
-      "STR": "record 2",
-      "_meta": {
         "op": "d",
-        "source": {
-          "scn": "<scn>",
-          "table": "TEST_CHANGES"
-        }
-      }
-    }
-  ],
-  [
-    "acmeCo/TEST_CHANGES",
-    {
-      "ID": 3,
-      "STR": "record 3",
-      "_meta": {
-        "op": "c",
         "source": {
           "scn": "<scn>",
           "table": "TEST_CHANGES"
