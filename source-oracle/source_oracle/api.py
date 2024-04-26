@@ -212,10 +212,10 @@ async def fetch_changes(
 
 
 def cast_column(c: OracleColumn) -> str:
-    if not c.is_datime and not c.cast_to_string:
+    if not c.is_datetime and not c.cast_to_string:
         return c.column_name
 
-    if not c.is_datetime and c.cast_to_string:
+    if c.cast_to_string and not c.is_datetime:
         return f"TO_CHAR({c.column_name}) AS {c.column_name}"
 
     out = "TO_CHAR(" + c.column_name
@@ -230,9 +230,7 @@ def cast_column(c: OracleColumn) -> str:
     if c.has_timezone:
         out = out + " AT TIME ZONE 'UTC'"
 
-        out = out + f", {fmt})"
-
-    out = out + " AS " + c.column_name
+    out = out + f", {fmt}) AS {c.column_name}"
 
     return out
 
