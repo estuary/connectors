@@ -125,7 +125,7 @@ async def fetch_page(
 
     query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
 
-    log.info(query, page)
+    log.debug("fetch_page", query, page)
 
     last_rowid = None
     async with pool.acquire() as conn:
@@ -171,7 +171,7 @@ async def fetch_changes(
 ) -> AsyncGenerator[Document | LogCursor, None]:
     query = template_env.get_template("inc").render(table=table, cursor=log_cursor)
 
-    log.debug(query, log_cursor)
+    log.debug("fetch_changes", query, log_cursor)
 
     last_scn = log_cursor
     async with pool.acquire() as conn:
@@ -211,6 +211,8 @@ async def fetch_changes(
         yield last_scn
 
 
+# datetime and some other data types must be cast to string
+# this helper function takes care of formatting datetimes as RFC3339 strings
 def cast_column(c: OracleColumn) -> str:
     if not c.is_datetime and not c.cast_to_string:
         return c.column_name
