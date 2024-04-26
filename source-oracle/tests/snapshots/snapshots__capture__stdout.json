@@ -14,8 +14,8 @@
       "SINGLE_NCHAR": "a",
       "SMALL_INT": 123456789,
       "TS": "2022-01-01T13:00:00.000000",
-      "TS_LOCAL_TZ": "2022-01-01T17:00:00.000000Z",
-      "TS_LOCAL_TZ_NINE": "2022-01-01T18:00:00.000000000Z",
+      "TS_LOCAL_TZ": "2022-01-01T16:00:00.000000Z",
+      "TS_LOCAL_TZ_NINE": "2022-01-01T17:00:00.000000000Z",
       "TS_NINE": "2022-01-01T14:00:00.123456789",
       "TS_TZ": "2022-01-01T14:00:00.000000Z",
       "TS_TZ_NINE": "2022-01-01T15:00:00.123456789Z",
@@ -23,6 +23,66 @@
       "VCHAR2": "varchar2 value",
       "_meta": {
         "op": "c"
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 1,
+      "STR": "record 1",
+      "_meta": {
+        "op": "c"
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 1,
+      "STR": "updated str",
+      "_meta": {
+        "op": "u"
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 2,
+      "STR": "record 2",
+      "_meta": {
+        "op": "c"
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 2,
+      "STR": "record 2",
+      "_meta": {
+        "op": "d"
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "record 3",
+      "_meta": {
+        "op": "c"
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "updated str 2",
+      "_meta": {
+        "op": "u"
       }
     }
   ]

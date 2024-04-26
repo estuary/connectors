@@ -15,6 +15,10 @@ captures:
           name: TEST_ALL_TYPES
           interval: PT0S
         target: acmeCo/TEST_ALL_TYPES
+      - resource:
+          name: TEST_CHANGES
+          interval: PT0S
+        target: acmeCo/TEST_CHANGES
     interval: 3m
     shards:
       logLevel: debug
