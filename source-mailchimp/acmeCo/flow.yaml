@@ -1,0 +1,20 @@
+---
+collections:
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/email_activity:
+    schema: email_activity.schema.yaml
+    key:
+      - /timestamp
+      - /email_id
+      - /action
+  acmeCo/lists:
+    schema: lists.schema.yaml
+    key:
+      - /id
+  acmeCo/reports:
+    schema: reports.schema.yaml
+    key:
+      - /id

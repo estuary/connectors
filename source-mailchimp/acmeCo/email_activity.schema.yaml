@@ -1,0 +1,56 @@
+---
+description: "A list of member's subscriber activity in a specific campaign."
+properties:
+  action:
+    description: "One of the following actions: 'open', 'click', or 'bounce'"
+    title: action
+    type: string
+  campaign_id:
+    description: The unique id for the campaign.
+    title: The unique id for the campaign.
+    type: string
+  email_address:
+    description: Email address for a subscriber.
+    title: Email address for a subscriber.
+    type: string
+  email_id:
+    description: "The MD5 hash of the lowercase version of the list member's email address."
+    title: email MD5 hash.
+    type: string
+  ip:
+    description: The IP address recorded for the action.
+    title: Action ip address
+    type:
+      - string
+      - "null"
+  list_id:
+    description: The unique id for the list.
+    title: The unique id for the list.
+    type: string
+  list_is_active:
+    description: "The status of the list used, namely if it's deleted or disabled."
+    title: The status of the list used.
+    type: boolean
+  timestamp:
+    description: The date and time recorded for the action in ISO 8601 format.
+    format: date-time
+    title: Action date and time
+    type: string
+  type:
+    description: "If the action is a 'bounce', the type of bounce received: 'hard', 'soft'."
+    title: Type
+    type:
+      - string
+      - "null"
+  url:
+    description: "If the action is a 'click', the URL on which the member clicked."
+    title: Click url
+    type:
+      - string
+      - "null"
+required:
+  - timestamp
+  - email_id
+  - action
+title: Email Activity
+type: object

@@ -1,0 +1,135 @@
+[
+  {
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "access_token": {
+                  "airbyte_secret": true,
+                  "description": "An access token generated using the above client ID and secret.",
+                  "title": "Access Token",
+                  "type": "string"
+                },
+                "auth_type": {
+                  "const": "oauth2.0",
+                  "default": "oauth2.0",
+                  "order": 0,
+                  "type": "string"
+                },
+                "client_id": {
+                  "airbyte_secret": true,
+                  "description": "The Client ID of your OAuth application.",
+                  "title": "Client ID",
+                  "type": "string"
+                },
+                "client_secret": {
+                  "airbyte_secret": true,
+                  "description": "The Client Secret of your OAuth application.",
+                  "title": "Client Secret",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "auth_type",
+                "access_token"
+              ],
+              "title": "OAuth2.0",
+              "type": "object",
+              "x-oauth2-provider": "mailchimp"
+            },
+            {
+              "properties": {
+                "apikey": {
+                  "airbyte_secret": true,
+                  "description": "Mailchimp API Key. See the docs for more information on how to generate this key: https://go.estuary.dev/tmiNoF",
+                  "title": "API Key",
+                  "type": "string"
+                },
+                "auth_type": {
+                  "const": "apikey",
+                  "default": "apikey",
+                  "order": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "auth_type",
+                "apikey"
+              ],
+              "title": "API Key",
+              "type": "object"
+            }
+          ],
+          "title": "Authentication",
+          "type": "object"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "Mailchimp Spec",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/tmiNoF",
+    "oauth2": {
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      },
+      "accessTokenUrlTemplate": "https://login.mailchimp.com/oauth2/token",
+      "authUrlTemplate": "https://login.mailchimp.com/oauth2/authorize?response_type=code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "provider": "mailchimp"
+    },
+    "protocol": 3032023,
+    "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "cursorField": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "title": "ResourceSpec",
+      "type": "object"
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

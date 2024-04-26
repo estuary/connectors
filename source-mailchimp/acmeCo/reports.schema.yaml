@@ -1,0 +1,444 @@
+---
+description: A list of reports containing campaigns marked as Sent.
+properties:
+  ab_split:
+    description: General stats about different groups of an A/B Split campaign. Does not return information about Multivariate Campaigns.
+    properties:
+      a:
+        description: Stats for Campaign A.
+        properties:
+          abuse_reports:
+            description: Abuse reports for Campaign A.
+            title: Abuse Reports
+            type: integer
+          bounces:
+            description: Bounces for Campaign A.
+            title: Bounces
+            type: integer
+          forwards:
+            description: Forwards for Campaign A.
+            title: Forwards
+            type: integer
+          forwards_opens:
+            description: Opens from forwards for Campaign A.
+            title: Forward Opens
+            type: integer
+          last_open:
+            description: The last open for Campaign A.
+            title: Last Open
+            type: string
+          opens:
+            description: Opens for Campaign A.
+            title: Opens
+            type: integer
+          recipient_clicks:
+            description: Recipient Clicks for Campaign A.
+            title: Recipient Clicks
+            type: integer
+          unique_opens:
+            description: Unique opens for Campaign A.
+            title: Unique Opens
+            type: integer
+          unsubs:
+            description: Unsubscribes for Campaign A.
+            title: Unsubscribes
+            type: integer
+        title: Campaign A
+        type: object
+      b:
+        description: Stats for Campaign B.
+        properties:
+          abuse_reports:
+            description: Abuse reports for Campaign B.
+            title: Abuse Reports
+            type: integer
+          bounces:
+            description: Bounces for Campaign B.
+            title: Bounces
+            type: integer
+          forwards:
+            description: Forwards for Campaign B.
+            title: Forwards
+            type: integer
+          forwards_opens:
+            description: Opens for forwards from Campaign B.
+            title: Forward Opens
+            type: integer
+          last_open:
+            description: The last open for Campaign B.
+            title: Last Open
+            type: string
+          opens:
+            description: Opens for Campaign B.
+            title: Opens
+            type: integer
+          recipient_clicks:
+            description: Recipients clicks for Campaign B.
+            title: Recipient Clicks
+            type: integer
+          unique_opens:
+            description: Unique opens for Campaign B.
+            title: Unique Opens
+            type: integer
+          unsubs:
+            description: Unsubscribes for Campaign B.
+            title: Unsubscribes
+            type: integer
+        title: Campaign B
+        type: object
+    title: A/B Split Stats
+    type: object
+  abuse_reports:
+    description: The number of abuse reports generated for this campaign.
+    title: Abuse Reports
+    type: integer
+  bounces:
+    description: An object describing the bounce summary for the campaign.
+    properties:
+      hard_bounces:
+        description: The total number of hard bounced email addresses.
+        title: Hard Bounces
+        type: integer
+      soft_bounces:
+        description: The total number of soft bounced email addresses.
+        title: Soft Bounces
+        type: integer
+      syntax_errors:
+        description: The total number of addresses that were syntax-related bounces.
+        title: Syntax Errors
+        type: integer
+    title: Bounces
+    type: object
+  campaign_title:
+    description: The title of the campaign.
+    readOnly: true
+    title: Campaign Title
+    type: string
+  clicks:
+    description: An object describing the click activity for the campaign.
+    properties:
+      click_rate:
+        description: The number of unique clicks divided by the total number of successful deliveries.
+        title: Click Rate
+        type: number
+      clicks_total:
+        description: The total number of clicks for the campaign.
+        title: Total Clicks
+        type: integer
+      last_click:
+        description: The date and time of the last recorded click for the campaign in ISO 8601 format.
+        format: date-time
+        title: Last Click
+        type: string
+      unique_clicks:
+        description: The total number of unique clicks for links across a campaign.
+        title: Unique Clicks
+        type: integer
+      unique_subscriber_clicks:
+        description: The total number of subscribers who clicked on a campaign.
+        title: Unique Subscriber Clicks
+        type: integer
+    title: Clicks
+    type: object
+  delivery_status:
+    description: Updates on campaigns in the process of sending.
+    properties:
+      can_cancel:
+        description: Whether a campaign send can be canceled.
+        readOnly: true
+        title: Campaign Cancelable
+        type: boolean
+      emails_canceled:
+        description: The total number of emails canceled for this campaign.
+        readOnly: true
+        title: Emails Canceled
+        type: integer
+      emails_sent:
+        description: The total number of emails confirmed sent for this campaign so far.
+        readOnly: true
+        title: Emails Sent
+        type: integer
+      enabled:
+        description: Whether Campaign Delivery Status is enabled for this account and campaign.
+        readOnly: true
+        title: Delivery Status Enabled
+        type: boolean
+      status:
+        description: The current state of a campaign delivery.
+        readOnly: true
+        title: Campaign Delivery Status
+        type: string
+    title: Campaign Delivery Status
+    type: object
+  ecommerce:
+    description: E-Commerce stats for a campaign.
+    properties:
+      currency_code:
+        example: USD
+        readOnly: true
+        title: Three letter currency code for this user
+        type: string
+      total_orders:
+        description: The total orders for a campaign.
+        readOnly: true
+        title: Total Orders
+        type: integer
+      total_revenue:
+        description: The total revenue for a campaign. Calculated as the sum of all order totals minus shipping and tax totals.
+        readOnly: true
+        title: Total Revenue
+        type: number
+      total_spent:
+        description: The total spent for a campaign. Calculated as the sum of all order totals with no deductions.
+        readOnly: true
+        title: Total Spent
+        type: number
+    title: E-Commerce Report
+    type: object
+  emails_sent:
+    description: The total number of emails sent for this campaign.
+    title: Emails Sent
+    type: integer
+  facebook_likes:
+    description: An object describing campaign engagement on Facebook.
+    properties:
+      facebook_likes:
+        description: The number of Facebook likes for the campaign.
+        title: Facebook Likes
+        type: integer
+      recipient_likes:
+        description: The number of recipients who liked the campaign on Facebook.
+        title: Recipient Likes
+        type: integer
+      unique_likes:
+        description: The number of unique likes.
+        title: Unique Likes
+        type: integer
+    title: Facebook Likes
+    type: object
+  forwards:
+    description: An object describing the forwards and forward activity for the campaign.
+    properties:
+      forwards_count:
+        description: How many times the campaign has been forwarded.
+        title: Total Forwards
+        type: integer
+      forwards_opens:
+        description: How many times the forwarded campaign has been opened.
+        title: Forward Opens
+        type: integer
+    title: Forwards
+    type: object
+  id:
+    description: A string that uniquely identifies this campaign.
+    title: Campaign ID
+    type: string
+  industry_stats:
+    description: The average campaign statistics for your industry.
+    properties:
+      abuse_rate:
+        description: The industry abuse rate.
+        title: Abuse Rate
+        type: number
+      bounce_rate:
+        description: The industry bounce rate.
+        title: Bounce Rate
+        type: number
+      click_rate:
+        description: The industry click rate.
+        title: Click Rate
+        type: number
+      open_rate:
+        description: The industry open rate.
+        title: Open Rate
+        type: number
+      type:
+        description: "The type of business industry associated with your account. For example: retail, education, etc."
+        title: Industry Type
+        type: string
+      unopen_rate:
+        description: The industry unopened rate.
+        title: Unopened Rate
+        type: number
+      unsub_rate:
+        description: The industry unsubscribe rate.
+        title: Unsubscribe Rate
+        type: number
+    title: Industry Stats
+    type: object
+  list_id:
+    description: The unique list id.
+    readOnly: true
+    title: List ID
+    type: string
+  list_is_active:
+    description: "The status of the list used, namely if it's deleted or disabled."
+    readOnly: true
+    title: List Status
+    type: boolean
+  list_name:
+    description: The name of the list.
+    readOnly: true
+    title: List Name
+    type: string
+  list_stats:
+    description: "The average campaign statistics for your list. This won't be present if we haven't calculated it yet for this list."
+    properties:
+      click_rate:
+        description: The average click rate (a percentage represented as a number between 0 and 100) per campaign for the list.
+        readOnly: true
+        title: Click Rate
+        type: number
+      open_rate:
+        description: The average open rate (a percentage represented as a number between 0 and 100) per campaign for the list.
+        readOnly: true
+        title: Open Rate
+        type: number
+      sub_rate:
+        description: The average number of subscriptions per month for the list.
+        readOnly: true
+        title: Average Subscription Rate
+        type: number
+      unsub_rate:
+        description: The average number of unsubscriptions per month for the list.
+        readOnly: true
+        title: Average Unsubscription Rate
+        type: number
+    title: List Stats
+    type: object
+  opens:
+    description: An object describing the open activity for the campaign.
+    properties:
+      last_open:
+        description: The date and time of the last recorded open in ISO 8601 format.
+        format: date-time
+        title: Last Open
+        type: string
+      open_rate:
+        description: The number of unique opens divided by the total number of successful deliveries.
+        title: Open Rate
+        type: number
+      opens_total:
+        description: The total number of opens for a campaign.
+        title: Total Opens
+        type: integer
+      unique_opens:
+        description: The total number of unique opens.
+        title: Unique Opens
+        type: integer
+    title: Opens
+    type: object
+  preview_text:
+    description: The preview text for the campaign.
+    title: Campaign Preview Text
+    type: string
+  rss_last_send:
+    description: "For RSS campaigns, the date and time of the last send in ISO 8601 format."
+    format: date-time
+    readOnly: true
+    title: RSS Last Send
+    type: string
+  send_time:
+    description: The date and time a campaign was sent in ISO 8601 format.
+    format: date-time
+    readOnly: true
+    title: Send Time
+    type: string
+  share_report:
+    description: "The url and password for the [VIP report](https://mailchimp.com/help/share-a-campaign-report/)."
+    properties:
+      share_password:
+        description: "If password protected, the password for the VIP report."
+        readOnly: true
+        title: Report Password
+        type: string
+      share_url:
+        description: The URL for the VIP report.
+        readOnly: true
+        title: Report URL
+        type: string
+    title: Share Report
+    type: object
+  subject_line:
+    description: The subject line for the campaign.
+    readOnly: true
+    title: Campaign Subject Line
+    type: string
+  timeseries:
+    description: An hourly breakdown of the performance of the campaign over the first 24 hours.
+    items:
+      properties:
+        emails_sent:
+          description: The number of emails sent in the timeseries.
+          title: Emails Sent
+          type: integer
+        recipients_clicks:
+          description: The number of clicks in the timeseries.
+          title: Recipient Clicks
+          type: integer
+        timestamp:
+          description: The date and time for the series in ISO 8601 format.
+          format: date-time
+          title: Timestamp
+          type: string
+        unique_opens:
+          description: The number of unique opens in the timeseries.
+          title: Unique Opens
+          type: integer
+      type: object
+    title: Timeseries
+    type: array
+  timewarp:
+    description: "An hourly breakdown of sends, opens, and clicks if a campaign is sent using timewarp."
+    items:
+      properties:
+        bounces:
+          description: The number of bounces.
+          title: Bounces
+          type: integer
+        clicks:
+          description: The number of clicks.
+          title: Clicks
+          type: integer
+        gmt_offset:
+          description: "For campaigns sent with timewarp, the time zone group the member is apart of."
+          title: GMT Offset
+          type: integer
+        last_click:
+          description: The date and time of the last click in ISO 8601 format.
+          format: date-time
+          title: Last Click
+          type: string
+        last_open:
+          description: The date and time of the last open in ISO 8601 format.
+          format: date-time
+          title: Last Open
+          type: string
+        opens:
+          description: The number of opens.
+          title: Opens
+          type: integer
+        unique_clicks:
+          description: The number of unique clicks.
+          title: Unique Clicks
+          type: integer
+        unique_opens:
+          description: The number of unique opens.
+          title: Unique Opens
+          type: integer
+      type: object
+    title: Timewarp Stats
+    type: array
+  type:
+    description: "The type of campaign (regular, plain-text, ab_split, rss, automation, variate, or auto)."
+    title: Campaign Type
+    type: string
+  unsubscribed:
+    description: The total number of unsubscribed members for this campaign.
+    readOnly: true
+    title: Unsubscribe Count
+    type: integer
+required:
+  - id
+title: Campaign Reports
+type: object

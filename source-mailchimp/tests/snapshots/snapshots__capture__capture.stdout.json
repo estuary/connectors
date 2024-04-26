@@ -1,0 +1,159 @@
+[
+  [
+    "acmeCo/lists",
+    {
+      "_links": [
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
+          "method": "GET",
+          "rel": "self",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Response.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists",
+          "method": "GET",
+          "rel": "parent",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
+          "method": "PATCH",
+          "rel": "update",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/PATCH.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Response.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
+          "method": "POST",
+          "rel": "batch-sub-unsub-members",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/BatchPOST.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/BatchPOST-Response.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72",
+          "method": "DELETE",
+          "rel": "delete"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/abuse-reports",
+          "method": "GET",
+          "rel": "abuse-reports",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Abuse/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Abuse/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/activity",
+          "method": "GET",
+          "rel": "activity",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Activity/Response.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/clients",
+          "method": "GET",
+          "rel": "clients",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Clients/Response.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/growth-history",
+          "method": "GET",
+          "rel": "growth-history",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Growth/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Growth/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/interest-categories",
+          "method": "GET",
+          "rel": "interest-categories",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/InterestCategories/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/InterestCategories/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/members",
+          "method": "GET",
+          "rel": "members",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Members/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Members/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/merge-fields",
+          "method": "GET",
+          "rel": "merge-fields",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/MergeFields/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/MergeFields/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/segments",
+          "method": "GET",
+          "rel": "segments",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Segments/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Segments/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/webhooks",
+          "method": "GET",
+          "rel": "webhooks",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Webhooks/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Webhooks/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/signup-forms",
+          "method": "GET",
+          "rel": "signup-forms",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/SignupForms/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/SignupForms/CollectionResponse.json"
+        },
+        {
+          "href": "https://us22.api.mailchimp.com/3.0/lists/7a1cbe4b72/locations",
+          "method": "GET",
+          "rel": "locations",
+          "schema": "https://us22.api.mailchimp.com/schema/3.0/Paths/Lists/Locations/Collection.json",
+          "targetSchema": "https://us22.api.mailchimp.com/schema/3.0/Definitions/Lists/Locations/CollectionResponse.json"
+        }
+      ],
+      "beamer_address": "us22-eb203924dd-18076968e2@inbound.mailchimp.com",
+      "campaign_defaults": {
+        "from_email": "leofs123@gmail.com",
+        "from_name": "Estu",
+        "language": "en",
+        "subject": ""
+      },
+      "contact": "redacted",
+      "date_created": "2024-03-22T20:01:48+00:00",
+      "double_optin": false,
+      "email_type_option": false,
+      "has_welcome": false,
+      "id": "7a1cbe4b72",
+      "list_rating": 0,
+      "marketing_permissions": false,
+      "modules": [],
+      "name": "Penguins",
+      "notify_on_subscribe": "",
+      "notify_on_unsubscribe": "",
+      "permission_reminder": "Voc\u00ea est\u00e1 recebendo este e-mail porque se inscreveu em nosso site.",
+      "stats": {
+        "avg_sub_rate": 0,
+        "avg_unsub_rate": 0,
+        "campaign_count": 0,
+        "campaign_last_sent": "",
+        "cleaned_count": 0,
+        "cleaned_count_since_send": 0,
+        "click_rate": 0,
+        "last_sub_date": "redacted",
+        "last_unsub_date": "",
+        "member_count": 2,
+        "member_count_since_send": 2,
+        "merge_field_count": 5,
+        "open_rate": 0,
+        "target_sub_rate": 0,
+        "unsubscribe_count": 0,
+        "unsubscribe_count_since_send": 0
+      },
+      "subscribe_url_long": "https://gmail.us22.list-manage.com/subscribe?u=ae90d8c414dc11cf841a0c191&id=7a1cbe4b72",
+      "subscribe_url_short": "http://eepurl.com/iOREaU",
+      "use_archive_bar": true,
+      "visibility": "prv",
+      "web_id": 1174
+    }
+  ]
+]

@@ -1,0 +1,246 @@
+---
+description: Information about a specific list.
+properties:
+  beamer_address:
+    description: "The list's [Email Beamer](https://mailchimp.com/help/use-email-beamer-to-create-a-campaign/) address."
+    readOnly: true
+    title: Beamer Address
+    type: string
+  campaign_defaults:
+    description: "[Default values for campaigns](https://mailchimp.com/help/edit-your-emails-subject-preview-text-from-name-or-from-email-address/) created for this list."
+    properties:
+      from_email:
+        description: The default from email for campaigns sent to this list.
+        title: "Sender's Email Address"
+        type: string
+      from_name:
+        description: The default from name for campaigns sent to this list.
+        title: "Sender's Name"
+        type: string
+      language:
+        description: "The default language for this lists's forms."
+        title: Language
+        type: string
+      subject:
+        description: The default subject line for campaigns sent to this list.
+        title: Subject
+        type: string
+    title: Campaign Defaults
+    type: object
+  contact:
+    description: "[Contact information displayed in campaign footers](https://mailchimp.com/help/about-campaign-footers/) to comply with international spam laws."
+    properties:
+      address1:
+        description: The street address for the list contact.
+        title: Address
+        type: string
+      address2:
+        description: The street address for the list contact.
+        title: Address
+        type: string
+      city:
+        description: The city for the list contact.
+        title: City
+        type: string
+      company:
+        description: The company name for the list.
+        title: Company Name
+        type: string
+      country:
+        description: A two-character ISO3166 country code. Defaults to US if invalid.
+        title: Country Code
+        type: string
+      phone:
+        description: The phone number for the list contact.
+        title: Phone Number
+        type: string
+      state:
+        description: The state for the list contact.
+        title: State
+        type: string
+      zip:
+        description: The postal or zip code for the list contact.
+        title: Postal Code
+        type: string
+    title: List Contact
+    type: object
+  date_created:
+    description: The date and time that this list was created in ISO 8601 format.
+    format: date-time
+    readOnly: true
+    title: Creation Date
+    type: string
+  double_optin:
+    default: false
+    description: Whether or not to require the subscriber to confirm subscription via email.
+    title: Double Opt In
+    type: boolean
+  email_type_option:
+    description: "Whether the list supports [multiple formats for emails](https://mailchimp.com/help/change-list-name-and-defaults/). When set to `true`, subscribers can choose whether they want to receive HTML or plain-text emails. When set to `false`, subscribers will receive HTML emails, with a plain-text alternative backup."
+    title: Email Type Option
+    type: boolean
+  has_welcome:
+    default: false
+    description: "Whether or not this list has a welcome automation connected. Welcome Automations: welcomeSeries, singleWelcome, emailFollowup."
+    example: false
+    title: Has Welcome
+    type: boolean
+  id:
+    description: A string that uniquely identifies this list.
+    readOnly: true
+    title: List ID
+    type: string
+  list_rating:
+    description: An auto-generated activity score for the list (0-5).
+    readOnly: true
+    title: List Rating
+    type: integer
+  marketing_permissions:
+    default: false
+    description: Whether or not the list has marketing permissions (eg. GDPR) enabled.
+    title: Marketing Permissions
+    type: boolean
+  modules:
+    description: Any list-specific modules installed for this list.
+    items:
+      type: string
+    readOnly: true
+    title: Modules
+    type: array
+  name:
+    description: The name of the list.
+    title: List Name
+    type: string
+  notify_on_subscribe:
+    default: "false"
+    description: "The email address to send [subscribe notifications](https://mailchimp.com/help/change-subscribe-and-unsubscribe-notifications/) to."
+    title: Notify on Subscribe
+    type: string
+  notify_on_unsubscribe:
+    default: "false"
+    description: "The email address to send [unsubscribe notifications](https://mailchimp.com/help/change-subscribe-and-unsubscribe-notifications/) to."
+    title: Notify on Unsubscribe
+    type: string
+  permission_reminder:
+    description: "The [permission reminder](https://mailchimp.com/help/edit-the-permission-reminder/) for the list."
+    title: Permission Reminder
+    type: string
+  stats:
+    description: Stats for the list. Many of these are cached for at least five minutes.
+    properties:
+      avg_sub_rate:
+        description: "The average number of subscriptions per month for the list (not returned if we haven't calculated it yet)."
+        readOnly: true
+        title: Average Subscription Rate
+        type: number
+      avg_unsub_rate:
+        description: "The average number of unsubscriptions per month for the list (not returned if we haven't calculated it yet)."
+        readOnly: true
+        title: Average Unsubscription Rate
+        type: number
+      campaign_count:
+        description: The number of campaigns in any status that use this list.
+        readOnly: true
+        title: Campaign Count
+        type: integer
+      campaign_last_sent:
+        description: The date and time the last campaign was sent to this list in ISO 8601 format. This is updated when a campaign is sent to 10 or more recipients.
+        readOnly: true
+        title: Campaign Last Sent
+        type: string
+      cleaned_count:
+        description: The number of members cleaned from the list.
+        readOnly: true
+        title: Cleaned Count
+        type: integer
+      cleaned_count_since_send:
+        description: The number of members cleaned from the list since the last campaign was sent.
+        readOnly: true
+        title: Cleaned Count Since Send
+        type: integer
+      click_rate:
+        description: "The average click rate (a percentage represented as a number between 0 and 100) per campaign for the list (not returned if we haven't calculated it yet)."
+        readOnly: true
+        title: Click Rate
+        type: number
+      last_sub_date:
+        description: The date and time of the last time someone subscribed to this list in ISO 8601 format.
+        readOnly: true
+        title: Date of Last List Subscribe
+        type: string
+      last_unsub_date:
+        description: The date and time of the last time someone unsubscribed from this list in ISO 8601 format.
+        readOnly: true
+        title: Date of Last List Unsubscribe
+        type: string
+      member_count:
+        description: The number of active members in the list.
+        readOnly: true
+        title: Member Count
+        type: integer
+      member_count_since_send:
+        description: The number of active members in the list since the last campaign was sent.
+        readOnly: true
+        title: Member Count Since Send
+        type: integer
+      merge_field_count:
+        description: "The number of merge vars for this list (not EMAIL, which is required)."
+        readOnly: true
+        title: Merge Var Count
+        type: integer
+      open_rate:
+        description: "The average open rate (a percentage represented as a number between 0 and 100) per campaign for the list (not returned if we haven't calculated it yet)."
+        readOnly: true
+        title: Open Rate
+        type: number
+      target_sub_rate:
+        description: "The target number of subscriptions per month for the list to keep it growing (not returned if we haven't calculated it yet)."
+        readOnly: true
+        title: Average Subscription Rate
+        type: number
+      total_contacts:
+        description: "The number of contacts in the list, including subscribed, unsubscribed, pending, cleaned, deleted, transactional, and those that need to be reconfirmed."
+        readOnly: true
+        title: Total Contacts
+        type: integer
+      unsubscribe_count:
+        description: The number of members who have unsubscribed from the list.
+        readOnly: true
+        title: Unsubscribe Count
+        type: integer
+      unsubscribe_count_since_send:
+        description: The number of members who have unsubscribed since the last campaign was sent.
+        readOnly: true
+        title: Unsubscribe Count Since Send
+        type: integer
+    readOnly: true
+    title: Statistics
+    type: object
+  subscribe_url_long:
+    description: "The full version of this list's subscribe form (host will vary)."
+    readOnly: true
+    title: Subscribe URL Long
+    type: string
+  subscribe_url_short:
+    description: "Our [EepURL shortened](https://mailchimp.com/help/share-your-signup-form/) version of this list's subscribe form."
+    readOnly: true
+    title: Subscribe URL Short
+    type: string
+  use_archive_bar:
+    default: false
+    description: "Whether campaigns for this list use the [Archive Bar](https://mailchimp.com/help/about-email-campaign-archives-and-pages/) in archives by default."
+    title: Use Archive Bar
+    type: boolean
+  visibility:
+    description: "Whether this list is [public or private](https://mailchimp.com/help/about-list-publicity/)."
+    title: Visibility
+    type: string
+  web_id:
+    description: "The ID used in the Mailchimp web application. View this list in your Mailchimp account at `https://{dc}.admin.mailchimp.com/lists/members/?id={web_id}`."
+    readOnly: true
+    title: List Web ID
+    type: integer
+required:
+  - id
+title: Subscriber List
+type: object

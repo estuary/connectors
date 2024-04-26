@@ -1,0 +1,34 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-mailchimp:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-mailchimp:v2"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: lists
+          syncMode: incremental
+          cursorField:
+            - date_created
+        target: acmeCo/lists
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+          cursorField:
+            - create_time
+        target: acmeCo/campaigns
+      - resource:
+          stream: email_activity
+          syncMode: incremental
+          cursorField:
+            - timestamp
+        target: acmeCo/email_activity
+      - resource:
+          stream: reports
+          syncMode: incremental
+          cursorField:
+            - send_time
+        target: acmeCo/reports
