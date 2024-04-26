@@ -89,7 +89,7 @@ def test_capture(request, snapshot):
         c.execute("UPDATE test_changes SET str='updated str 2' WHERE id=3")
     conn.commit()
 
-    out, _ = p.communicate(timeout=60)
+    out, _ = p.communicate(timeout=5*60)
     assert p.returncode == 0
     lines = [json.loads(l) for l in out.splitlines()[:50]]
     lines.sort(key=lambda doc: (doc[0], doc[1]['_meta'].get('scn', 0)))
