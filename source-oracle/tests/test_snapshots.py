@@ -62,7 +62,7 @@ def test_capture(request, snapshot):
             "--sessions",
             "1,1,1",
             "--delay",
-            "1s",
+            "2s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -76,14 +76,14 @@ def test_capture(request, snapshot):
         c.execute("INSERT INTO test_changes(id, str) VALUES (3, 'record 3')")
     conn.commit()
 
-    time.sleep(5)
+    time.sleep(3)
 
     with conn.cursor() as c:
         c.execute("DELETE FROM test_changes WHERE id=2")
         c.execute("UPDATE test_changes SET str='updated str'")
     conn.commit()
 
-    time.sleep(5)
+    time.sleep(3)
 
     with conn.cursor() as c:
         c.execute("UPDATE test_changes SET str='updated str 2' WHERE id=3")
@@ -93,7 +93,7 @@ def test_capture(request, snapshot):
     assert p.returncode == 0
     lines = [json.loads(l) for l in out.splitlines()[:50]]
     # sort the items to make snapshots more deterministic
-    lines.sort(key=lambda doc: (doc[0], doc[1]['_meta'].get('scn', 0)))
+    lines.sort(key=lambda doc: (doc[0], doc[1]['ID'], doc[1]['_meta'].get('scn', 0)))
 
     # clean up snapshot from non-deterministic values
     for _, doc in lines:
