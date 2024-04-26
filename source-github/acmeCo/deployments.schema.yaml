@@ -1,18 +1,75 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
+  url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  task:
+    type:
+      - "null"
+      - string
+  original_environment:
+    type:
+      - "null"
+      - string
+  environment:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
   created_at:
+    type: string
     format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  statuses_url:
+    type:
+      - "null"
+      - string
+  repository_url:
     type:
       - "null"
       - string
   creator:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -28,42 +85,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -72,41 +93,57 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
-      url:
+      site_admin:
         type:
           - "null"
-          - string
-    type: object
-  description:
+          - boolean
+  sha:
     type:
       - "null"
       - string
-  environment:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  node_id:
-    type:
-      - "null"
-      - string
-  original_environment:
+  ref:
     type:
       - "null"
       - string
   payload:
     oneOf:
-      - additionalProperties: true
+      - type: object
         properties: {}
-        type: object
+        additionalProperties: true
       - type: string
       - type: "null"
+  transient_environment:
+    type:
+      - "null"
+      - boolean
+  production_environment:
+    type:
+      - "null"
+      - boolean
   performed_via_github_app:
+    type:
+      - "null"
+      - object
     properties:
       description:
         type:
@@ -137,73 +174,35 @@ properties:
           - string
           - "null"
       owner:
+        type:
+          - object
+          - "null"
         properties:
           id:
-            format: integer
             type:
               - string
               - integer
               - "null"
+            format: integer
           type:
             type:
               - string
               - "null"
-        type:
-          - object
-          - "null"
       slug:
         type:
           - string
           - "null"
       updated_at:
-        format: date-time
         type:
           - string
           - "null"
-    type:
-      - "null"
-      - object
-  production_environment:
-    type:
-      - "null"
-      - boolean
-  ref:
-    type:
-      - "null"
-      - string
+        format: date-time
   repository:
-    type:
-      - "null"
-      - string
-  repository_url:
-    type:
-      - "null"
-      - string
-  sha:
-    type:
-      - "null"
-      - string
-  statuses_url:
-    type:
-      - "null"
-      - string
-  task:
-    type:
-      - "null"
-      - string
-  transient_environment:
-    type:
-      - "null"
-      - boolean
-  updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  url:
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+    type: string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

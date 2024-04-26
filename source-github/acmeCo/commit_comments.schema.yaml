@@ -1,34 +1,26 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  author_association:
-    type:
-      - "null"
-      - string
-  body:
-    type:
-      - "null"
-      - string
-  commit_id:
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
+  repository:
+    type: string
   html_url:
+    type:
+      - "null"
+      - string
+  url:
     type:
       - "null"
       - string
   id:
     type: integer
-  line:
+  node_id:
     type:
       - "null"
-      - integer
-  node_id:
+      - string
+  body:
     type:
       - "null"
       - string
@@ -40,25 +32,40 @@ properties:
     type:
       - "null"
       - integer
-  repository:
-    type:
-      - string
-  updated_at:
-    format: date-time
+  line:
     type:
       - "null"
-      - string
-  url:
+      - integer
+  commit_id:
     type:
       - "null"
       - string
   user:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -74,42 +81,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -118,17 +89,87 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  author_association:
+    type:
+      - "null"
+      - string
+  reactions:
+    type: object
+    properties:
       url:
         type:
           - "null"
           - string
-    type:
-      - "null"
-      - object
-required:
-  - id
-type: object
+      total_count:
+        type:
+          - "null"
+          - integer
+      "+1":
+        type:
+          - "null"
+          - integer
+      "-1":
+        type:
+          - "null"
+          - integer
+      laugh:
+        type:
+          - "null"
+          - integer
+      hooray:
+        type:
+          - "null"
+          - integer
+      confused:
+        type:
+          - "null"
+          - integer
+      heart:
+        type:
+          - "null"
+          - integer
+      rocket:
+        type:
+          - "null"
+          - integer
+      eyes:
+        type:
+          - "null"
+          - integer
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

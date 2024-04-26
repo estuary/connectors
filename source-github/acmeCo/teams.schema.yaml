@@ -1,55 +1,16 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  description:
-    type:
-      - "null"
-      - string
-  html_url:
+  organization:
     type:
       - "null"
       - string
   id:
     type: integer
-  members_url:
-    type:
-      - "null"
-      - string
-  name:
-    type:
-      - "null"
-      - string
   node_id:
-    type:
-      - "null"
-      - string
-  organization:
-    type:
-      - "null"
-      - string
-  parent:
-    additionalProperties: true
-    properties: {}
-    type:
-      - "null"
-      - object
-  permission:
-    type:
-      - "null"
-      - string
-  privacy:
-    type:
-      - "null"
-      - string
-  repositories_url:
-    type:
-      - "null"
-      - string
-  repository:
-    type:
-      - "null"
-      - string
-  slug:
     type:
       - "null"
       - string
@@ -57,6 +18,52 @@ properties:
     type:
       - "null"
       - string
-required:
-  - id
-type: object
+  html_url:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  slug:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  privacy:
+    type:
+      - "null"
+      - string
+  notification_setting:
+    type:
+      - "null"
+      - string
+  permission:
+    type:
+      - "null"
+      - string
+  members_url:
+    type:
+      - "null"
+      - string
+  repositories_url:
+    type:
+      - "null"
+      - string
+  parent:
+    type:
+      - "null"
+      - object
+    properties: {}
+    additionalProperties: true
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

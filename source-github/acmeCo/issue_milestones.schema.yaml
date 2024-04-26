@@ -1,27 +1,71 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
 properties:
-  closed_at:
-    format: date-time
+  repository:
+    type: string
+  url:
     type:
       - "null"
       - string
-  closed_issues:
+  html_url:
+    type:
+      - "null"
+      - string
+  labels_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  number:
     type:
       - "null"
       - integer
-  created_at:
-    format: date-time
+  state:
+    type:
+      - "null"
+      - string
+  title:
+    type:
+      - "null"
+      - string
+  description:
     type:
       - "null"
       - string
   creator:
+    type: object
     properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
       avatar_url:
         type:
           - "null"
           - string
-      events_url:
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
         type:
           - "null"
           - string
@@ -37,42 +81,6 @@ properties:
         type:
           - "null"
           - string
-      gravatar_id:
-        type:
-          - "null"
-          - string
-      html_url:
-        type:
-          - "null"
-          - string
-      id:
-        type:
-          - "null"
-          - integer
-      login:
-        type:
-          - "null"
-          - string
-      node_id:
-        type:
-          - "null"
-          - string
-      organizations_url:
-        type:
-          - "null"
-          - string
-      received_events_url:
-        type:
-          - "null"
-          - string
-      repos_url:
-        type:
-          - "null"
-          - string
-      site_admin:
-        type:
-          - "null"
-          - boolean
       starred_url:
         type:
           - "null"
@@ -81,68 +89,58 @@ properties:
         type:
           - "null"
           - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
       type:
         type:
           - "null"
           - string
-      url:
+      site_admin:
         type:
           - "null"
-          - string
-    type:
-      - "null"
-      - object
-  description:
-    type:
-      - "null"
-      - string
-  due_on:
-    format: date-time
-    type:
-      - "null"
-      - string
-  html_url:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  labels_url:
-    type:
-      - "null"
-      - string
-  node_id:
-    type:
-      - "null"
-      - string
-  number:
-    type:
-      - "null"
-      - integer
+          - boolean
   open_issues:
     type:
       - "null"
       - integer
-  repository:
-    type:
-      - string
-  state:
+  closed_issues:
     type:
       - "null"
-      - string
-  title:
-    type:
-      - "null"
-      - string
-  updated_at:
+      - integer
+  created_at:
+    type: string
     format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  closed_at:
     type:
       - "null"
       - string
-  url:
+    format: date-time
+  due_on:
     type:
       - "null"
       - string
-required:
-  - id
-type: object
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id

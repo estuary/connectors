@@ -15,13 +15,22 @@
     "user": {
       "title": "Simple User",
       "description": "A GitHub user.",
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "name": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "email": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "login": {
           "type": "string"
@@ -36,7 +45,10 @@
           "type": "string"
         },
         "gravatar_id": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "url": {
           "type": "string"
@@ -84,7 +96,10 @@
       }
     },
     "body": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "state": {
       "type": "string"
@@ -105,7 +120,9 @@
               "type": "string"
             }
           },
-          "required": ["href"]
+          "required": [
+            "href"
+          ]
         },
         "pull_request": {
           "type": "object",
@@ -114,10 +131,15 @@
               "type": "string"
             }
           },
-          "required": ["href"]
+          "required": [
+            "href"
+          ]
         }
       },
-      "required": ["html", "pull_request"]
+      "required": [
+        "html",
+        "pull_request"
+      ]
     },
     "submitted_at": {
       "type": "string",

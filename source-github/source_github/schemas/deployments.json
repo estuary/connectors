@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["id"],
   "properties": {
     "url": {
       "type": ["null", "string"]
     },
     "id": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "node_id": {
       "type": ["null", "string"]
@@ -68,7 +69,46 @@
       "type": ["null", "boolean"]
     },
     "performed_via_github_app": {
-      "type": ["null", "string"]
+        "type": ["null", "object"],
+        "properties": {
+            "description": {
+                "type": ["null", "string"]
+            },
+            "events": {
+                "type": ["array", "null"]
+            },
+            "external_url": {
+                "type": ["string", "null"]
+            },
+            "html_url": {
+                "type": ["string", "null"]
+            },
+            "id": {
+                "type": ["integer", "null"]
+            },
+            "name": {
+                "type": ["string", "null"]
+            },
+            "node_id": {
+                "type": ["string", "null"]
+            },
+            "owner": {
+                "type": ["object", "null"],
+                "properties": {
+                    "id": { "type": ["string", "integer", "null"], "format": "integer" },
+                    "type": {
+                        "type": ["string", "null"]
+                    }
+                }
+            },
+            "slug": {
+                "type": ["string", "null"]
+            },
+            "updated_at": {
+                "type": ["string", "null"],
+                "format": "date-time"
+            }
+        }
     },
     "repository": {
       "type": "string"

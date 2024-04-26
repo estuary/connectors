@@ -27,7 +27,10 @@ def select_user_fields(user):
 
 
 def get_query_pull_requests(owner, name, first, after, direction):
-    kwargs = {"first": first, "order_by": {"field": "UPDATED_AT", "direction": direction}}
+    kwargs = {
+        "first": first,
+        "order_by": {"field": "UPDATED_AT", "direction": direction},
+    }
     if after:
         kwargs["after"] = after
 
@@ -55,14 +58,19 @@ def get_query_pull_requests(owner, name, first, after, direction):
     reviews = pull_requests.nodes.reviews(first=100, __alias__="review_comments")
     reviews.total_count()
     reviews.nodes.comments.__fields__(total_count=True)
-    user = pull_requests.nodes.merged_by(__alias__="merged_by").__as__(_schema_root.User)
+    user = pull_requests.nodes.merged_by(__alias__="merged_by").__as__(
+        _schema_root.User
+    )
     select_user_fields(user)
     pull_requests.page_info.__fields__(has_next_page=True, end_cursor=True)
     return str(op)
 
 
 def get_query_projectsV2(owner, name, first, after, direction):
-    kwargs = {"first": first, "order_by": {"field": "UPDATED_AT", "direction": direction}}
+    kwargs = {
+        "first": first,
+        "order_by": {"field": "UPDATED_AT", "direction": direction},
+    }
     if after:
         kwargs["after"] = after
 
@@ -103,7 +111,10 @@ def get_query_reviews(owner, name, first, after, number=None):
     if number:
         pull_request = repository.pull_request(number=number)
     else:
-        kwargs = {"first": first, "order_by": {"field": "UPDATED_AT", "direction": "ASC"}}
+        kwargs = {
+            "first": first,
+            "order_by": {"field": "UPDATED_AT", "direction": "ASC"},
+        }
         if after:
             kwargs["after"] = after
         pull_requests = repository.pull_requests(**kwargs)
@@ -165,7 +176,6 @@ def get_query_issue_reactions(owner, name, first, after, number=None):
 
 
 class QueryReactions:
-
     # AVERAGE_REVIEWS - optimal number of reviews to fetch inside every pull request.
     # If we try to fetch too many (up to 100) we will spend too many scores of query cost.
     # https://docs.github.com/en/graphql/overview/resource-limitations#calculating-a-rate-limit-score-before-running-the-call
@@ -174,7 +184,9 @@ class QueryReactions:
     AVERAGE_COMMENTS = 2
     AVERAGE_REACTIONS = 2
 
-    def get_query_root_repository(self, owner: str, name: str, first: int, after: Optional[str] = None):
+    def get_query_root_repository(
+        self, owner: str, name: str, first: int, after: Optional[str] = None
+    ):
         """
         Get GraphQL query which allows fetching reactions starting from the repository:
         query {
@@ -274,18 +286,24 @@ class QueryReactions:
         self._select_reactions(comment, first, after)
         return str(op)
 
-    def _select_reactions(self, comment: Selector, first: int, after: Optional[str] = None):
+    def _select_reactions(
+        self, comment: Selector, first: int, after: Optional[str] = None
+    ):
         kwargs = {"first": first}
         if after:
             kwargs["after"] = after
         reactions = comment.reactions(**kwargs)
         reactions.page_info.__fields__(has_next_page=True, end_cursor=True)
         reactions.total_count()
-        reactions.nodes.__fields__(id="node_id", database_id="id", content=True, created_at="created_at")
+        reactions.nodes.__fields__(
+            id="node_id", database_id="id", content=True, created_at="created_at"
+        )
         select_user_fields(reactions.nodes.user())
         return reactions
 
-    def _select_comments(self, review: Selector, first: int, after: Optional[str] = None):
+    def _select_comments(
+        self, review: Selector, first: int, after: Optional[str] = None
+    ):
         kwargs = {"first": first}
         if after:
             kwargs["after"] = after
@@ -296,7 +314,9 @@ class QueryReactions:
         comments.nodes.database_id(__alias__="id")
         return comments
 
-    def _select_reviews(self, pull_request: Selector, first: int, after: Optional[str] = None):
+    def _select_reviews(
+        self, pull_request: Selector, first: int, after: Optional[str] = None
+    ):
         kwargs = {"first": first}
         if after:
             kwargs["after"] = after
@@ -319,9 +339,17 @@ class CursorStorage:
 
     def add_cursor(self, typename, cursor, total_count, parent_id=None):
         priority = self.typename_to_prio[typename]
-        heapq.heappush(self.storage, (priority, next(self.count), (typename, cursor, total_count, parent_id)))
+        heapq.heappush(
+            self.storage,
+            (priority, next(self.count), (typename, cursor, total_count, parent_id)),
+        )
 
     def get_cursor(self):
         if self.storage:
             _, _, c = heapq.heappop(self.storage)
-            return {"typename": c[0], "cursor": c[1], "total_count": c[2], "parent_id": c[3]}
+            return {
+                "typename": c[0],
+                "cursor": c[1],
+                "total_count": c[2],
+                "parent_id": c[3],
+            }
