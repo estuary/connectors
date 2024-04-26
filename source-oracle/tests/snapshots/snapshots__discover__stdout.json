@@ -282,5 +282,81 @@
     "key": [
       "/ID"
     ]
+  },
+  {
+    "recommendedName": "TEST_CHANGES",
+    "resourceConfig": {
+      "name": "TEST_CHANGES",
+      "interval": "PT0S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "ID": {
+          "description": "Primary Key",
+          "title": "Id",
+          "type": "integer"
+        },
+        "STR": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Str"
+        }
+      },
+      "required": [
+        "ID"
+      ],
+      "title": "TEST_CHANGES",
+      "type": "object"
+    },
+    "key": [
+      "/ID"
+    ]
   }
 ]
