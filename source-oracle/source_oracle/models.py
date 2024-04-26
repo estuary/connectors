@@ -130,19 +130,16 @@ class OracleColumn(BaseModel, extra="forbid"):
     )
     nullable: bool = Field(default=True, alias="NULLABLE")
 
-    @property
     @computed_field
-    def is_datetime(self):
-        return self.data_type.startswith(self.Type.TIMESTAMP) or self.data_type == col.Type.DATE
+    def is_datetime(self) -> bool:
+        return self.data_type.startswith(self.Type.TIMESTAMP) or self.data_type == self.Type.DATE
 
-    @property
     @computed_field
-    def has_timezone(self):
+    def has_timezone(self) -> bool:
         return self.data_type.find(self.Type.WITH_TIMEZONE) > -1 or self.data_type.find(self.Type.WITH_LOCAL_TIMEZONE) > -1
 
-    @property
     @computed_field
-    def cast_to_string(self):
+    def cast_to_string(self) -> bool:
         return self.data_type.startswith(self.Type.INTERVAL)
 
     is_pk: bool = Field(default=False, alias="COL_IS_PK", description="Calculated by join on all_constraints and all_cons_columns")
@@ -200,12 +197,11 @@ def build_table(
             field_type = int
         elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type = str
-        elif col.is_datetime and col.has_timmezone:
+        elif col.is_datetime and col.has_timezone:
             field_type = datetime
         elif col.is_datetime:
             field_type = str
         elif col.data_type.startswith(col.Type.INTERVAL):
-            col.cast_to_string = True
             field_type = str
         else:
             raise NotImplementedError(f"unsupported type {col}")
