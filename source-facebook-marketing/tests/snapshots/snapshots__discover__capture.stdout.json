@@ -39181,6 +39181,7 @@
       ],
       "required": [
         "actor_id",
+        "application_id",
         "event_time",
         "event_type",
         "object_id"
