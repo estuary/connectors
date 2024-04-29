@@ -1,5 +1,5 @@
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeVar
 
@@ -92,6 +92,7 @@ class Names(StrEnum):
     companies = auto()
     contacts = auto()
     deals = auto()
+    email_events = auto()
     engagements = auto()
     line_items = auto()
     properties = auto()
@@ -354,3 +355,41 @@ class OldRecentEngagements(BaseModel):
 class OldRecentTicket(BaseModel):
     timestamp: int
     objectId: int
+
+
+# EmailEvent and EmailEventsResponse represent an email event and the shape of the email events API
+# response, respectively.
+
+class EmailEvent(BaseDocument, extra="allow"):
+    id: str
+    created: AwareDatetime
+    type: Literal[
+        "SENT",
+        "DROPPED",
+        "PROCESSED",
+        "DELIVERED",
+        "DEFERRED",
+        "BOUNCE",
+        "OPEN",
+        "CLICK",
+        "STATUSCHANGE",
+        "SPAMREPORT",
+        "SUPPRESSED",
+        "UNBOUNCE", # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
+    ] = Field(
+        default="UNBOUNCE",
+        json_schema_extra=lambda x: x.pop('default'),
+    )
+
+
+
+class EmailEventsResponse(BaseModel, extra="forbid"):
+    hasMore: bool
+    offset: str
+    events: list[EmailEvent]
+
+# The email events API is eventually consistent, and there may be delays in receiving particularly
+# recent events. As a result, we can't count on it being monotonic, and do the best we can to assume
+# its monotonic by only capturing documents that are older than HORIZON_DELTA from the present. The
+# value chosen here is largely arbitrary as there is no documented maximum event delay.
+EMAIL_EVENT_HORIZON_DELTA: timedelta = timedelta(minutes=30)
