@@ -131,7 +131,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	}
 	defer client.Close()
 
-	bindings, err := discoverCollections(ctx, client)
+	bindings, err := discoverCollections(ctx, client, cfg.Advanced.ExtraCollections)
 	if err != nil {
 		return nil, fmt.Errorf("discovery error: %w", err)
 	}
@@ -155,7 +155,7 @@ type discoveryState struct {
 	}
 }
 
-func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.Response_Discovered_Binding, error) {
+func discoverCollections(ctx context.Context, client *firestore.Client, extraCollections []string) ([]*pc.Response_Discovered_Binding, error) {
 	scanners, ctx := errgroup.WithContext(ctx)
 	var state = &discoveryState{
 		client:        client,
@@ -179,11 +179,17 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 		return nil, err
 	}
 
-	// Convert the set of resources which exist into bindings and return them.
 	// Locking the mutex here should be unnecessary as all worker threads have
-	// completed.
+	// completed, but we might as well do it anyway.
 	state.shared.Lock()
 	defer state.shared.Unlock()
+
+	// Add all resource paths specified via the advanced 'ExtraCollections' config.
+	for _, extraCollection := range extraCollections {
+		state.shared.resources[extraCollection] = struct{}{}
+	}
+
+	// Convert the set of resources which exist into bindings and return them.
 	var bindings []*pc.Response_Discovered_Binding
 	for resourcePath := range state.shared.resources {
 		resourceJSON, err := json.Marshal(resource{

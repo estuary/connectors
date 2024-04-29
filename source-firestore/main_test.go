@@ -232,7 +232,9 @@ func TestDiscovery(t *testing.T) {
 	client.Upsert(ctx, t, "users/2/docs/3", `{"foo": "baz", "asdf": 789}`)
 	client.Upsert(ctx, t, "users/2/docs/4", `{"foo": "baz", "asdf": 1000}`)
 	time.Sleep(1 * time.Second)
-	simpleCapture(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
+	var cs = simpleCapture(t)
+	cs.EndpointSpec.(*config).Advanced.ExtraCollections = []string{"flow_source_tests/*/nonexistent/*/extra/*/collection"}
+	cs.VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
 }
 
 func TestNestedCollections(t *testing.T) {
