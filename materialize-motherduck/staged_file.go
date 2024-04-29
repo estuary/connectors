@@ -155,7 +155,7 @@ func (f *stagedFile) allFiles() []string {
 	return out
 }
 
-func (f *stagedFile) flush(ctx context.Context) (func(context.Context), error) {
+func (f *stagedFile) flush() (func(context.Context), error) {
 	if err := f.flushFile(); err != nil {
 		return nil, err
 	}

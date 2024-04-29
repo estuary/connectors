@@ -67,10 +67,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	}
 
-	if err := migrateState(&prevState, open.Capture.Bindings); err != nil {
-		return fmt.Errorf("migrating previous state: %w", err)
-	}
-
 	updatedResourceStates, err := initResourceStates(prevState.Resources, open.Capture.Bindings)
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
@@ -108,51 +104,8 @@ type capture struct {
 
 type captureState struct {
 	sync.RWMutex
-	Resources    map[boilerplate.StateKey]*resourceState `json:"bindingStateV1,omitempty"`
-	OldResources map[string]*resourceState               `json:"Resources,omitempty"` // TODO(whb): Remove once all captures have migrated.
-	stateKeys    map[string]boilerplate.StateKey         // Allow for lookups of the stateKey from a document path.
-}
-
-func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) error {
-	if state.Resources != nil && state.OldResources != nil {
-		return fmt.Errorf("application error: both Resources and OldResources were non-nil")
-	} else if state.Resources != nil {
-		log.Info("skipping state migration since it's already done")
-		return nil
-	}
-
-	state.Resources = make(map[boilerplate.StateKey]*resourceState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		ll := log.WithFields(log.Fields{
-			"stateKey": b.StateKey,
-			"path":     res.Path,
-		})
-
-		stateFromOld, ok := state.OldResources[res.Path]
-		if !ok {
-			// This may happen if the connector has never emitted any checkpoints with data for this
-			// binding.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Resources[boilerplate.StateKey(b.StateKey)] = stateFromOld
-		ll.Info("migrated binding state")
-	}
-
-	state.OldResources = nil
-
-	return nil
+	Resources map[boilerplate.StateKey]*resourceState `json:"bindingStateV1,omitempty"`
+	stateKeys map[string]boilerplate.StateKey         // Allow for lookups of the stateKey from a document path.
 }
 
 type resourceState struct {
@@ -368,10 +321,29 @@ func (c *capture) Run(ctx context.Context) error {
 		}
 		if resourceState.Backfill == nil || resourceState.Backfill.Completed {
 			// Do nothing when no backfill is required
-		} else if resumeState, ok := backfillCollections[collectionID]; !ok {
+			continue
+		}
+		log.WithFields(log.Fields{
+			"resource":   resourceState.path,
+			"collection": collectionID,
+			"startAfter": resourceState.Backfill.StartAfter,
+			"cursor":     resourceState.Backfill.Cursor,
+		}).Debug("backfill required for binding")
+		if resumeState, ok := backfillCollections[collectionID]; !ok {
 			backfillCollections[collectionID] = resourceState.Backfill
 		} else if !resumeState.Equal(resourceState.Backfill) {
-			return fmt.Errorf("internal error: backfill state mismatch for resource %q with collection ID %q", resourceState.path, collectionID)
+			log.WithFields(log.Fields{
+				"resource":   resourceState.path,
+				"collection": collectionID,
+			}).Warn("backfill state mismatch, restarting all impacted collections")
+
+			resumeState.Cursor = ""
+			resumeState.MTime = time.Time{}
+			if resumeState.StartAfter.After(resourceState.Backfill.StartAfter) {
+				// Take the minimum StartAfter time across all collections so that we begin
+				// backfilling the new one as soon as possible.
+				resumeState.StartAfter = resourceState.Backfill.StartAfter
+			}
 		}
 	}
 
@@ -433,14 +405,20 @@ func (c *capture) Run(ctx context.Context) error {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
 		eg.Go(func() error {
-			return c.StreamChanges(ctx, rpcClient, collectionID, startTime)
+			if err := c.StreamChanges(ctx, rpcClient, collectionID, startTime); err != nil {
+				return fmt.Errorf("error streaming changes for collection %q: %w", collectionID, err)
+			}
+			return nil
 		})
 	}
 	for collectionID, resumeState := range backfillCollections {
 		var collectionID, resumeState = collectionID, resumeState // Copy loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting backfill worker")
 		eg.Go(func() error {
-			return c.BackfillAsync(ctx, libraryClient, collectionID, resumeState)
+			if err := c.BackfillAsync(ctx, libraryClient, collectionID, resumeState); err != nil {
+				return fmt.Errorf("error backfilling collection %q: %w", collectionID, err)
+			}
+			return nil
 		})
 	}
 	defer log.Info("capture terminating")
@@ -653,7 +631,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 	var listenClient firestore_pb.Firestore_ListenClient
 	var numRestarts, numDocuments int
 	var isCurrent, catchupStreaming bool
-	var catchupStarted time.Time
 	for {
 		if listenClient == nil {
 			var err error
@@ -683,7 +660,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					}
 				}()
 			}
-			catchupStarted = time.Now()
 		}
 
 		resp, err := listenClient.Recv()
@@ -744,8 +720,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					return fmt.Errorf("unexpected target ID %d", tc.TargetIds[0])
 				}
 			case firestore_pb.TargetChange_REMOVE:
-				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
-					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, skipping to latest changes (go.estuary.dev/YRDsKd)")
+				listenClient = nil
+				if catchupStreaming {
+					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up, skipping to latest changes (go.estuary.dev/YRDsKd)")
 					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
@@ -755,11 +732,12 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						logEntry.Fatal("forcing connector restart to establish consistency")
 					})
 					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
-					listenClient = nil
 				} else if tc.Cause != nil {
-					return fmt.Errorf("unexpected TargetChange.REMOVE: %v", tc.Cause.Message)
+					logEntry.WithField("cause", tc.Cause.Message).Warn("unexpected TargetChange.REMOVE")
+					time.Sleep(retryInterval)
 				} else {
-					return fmt.Errorf("unexpected TargetChange.REMOVE")
+					logEntry.Warn("unexpected TargetChange.REMOVE")
+					time.Sleep(retryInterval)
 				}
 			case firestore_pb.TargetChange_CURRENT:
 				if log.IsLevelEnabled(log.TraceLevel) {
@@ -927,6 +905,10 @@ func translateValue(val *firestore_pb.Value) (interface{}, error) {
 	case *firestore_pb.Value_DoubleValue:
 		if math.IsNaN(val.DoubleValue) {
 			return "NaN", nil
+		} else if math.IsInf(val.DoubleValue, +1) {
+			return "Infinity", nil
+		} else if math.IsInf(val.DoubleValue, -1) {
+			return "-Infinity", nil
 		}
 		return val.DoubleValue, nil
 	case *firestore_pb.Value_TimestampValue:
@@ -972,6 +954,10 @@ func sanitizeValue(x interface{}) interface{} {
 	case float64:
 		if math.IsNaN(x) {
 			return "NaN"
+		} else if math.IsInf(x, +1) {
+			return "Infinity"
+		} else if math.IsInf(x, -1) {
+			return "-Infinity"
 		}
 	case []interface{}:
 		for idx, value := range x {

@@ -14,6 +14,8 @@ on:
       - "source-hubspot-native/**"
       - "source-hubspot/**"
       - "source-mailchimp/**"
+      - "source-notion/**"
+      - "source-linkedin-pages/**"
   pull_request:
     branches: [main]
     paths:
@@ -27,6 +29,8 @@ on:
       - "source-hubspot-native/**"
       - "source-hubspot/**"
       - "source-mailchimp/**"
+      - "source-notion/**"
+      - "source-linkedin-pages/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -77,6 +81,14 @@ jobs:
           - name: source-mailchimp
             type: capture
             version: v2
+            usage_rate: "1.0"
+          - name: source-notion
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-linkedin-pages
+            type: capture
+            version: v1
             usage_rate: "1.0"
 
     steps:

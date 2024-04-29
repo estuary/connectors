@@ -154,13 +154,6 @@ func (c *config) toS3Client(ctx context.Context) (*s3.Client, error) {
 	return s3.NewFromConfig(awsCfg), nil
 }
 
-func (c *config) metaSchema() string {
-	if c.Schema == "" {
-		return "public"
-	}
-	return c.Schema
-}
-
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)."`
@@ -311,14 +304,13 @@ func newTransactor(
 	for _, b := range open.Materialization.Bindings {
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
-	is, err := sql.StdFetchInfoSchema(ctx, db, rsDialect, catalog, cfg.metaSchema(), resourcePaths)
+	is, err := sql.StdFetchInfoSchema(ctx, db, rsDialect, catalog, resourcePaths)
 	if err != nil {
 		return nil, err
 	}
 
 	for idx, target := range bindings {
 		if err = d.addBinding(
-			ctx,
 			idx,
 			target,
 			s3client,
@@ -354,7 +346,6 @@ type varcharColumnMeta struct {
 }
 
 func (t *transactor) addBinding(
-	ctx context.Context,
 	bindingIdx int,
 	target sql.Table,
 	client *s3.Client,

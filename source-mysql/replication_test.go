@@ -8,6 +8,10 @@ func TestIgnoreQueries(t *testing.T) {
 		`/* This is also a comment */`: true,
 		`BEGIN`:                        true,
 		`COMMIT`:                       true,
+		`CREATE DEFINER`:               true,
+		`CREATE OR REPLACE DEFINER`:    true,
+		`CREATE OR REPLACE ALGORITHM=UNDEFINED DEFINER`: true,
+		`CREATE ALGORITHM = TEMPTABLE DEFINER`:          true,
 
 		`CREATE USER IF NOT EXISTS flow_capture IDENTIFIED BY 'secret1234'`: true,
 

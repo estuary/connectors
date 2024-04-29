@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from pydantic import BaseModel, NonNegativeInt, PositiveInt
+from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field
 from typing import Any, Literal, TypeVar, Generic, Literal
 
 from .pydantic_polyfill import GenericModel
@@ -90,8 +90,14 @@ class ConnectorStateUpdate(GenericModel, Generic[ConnectorState]):
 
 
 class AccessToken(BaseModel):
-    credentials_title: Literal["Private App Credentials"]
-    access_token: str
+    credentials_title: Literal["Private App Credentials"] = Field(
+        default="Private App Credentials",
+        json_schema_extra={"type": "string"}
+    )
+    access_token: str = Field(
+        title="Access Token",
+        json_schema_extra={"secret": True},
+    )
 
 
 class BasicAuth(BaseModel):
@@ -110,10 +116,22 @@ class ValidationError(Exception):
 
 
 class BaseOAuth2Credentials(abc.ABC, BaseModel):
-    credentials_title: Literal["OAuth Credentials"]
-    client_id: str
-    client_secret: str
-    refresh_token: str
+    credentials_title: Literal["OAuth Credentials"] = Field(
+        default="OAuth Credentials",
+        json_schema_extra={"type": "string"}
+    )
+    client_id: str = Field(
+        title="Client Id",
+        json_schema_extra={"secret": True},
+    )
+    client_secret: str = Field(
+        title="Client Secret",
+        json_schema_extra={"secret": True},
+    )
+    refresh_token: str = Field(
+        title="Refresh Token",
+        json_schema_extra={"secret": True},
+    )
 
     @abc.abstractmethod
     def _you_must_build_oauth2_credentials_for_a_provider(self): ...

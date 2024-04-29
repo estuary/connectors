@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -12,19 +13,24 @@ import (
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/databricks/databricks-sql-go"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db       *stdsql.DB
+	cfg      *config
+	ep       *sql.Endpoint
+	wsClient *databricks.WorkspaceClient
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
@@ -32,78 +38,86 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 
 	db, err := stdsql.Open("databricks", cfg.ToURI())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.Credentials.PersonalAccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating workspace client: %w", err)
 	}
 
 	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
+		db:       db,
+		cfg:      cfg,
+		ep:       ep,
+		wsClient: wsClient,
 	}, nil
 }
 
-// InfoSchema for materialize-databricks is almost exactly the same as StdFetchInfoSchema, but
-// Databricks requires the information_schema view to be qualified with "system", at least on
-// some deployments.
-// TODO(whb): This should likely be refactored to use the Databricks WorkspaceClient, since queries
-// to the information_schema view will be non-responsive if the warehouse has gone to sleep -
-// assuming, of course, the WorkspaceClient is not also non-responsive if the warehouse is asleep.
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
 		sql.ToLocatePathFn(c.ep.Dialect.TableLocator),
 		c.ep.Dialect.ColumnLocator,
 	)
 
-	schemas := []string{c.ep.Dialect.Literal(c.cfg.SchemaName)}
+	rpSchemas := make(map[string]struct{})
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
-		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+		rpSchemas[databricksDialect.TableLocator(p).TableSchema] = struct{}{}
 	}
 
-	slices.Sort(schemas)
-	schemas = slices.Compact(schemas)
+	// Databricks' Tables API provides a free-form "metadata" field that is a JSON object containing
+	// some additional useful information.
+	type columnMeta struct {
+		Metadata struct {
+			Default json.RawMessage `json:"CURRENT_DEFAULT,omitempty"`
+		} `json:"metadata"`
+	}
 
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
-		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
-		from system.information_schema.columns
-		where table_catalog = %s
-		and table_schema in (%s);
-	`,
-		c.ep.Dialect.Literal(c.cfg.CatalogName),
-		strings.Join(schemas, ","),
-	))
+	// The table listing will fail if the schema doesn't already exist, so only attempt to list
+	// tables in schemas that do exist.
+	existingSchemas, err := c.ListSchemas(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("querying system.information_schema.columns: %w", err)
-	}
-	defer rows.Close()
-
-	type columnRow struct {
-		TableSchema            string
-		TableName              string
-		ColumnName             string
-		IsNullable             string
-		DataType               string
-		CharacterMaximumLength stdsql.NullInt64
-		ColumnDefault          stdsql.NullString
+		return nil, fmt.Errorf("listing schemas: %w", err)
 	}
 
-	for rows.Next() {
-		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
-			return nil, fmt.Errorf("scanning column row: %w", err)
+	for sc := range rpSchemas {
+		if !slices.Contains(existingSchemas, sc) {
+			log.WithField("schema", sc).Debug("not listing tables for schema since it doesn't exist")
+			continue
 		}
 
-		is.PushField(boilerplate.EndpointField{
-			Name:               c.ColumnName,
-			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
-			Type:               c.DataType,
-			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
-			HasDefault:         c.ColumnDefault.Valid,
-		}, c.TableSchema, c.TableName)
-	}
+		tableIter := c.wsClient.Tables.List(ctx, catalog.ListTablesRequest{
+			CatalogName: c.cfg.CatalogName,
+			SchemaName:  sc,
+		})
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err(): %w", err)
+		for tableIter.HasNext(ctx) {
+			t, err := tableIter.Next(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("iterating tables: %w", err)
+			}
+
+			is.PushResource(t.SchemaName, t.Name)
+
+			for _, c := range t.Columns {
+				var colMeta columnMeta
+				if err := json.Unmarshal([]byte(c.TypeJson), &colMeta); err != nil {
+					return nil, fmt.Errorf("unmarshalling column metadata: %w", err)
+				}
+
+				is.PushField(boilerplate.EndpointField{
+					Name:               c.Name,
+					Nullable:           c.Nullable,
+					Type:               string(c.TypeName),
+					CharacterMaxLength: 0, // TODO(whb): Currently not supported by us, although we could parse the metadata for VARCHAR columns.
+					HasDefault:         colMeta.Metadata.Default != nil,
+				}, t.SchemaName, t.Name)
+			}
+		}
 	}
 
 	return is, nil
@@ -159,23 +173,39 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}, nil
 }
 
-// TODO(whb): Consider using a WorkspaceClient here exclusively to check what we can and forego the
-// ping so that a sleeping warehouse doesn't hang on Validate.
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	listed, err := c.wsClient.Schemas.ListAll(ctx, catalog.ListSchemasRequest{
+		CatalogName: c.cfg.CatalogName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	schemaNames := make([]string, 0, len(listed))
+	for _, ls := range listed {
+		schemaNames = append(schemaNames, ls.Name)
+	}
+
+	return schemaNames, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	_, err := c.wsClient.Schemas.Create(ctx, catalog.CreateSchema{
+		CatalogName: c.cfg.CatalogName,
+		Name:        schemaName,
+	})
+
+	return err
+}
+
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:        fmt.Sprintf("%s/%s", c.cfg.Address, c.cfg.HTTPPath),
-		Token:       c.cfg.Credentials.PersonalAccessToken,
-		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-	})
-	if err != nil {
-		errs.Err(err)
-	}
-
 	var httpPathSplit = strings.Split(c.cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
-	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
+	var warehouseStopped = true
+	var warehouseErr error
+	if res, err := c.wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
 		errs.Err(err)
 	} else {
 		switch res.State {
@@ -184,23 +214,41 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 		case databricksSql.StateDeleting:
 			errs.Err(fmt.Errorf("The selected SQL Warehouse is being deleted, please use an active SQL warehouse."))
 		case databricksSql.StateStarting:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is starting, please wait a couple of minutes before trying again."))
+			warehouseErr = fmt.Errorf("The selected SQL Warehouse is starting, please wait a couple of minutes before trying again.")
 		case databricksSql.StateStopped:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopped, please start the SQL warehouse and try again."))
+			warehouseErr = fmt.Errorf("The selected SQL Warehouse is stopped, please start the SQL warehouse and try again.")
 		case databricksSql.StateStopping:
-			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again."))
+			warehouseErr = fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again.")
+		case databricksSql.StateRunning:
+			warehouseStopped = false
 		}
 	}
 
-	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
-	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
-	// bail out well before then. Note that it is normal for Databricks warehouses to go offline
-	// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
-	// process however we don't want to wait 5 minutes as that does not create a good UX for the
-	// user in the UI
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
+	if errs.Len() > 0 {
+		return errs
+	}
 
+	if warehouseStopped {
+		// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
+		// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
+		// bail out well before then. Note that it is normal for Databricks warehouses to go offline
+		// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
+		// process however we don't want to wait 5 minutes as that does not create a good UX for the
+		// user in the UI
+		if r, err := c.wsClient.Warehouses.Start(ctx, databricksSql.StartRequest{Id: warehouseId}); err != nil {
+			errs.Err(fmt.Errorf("Could not start the warehouse: %w", err))
+		} else if _, err := r.GetWithTimeout(60 * time.Second); err != nil {
+			errs.Err(warehouseErr)
+		}
+
+		if errs.Len() > 0 {
+			return errs
+		}
+	}
+
+	// We avoid running this ping if the warehouse is not awake, see
+	// the issue below for more information on why:
+	// https://github.com/databricks/databricks-sql-go/issues/198
 	if err := c.db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var execErr dbsqlerr.DBExecutionError

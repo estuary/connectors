@@ -58,7 +58,7 @@ var pgDialect = func() sql.Dialect {
 		sql.ColValidation{Types: []string{"numeric"}, Validate: sql.NumericCompatible},
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"text"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"text", "character varying"}, Validate: sql.StringCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
 		sql.ColValidation{Types: []string{"interval"}, Validate: sql.DurationCompatible},

@@ -114,6 +114,49 @@ func TestBasicDatatypes(t *testing.T) {
 	})
 }
 
+func TestDecimals(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "75319739"
+	var tableName = fmt.Sprintf("test.decimals_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, x NUMERIC(6, 4), y NUMERIC(200, 100))", tableName))
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+	var insertQuery = fmt.Sprintf("INSERT INTO %s VALUES ($1,$2,$3)", tableName)
+	executeControlQuery(ctx, t, control, insertQuery, 0, 12.3456, 1234567890)
+	executeControlQuery(ctx, t, control, insertQuery, 1, 98.7654, "9876543210987654321098765432109876543210987654321098765432109876543210987654321098765432109876543210.0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789")
+
+	// Run the capture for 5 seconds, which should be plenty to pull down a few rows.
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	time.AfterFunc(5*time.Second, cancelCapture)
+	cs.Capture(captureCtx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+func TestJSONColumn(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "26214"
+	var tableName = fmt.Sprintf("test.json_column_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data JSON)", tableName))
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	executeControlQuery(ctx, t, control, fmt.Sprintf(`INSERT INTO %s VALUES (0, '{"a": 123}'), (1, ' {"b": 456}')`, tableName))
+
+	// Run the capture for 1 second, which should be plenty to pull down a few rows.
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	time.AfterFunc(1*time.Second, cancelCapture)
+	cs.Capture(captureCtx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func TestSchemaFilter(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)

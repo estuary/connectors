@@ -50,6 +50,20 @@ type Client interface {
 	Close()
 }
 
+// SchemaManager is an optional interface that destinations can implement if they support schemas
+// and their automatic creation.
+type SchemaManager interface {
+	// ListSchemas returns a list of all existing schemas, with their names as-reported by the
+	// destination.
+	ListSchemas(ctx context.Context) ([]string, error)
+
+	// Create schema creates a schema. The schemaName will have already had any dialect-specific
+	// transformations applied to it (ex: replacing special characters with underscores) via
+	// TableLocator, but it will not have identifier quoting applied, and identifier quoting must be
+	// handled by the caller if needed.
+	CreateSchema(ctx context.Context, schemaName string) error
+}
+
 // Resource is a driver-provided type which represents the SQL resource
 // (for example, a table) bound to by a binding.
 type Resource interface {

@@ -5,10 +5,11 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/iancoleman/orderedmap"
-	"github.com/invopop/jsonschema"
 	"regexp"
 	"strings"
+
+	"github.com/iancoleman/orderedmap"
+	"github.com/invopop/jsonschema"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -40,9 +41,9 @@ type advancedConfig struct {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI(tenant string, withSchema bool) string {
+func (c *config) ToURI(tenant string) string {
 	// Build a DSN connection string.
-	var configCopy = c.asSnowflakeConfig(tenant, withSchema)
+	var configCopy = c.asSnowflakeConfig(tenant)
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
 	// Without this, the authentication token will expire after 4 hours of inactivity.
 	// The Params map will not have been initialized if the endpoint config didn't specify
@@ -65,7 +66,9 @@ func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
 		// escaped, so here we allow an escape hatch to parse these PEM files
 		var pkString = strings.ReplaceAll(c.PrivateKey, "\\n", "\n")
 		var block, _ = pem.Decode([]byte(pkString))
-		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
+		if block == nil {
+			return nil, fmt.Errorf("invalid private key: must be PEM format")
+		} else if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 			return nil, fmt.Errorf("parsing private key: %w", err)
 		} else {
 			return key.(*rsa.PrivateKey), nil
@@ -75,20 +78,15 @@ func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
 	return nil, fmt.Errorf("only supported with JWT authentication")
 }
 
-func (c *config) asSnowflakeConfig(tenant string, withSchema bool) sf.Config {
+func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 	var maxStatementCount string = "0"
 	var json string = "json"
-
-	var schema = ""
-	if withSchema {
-		schema = c.Schema
-	}
 
 	var conf = sf.Config{
 		Account:     c.Account,
 		Host:        c.Host,
 		Database:    c.Database,
-		Schema:      schema,
+		Schema:      c.Schema,
 		Warehouse:   c.Warehouse,
 		Role:        c.Role,
 		Application: fmt.Sprintf("%s_EstuaryFlow", tenant),
@@ -182,12 +180,9 @@ const (
 )
 
 type credentialConfig struct {
-	AuthType string `json:"auth_type"`
-
-	User string `json:"user"`
-
-	Password string `json:"password"`
-
+	AuthType   string `json:"auth_type"`
+	User       string `json:"user"`
+	Password   string `json:"password"`
 	PrivateKey string `json:"private_key"`
 }
 

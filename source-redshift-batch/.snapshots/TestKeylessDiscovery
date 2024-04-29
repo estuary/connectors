@@ -38,30 +38,60 @@ Binding 0:
             ]
           },
           "v_bigint": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "v_bool": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "v_int": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "v_int_notnull": {
             "type": "integer"
           },
           "v_smallint": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "v_str": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "v_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "v_text_notnull": {
             "type": "string"
           },
           "v_ts": {
-            "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "v_tstz": {
-            "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

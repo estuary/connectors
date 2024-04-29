@@ -35,6 +35,15 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
+	if db.HistoryMode() {
+		sourceSchema.Extras = map[string]interface{}{
+			"reduce": map[string]interface{}{
+				"strategy":    "lastWriteWins",
+				"associative": false,
+			},
+		}
+	}
+
 	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
 		var logEntry = logrus.WithFields(logrus.Fields{

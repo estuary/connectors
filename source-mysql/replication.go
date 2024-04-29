@@ -452,7 +452,9 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
-var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
+var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|# [^\n]*)$`)
+var createDefinerRegex = `CREATE\s*(OR REPLACE){0,1}\s*(ALGORITHM\s*=\s*[^ ]+)*\s*DEFINER`
+var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
 
 func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
 	// There are basically three types of query events we might receive:
@@ -467,11 +469,15 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	//     that we don't care about, either because they change things that
 	//     don't impact our capture or because we get the relevant information
 	//     by some other means.
-	if ignoreQueriesRe.MatchString(query) {
-		logrus.WithField("query", query).Trace("ignoring query event")
+	if silentIgnoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Trace("silently ignoring query event")
 		return nil
 	}
-	logrus.WithField("query", query).Debug("handling query event")
+	if ignoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Info("ignoring query event")
+		return nil
+	}
+	logrus.WithField("query", query).Info("handling query event")
 
 	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
@@ -480,7 +486,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
 	switch stmt := stmt.(type) {
-	case *sqlparser.CreateDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
+	case *sqlparser.CreateDatabase, *sqlparser.AlterDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
@@ -677,11 +683,30 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 func translateDataType(t sqlparser.ColumnType) any {
 	var typeName = strings.ToLower(t.Type)
 	if typeName == "enum" {
-		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, t.EnumValues...)}
+		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
 	} else if typeName == "set" {
-		return &mysqlColumnType{Type: typeName, EnumValues: t.EnumValues}
+		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
 	}
 	return typeName
+}
+
+// unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted
+// escaped string values such as the EnumValues list returned by the Vitess SQL Parser
+// package when parsing a DDL query involving enum/set values.
+//
+// The single-quote wrapping and escaping of these strings is clearly deliberate, as
+// under the hood the package actually tokenizes the strings to raw values and then
+// explicitly calls `encodeSQLString()` to re-wrap them when building the AST. The
+// actual reason for doing this is unknown however, and it makes very little sense.
+//
+// So whatever, here's a helper function to undo that escaping and get back down to
+// the raw strings again.
+func unquoteEnumValues(values []string) []string {
+	var unquoted []string
+	for _, qval := range values {
+		unquoted = append(unquoted, decodeMySQLString(qval))
+	}
+	return unquoted
 }
 
 func findStr(needle string, cols []string) int {

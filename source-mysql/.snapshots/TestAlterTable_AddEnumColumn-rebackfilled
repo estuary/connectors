@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test/test_altertable_addenumcolumn_30213486": 5 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:0"}},"data":"aaa","enumcol":null,"id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:1"}},"data":"bbb","enumcol":null,"id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:2"}},"data":"eee","enumcol":"med","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:3"}},"data":"fff","enumcol":"lg","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:4"}},"data":"ggg","enumcol":"sm","id":5}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FAlterTable_AddEnumColumn_30213486":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","enumcol"],"types":{"data":"text","enumcol":{"enum":["","sm","med","lg"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

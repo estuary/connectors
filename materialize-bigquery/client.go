@@ -10,6 +10,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -18,9 +19,12 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
+
+var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
 	bigqueryClient     *bigquery.Client
@@ -39,61 +43,71 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		bqDialect.ColumnLocator,
 	)
 
-	datasets := []string{c.cfg.Dataset}
+	rpDatasets := make(map[string]struct{})
 	for _, p := range resourcePaths {
-		datasets = append(datasets, p[1]) // Dataset is always the second element of the path.
+		rpDatasets[bqDialect.TableLocator(p).TableSchema] = struct{}{}
 	}
 
-	slices.Sort(datasets)
-	datasets = slices.Compact(datasets)
+	// Fetch table and column metadata using the metadata API. This API is free to use, and has very
+	// high rate limits. Running a job to query the INFORMATION_SCHEMA view costs a minimum of 10MB
+	// per query, so this is a little more cost effective and efficient.
+	var mu sync.Mutex
+	group, groupCtx := errgroup.WithContext(ctx)
 
-	for _, ds := range datasets {
-		job, err := c.query(ctx, fmt.Sprintf(
-			"select table_schema, table_name, column_name, is_nullable, data_type, column_default from %s.%s.INFORMATION_SCHEMA.COLUMNS;",
-			bqDialect.Identifier(c.cfg.ProjectID), // Use the project containing the dataset rather than the billing project if a billing project is configured.
-			bqDialect.Identifier(ds),
-		))
-		if err != nil {
-			return nil, fmt.Errorf("querying INFORMATION_SCHEMA.COLUMNS for dataset %q: %w", ds, err)
+	// The table listing will fail if the dataset doesn't already exist, so only attempt to list
+	// tables in datasets that do exist.
+	existingDatasets, err := c.ListSchemas(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing schemas: %w", err)
+	}
+
+	for ds := range rpDatasets {
+		if !slices.Contains(existingDatasets, ds) {
+			log.WithField("dataset", ds).Debug("not listing tables for dataset since it doesn't exist")
+			continue
 		}
 
-		it, err := job.Read(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("reading job: %w", err)
-		}
-
-		type columnRow struct {
-			TableSchema   string `bigquery:"table_schema"`
-			TableName     string `bigquery:"table_name"`
-			ColumnName    string `bigquery:"column_name"`
-			IsNullable    string `bigquery:"is_nullable"` // string YES or NO
-			DataType      string `bigquery:"data_type"`
-			ColumnDefault string `bigquery:"column_default"` // "NULL" if no default
-		}
+		tableIter := c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, ds).Tables(ctx)
 
 		for {
-			var c columnRow
-			if err = it.Next(&c); err == iterator.Done {
-				break
-			} else if err != nil {
-				return nil, fmt.Errorf("columnRow read: %w", err)
+			table, err := tableIter.Next()
+			if err != nil {
+				if err == iterator.Done {
+					break
+				}
+				return nil, fmt.Errorf("table iterator next: %w", err)
 			}
 
-			if strings.HasPrefix(c.DataType, "BIGNUMERIC") {
-				// BigQuery includes the precision of BIGNUMERIC columns in the DataType string. We
-				// want to treat all pre-existing BIGNUMERIC columns the same, so that is stripped
-				// out here.
-				c.DataType = "BIGNUMERIC"
-			}
+			mu.Lock()
+			is.PushResource(table.DatasetID, table.TableID)
+			mu.Unlock()
 
-			is.PushField(boilerplate.EndpointField{
-				Name:               c.ColumnName,
-				Nullable:           strings.EqualFold(c.IsNullable, "yes"),
-				Type:               c.DataType,
-				CharacterMaxLength: 0, // BigQuery does not have a character_maximum_length in its INFORMATION_SCHEMA.COLUMNS view.
-				HasDefault:         !strings.EqualFold(c.ColumnDefault, "null"),
-			}, c.TableSchema, c.TableName)
+			group.Go(func() error {
+				md, err := table.Metadata(groupCtx, bigquery.WithMetadataView(bigquery.BasicMetadataView))
+				if err != nil {
+					return fmt.Errorf("getting metadata for %s.%s: %w", table.DatasetID, table.TableID, err)
+				}
+
+				mu.Lock()
+				defer mu.Unlock()
+
+				for _, f := range md.Schema {
+					is.PushField(boilerplate.EndpointField{
+						Name:               f.Name,
+						Nullable:           !f.Required,
+						Type:               string(f.Type),
+						CharacterMaxLength: int(f.MaxLength),
+						HasDefault:         len(f.DefaultValueExpression) > 0,
+					}, table.DatasetID, table.TableID)
+				}
+
+				return nil
+			})
 		}
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 
 	return is, nil
@@ -118,6 +132,13 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+// TODO(whb): In display of needless cruelty, BigQuery will throw an error if you try to use an
+// ALTER TABLE sql statement to add columns to a table with no pre-existing columns, claiming that
+// it does not have a schema. I believe the client API would allow us to set the schema, but this
+// would have to be done in a totally different way than we are currently doing things and I'm not
+// up for tackling that right now. With recent changes to at least recognizing that tables with no
+// columns exist, we'll at least get a coherent error message when this happens and can know that
+// the workaround is to re-backfill the table so it gets created fresh with the needed columns.
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var alterColumnStmtBuilder strings.Builder
 	if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
@@ -129,6 +150,33 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		_, err := c.query(ctx, alterColumnStmt)
 		return err
 	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	// BigQuery represents the concept of a "schema" with datasets.
+	iter := c.bigqueryClient.Datasets(ctx)
+	iter.ProjectID = c.cfg.ProjectID
+
+	dsNames := []string{}
+	for {
+		ds, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, fmt.Errorf("dataset iterator next: %w", err)
+		}
+
+		dsNames = append(dsNames, ds.DatasetID)
+	}
+
+	return dsNames, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, schemaName).Create(ctx, &bigquery.DatasetMetadata{
+		Location: c.cfg.Region,
+	})
 }
 
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {

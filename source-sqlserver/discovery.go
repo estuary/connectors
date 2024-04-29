@@ -386,8 +386,17 @@ var sqlserverTypeToJSON = map[string]columnSchema{
 	"image":     {jsonType: "string", contentEncoding: "base64"},
 
 	"date":           {jsonType: "string", format: "date"},
-	"time":           {jsonType: "string", format: "time"},
 	"datetimeoffset": {jsonType: "string", format: "date-time"},
+
+	// The 'time' format in JSON schemas means the RFC3339 'full-time' grammar rule,
+	// which includes a numeric timezone offset. The TIME column in SQL Server has
+	// no associated timezone data, and it's not possible to unambiguously assign a
+	// numeric timezone offset to these HH:MM:SS time values using the configured
+	// datetime location (handwaving at one reason: how do we know if DST applies?).
+	//
+	// So we don't do that, and that's why TIME columns just get turned into strings
+	// without a specific format guarantee here.
+	"time": {jsonType: "string"},
 
 	"uniqueidentifier": {jsonType: "string", format: "uuid"},
 

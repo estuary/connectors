@@ -13,7 +13,6 @@ import (
 	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -22,57 +21,8 @@ import (
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
-	Cursor     string                               `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
-	Streams    map[boilerplate.StateKey]*TableState `json:"bindingStateV1,omitempty"` // A mapping from runtime-provided state keys to table-specific state.
-	OldStreams map[string]*TableState               `json:"streams,omitempty"`        // TODO(whb): Remove once all captures have migrated.
-}
-
-func migrateState(state *PersistentState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
-	if state.Streams != nil && state.OldStreams != nil {
-		return false, fmt.Errorf("application error: both Streams and OldStreams were non-nil")
-	} else if state.Streams != nil {
-		logrus.Info("skipping state migration since it's already done")
-		return false, nil
-	} else if state.OldStreams == nil {
-		logrus.Info("skipping state migration since there is no old state")
-		return false, nil
-	}
-
-	state.Streams = make(map[boilerplate.StateKey]*TableState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res Resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return false, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		var streamID = JoinStreamID(res.Namespace, res.Stream)
-
-		ll := logrus.WithFields(logrus.Fields{
-			"stateKey": b.StateKey,
-			"resource": res,
-			"streamID": streamID,
-		})
-
-		stateFromOld, ok := state.OldStreams[streamID]
-		if !ok {
-			// This should only happen if a new binding has been added at the same time as the
-			// connector first restarted for the state migration.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Streams[boilerplate.StateKey(b.StateKey)] = stateFromOld
-		ll.Info("migrated binding state")
-	}
-
-	state.OldStreams = nil
-
-	return true, nil
+	Cursor  string                               `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
+	Streams map[boilerplate.StateKey]*TableState `json:"bindingStateV1,omitempty"` // A mapping from runtime-provided state keys to table-specific state.
 }
 
 // Validate performs basic sanity-checking after a state has been parsed from JSON. More
@@ -476,7 +426,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 	// bindings and then re-enable them (which will cause them all to get backfilled anew, as they
 	// should after such an event).
 	if allStreamsAreNew {
-		logrus.Info("no active bindings, resetting cursor")
+		logrus.Info("all bindings are new, resetting replication cursor")
 		c.State.Cursor = ""
 	}
 
@@ -677,7 +627,7 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
 		logrus.WithFields(logrus.Fields{
-			"streams":  streams,
+			"count":    len(streams),
 			"selected": streamID,
 		}).Info("backfilling streams")
 		if err := c.backfillStream(ctx, streamID); err != nil {
@@ -730,8 +680,13 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	}
 
 	// Update stream state to reflect backfill results
+	logrus.WithFields(logrus.Fields{
+		"stream": streamID,
+		"rows":   eventCount,
+	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	if eventCount == 0 {
+		logrus.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableModeActive
 		state.Scanned = nil
 	} else {

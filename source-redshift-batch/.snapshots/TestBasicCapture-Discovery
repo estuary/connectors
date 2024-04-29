@@ -39,7 +39,10 @@ Binding 0:
             ]
           },
           "data": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "id": {
             "type": "integer"

@@ -91,6 +91,7 @@ jobs:
           - source-snowflake
           - source-sqlserver
           - source-test
+          - source-azure-blob-storage
           - materialize-bigquery
           - materialize-databricks
           - materialize-dynamodb

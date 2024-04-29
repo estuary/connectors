@@ -106,7 +106,7 @@ func (f *stagedFile) fileKey(file string) string {
 	return path.Join(f.prefix, file)
 }
 
-func (f *stagedFile) flush(ctx context.Context) (func(context.Context), error) {
+func (f *stagedFile) flush() (func(context.Context), error) {
 	if err := f.flushFile(); err != nil {
 		return nil, err
 	}

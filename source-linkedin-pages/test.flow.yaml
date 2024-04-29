@@ -1,0 +1,29 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-linkedin-pages:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_linkedin_pages
+        config: connector_config.yaml
+    bindings:
+      - resource:
+          stream: organization_lookup
+          syncMode: full_refresh
+        target: acmeCo/organization_lookup
+      - resource:
+          stream: follower_statistics
+          syncMode: full_refresh
+        target: acmeCo/follower_statistics
+      - resource:
+          stream: share_statistics
+          syncMode: full_refresh
+        target: acmeCo/share_statistics
+      - resource:
+          stream: total_follower_count
+          syncMode: full_refresh
+        target: acmeCo/total_follower_count

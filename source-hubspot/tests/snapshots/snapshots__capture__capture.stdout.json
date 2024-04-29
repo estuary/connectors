@@ -1011,7 +1011,7 @@
         "hs_arr": null,
         "hs_closed_amount": 0,
         "hs_closed_amount_in_home_currency": 0,
-        "hs_closed_won_count": null,
+        "hs_closed_won_count": 0,
         "hs_closed_won_date": null,
         "hs_created_by_user_id": 63597369,
         "hs_createdate": "2024-01-31T17:38:10.999000+00:00",
@@ -1153,7 +1153,8 @@
       "id": "711847525",
       "lastName": "Williams",
       "updatedAt": "2024-02-01T16:19:49.900Z",
-      "userId": 63597369
+      "userId": 63597369,
+      "userIdIncludingInactive": 63597369
     }
   ],
   [

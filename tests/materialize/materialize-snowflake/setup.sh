@@ -14,7 +14,7 @@ export SNOWFLAKE_AUTH_TYPE="${SNOWFLAKE_AUTH_TYPE}"
 # if auth type is user_password
 export SNOWFLAKE_USER="${SNOWFLAKE_USER:-}"
 export SNOWFLAKE_PASSWORD="${SNOWFLAKE_PASSWORD:-}"
-if [ -z "${${SNOWFLAKE_PRIVATE_KEY+x}}" ]; then 
+if [ -n "${SNOWFLAKE_PRIVATE_KEY:-}" ]; then 
   # if auth type is jwt
   export SNOWFLAKE_PRIVATE_KEY="$(cat ${SNOWFLAKE_PRIVATE_KEY:-} | jq -sR . | sed -e 's/^"//' -e 's/"$//')"
 fi

@@ -59,6 +59,7 @@ def crm_object(
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         open_binding(
             binding,
@@ -105,6 +106,7 @@ def properties(http: HTTPSession) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         open_binding(
             binding,

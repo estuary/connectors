@@ -39,22 +39,37 @@ Binding 0:
             ]
           },
           "a_bool": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "a_date": {
-            "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "a_real": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "a_ts": {
-            "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "a_tstz": {
-            "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "id": {
             "type": "integer"

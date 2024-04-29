@@ -7,15 +7,17 @@
           "properties": {
             "credentials_title": {
               "const": "Private App Credentials",
-              "title": "Credentials Title"
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
             },
             "access_token": {
+              "secret": true,
               "title": "Access Token",
               "type": "string"
             }
           },
           "required": [
-            "credentials_title",
             "access_token"
           ],
           "title": "AccessToken",
@@ -25,23 +27,27 @@
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
-              "title": "Credentials Title"
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
             },
             "client_id": {
+              "secret": true,
               "title": "Client Id",
               "type": "string"
             },
             "client_secret": {
+              "secret": true,
               "title": "Client Secret",
               "type": "string"
             },
             "refresh_token": {
+              "secret": true,
               "title": "Refresh Token",
               "type": "string"
             }
           },
           "required": [
-            "credentials_title",
             "client_id",
             "client_secret",
             "refresh_token"
