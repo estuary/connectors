@@ -14,6 +14,22 @@
         "type": "string",
         "title": "Database",
         "description": "Optional name of the database to capture from. Leave blank to autodetect. Typically \"projects/$PROJECTID/databases/(default)\"."
+      },
+      "advanced": {
+        "properties": {
+          "extra_collections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Extra Collections",
+            "description": "A list of collection paths (in the form \"foo/*/bar/*/baz\") which will always be assumed to exist even if not found by autodiscovery. Useful for very rare collections which may not be reliably detected by discovery sampling of the dataset."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
       }
     },
     "type": "object",
