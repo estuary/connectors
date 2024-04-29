@@ -53,6 +53,8 @@ type config struct {
 
 type advancedConfig struct {
 	ExtraCollections []string `json:"extra_collections,omitempty" jsonschema:"title=Extra Collections,description=A list of collection paths (in the form \"foo/*/bar/*/baz\") which will always be assumed to exist even if not found by autodiscovery. Useful for very rare collections which may not be reliably detected by discovery sampling of the dataset."`
+
+	SkipDiscovery bool `json:"skip_discovery,omitempty" jsonschema:"title=Skip Automatic Discovery,description=When set the connector will skip automatic collection discovery. This generally only makes sense when the \"Extra Collections\" setting is used."`
 }
 
 var databasePathRe = regexp.MustCompile(`^projects/[^/]+/databases/[^/]+$`)
