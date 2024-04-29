@@ -38,5 +38,5 @@
     }
   },
   "type": ["object"],
-  "required": ["actor_id", "event_time", "event_type", "object_id"]
+  "required": ["actor_id", "application_id","event_time", "event_type", "object_id"]
 }
