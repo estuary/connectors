@@ -4,7 +4,6 @@ from estuary_cdk.http import HTTPSession
 from logging import Logger
 from typing import Iterable, Any
 from zoneinfo import ZoneInfo
-import json
 
 from .models import (
     NumberType,
