@@ -1,0 +1,100 @@
+[
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 1,
+      "STR": "record 1",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "row_id": "<row_id>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 2,
+      "STR": "record 2",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "row_id": "<row_id>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "record 3",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "row_id": "<row_id>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 1,
+      "STR": "updated str",
+      "_meta": {
+        "op": "u",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 2,
+      "STR": "record 2",
+      "_meta": {
+        "op": "d",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "updated str",
+      "_meta": {
+        "op": "u",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/TEST_CHANGES",
+    {
+      "ID": 3,
+      "STR": "updated str 2",
+      "_meta": {
+        "op": "u",
+        "source": {
+          "scn": "<scn>",
+          "table": "TEST_CHANGES"
+        }
+      }
+    }
+  ]
+]

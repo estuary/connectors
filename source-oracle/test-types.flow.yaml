@@ -1,0 +1,20 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-oracle:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_oracle
+        config: config.yaml
+    bindings:
+      - resource:
+          name: TEST_ALL_TYPES
+          interval: PT0S
+        target: acmeCo/TEST_ALL_TYPES
+    interval: 3m
+    shards:
+      logLevel: debug
