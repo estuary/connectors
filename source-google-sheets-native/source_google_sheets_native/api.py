@@ -39,17 +39,8 @@ async def fetch_rows(
         "fields": "properties,sheets.properties,sheets.data(rowData.values(effectiveFormat(numberFormat(type)),effectiveValue))",
     }
 
-    # checking if sheet is empty before model eval
-    # since the rowData field wont be returned 
-    sheet_info = json.loads(await http.request(log, url, params=params))
-
-    if len(sheet_info["sheets"][0]["data"][0]) == 0:
-        log.warn(f"Spreadsheet sheet '{sheet.properties.title}' is empty!")
-        return ([])
-
-
     spreadsheet = Spreadsheet.model_validate_json(
-        json.dumps(sheet_info)
+        await http.request(log, url, params=params)
     )
 
     if len(spreadsheet.sheets) == 0:
@@ -57,7 +48,13 @@ async def fetch_rows(
 
     sheet = spreadsheet.sheets[0]
 
+    if sheet.data is None:
+        return ([])
+
     rows = sheet.data[0].rowData
+
+    if rows is None:
+        return ([])
 
     headers = default_column_headers(sheet.properties.gridProperties.columnCount)
 

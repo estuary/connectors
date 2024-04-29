@@ -91,10 +91,10 @@ class Sheet(BaseModel, extra="allow"):
         effectiveValue: "Sheet.EffectiveValue | None" = None
 
     class RowData(BaseModel, extra="forbid"):
-        values: list["Sheet.Value"]
+        values: list["Sheet.Value"] | None = None
 
     class Data(BaseModel, extra="forbid"):
-        rowData: list["Sheet.RowData"]
+        rowData: list["Sheet.RowData"] | None = None
 
         @model_validator(mode="after")
         def _post_init(self) -> "Sheet.Data":
