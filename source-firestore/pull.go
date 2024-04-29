@@ -690,8 +690,31 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 		}
 		logEntry.WithField("resp", resp).Trace("got response")
 
+		var prevResumeToken string
+
 		switch resp := resp.ResponseType.(type) {
 		case *firestore_pb.ListenResponse_TargetChange:
+			// This is an experimental bit of debugging-in-production logging added in April 2024
+			// in order to investigate whether it might be possible to make incremental streaming
+			// progress using resume tokens instead of read times when retrying.
+			//
+			// The official Firestore client library (which we don't use because it doesn't allow
+			// us to stream incremental results before an entire consistent snapshot has been read
+			// into memory) only updates the resume token when a consistent point is reached. But
+			// it is theoretically permitted for the server to send useful resume tokens before we
+			// reach that point, and if it does then this might allow us to more reliably stream
+			// changes from high-throughput collections.
+			if len(resp.TargetChange.ResumeToken) != 0 {
+				var nextResumeToken = string(resp.TargetChange.ResumeToken)
+				if nextResumeToken != prevResumeToken {
+					logEntry.WithFields(log.Fields{
+						"token":   nextResumeToken,
+						"targets": resp.TargetChange.TargetIds,
+					}).Debug("got new resume token")
+					prevResumeToken = nextResumeToken
+				}
+			}
+
 			logEntry.WithField("tc", resp.TargetChange).Trace("TargetChange Event")
 			switch tc := resp.TargetChange; tc.TargetChangeType {
 			case firestore_pb.TargetChange_NO_CHANGE:
