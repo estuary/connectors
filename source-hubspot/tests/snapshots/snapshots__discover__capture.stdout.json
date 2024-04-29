@@ -640,6 +640,12 @@
                 "string"
               ]
             },
+            "hs_country_code": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_created_by_user_id": {
               "type": [
                 "null",
@@ -15021,6 +15027,12 @@
             },
             "hs_sales_email_last_replied": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_seen_by_agent_ids": {
               "type": [
                 "null",
                 "string"
