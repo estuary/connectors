@@ -46,8 +46,14 @@ async def fetch_rows(
         raise RuntimeError(f"Spreadsheet sheet '{sheet}' was not found")
 
     sheet = spreadsheet.sheets[0]
-    assert sheet.data
+
+    if sheet.data is None:
+        return ([])
+
     rows = sheet.data[0].rowData
+
+    if rows is None:
+        return ([])
 
     headers = default_column_headers(sheet.properties.gridProperties.columnCount)
 
