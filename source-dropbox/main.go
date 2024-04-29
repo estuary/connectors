@@ -61,12 +61,13 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
-	token, err := cfg.Credentials.GetAccessToken(ctx)
+	oauthClient, err := cfg.Credentials.GetOauthClient(ctx)
 	if err != nil {
 		return &dropboxStore{}, err
 	}
 	config := dropbox.Config{
-		Token:    token,
+		//! Note: This Client property was originally build for testing purposes. So, it can change in the future.
+		Client:   oauthClient,
 		LogLevel: dropbox.LogDebug,
 	}
 	client := files.New(config)

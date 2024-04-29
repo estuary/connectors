@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"golang.org/x/oauth2"
 )
 
 func GetScopes() []string {
@@ -69,6 +72,21 @@ func (c *Credentials) Validate() error {
 	return nil
 }
 
-func (c *Credentials) GetAccessToken(ctx context.Context) (string, error) {
-	return c.AccessToken, nil
+func (c *Credentials) GetOauthClient(ctx context.Context) (*http.Client, error) {
+	ts := &TokenSource{cred: c}
+
+	return oauth2.NewClient(ctx, ts), nil
+}
+
+type TokenSource struct {
+	cred *Credentials
+}
+
+func (ts *TokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{
+		AccessToken:  ts.cred.AccessToken,
+		RefreshToken: ts.cred.RefreshToken,
+		TokenType:    ts.cred.TokenType,
+		Expiry:       time.Unix(int64(ts.cred.ExpireTime), 0),
+	}, nil
 }
