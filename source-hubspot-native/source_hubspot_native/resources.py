@@ -11,6 +11,8 @@ from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 from .api import (
     FetchRecentFn,
     fetch_changes,
+    fetch_email_events_changes,
+    fetch_email_events_page,
     fetch_page,
     fetch_properties,
     fetch_recent_companies,
@@ -20,12 +22,14 @@ from .api import (
     fetch_recent_tickets,
 )
 from .models import (
+    EMAIL_EVENT_HORIZON_DELTA,
     OAUTH2_SPEC,
     BaseCRMObject,
     Company,
     Contact,
     CRMObject,
     Deal,
+    EmailEvent,
     EndpointConfig,
     Engagement,
     Names,
@@ -47,6 +51,7 @@ async def all_resources(
         crm_object(Engagement, http, fetch_recent_engagements),
         crm_object(Ticket, http, fetch_recent_tickets),
         properties(http),
+        email_events(http),
     ]
 
 
@@ -125,6 +130,44 @@ def properties(http: HTTPSession) -> Resource:
         initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=Names.properties, interval=timedelta(days=1)
+        ),
+        schema_inference=True,
+    )
+
+def email_events(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_email_events_changes, http),
+            fetch_page=functools.partial(fetch_email_events_page, http),
+        )
+
+    # started_at is set in the past per the horizon delta, otherwise we might miss events happening
+    # simultaneously with the stream's initialization. It is set with millisecond precision, since
+    # the API doesn't support anything beyond milliseconds.
+    started_at = datetime.now(tz=UTC) - EMAIL_EVENT_HORIZON_DELTA
+    started_at = started_at.replace(microsecond=started_at.microsecond // 1000 * 1000)
+
+    return Resource(
+        name=Names.email_events,
+        key=["/id"],
+        model=EmailEvent,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(
+            name=Names.email_events, interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
