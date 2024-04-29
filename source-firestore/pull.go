@@ -172,12 +172,16 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 			// change data has been skipped. To get back into a consistent state, we will have
 			// to restart from the current moment (to maximize our changes of staying caught
 			// up going forward) and start a new backfill of the entire collection.
-			var prevStartTime time.Time
+			var startTime time.Time
 			if prevState.Backfill != nil {
-				prevStartTime = prevState.Backfill.StartAfter
+				startTime = prevState.Backfill.StartAfter
 			}
-			var startTime = prevStartTime.Add(backfillRestartDelay)
-			if time.Now().After(startTime) {
+			// Add a restart delay unless the current StartAfter time is already in the future.
+			if startTime.Before(time.Now()) {
+				startTime = startTime.Add(backfillRestartDelay)
+			}
+			// If the adjusted start time is still in the past, we ought to start immediately.
+			if startTime.Before(time.Now()) {
 				startTime = time.Now()
 			}
 			state.ReadTime = now
