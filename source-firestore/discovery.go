@@ -131,7 +131,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	}
 	defer client.Close()
 
-	bindings, err := discoverCollections(ctx, client, cfg.Advanced.ExtraCollections)
+	bindings, err := discoverCollections(ctx, client, cfg.Advanced.ExtraCollections, cfg.Advanced.SkipDiscovery)
 	if err != nil {
 		return nil, fmt.Errorf("discovery error: %w", err)
 	}
@@ -155,7 +155,7 @@ type discoveryState struct {
 	}
 }
 
-func discoverCollections(ctx context.Context, client *firestore.Client, extraCollections []string) ([]*pc.Response_Discovered_Binding, error) {
+func discoverCollections(ctx context.Context, client *firestore.Client, extraCollections []string, skipAutodiscovery bool) ([]*pc.Response_Discovered_Binding, error) {
 	scanners, ctx := errgroup.WithContext(ctx)
 	var state = &discoveryState{
 		client:        client,
@@ -165,18 +165,20 @@ func discoverCollections(ctx context.Context, client *firestore.Client, extraCol
 	state.shared.counts = make(map[resourcePath]int)
 	state.shared.resources = make(map[resourcePath]struct{})
 
-	// Request processing of all top-level collections.
-	var collections, err = client.Collections(ctx).GetAll()
-	if err != nil {
-		return nil, err
-	}
-	for _, coll := range collections {
-		state.handleCollection(ctx, coll)
-	}
+	if !skipAutodiscovery {
+		// Request scanning of all top-level collections.
+		var collections, err = client.Collections(ctx).GetAll()
+		if err != nil {
+			return nil, err
+		}
+		for _, coll := range collections {
+			state.handleCollection(ctx, coll)
+		}
 
-	// Wait for all scanners to terminate
-	if err := state.scanners.Wait(); err != nil {
-		return nil, err
+		// Wait for all scanners to terminate
+		if err := state.scanners.Wait(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Locking the mutex here should be unnecessary as all worker threads have
