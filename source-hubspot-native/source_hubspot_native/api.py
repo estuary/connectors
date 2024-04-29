@@ -1,8 +1,18 @@
 import asyncio
 import itertools
-from datetime import UTC, datetime
+import time
+from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Iterable
+from typing import (
+    Any,
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Optional,
+    Tuple,
+)
 
 from estuary_cdk.capture.common import (
     LogCursor,
@@ -12,9 +22,12 @@ from estuary_cdk.http import HTTPSession
 from pydantic import TypeAdapter
 
 from .models import (
+    EMAIL_EVENT_HORIZON_DELTA,
     Association,
     BatchResult,
     CRMObject,
+    EmailEvent,
+    EmailEventsResponse,
     OldRecentCompanies,
     OldRecentContacts,
     OldRecentDeals,
@@ -280,5 +293,83 @@ async def fetch_recent_tickets(
     return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 
 
+async def fetch_email_events_changes(
+    http: HTTPSession, log: Logger, log_cursor: LogCursor
+) -> AsyncGenerator[EmailEvent | LogCursor, None]:
+
+    assert isinstance(log_cursor, datetime)
+
+    url = f"{HUB}/email/public/v1/events"
+
+    horizon = int((datetime.now(tz=UTC) - EMAIL_EVENT_HORIZON_DELTA).timestamp() * 1000)
+
+    input: Dict[str, Any] = {
+        "startTimestamp": _dt_to_ms(log_cursor),
+        "endTimestamp": horizon,
+        "limit": 1000,
+    }
+
+    max_ts = log_cursor
+
+    # Email events are in reverse-chronological order. Page through them and yield them along the
+    # way, which will not produce documents ordered chronologically, but it isn't practical to load
+    # them all into memory and sort.
+    while True:
+        result = EmailEventsResponse.model_validate_json(
+            await http.request(log, url, params=input)
+        )
+
+        for event in result.events:
+            if event.created > max_ts:
+                max_ts = event.created
+
+            yield event
+
+        if not result.hasMore:
+            break
+
+        input["offset"] = result.offset
+
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
+
+
+async def fetch_email_events_page(
+    # Closed over via functools.partial:
+    http: HTTPSession,
+    # Remainder is common.FetchPageFn:
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[EmailEvent | PageCursor, None]:
+    
+    assert isinstance(cutoff, datetime)
+    
+    url = f"{HUB}/email/public/v1/events"
+
+    input: Dict[str, Any] = {
+        "endTimestamp": _dt_to_ms(cutoff) - 1, # endTimestamp is inclusive.
+        "limit": 1000,
+    }
+    if page:
+        input["offset"] = page
+
+    result = EmailEventsResponse.model_validate_json(
+        await http.request(log, url, params=input)
+    )
+
+    for event in result.events:
+        yield event
+
+    if result.hasMore:
+        yield result.offset
+
+
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
+
+def _dt_to_ms(dt: datetime) -> int:
+    v = dt.timestamp() * 1000
+    if v % 1 != 0:
+        raise ValueError("Only millisecond precision is supported")
+    return int(v)
