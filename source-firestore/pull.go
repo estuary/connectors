@@ -560,7 +560,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 				Path:       doc.Ref.Path,
 				CreateTime: &doc.CreateTime,
 				UpdateTime: &doc.UpdateTime,
-				Backfill:   true,
+				Snapshot:   true,
 			}
 
 			if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
