@@ -125,7 +125,7 @@ func (dbx *dropboxStore) check() error {
 func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
 	log.Debug("Listing files in path: ", dbx.config.Path)
 	log.Debug("Query: ", query)
-	files, err := dbx.client.ListFolder(&files.ListFolderArg{Path: query.Prefix})
+	files, err := dbx.client.ListFolder(&files.ListFolderArg{Path: query.Prefix, Recursive: query.Recursive})
 	if err != nil {
 		return nil, err
 	}
@@ -170,14 +170,13 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 	if len(l.files.Entries) == 0 {
 		return filesource.ObjectInfo{}, io.EOF
 	}
-	if !l.files.HasMore && l.index > 0 {
+	if l.index > len(l.files.Entries)-1 {
 		log.Debug("No more files to list")
 		return filesource.ObjectInfo{}, io.EOF
 	}
 
 	fileEntry, ok := l.files.Entries[l.index].(*files.FileMetadata)
 	if ok {
-		log.Debug("Entry: ", fileEntry)
 		log.Debug("Listing object: ", fileEntry.PathDisplay)
 		l.index++
 
@@ -194,13 +193,16 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 	}
 	folderEntry, ok := l.files.Entries[l.index].(*files.FolderMetadata)
 	if ok {
-		log.Debug("Listing folder: ", folderEntry.PathDisplay)
+		log.Debug("Skipping folder: ", folderEntry.PathDisplay)
 		l.index++
+		if !l.recursive {
+			return filesource.ObjectInfo{
+				Path:     folderEntry.PathDisplay,
+				IsPrefix: true,
+			}, nil
+		}
 
-		return filesource.ObjectInfo{
-			Path:     folderEntry.PathDisplay,
-			IsPrefix: true, // !l.recursive
-		}, nil
+		return l.Next()
 	}
 	return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
 }
