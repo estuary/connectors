@@ -92,10 +92,33 @@ type dropboxStore struct {
 // It returns an error if the container is not found, the account is disabled, or if there is an authorization failure.
 // If the listing is successful, it returns nil.
 func (dbx *dropboxStore) check() error {
-	_, err := dbx.client.ListFolder(&files.ListFolderArg{Path: dbx.config.Path})
+	resp, err := dbx.client.ListFolder(&files.ListFolderArg{Path: dbx.config.Path})
 	if err != nil {
-		return fmt.Errorf("failed to list files: %w", err)
+		log.Error("Failed to list files")
+		return err
 	}
+	for _, entry := range resp.Entries {
+		fileEntry, ok := entry.(*files.FileMetadata)
+		if !ok {
+			continue
+		}
+		meta, reader, err := dbx.client.Download(&files.DownloadArg{Path: fileEntry.PathDisplay})
+		if err != nil {
+			log.Error("Failed to download file: ", fileEntry.PathDisplay)
+			return err
+		}
+		log.Debug("File metadata: ", meta)
+		defer reader.Close()
+		content := make([]byte, meta.Size)
+		if _, err := reader.Read(content); err != nil {
+			log.Error("Failed to download file: ", fileEntry.PathDisplay)
+			return err
+		}
+
+		// log.Debug("File content: ", string(content))
+		break
+	}
+	log.Debug("Successfully connected to Dropbox")
 	return nil
 }
 
@@ -172,12 +195,11 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 	folderEntry, ok := l.files.Entries[l.index].(*files.FolderMetadata)
 	if ok {
 		log.Debug("Listing folder: ", folderEntry.PathDisplay)
-		log.Debug("Entry: ", folderEntry)
 		l.index++
 
 		return filesource.ObjectInfo{
 			Path:     folderEntry.PathDisplay,
-			IsPrefix: !l.recursive,
+			IsPrefix: true, // !l.recursive
 		}, nil
 	}
 	return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
