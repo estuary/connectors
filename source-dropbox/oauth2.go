@@ -12,7 +12,6 @@ import (
 	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -131,11 +130,6 @@ func (ts *TokenSource) Token() (*oauth2.Token, error) {
 	token.AccessToken = respPayload.AccessToken
 	token.RefreshToken = ts.cred.RefreshToken
 	token.TokenType = respPayload.TokenType
-
-	log.Debug("Payload: ", payload)
-	log.Debug("Token.AccessToken: ", token.AccessToken)
-	log.Debug("Token.Expiry: ", token.Expiry)
-	log.Debug("Token.RefreshToken: ", token.RefreshToken)
 
 	return &token, nil
 }
