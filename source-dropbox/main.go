@@ -61,6 +61,7 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
+	log.Debug("Creating Dropbox client")
 	oauthClient, err := cfg.Credentials.GetOauthClient(ctx)
 	if err != nil {
 		return &dropboxStore{}, err
@@ -107,10 +108,11 @@ func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (file
 	}
 
 	return &dropboxListing{
-		ctx:    ctx,
-		client: dbx.client,
-		files:  *files,
-		index:  0,
+		ctx:       ctx,
+		client:    dbx.client,
+		files:     *files,
+		index:     0,
+		recursive: query.Recursive,
 	}, nil
 }
 
@@ -132,15 +134,15 @@ func (dbx *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (i
 }
 
 type dropboxListing struct {
-	ctx    context.Context
-	client files.Client
-	files  files.ListFolderResult
-	index  int
+	ctx       context.Context
+	client    files.Client
+	files     files.ListFolderResult
+	index     int
+	recursive bool
 }
 
 func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 	log.Debug("Listing next file")
-	log.Debug(l.files.Entries)
 
 	if len(l.files.Entries) == 0 {
 		return filesource.ObjectInfo{}, io.EOF
@@ -149,28 +151,37 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 		log.Debug("No more files to list")
 		return filesource.ObjectInfo{}, io.EOF
 	}
-	entry, ok := l.files.Entries[l.index].(*files.FileMetadata)
-	if !ok {
-		return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
+
+	fileEntry, ok := l.files.Entries[l.index].(*files.FileMetadata)
+	if ok {
+		log.Debug("Entry: ", fileEntry)
+		log.Debug("Listing object: ", fileEntry.PathDisplay)
+		l.index++
+
+		obj := filesource.ObjectInfo{
+			Path:    fileEntry.PathDisplay,
+			ModTime: fileEntry.ClientModified,
+			Size:    int64(fileEntry.Size),
+		}
+		if fileEntry.ExportInfo != nil {
+			obj.ContentType = fileEntry.ExportInfo.ExportAs
+		}
+		return obj, nil
+
 	}
-	obj := filesource.ObjectInfo{}
+	folderEntry, ok := l.files.Entries[l.index].(*files.FolderMetadata)
+	if ok {
+		log.Debug("Listing folder: ", folderEntry.PathDisplay)
+		log.Debug("Entry: ", folderEntry)
+		l.index++
 
-	log.Debug("Entry: ", entry)
-
-	obj.Path = entry.PathDisplay
-	obj.ModTime = entry.ClientModified
-	if entry.ExportInfo != nil {
-		obj.ContentType = entry.ExportInfo.ExportAs
+		return filesource.ObjectInfo{
+			Path:     folderEntry.PathDisplay,
+			IsPrefix: !l.recursive,
+		}, nil
 	}
-	obj.Size = int64(entry.Size)
-
-	log.Debug("Listing object: ", obj.Path)
-
-	l.index++
-
-	return obj, nil
+	return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
 }
-
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
 
 	return json.RawMessage(`{
