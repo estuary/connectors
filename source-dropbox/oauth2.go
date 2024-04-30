@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -73,20 +77,71 @@ func (c *Credentials) Validate() error {
 }
 
 func (c *Credentials) GetOauthClient(ctx context.Context) (*http.Client, error) {
-	ts := &TokenSource{cred: c}
+	ts := &TokenSource{cred: c, ctx: ctx}
 
 	return oauth2.NewClient(ctx, ts), nil
 }
 
 type TokenSource struct {
 	cred *Credentials
+	ctx  context.Context
 }
 
 func (ts *TokenSource) Token() (*oauth2.Token, error) {
-	return &oauth2.Token{
-		AccessToken:  ts.cred.AccessToken,
-		RefreshToken: ts.cred.RefreshToken,
-		TokenType:    ts.cred.TokenType,
-		Expiry:       time.Unix(int64(ts.cred.ExpireTime), 0),
-	}, nil
+	tokenUrl := "https://api.dropboxapi.com/oauth2/token"
+	method := "POST"
+
+	payload := &bytes.Buffer{}
+	writer := multipart.NewWriter(payload)
+	writer.WriteField("client_id", ts.cred.ClientID)
+	writer.WriteField("client_secret", ts.cred.ClientSecret)
+	writer.WriteField("grant_type", "refresh_token")
+	writer.WriteField("refresh_token", ts.cred.RefreshToken)
+
+	err := writer.Close()
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(method, tokenUrl, payload)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var token oauth2.Token
+	var respPayload TokenResponsePayload
+	err = json.Unmarshal(body, &respPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	token.Expiry = time.Unix(int64(respPayload.Expires), 0)
+	token.AccessToken = respPayload.AccessToken
+	token.RefreshToken = ts.cred.RefreshToken
+	token.TokenType = respPayload.TokenType
+
+	log.Debug("Payload: ", payload)
+	log.Debug("Token.AccessToken: ", token.AccessToken)
+	log.Debug("Token.Expiry: ", token.Expiry)
+	log.Debug("Token.RefreshToken: ", token.RefreshToken)
+
+	return &token, nil
+}
+
+type TokenResponsePayload struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	Expires     int    `json:"expires_in"`
 }
