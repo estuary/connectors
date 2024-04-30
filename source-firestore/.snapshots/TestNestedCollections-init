@@ -1,15 +1,15 @@
 # ================================
 # Collection "flow_source_tests/*/nested_users": 2 Documents
 # ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"name":"Alice"}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"name":"Bob"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"name":"Alice"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"name":"Bob"}
 # ================================
 # Collection "flow_source_tests/*/nested_users/*/docs": 4 Documents
 # ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"asdf":123,"foo":"bar"}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"asdf":456,"foo":"bar"}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B2/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"asdf":789,"foo":"baz"}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B2/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"asdf":1000,"foo":"baz"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"asdf":123,"foo":"bar"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"asdf":456,"foo":"bar"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B2/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"asdf":789,"foo":"baz"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNestedCollections/nested_users/B2/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"asdf":1000,"foo":"baz"}
 # ================================
 # Final State Checkpoint
 # ================================

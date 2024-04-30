@@ -1,18 +1,18 @@
 # ================================
 # Collection "flow_source_tests/*/groups/*/docs": 4 Documents
 # ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":5}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":6}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":7}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":8}
 # ================================
 # Collection "flow_source_tests/*/users/*/docs": 6 Documents
 # ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":1}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":2}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":3}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":3}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","backfill":true},"data":4}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":4}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
 # ================================
 # Final State Checkpoint
