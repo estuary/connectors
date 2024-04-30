@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -67,6 +68,16 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		// connector-internal uses of the data to see the tables.
 		if table.OmitBinding {
 			logEntry.Debug("excluding table from catalog discovery because OmitBinding is set")
+			continue
+		}
+
+		// Don't discover materialized tables, since that is almost never what is intended, and
+		// causes problems with synthetic projection names. A column of "flow_published_at" is used
+		// as a sentinel for guessing if the table is from a materialization or not. Although not
+		// 100% accurate (the user could exclude this field), it will work in the vast majority of
+		// cases.
+		if slices.Contains(table.ColumnNames, "flow_published_at") {
+			logEntry.Info("excluding table from catalog discovery because it contains the column 'flow_published_at' and is likely a materialized table")
 			continue
 		}
 
