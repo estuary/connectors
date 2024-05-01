@@ -104,7 +104,6 @@ class OracleTable(BaseModel, extra="forbid"):
     Oracle all_tables records. docs: https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_TABLES.html
     """
 
-    tablespace_name: str = Field(alias="TABLESPACE_NAME")  # "SYSTEM", or "AcmeCo"
     table_name: str = Field(alias="TABLE_NAME")  # "OA_FOOBAR" for system tables, or e.x. "Account"
 
 
