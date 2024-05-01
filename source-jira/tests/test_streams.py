@@ -88,7 +88,7 @@ def test_application_roles_stream_401_error(config, caplog):
     assert is_available is False
 
     assert reason == (
-        "Unable to read application_roles stream. The endpoint https://test_application_domain/rest/api/3/applicationrole?maxResults=50 returned 401: Unauthorized. Invalid creds were provided, please check your api token, domain and/or email.. Please visit https://docs.airbyte.com/integrations/sources/jira to learn more.  "
+        "Unable to read application_roles stream. The endpoint https://test_application_domain/rest/api/3/applicationrole?maxResults=50 returned 401: Unauthorized. Invalid creds were provided, please check your api token, domain and/or email.. Please visit https://go.estuary.dev/Bk7fII to learn more.  "
     )
 
 
@@ -177,7 +177,7 @@ def test_board_stream_forbidden(config, boards_response, caplog):
         "https://test_boards_domain/rest/agile/1.0/board?maxResults=50 returned 403: "
         "Forbidden. Please check the 'READ' permission(Scopes for Connect apps) "
         "and/or the user has Jira Software rights and access.. Please visit "
-        "https://docs.airbyte.com/integrations/sources/jira to learn more.  "
+        "https://go.estuary.dev/Bk7fII to learn more.  "
         "403 Client Error: Forbidden for url: "
         "https://test_boards_domain/rest/agile/1.0/board?maxResults=50"
     )

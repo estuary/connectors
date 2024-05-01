@@ -63,7 +63,12 @@
           "type": "string",
           "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
           "readOnly": true,
-          "enum": ["atlassian", "app", "customer", "unknown"]
+          "enum": [
+            "atlassian",
+            "app",
+            "customer",
+            "unknown"
+          ]
         },
         "name": {
           "type": "string",
@@ -123,10 +128,7 @@
           "type": "object",
           "properties": {
             "size": {
-              "type": "integer",
-              "xml": {
-                "attribute": true
-              }
+              "type": "integer"
             },
             "items": {
               "type": "array",
@@ -152,11 +154,7 @@
               "type": "object"
             },
             "max-results": {
-              "type": "integer",
-              "xml": {
-                "name": "max-results",
-                "attribute": true
-              }
+              "type": "integer"
             }
           }
         },
@@ -166,10 +164,7 @@
           "type": "object",
           "properties": {
             "size": {
-              "type": "integer",
-              "xml": {
-                "attribute": true
-              }
+              "type": "integer"
             },
             "items": {
               "type": "array",
@@ -241,21 +236,14 @@
               "type": "object"
             },
             "max-results": {
-              "type": "integer",
-              "xml": {
-                "name": "max-results",
-                "attribute": true
-              }
+              "type": "integer"
             }
           }
         },
         "expand": {
           "type": "string",
           "description": "Expand options that include additional user details in the response.",
-          "readOnly": true,
-          "xml": {
-            "attribute": true
-          }
+          "readOnly": true
         }
       }
     },

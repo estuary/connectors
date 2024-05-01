@@ -13,7 +13,10 @@
       "readOnly": true
     },
     "issueId": {
-      "type": ["null", "string"],
+      "type": [
+        "null",
+        "string"
+      ],
       "description": "Id of the related issue.",
       "readOnly": true
     },
@@ -49,12 +52,18 @@
       "readOnly": true
     },
     "visibility": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "type": {
           "type": "string",
           "description": "Whether visibility of this item is restricted to a group or role.",
-          "enum": ["group", "role"]
+          "enum": [
+            "group",
+            "role"
+          ]
         },
         "value": {
           "type": "string",
