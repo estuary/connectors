@@ -6,6 +6,7 @@ import logging
 from typing import Any, List, Mapping, Optional, Tuple
 
 import pendulum
+from pendulum.duration import Duration
 import requests
 from airbyte_cdk import AirbyteLogger
 from airbyte_cdk.models import FailureType
@@ -83,9 +84,10 @@ class SourceJira(AbstractSource):
         start_date = config.get("start_date")
         if start_date:
             config["start_date"] = pendulum.parse(start_date)
-        config["lookback_window_minutes"] = pendulum.duration(
-            minutes=config.get("lookback_window_minutes", 0)
-        )
+        if not isinstance(config.get("lookback_window_minutes"), Duration):
+            config["lookback_window_minutes"] = pendulum.duration(
+                minutes=config.get("lookback_window_minutes", 0),
+            )
         config["projects"] = config.get("projects", [])
         return config
 
@@ -155,7 +157,13 @@ class SourceJira(AbstractSource):
                 == "application/json"
             ):
                 message = " ".join(
-                    map(str, request_error.response.json().get("errorMessages", ""))
+                    map(
+                        str,
+                        request_error.response.json().get(
+                            "errorMessages",
+                            "",
+                        ),
+                    )
                 )
                 return False, f"{message} {request_error}"
 
