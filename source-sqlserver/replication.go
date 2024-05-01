@@ -464,6 +464,7 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 
 	query("EXEC msdb.dbo.sp_help_job;")
 	query("EXEC sys.sp_cdc_help_jobs;")
+	query("SELECT * FROM msdb.dbo.cdc_jobs;")
 	query("EXEC sys.sp_cdc_help_change_data_capture;")
 	return nil
 }
