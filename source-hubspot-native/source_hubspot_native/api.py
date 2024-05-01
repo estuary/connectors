@@ -1,6 +1,6 @@
 import asyncio
 import itertools
-import time
+import json
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
@@ -10,8 +10,6 @@ from typing import (
     Callable,
     Dict,
     Iterable,
-    Optional,
-    Tuple,
 )
 
 from estuary_cdk.capture.common import (
@@ -40,32 +38,37 @@ from .models import (
 HUB = "https://api.hubapi.com"
 
 
+properties_cache: dict[str, Properties]= {}
+
 async def fetch_properties(
-    log: Logger, cls: type[CRMObject], http: HTTPSession
+    log: Logger, http: HTTPSession, object_name: str
 ) -> Properties:
-    if p := getattr(cls, "CACHED_PROPERTIES", None):
-        return p
+    if object_name in properties_cache:
+        return properties_cache[object_name]
 
-    url = f"{HUB}/crm/v3/properties/{cls.NAME}"
-    cls.CACHED_PROPERTIES = Properties.model_validate_json(await http.request(log, url))
-    for p in cls.CACHED_PROPERTIES.results:
-        p.hubspotObject = cls.NAME
+    url = f"{HUB}/crm/v3/properties/{object_name}"
+    properties_cache[object_name] = Properties.model_validate_json(await http.request(log, url))
+    for p in properties_cache[object_name].results:
+        p.hubspotObject = object_name
 
-    return cls.CACHED_PROPERTIES
+    return properties_cache[object_name]
 
 
 async def fetch_page(
     # Closed over via functools.partial:
     cls: type[CRMObject],
     http: HTTPSession,
+    object_name: str,
     # Remainder is common.FetchPageFn:
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor | None,
+    cutoff: LogCursor,
 ) -> AsyncGenerator[CRMObject | str, None]:
+    
+    assert isinstance(cutoff, datetime)
 
-    url = f"{HUB}/crm/v3/objects/{cls.NAME}"
-    properties = await fetch_properties(log, cls, http)
+    url = f"{HUB}/crm/v3/objects/{object_name}"
+    properties = await fetch_properties(log, http, object_name)
     property_names = ",".join(p.name for p in properties.results if not p.calculated)
 
     input = {
@@ -94,11 +97,12 @@ async def fetch_batch(
     log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
+    object_name: str,
     ids: Iterable[str],
 ) -> BatchResult[CRMObject]:
 
-    url = f"{HUB}/crm/v3/objects/{cls.NAME}/batch/read"
-    properties = await fetch_properties(log, cls, http)
+    url = f"{HUB}/crm/v3/objects/{object_name}/batch/read"
+    properties = await fetch_properties(log, http, object_name)
     property_names = [p.name for p in properties.results if not p.calculated]
 
     input = {
@@ -117,10 +121,11 @@ async def fetch_association(
     log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
+    object_name: str,
     ids: Iterable[str],
     associated_entity: str,
 ) -> BatchResult[Association]:
-    url = f"{HUB}/crm/v4/associations/{cls.NAME}/{associated_entity}/batch/read"
+    url = f"{HUB}/crm/v4/associations/{object_name}/{associated_entity}/batch/read"
     input = {"inputs": [{"id": id} for id in ids]}
 
     return BatchResult[Association].model_validate_json(
@@ -132,14 +137,15 @@ async def fetch_batch_with_associations(
     log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
+    object_name: str,
     ids: list[str],
 ) -> BatchResult[CRMObject]:
 
     batch, all_associated = await asyncio.gather(
-        fetch_batch(log, cls, http, ids),
+        fetch_batch(log, cls, http, object_name, ids),
         asyncio.gather(
             *(
-                fetch_association(log, cls, http, ids, e)
+                fetch_association(log, cls, http, object_name, ids, e)
                 for e in cls.ASSOCIATED_ENTITIES
             )
         ),
@@ -178,6 +184,7 @@ async def fetch_changes(
     cls: type[CRMObject],
     fetch_recent: FetchRecentFn,
     http: HTTPSession,
+    object_name: str,
     # Remainder is common.FetchChangesFn:
     log: Logger,
     log_cursor: LogCursor,
@@ -207,7 +214,7 @@ async def fetch_changes(
         batch = list(batch_it)
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-            log, cls, http, [id for _, id in batch]
+            log, cls, http, object_name, [id for _, id in batch]
         )
         for doc in documents.results:
             yield doc
