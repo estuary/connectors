@@ -15,9 +15,45 @@ from source_jira.utils import read_full_refresh
 def test_pagination_projects():
     domain = "domain.com"
     responses_json = [
-        (HTTPStatus.OK, {}, json.dumps({"startAt": 0, "maxResults": 2, "total": 6, "isLast": False, "values": [{"id": "1"}, {"id": "2"}]})),
-        (HTTPStatus.OK, {}, json.dumps({"startAt": 2, "maxResults": 2, "total": 6, "isLast": False, "values": [{"id": "3"}, {"id": "4"}]})),
-        (HTTPStatus.OK, {}, json.dumps({"startAt": 4, "maxResults": 2, "total": 6, "isLast": True, "values": [{"id": "5"}, {"id": "6"}]})),
+        (
+            HTTPStatus.OK,
+            {},
+            json.dumps(
+                {
+                    "startAt": 0,
+                    "maxResults": 2,
+                    "total": 6,
+                    "isLast": False,
+                    "values": [{"id": "1"}, {"id": "2"}],
+                }
+            ),
+        ),
+        (
+            HTTPStatus.OK,
+            {},
+            json.dumps(
+                {
+                    "startAt": 2,
+                    "maxResults": 2,
+                    "total": 6,
+                    "isLast": False,
+                    "values": [{"id": "3"}, {"id": "4"}],
+                }
+            ),
+        ),
+        (
+            HTTPStatus.OK,
+            {},
+            json.dumps(
+                {
+                    "startAt": 4,
+                    "maxResults": 2,
+                    "total": 6,
+                    "isLast": True,
+                    "values": [{"id": "5"}, {"id": "6"}],
+                }
+            ),
+        ),
     ]
 
     responses.add_callback(
@@ -29,7 +65,14 @@ def test_pagination_projects():
 
     stream = Projects(authenticator=None, domain=domain, projects=[])
     records = list(read_full_refresh(stream))
-    assert records == [{"id": "1"}, {"id": "2"}, {"id": "3"}, {"id": "4"}, {"id": "5"}, {"id": "6"}]
+    assert records == [
+        {"id": "1"},
+        {"id": "2"},
+        {"id": "3"},
+        {"id": "4"},
+        {"id": "5"},
+        {"id": "6"},
+    ]
 
 
 @responses.activate
@@ -44,7 +87,10 @@ def test_pagination_issues():
                     "startAt": 0,
                     "maxResults": 2,
                     "total": 6,
-                    "issues": [{"id": "1", "updated": "2022-01-01"}, {"id": "2", "updated": "2022-01-01"}],
+                    "issues": [
+                        {"id": "1", "updated": "2022-01-01"},
+                        {"id": "2", "updated": "2022-01-01"},
+                    ],
                 }
             ),
         ),
@@ -56,7 +102,10 @@ def test_pagination_issues():
                     "startAt": 2,
                     "maxResults": 2,
                     "total": 6,
-                    "issues": [{"id": "3", "updated": "2022-01-01"}, {"id": "4", "updated": "2022-01-01"}],
+                    "issues": [
+                        {"id": "3", "updated": "2022-01-01"},
+                        {"id": "4", "updated": "2022-01-01"},
+                    ],
                 }
             ),
         ),
@@ -68,7 +117,10 @@ def test_pagination_issues():
                     "startAt": 4,
                     "maxResults": 2,
                     "total": 6,
-                    "issues": [{"id": "5", "updated": "2022-01-01"}, {"id": "6", "updated": "2022-01-01"}],
+                    "issues": [
+                        {"id": "5", "updated": "2022-01-01"},
+                        {"id": "6", "updated": "2022-01-01"},
+                    ],
                 }
             ),
         ),

@@ -44,8 +44,13 @@ def test_migrate_config():
     assert "issues_stream_expand_with" in test_migrated_config
     assert isinstance(test_migrated_config["issues_stream_expand_with"], list)
     # check the old property is in place
-    assert all(key in test_migrated_config for key in migration_instance.migrate_from_keys_map)
-    assert all(isinstance(test_migrated_config[key], bool) for key in migration_instance.migrate_from_keys_map)
+    assert all(
+        key in test_migrated_config for key in migration_instance.migrate_from_keys_map
+    )
+    assert all(
+        isinstance(test_migrated_config[key], bool)
+        for key in migration_instance.migrate_from_keys_map
+    )
     # check the migration should be skipped, once already done
     assert not migration_instance.should_migrate(test_migrated_config)
     # test CONTROL MESSAGE was emitted
@@ -53,7 +58,10 @@ def test_migrate_config():
     assert control_msg.type == Type.CONTROL
     assert control_msg.control.type == OrchestratorType.CONNECTOR_CONFIG
     # check the migrated values
-    assert control_msg.control.connectorConfig.config["issues_stream_expand_with"] == ["changelog", "renderedFields"]
+    assert control_msg.control.connectorConfig.config["issues_stream_expand_with"] == [
+        "changelog",
+        "renderedFields",
+    ]
     # revert the test_config to the starting point
     revert_migration()
 
@@ -64,5 +72,10 @@ def test_config_is_reverted():
     # check the config no longer has the migrated property
     assert "issues_stream_expand_with" not in test_config
     # check the old property is still there
-    assert all(key in test_config for key in MigrateIssueExpandProperties.migrate_from_keys_map)
-    assert all(isinstance(test_config[key], bool) for key in MigrateIssueExpandProperties.migrate_from_keys_map)
+    assert all(
+        key in test_config for key in MigrateIssueExpandProperties.migrate_from_keys_map
+    )
+    assert all(
+        isinstance(test_config[key], bool)
+        for key in MigrateIssueExpandProperties.migrate_from_keys_map
+    )

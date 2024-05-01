@@ -83,7 +83,9 @@ class SourceJira(AbstractSource):
         start_date = config.get("start_date")
         if start_date:
             config["start_date"] = pendulum.parse(start_date)
-        config["lookback_window_minutes"] = pendulum.duration(minutes=config.get("lookback_window_minutes", 0))
+        config["lookback_window_minutes"] = pendulum.duration(
+            minutes=config.get("lookback_window_minutes", 0)
+        )
         config["projects"] = config.get("projects", [])
         return config
 
@@ -91,16 +93,24 @@ class SourceJira(AbstractSource):
     def get_authenticator(config: Mapping[str, Any]):
         return BasicHttpAuthenticator(config["email"], config["api_token"])
 
-    def check_connection(self, logger: AirbyteLogger, config: Mapping[str, Any]) -> Tuple[bool, Optional[Any]]:
+    def check_connection(
+        self, logger: AirbyteLogger, config: Mapping[str, Any]
+    ) -> Tuple[bool, Optional[Any]]:
         try:
             original_config = config.copy()
             config = self._validate_and_transform(config)
             authenticator = self.get_authenticator(config)
-            kwargs = {"authenticator": authenticator, "domain": config["domain"], "projects": config["projects"]}
+            kwargs = {
+                "authenticator": authenticator,
+                "domain": config["domain"],
+                "projects": config["projects"],
+            }
 
             # check projects
             projects_stream = Projects(**kwargs)
-            projects = {project["key"] for project in read_full_refresh(projects_stream)}
+            projects = {
+                project["key"] for project in read_full_refresh(projects_stream)
+            }
             unknown_projects = set(config["projects"]) - projects
             if unknown_projects:
                 return False, "unknown project(s): " + ", ".join(unknown_projects)
@@ -113,9 +123,14 @@ class SourceJira(AbstractSource):
                 except:
                     logger.warning("No access to stream: " + stream.name)
                 else:
-                    logger.info(f"API Token have access to stream: {stream.name}, so check is successful.")
+                    logger.info(
+                        f"API Token have access to stream: {stream.name}, so check is successful."
+                    )
                     return True, None
-            return False, "This API Token does not have permission to read any of the resources."
+            return (
+                False,
+                "This API Token does not have permission to read any of the resources.",
+            )
         except ValidationError as validation_error:
             return False, validation_error
         except requests.exceptions.RequestException as request_error:
@@ -134,8 +149,14 @@ class SourceJira(AbstractSource):
                 ) from None
 
             # sometimes jira returns non json response
-            if has_response and request_error.response.headers.get("content-type") == "application/json":
-                message = " ".join(map(str, request_error.response.json().get("errorMessages", "")))
+            if (
+                has_response
+                and request_error.response.headers.get("content-type")
+                == "application/json"
+            ):
+                message = " ".join(
+                    map(str, request_error.response.json().get("errorMessages", ""))
+                )
                 return False, f"{message} {request_error}"
 
             # we don't know what this is, rethrow it
@@ -144,7 +165,11 @@ class SourceJira(AbstractSource):
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
         config = self._validate_and_transform(config)
         authenticator = self.get_authenticator(config)
-        args = {"authenticator": authenticator, "domain": config["domain"], "projects": config["projects"]}
+        args = {
+            "authenticator": authenticator,
+            "domain": config["domain"],
+            "projects": config["projects"],
+        }
         incremental_args = {
             **args,
             "start_date": config.get("start_date"),
@@ -155,7 +180,11 @@ class SourceJira(AbstractSource):
         experimental_streams = []
         if config.get("enable_experimental_streams", False):
             experimental_streams.append(
-                PullRequests(issues_stream=issues_stream, issue_fields_stream=issue_fields_stream, **incremental_args)
+                PullRequests(
+                    issues_stream=issues_stream,
+                    issue_fields_stream=issue_fields_stream,
+                    **incremental_args,
+                )
             )
         return [
             ApplicationRoles(**args),

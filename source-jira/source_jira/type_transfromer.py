@@ -20,7 +20,9 @@ class DateTimeTransformer(TypeTransformer):
         if target_format == "date-time":
             if isinstance(original_item, str):
                 try:
-                    date = datetime.strptime(original_item, DateTimeTransformer.api_date_time_format)
+                    date = datetime.strptime(
+                        original_item, DateTimeTransformer.api_date_time_format
+                    )
                     return date.isoformat()
                 except ValueError:
                     logger.warning(f"{original_item}: doesn't match expected format.")

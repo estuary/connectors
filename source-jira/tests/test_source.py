@@ -19,7 +19,9 @@ def test_streams(config):
 
 
 @responses.activate
-def test_check_connection_config_no_access_to_one_stream(config, caplog, projects_response, avatars_response):
+def test_check_connection_config_no_access_to_one_stream(
+    config, caplog, projects_response, avatars_response
+):
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/project/search?maxResults=50&expand=description%2Clead&status=live&status=archived&status=deleted",
@@ -35,7 +37,11 @@ def test_check_connection_config_no_access_to_one_stream(config, caplog, project
         f"https://{config['domain']}/rest/api/3/avatar/issuetype/system?maxResults=50",
         json=avatars_response,
     )
-    responses.add(responses.GET, f"https://{config['domain']}/rest/api/3/label?maxResults=50", status=401)
+    responses.add(
+        responses.GET,
+        f"https://{config['domain']}/rest/api/3/label?maxResults=50",
+        status=401,
+    )
     source = SourceJira()
     logger_mock = MagicMock()
     assert source.check_connection(logger=logger_mock, config=config) == (True, None)
@@ -48,14 +54,19 @@ def test_check_connection_404_error(config):
         f"https://{config['domain']}/rest/api/3/project/search?maxResults=50&expand=description%2Clead&status=live&status=archived&status=deleted",
         status=404,
     )
-    responses.add(responses.GET, f"https://{config['domain']}/rest/api/3/label?maxResults=50", status=404)
+    responses.add(
+        responses.GET,
+        f"https://{config['domain']}/rest/api/3/label?maxResults=50",
+        status=404,
+    )
     source = SourceJira()
     logger_mock = MagicMock()
     with pytest.raises(AirbyteTracedException) as e:
         source.check_connection(logger=logger_mock, config=config)
 
     assert (
-        e.value.message == "Config validation error: please check that your domain is valid and does not include protocol (e.g: https://)."
+        e.value.message
+        == "Config validation error: please check that your domain is valid and does not include protocol (e.g: https://)."
     )
 
 
@@ -63,4 +74,6 @@ def test_get_authenticator(config):
     source = SourceJira()
     authenticator = source.get_authenticator(config=config)
 
-    assert authenticator.get_auth_header() == {"Authorization": "Basic ZW1haWxAZW1haWwuY29tOnRva2Vu"}
+    assert authenticator.get_auth_header() == {
+        "Authorization": "Basic ZW1haWxAZW1haWwuY29tOnRva2Vu"
+    }

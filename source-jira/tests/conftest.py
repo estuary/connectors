@@ -386,7 +386,10 @@ def mock_projects_responses(config, projects_response):
 @fixture
 def mock_projects_responses_additional_project(config, projects_response):
     Projects.use_cache = False
-    projects_response["values"] += [{"id": "3", "key": "Project3"}, {"id": "4", "key": "Project4"}]
+    projects_response["values"] += [
+        {"id": "3", "key": "Project3"},
+        {"id": "4", "key": "Project4"},
+    ]
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/project/search?maxResults=50&expand=description%2Clead&status=live&status=archived&status=deleted",
@@ -439,7 +442,9 @@ def mock_issues_responses(config, issues_response):
                 }
             )
         ],
-        json={"errorMessages": ["The value '3' does not exist for the field 'project'."]},
+        json={
+            "errorMessages": ["The value '3' does not exist for the field 'project'."]
+        },
         status=400,
     )
     responses.add(
@@ -514,7 +519,9 @@ def mock_issue_watchers_responses(config, issue_watchers_response):
 
 
 @fixture
-def mock_issue_custom_field_contexts_response(config, issue_custom_field_contexts_response):
+def mock_issue_custom_field_contexts_response(
+    config, issue_custom_field_contexts_response
+):
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/field/issuetype/context?maxResults=50",
@@ -533,7 +540,9 @@ def mock_issue_custom_field_contexts_response(config, issue_custom_field_context
 
 
 @fixture
-def mock_issue_custom_field_contexts_response_error(config, issue_custom_field_contexts_response):
+def mock_issue_custom_field_contexts_response_error(
+    config, issue_custom_field_contexts_response
+):
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/field/issuetype/context?maxResults=50",
@@ -542,14 +551,24 @@ def mock_issue_custom_field_contexts_response_error(config, issue_custom_field_c
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/field/issuetype2/context?maxResults=50",
-        json={"errorMessages": ["Not found issue custom field context for issue fields issuetype2"]},
+        json={
+            "errorMessages": [
+                "Not found issue custom field context for issue fields issuetype2"
+            ]
+        },
         status=404,
     )
-    responses.add(responses.GET, f"https://{config['domain']}/rest/api/3/field/issuetype3/context?maxResults=50", json={})
+    responses.add(
+        responses.GET,
+        f"https://{config['domain']}/rest/api/3/field/issuetype3/context?maxResults=50",
+        json={},
+    )
 
 
 @fixture
-def mock_issue_custom_field_options_response(config, issue_custom_field_options_response):
+def mock_issue_custom_field_options_response(
+    config, issue_custom_field_options_response
+):
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/field/issuetype/context/10130/option?maxResults=50",
@@ -558,7 +577,11 @@ def mock_issue_custom_field_options_response(config, issue_custom_field_options_
     responses.add(
         responses.GET,
         f"https://{config['domain']}/rest/api/3/field/issuetype/context/10129/option?maxResults=50",
-        json={"errorMessages": ["Not found issue custom field options for issue fields issuetype3"]},
+        json={
+            "errorMessages": [
+                "Not found issue custom field options for issue fields issuetype3"
+            ]
+        },
         status=404,
     )
 

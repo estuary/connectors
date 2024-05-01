@@ -14,7 +14,9 @@ from airbyte_cdk.logger import AirbyteLogger as Logger
 from airbyte_cdk.sources import Source
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http import HttpStream
-from airbyte_cdk.sources.streams.http.availability_strategy import HttpAvailabilityStrategy
+from airbyte_cdk.sources.streams.http.availability_strategy import (
+    HttpAvailabilityStrategy,
+)
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from requests.exceptions import HTTPError
 from source_jira.type_transfromer import DateTimeTransformer
@@ -29,7 +31,9 @@ class JiraAvailabilityStrategy(HttpAvailabilityStrategy):
     Inherit from HttpAvailabilityStrategy with slight modification to 403 and 401 error messages.
     """
 
-    def reasons_for_unavailable_status_codes(self, stream: Stream, logger: Logger, source: Source, error: HTTPError) -> Dict[int, str]:
+    def reasons_for_unavailable_status_codes(
+        self, stream: Stream, logger: Logger, source: Source, error: HTTPError
+    ) -> Dict[int, str]:
         reasons_for_codes: Dict[int, str] = {
             requests.codes.FORBIDDEN: "Please check the 'READ' permission(Scopes for Connect apps) and/or the user has Jira Software rights and access.",
             requests.codes.UNAUTHORIZED: "Invalid creds were provided, please check your api token, domain and/or email.",
@@ -53,7 +57,9 @@ class JiraStream(HttpStream, ABC):
     # it's generally applied to all streams that might have the same error hit in the future.
     skip_http_status_codes = [requests.codes.BAD_REQUEST]
     raise_on_http_errors = True
-    transformer: TypeTransformer = DateTimeTransformer(TransformConfig.DefaultSchemaNormalization)
+    transformer: TypeTransformer = DateTimeTransformer(
+        TransformConfig.DefaultSchemaNormalization
+    )
     # emitting state message after every page read
     state_checkpoint_interval = page_size
 
@@ -81,7 +87,9 @@ class JiraStream(HttpStream, ABC):
         """Number of retries increased from default 5 to 10, based on issues with Jira. Max waiting time is still default 10 minutes."""
         return 10
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+    def next_page_token(
+        self, response: requests.Response
+    ) -> Optional[Mapping[str, Any]]:
         response_json = response.json()
         if isinstance(response_json, dict):
             startAt = response_json.get("startAt")
@@ -114,27 +122,43 @@ class JiraStream(HttpStream, ABC):
     def request_headers(self, **kwargs) -> Mapping[str, Any]:
         return {"Accept": "application/json"}
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
-        records = response_json if not self.extract_field else response_json.get(self.extract_field, [])
+        records = (
+            response_json
+            if not self.extract_field
+            else response_json.get(self.extract_field, [])
+        )
         if isinstance(records, list):
             for record in records:
                 yield self.transform(record=record, **kwargs)
         else:
             yield self.transform(record=records, **kwargs)
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         return record
 
     def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
         try:
             yield from super().read_records(**kwargs)
         except HTTPError as e:
-            if not (self.skip_http_status_codes and e.response.status_code in self.skip_http_status_codes):
+            if not (
+                self.skip_http_status_codes
+                and e.response.status_code in self.skip_http_status_codes
+            ):
                 raise e
             errors = e.response.json().get("errorMessages")
             custom_error = self._get_custom_error(e.response)
-            self.logger.warning(f"Stream `{self.name}`. An error occurred, details: {errors}. Skipping for now. {custom_error}")
+            self.logger.warning(
+                f"Stream `{self.name}`. An error occurred, details: {errors}. Skipping for now. {custom_error}"
+            )
 
 
 class StartDateJiraStream(JiraStream, ABC):
@@ -154,7 +178,11 @@ class IncrementalJiraStream(StartDateJiraStream, ABC):
         super().__init__(**kwargs)
         self._starting_point_cache = {}
 
-    def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]):
+    def get_updated_state(
+        self,
+        current_stream_state: MutableMapping[str, Any],
+        latest_record: Mapping[str, Any],
+    ):
         updated_state = latest_record[self.cursor_field]
         stream_state_value = current_stream_state.get(self.cursor_field)
         if stream_state_value:
@@ -168,24 +196,37 @@ class IncrementalJiraStream(StartDateJiraStream, ABC):
             compare_date = compare_date.strftime("%Y/%m/%d %H:%M")
             return f"{self.cursor_field} >= '{compare_date}'"
 
-    def get_starting_point(self, stream_state: Mapping[str, Any]) -> Optional[pendulum.DateTime]:
+    def get_starting_point(
+        self, stream_state: Mapping[str, Any]
+    ) -> Optional[pendulum.DateTime]:
         if self.cursor_field not in self._starting_point_cache:
-            self._starting_point_cache[self.cursor_field] = self._get_starting_point(stream_state=stream_state)
+            self._starting_point_cache[self.cursor_field] = self._get_starting_point(
+                stream_state=stream_state
+            )
         return self._starting_point_cache[self.cursor_field]
 
-    def _get_starting_point(self, stream_state: Mapping[str, Any]) -> Optional[pendulum.DateTime]:
+    def _get_starting_point(
+        self, stream_state: Mapping[str, Any]
+    ) -> Optional[pendulum.DateTime]:
         if stream_state:
             stream_state_value = stream_state.get(self.cursor_field)
             if stream_state_value:
-                stream_state_value = pendulum.parse(stream_state_value) - self._lookback_window_minutes
+                stream_state_value = (
+                    pendulum.parse(stream_state_value) - self._lookback_window_minutes
+                )
                 return safe_max(stream_state_value, self._start_date)
         return self._start_date
 
     def read_records(
-        self, stream_slice: Optional[Mapping[str, Any]] = None, stream_state: Mapping[str, Any] = None, **kwargs
+        self,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Mapping[str, Any] = None,
+        **kwargs,
     ) -> Iterable[Mapping[str, Any]]:
         start_point = self.get_starting_point(stream_state=stream_state)
-        for record in super().read_records(stream_slice=stream_slice, stream_state=stream_state, **kwargs):
+        for record in super().read_records(
+            stream_slice=stream_slice, stream_state=stream_state, **kwargs
+        ):
             cursor_value = pendulum.parse(record[self.cursor_field])
             if not start_point or cursor_value >= start_point:
                 yield record
@@ -240,7 +281,12 @@ class Boards(JiraStream):
             if not self._projects or location.get("projectKey") in self._projects:
                 yield board
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         location = record.get("location")
         if location:
             record["projectId"] = str(location.get("projectId"))
@@ -260,7 +306,11 @@ class BoardIssues(StartDateJiraStream):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._starting_point_cache = {}
-        self.boards_stream = Boards(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.boards_stream = Boards(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"board/{stream_slice['board_id']}/issue"
@@ -271,14 +321,20 @@ class BoardIssues(StartDateJiraStream):
         stream_slice: Mapping[str, Any],
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
-        params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        params = super().request_params(
+            stream_state=stream_state,
+            stream_slice=stream_slice,
+            next_page_token=next_page_token,
+        )
         params["fields"] = ["key", "created", "updated"]
         jql = self.jql_compare_date(stream_state, stream_slice)
         if jql:
             params["jql"] = jql
         return params
 
-    def jql_compare_date(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any]) -> Optional[str]:
+    def jql_compare_date(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any]
+    ) -> Optional[str]:
         compare_date = self.get_starting_point(stream_state, stream_slice)
         if compare_date:
             compare_date = compare_date.strftime("%Y/%m/%d %H:%M")
@@ -300,43 +356,68 @@ class BoardIssues(StartDateJiraStream):
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
         yield from read_full_refresh(self.boards_stream)
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         try:
-            yield from super().read_records(stream_slice={"board_id": stream_slice["id"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"board_id": stream_slice["id"]}, **kwargs
+            )
         except HTTPError as e:
             if self._is_board_error(e.response):
                 # Wrong board is skipped
-                self.logger.warning(f"Board {stream_slice['id']} has no columns with a mapped status. Skipping.")
+                self.logger.warning(
+                    f"Board {stream_slice['id']} has no columns with a mapped status. Skipping."
+                )
             else:
                 raise
 
-    def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]):
+    def get_updated_state(
+        self,
+        current_stream_state: MutableMapping[str, Any],
+        latest_record: Mapping[str, Any],
+    ):
         updated_state = latest_record[self.cursor_field]
         board_id = str(latest_record["boardId"])
-        stream_state_value = current_stream_state.get(board_id, {}).get(self.cursor_field)
+        stream_state_value = current_stream_state.get(board_id, {}).get(
+            self.cursor_field
+        )
         if stream_state_value:
             updated_state = max(updated_state, stream_state_value)
         current_stream_state.setdefault(board_id, {})[self.cursor_field] = updated_state
         return current_stream_state
 
-    def get_starting_point(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any]) -> Optional[pendulum.DateTime]:
+    def get_starting_point(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any]
+    ) -> Optional[pendulum.DateTime]:
         board_id = str(stream_slice["board_id"])
         if self.cursor_field not in self._starting_point_cache:
-            self._starting_point_cache.setdefault(board_id, {})[self.cursor_field] = self._get_starting_point(
-                stream_state=stream_state, stream_slice=stream_slice
+            self._starting_point_cache.setdefault(board_id, {})[self.cursor_field] = (
+                self._get_starting_point(
+                    stream_state=stream_state, stream_slice=stream_slice
+                )
             )
         return self._starting_point_cache[board_id][self.cursor_field]
 
-    def _get_starting_point(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any]) -> Optional[pendulum.DateTime]:
+    def _get_starting_point(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any]
+    ) -> Optional[pendulum.DateTime]:
         if stream_state:
             board_id = str(stream_slice["board_id"])
             stream_state_value = stream_state.get(board_id, {}).get(self.cursor_field)
             if stream_state_value:
-                stream_state_value = pendulum.parse(stream_state_value) - self._lookback_window_minutes
+                stream_state_value = (
+                    pendulum.parse(stream_state_value) - self._lookback_window_minutes
+                )
                 return safe_max(stream_state_value, self._start_date)
         return self._start_date
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["boardId"] = stream_slice["board_id"]
         record["created"] = record["fields"]["created"]
         record["updated"] = record["fields"]["updated"]
@@ -367,7 +448,9 @@ class Filters(JiraStream):
 
     def request_params(self, **kwargs) -> MutableMapping[str, Any]:
         params = super().request_params(**kwargs)
-        params["expand"] = "description,owner,jql,viewUrl,searchUrl,favourite,favouritedCount,sharePermissions,isWritable,subscriptions"
+        params["expand"] = (
+            "description,owner,jql,viewUrl,searchUrl,favourite,favouritedCount,sharePermissions,isWritable,subscriptions"
+        )
         return params
 
 
@@ -378,16 +461,29 @@ class FilterSharing(JiraStream):
 
     def __init__(self, render_fields: bool = False, **kwargs):
         super().__init__(**kwargs)
-        self.filters_stream = Filters(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.filters_stream = Filters(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"filter/{stream_slice['filter_id']}/permission"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for filters in read_full_refresh(self.filters_stream):
-            yield from super().read_records(stream_slice={"filter_id": filters["id"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"filter_id": filters["id"]}, **kwargs
+            )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["filterId"] = stream_slice["filter_id"]
         return record
 
@@ -421,8 +517,16 @@ class Issues(IncrementalJiraStream):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._project_ids = []
-        self.issue_fields_stream = IssueFields(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
-        self.projects_stream = Projects(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.issue_fields_stream = IssueFields(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
+        self.projects_stream = Projects(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, **kwargs) -> str:
         return "search"
@@ -433,7 +537,11 @@ class Issues(IncrementalJiraStream):
         stream_slice: Mapping[str, Any] = None,
         next_page_token: Mapping[str, Any] = None,
     ) -> MutableMapping[str, Any]:
-        params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        params = super().request_params(
+            stream_state=stream_state,
+            stream_slice=stream_slice,
+            next_page_token=next_page_token,
+        )
         params["fields"] = "*all"
 
         jql_parts = [self.jql_compare_date(stream_state)]
@@ -445,7 +553,9 @@ class Issues(IncrementalJiraStream):
         params["expand"] = ",".join(self._expand_fields_list)
         return params
 
-    def transform(self, record: MutableMapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self, record: MutableMapping[str, Any], **kwargs
+    ) -> MutableMapping[str, Any]:
         record["projectId"] = record["fields"]["project"]["id"]
         record["projectKey"] = record["fields"]["project"]["key"]
         record["created"] = record["fields"]["created"]
@@ -453,9 +563,13 @@ class Issues(IncrementalJiraStream):
 
         # remove fields that are None
         if "renderedFields" in record:
-            record["renderedFields"] = {k: v for k, v in record["renderedFields"].items() if v is not None}
+            record["renderedFields"] = {
+                k: v for k, v in record["renderedFields"].items() if v is not None
+            }
         if "fields" in record:
-            record["fields"] = {k: v for k, v in record["fields"].items() if v is not None}
+            record["fields"] = {
+                k: v for k, v in record["fields"].items() if v is not None
+            }
         return record
 
     def get_project_ids(self):
@@ -500,13 +614,23 @@ class IssueComments(IncrementalJiraStream):
         return f"issue/{stream_slice['key']}/comment"
 
     def read_records(
-        self, stream_slice: Optional[Mapping[str, Any]] = None, stream_state: Mapping[str, Any] = None, **kwargs
+        self,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Mapping[str, Any] = None,
+        **kwargs,
     ) -> Iterable[Mapping[str, Any]]:
         for issue in read_incremental(self.issues_stream, stream_state=stream_state):
             stream_slice = {"key": issue["key"]}
-            yield from super().read_records(stream_slice=stream_slice, stream_state=stream_state, **kwargs)
+            yield from super().read_records(
+                stream_slice=stream_slice, stream_state=stream_state, **kwargs
+            )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = stream_slice["key"]
         return record
 
@@ -557,19 +681,34 @@ class IssueCustomFieldContexts(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.issue_fields_stream = IssueFields(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.issue_fields_stream = IssueFields(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"field/{stream_slice['field_id']}/context"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for field in read_full_refresh(self.issue_fields_stream):
             if field.get("custom", False):
                 yield from super().read_records(
-                    stream_slice={"field_id": field["id"], "field_type": field.get("schema", {}).get("type")}, **kwargs
+                    stream_slice={
+                        "field_id": field["id"],
+                        "field_type": field.get("schema", {}).get("type"),
+                    },
+                    **kwargs,
                 )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["fieldId"] = stream_slice["field_id"]
         record["fieldType"] = stream_slice["field_type"]
         return record
@@ -592,18 +731,33 @@ class IssueCustomFieldOptions(JiraStream):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.issue_custom_field_contexts_stream = IssueCustomFieldContexts(
-            authenticator=self.authenticator, domain=self._domain, projects=self._projects
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
         )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"field/{stream_slice['field_id']}/context/{stream_slice['context_id']}/option"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for record in read_full_refresh(self.issue_custom_field_contexts_stream):
             if record.get("fieldType") == "option":
-                yield from super().read_records(stream_slice={"field_id": record["fieldId"], "context_id": record["id"]}, **kwargs)
+                yield from super().read_records(
+                    stream_slice={
+                        "field_id": record["fieldId"],
+                        "context_id": record["id"],
+                    },
+                    **kwargs,
+                )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["fieldId"] = stream_slice["field_id"]
         record["contextId"] = stream_slice["context_id"]
         return record
@@ -670,7 +824,9 @@ class IssuePropertyKeys(JiraStream):
         key = stream_slice["key"]
         return f"issue/{key}/properties"
 
-    def read_records(self, stream_slice: Mapping[str, Any], **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Mapping[str, Any], **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         issue_key = stream_slice["key"]
         yield from super().read_records(stream_slice={"key": issue_key}, **kwargs)
 
@@ -690,17 +846,36 @@ class IssueProperties(StartDateJiraStream):
             projects=self._projects,
             start_date=self._start_date,
         )
-        self.issue_property_keys_stream = IssuePropertyKeys(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.issue_property_keys_stream = IssuePropertyKeys(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"issue/{stream_slice['issue_key']}/properties/{stream_slice['key']}"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for issue in read_full_refresh(self.issues_stream):
-            for property_key in self.issue_property_keys_stream.read_records(stream_slice={"key": issue["key"]}, **kwargs):
-                yield from super().read_records(stream_slice={"key": property_key["key"], "issue_key": issue["key"]}, **kwargs)
+            for property_key in self.issue_property_keys_stream.read_records(
+                stream_slice={"key": issue["key"]}, **kwargs
+            ):
+                yield from super().read_records(
+                    stream_slice={
+                        "key": property_key["key"],
+                        "issue_key": issue["key"],
+                    },
+                    **kwargs,
+                )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = stream_slice["issue_key"]
         return record
 
@@ -722,14 +897,25 @@ class IssueRemoteLinks(StartDateJiraStream):
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"issue/{stream_slice['key']}/remotelink"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for issue in read_full_refresh(self.issues_stream):
-            yield from super().read_records(stream_slice={"key": issue["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": issue["key"]}, **kwargs
+            )
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+    def next_page_token(
+        self, response: requests.Response
+    ) -> Optional[Mapping[str, Any]]:
         return None
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = stream_slice["key"]
         return record
 
@@ -807,14 +993,25 @@ class IssueTransitions(StartDateJiraStream):
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"issue/{stream_slice['key']}/transitions"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for issue in read_full_refresh(self.issues_stream):
-            yield from super().read_records(stream_slice={"key": issue["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": issue["key"]}, **kwargs
+            )
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+    def next_page_token(
+        self, response: requests.Response
+    ) -> Optional[Mapping[str, Any]]:
         return None
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = stream_slice["key"]
         return record
 
@@ -844,11 +1041,20 @@ class IssueVotes(StartDateJiraStream):
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"issue/{stream_slice['key']}/votes"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for issue in read_full_refresh(self.issues_stream):
-            yield from super().read_records(stream_slice={"key": issue["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": issue["key"]}, **kwargs
+            )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = stream_slice["key"]
         return record
 
@@ -880,11 +1086,20 @@ class IssueWatchers(StartDateJiraStream):
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"issue/{stream_slice['key']}/watchers"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for issue in read_full_refresh(self.issues_stream):
-            yield from super().read_records(stream_slice={"key": issue["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": issue["key"]}, **kwargs
+            )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = stream_slice["key"]
         return record
 
@@ -910,11 +1125,16 @@ class IssueWorklogs(IncrementalJiraStream):
         return f"issue/{stream_slice['key']}/worklog"
 
     def read_records(
-        self, stream_slice: Optional[Mapping[str, Any]] = None, stream_state: Mapping[str, Any] = None, **kwargs
+        self,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Mapping[str, Any] = None,
+        **kwargs,
     ) -> Iterable[Mapping[str, Any]]:
         for issue in read_incremental(self.issues_stream, stream_state=stream_state):
             stream_slice = {"key": issue["key"]}
-            yield from super().read_records(stream_slice=stream_slice, stream_state=stream_state, **kwargs)
+            yield from super().read_records(
+                stream_slice=stream_slice, stream_state=stream_state, **kwargs
+            )
 
 
 class JiraSettings(JiraStream):
@@ -937,7 +1157,12 @@ class Labels(JiraStream):
     def path(self, **kwargs) -> str:
         return "label"
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         return {"label": record}
 
 
@@ -952,7 +1177,9 @@ class Permissions(JiraStream):
     def path(self, **kwargs) -> str:
         return "permissions"
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
         records = response_json.get(self.extract_field, {}).values()
         yield from records
@@ -1005,12 +1232,18 @@ class ProjectAvatars(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.projects_stream = Projects(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.projects_stream = Projects(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"project/{stream_slice['key']}/avatars"
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         response_json = response.json()
         stream_slice = kwargs["stream_slice"]
         for records in response_json.values():
@@ -1018,9 +1251,13 @@ class ProjectAvatars(JiraStream):
                 record["projectId"] = stream_slice["key"]
                 yield record
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
-            yield from super().read_records(stream_slice={"key": project["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": project["key"]}, **kwargs
+            )
 
 
 class ProjectCategories(JiraStream):
@@ -1047,14 +1284,22 @@ class ProjectComponents(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.projects_stream = Projects(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.projects_stream = Projects(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"project/{stream_slice['key']}/component"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
-            yield from super().read_records(stream_slice={"key": project["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": project["key"]}, **kwargs
+            )
 
 
 class ProjectEmail(JiraStream):
@@ -1071,16 +1316,29 @@ class ProjectEmail(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.projects_stream = Projects(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.projects_stream = Projects(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"project/{stream_slice['project_id']}/email"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
-            yield from super().read_records(stream_slice={"project_id": project["id"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"project_id": project["id"]}, **kwargs
+            )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["projectId"] = stream_slice["project_id"]
         return record
 
@@ -1094,16 +1352,29 @@ class ProjectPermissionSchemes(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.projects_stream = Projects(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.projects_stream = Projects(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"project/{stream_slice['key']}/securitylevel"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
-            yield from super().read_records(stream_slice={"key": project["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": project["key"]}, **kwargs
+            )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["projectId"] = stream_slice["key"]
         return record
 
@@ -1139,14 +1410,22 @@ class ProjectVersions(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.projects_stream = Projects(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.projects_stream = Projects(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"project/{stream_slice['key']}/version"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
-            yield from super().read_records(stream_slice={"key": project["key"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"key": project["key"]}, **kwargs
+            )
 
 
 class PullRequests(IncrementalJiraStream):
@@ -1164,7 +1443,9 @@ class PullRequests(IncrementalJiraStream):
 
     pr_regex = r"(?P<prDetails>PullRequestOverallDetails{openCount=(?P<open>[0-9]+), mergedCount=(?P<merged>[0-9]+), declinedCount=(?P<declined>[0-9]+)})|(?P<pr>pullrequest={dataType=pullrequest, state=(?P<state>[a-zA-Z]+), stateCount=(?P<count>[0-9]+)})"
 
-    def __init__(self, issues_stream: Issues, issue_fields_stream: IssueFields, **kwargs):
+    def __init__(
+        self, issues_stream: Issues, issue_fields_stream: IssueFields, **kwargs
+    ):
         super().__init__(**kwargs)
         self.issues_stream = issues_stream
         self.issue_fields_stream = issue_fields_stream
@@ -1191,13 +1472,20 @@ class PullRequests(IncrementalJiraStream):
         matches = 0
         for match in re.finditer(self.pr_regex, dev_field, re.MULTILINE):
             if match.group("prDetails"):
-                matches += int(match.group("open")) + int(match.group("merged")) + int(match.group("declined"))
+                matches += (
+                    int(match.group("open"))
+                    + int(match.group("merged"))
+                    + int(match.group("declined"))
+                )
             elif match.group("pr"):
                 matches += int(match.group("count"))
         return matches > 0
 
     def read_records(
-        self, stream_slice: Optional[Mapping[str, Any]] = None, stream_state: Mapping[str, Any] = None, **kwargs
+        self,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Mapping[str, Any] = None,
+        **kwargs,
     ) -> Iterable[Mapping[str, Any]]:
         field_ids_by_name = self.issue_fields_stream.field_ids_by_name()
         dev_field_ids = field_ids_by_name.get("Development", [])
@@ -1205,11 +1493,20 @@ class PullRequests(IncrementalJiraStream):
             for dev_field_id in dev_field_ids:
                 if self.has_pull_requests(issue["fields"].get(dev_field_id)):
                     yield from super().read_records(
-                        stream_slice={"id": issue["id"], self.cursor_field: issue["fields"][self.cursor_field]}, **kwargs
+                        stream_slice={
+                            "id": issue["id"],
+                            self.cursor_field: issue["fields"][self.cursor_field],
+                        },
+                        **kwargs,
                     )
                     break
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["id"] = stream_slice["id"]
         record[self.cursor_field] = stream_slice[self.cursor_field]
         return record
@@ -1237,29 +1534,53 @@ class ScreenTabs(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.screens_stream = Screens(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.screens_stream = Screens(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"screens/{stream_slice['screen_id']}/tabs"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for screen in read_full_refresh(self.screens_stream):
-            yield from self.read_tab_records(stream_slice={"screen_id": screen["id"]}, **kwargs)
+            yield from self.read_tab_records(
+                stream_slice={"screen_id": screen["id"]}, **kwargs
+            )
 
-    def read_tab_records(self, stream_slice: Mapping[str, Any], **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_tab_records(
+        self, stream_slice: Mapping[str, Any], **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         screen_id = stream_slice["screen_id"]
-        for screen_tab in super().read_records(stream_slice={"screen_id": screen_id}, **kwargs):
+        for screen_tab in super().read_records(
+            stream_slice={"screen_id": screen_id}, **kwargs
+        ):
             """
             For some projects jira creates screens automatically, which does not present in UI, but exist in screens stream.
             We receive 400 error "Screen with id {screen_id} does not exist" for tabs by these screens.
             """
-            bad_request_reached = re.match(r"Screen with id \d* does not exist", screen_tab.get("errorMessages", [""])[0])
+            bad_request_reached = re.match(
+                r"Screen with id \d* does not exist",
+                screen_tab.get("errorMessages", [""])[0],
+            )
             if bad_request_reached:
-                self.logger.info("Could not get screen tab for %s screen id. Reason: %s", screen_id, screen_tab["errorMessages"][0])
+                self.logger.info(
+                    "Could not get screen tab for %s screen id. Reason: %s",
+                    screen_id,
+                    screen_tab["errorMessages"][0],
+                )
                 return
             yield screen_tab
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["screenId"] = stream_slice["screen_id"]
         return record
 
@@ -1271,19 +1592,43 @@ class ScreenTabFields(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.screens_stream = Screens(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
-        self.screen_tabs_stream = ScreenTabs(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.screens_stream = Screens(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
+        self.screen_tabs_stream = ScreenTabs(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
-        return f"screens/{stream_slice['screen_id']}/tabs/{stream_slice['tab_id']}/fields"
+        return (
+            f"screens/{stream_slice['screen_id']}/tabs/{stream_slice['tab_id']}/fields"
+        )
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for screen in read_full_refresh(self.screens_stream):
-            for tab in self.screen_tabs_stream.read_tab_records(stream_slice={"screen_id": screen["id"]}, **kwargs):
-                if "id" in tab:  # Check for proper tab record since the ScreenTabs stream doesn't throw http errors
-                    yield from super().read_records(stream_slice={"screen_id": screen["id"], "tab_id": tab["id"]}, **kwargs)
+            for tab in self.screen_tabs_stream.read_tab_records(
+                stream_slice={"screen_id": screen["id"]}, **kwargs
+            ):
+                if (
+                    "id" in tab
+                ):  # Check for proper tab record since the ScreenTabs stream doesn't throw http errors
+                    yield from super().read_records(
+                        stream_slice={"screen_id": screen["id"], "tab_id": tab["id"]},
+                        **kwargs,
+                    )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["screenId"] = stream_slice["screen_id"]
         record["tabId"] = stream_slice["tab_id"]
         return record
@@ -1311,7 +1656,11 @@ class Sprints(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.boards_stream = Boards(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.boards_stream = Boards(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def _get_custom_error(self, response: requests.Response) -> str:
         if response.status_code == requests.codes.BAD_REQUEST:
@@ -1328,15 +1677,24 @@ class Sprints(JiraStream):
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"board/{stream_slice['board_id']}/sprint"
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         available_board_types = ["scrum", "simple"]
         for board in read_full_refresh(self.boards_stream):
             if board["type"] in available_board_types:
                 board_details = {"name": board["name"], "id": board["id"]}
                 self.logger.info(f"Fetching sprints for board: {board_details}")
-                yield from super().read_records(stream_slice={"board_id": board["id"]}, **kwargs)
+                yield from super().read_records(
+                    stream_slice={"board_id": board["id"]}, **kwargs
+                )
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["boardId"] = stream_slice["board_id"]
         return record
 
@@ -1352,8 +1710,16 @@ class SprintIssues(IncrementalJiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.sprints_stream = Sprints(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
-        self.issue_fields_stream = IssueFields(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.sprints_stream = Sprints(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
+        self.issue_fields_stream = IssueFields(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"sprint/{stream_slice['sprint_id']}/issue"
@@ -1364,20 +1730,31 @@ class SprintIssues(IncrementalJiraStream):
         stream_slice: Mapping[str, Any],
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
-        params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        params = super().request_params(
+            stream_state=stream_state,
+            stream_slice=stream_slice,
+            next_page_token=next_page_token,
+        )
         params["fields"] = stream_slice["fields"]
         jql = self.jql_compare_date(stream_state)
         if jql:
             params["jql"] = jql
         return params
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         fields = self.get_fields()
         for sprint in read_full_refresh(self.sprints_stream):
             stream_slice = {"sprint_id": sprint["id"], "fields": fields}
             yield from super().read_records(stream_slice=stream_slice, **kwargs)
 
-    def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
+    def transform(
+        self,
+        record: MutableMapping[str, Any],
+        stream_slice: Mapping[str, Any],
+        **kwargs,
+    ) -> MutableMapping[str, Any]:
         record["issueId"] = record["id"]
         record["id"] = "-".join([str(stream_slice["sprint_id"]), record["id"]])
         record["sprintId"] = stream_slice["sprint_id"]
@@ -1426,7 +1803,11 @@ class UsersGroupsDetailed(JiraStream):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.users_stream = Users(authenticator=self.authenticator, domain=self._domain, projects=self._projects)
+        self.users_stream = Users(
+            authenticator=self.authenticator,
+            domain=self._domain,
+            projects=self._projects,
+        )
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return "user"
@@ -1437,14 +1818,22 @@ class UsersGroupsDetailed(JiraStream):
         stream_slice: Mapping[str, Any],
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
-        params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        params = super().request_params(
+            stream_state=stream_state,
+            stream_slice=stream_slice,
+            next_page_token=next_page_token,
+        )
         params["accountId"] = stream_slice["accountId"]
         params["expand"] = "groups,applicationRoles"
         return params
 
-    def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         for user in read_full_refresh(self.users_stream):
-            yield from super().read_records(stream_slice={"accountId": user["accountId"]}, **kwargs)
+            yield from super().read_records(
+                stream_slice={"accountId": user["accountId"]}, **kwargs
+            )
 
 
 class Workflows(JiraStream):
