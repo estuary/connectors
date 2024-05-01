@@ -1,0 +1,69 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  id:
+    type: integer
+  location:
+    properties:
+      avatarURI:
+        type:
+          - "null"
+          - string
+      displayName:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+      projectId:
+        type:
+          - "null"
+          - integer
+      projectKey:
+        type:
+          - "null"
+          - string
+      projectName:
+        type:
+          - "null"
+          - string
+      projectTypeKey:
+        type:
+          - "null"
+          - string
+      userAccountId:
+        type:
+          - "null"
+          - string
+      userId:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  projectId:
+    type:
+      - "null"
+      - string
+  projectKey:
+    type:
+      - string
+      - "null"
+  self:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

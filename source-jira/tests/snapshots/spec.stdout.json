@@ -1,0 +1,157 @@
+{
+  "configSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": true,
+    "properties": {
+      "api_token": {
+        "airbyte_secret": true,
+        "description": "Jira API Token. See the docs for more information on how to generate this key. API Token is used for Authorization to your account: https://go.estuary.dev/Bk7fII",
+        "order": 0,
+        "title": "API Token",
+        "type": "string"
+      },
+      "domain": {
+        "description": "The Domain for your Jira account, e.g. estuary.atlassian.net, estuary.jira.com, jira.your-domain.com",
+        "examples": [
+          "<your-domain>.atlassian.net",
+          "<your-domain>.jira.com",
+          "jira.<your-domain>.com"
+        ],
+        "order": 1,
+        "title": "Domain",
+        "type": "string"
+      },
+      "email": {
+        "description": "The user email for your Jira account which you used to generate the API token. This field is used for Authorization to your account by BasicAuth.",
+        "order": 2,
+        "title": "Email",
+        "type": "string"
+      },
+      "enable_experimental_streams": {
+        "default": false,
+        "description": "Allow the use of experimental streams which rely on undocumented Jira API endpoints. See the docs for more info: https://go.estuary.dev/Bk7fII",
+        "order": 6,
+        "title": "Enable Experimental Streams",
+        "type": "boolean"
+      },
+      "expand_issue_changelog": {
+        "default": false,
+        "description": "(DEPRECATED) Expand the changelog when replicating issues.",
+        "title": "Expand Issue Changelog",
+        "type": "boolean"
+      },
+      "expand_issue_transition": {
+        "default": false,
+        "description": "(DEPRECATED) Expand the transitions when replicating issues.",
+        "title": "Expand Issue Transitions",
+        "type": "boolean"
+      },
+      "issues_stream_expand_with": {
+        "default": [],
+        "description": "Select fields to Expand the `Issues` stream when replicating with: ",
+        "items": {
+          "enum": [
+            "renderedFields",
+            "transitions",
+            "changelog"
+          ],
+          "type": "string"
+        },
+        "title": "Expand Issues stream",
+        "type": "array"
+      },
+      "lookback_window_minutes": {
+        "default": 0,
+        "description": "When set to N, the connector will always refresh resources created within the past N minutes. By default, updated objects that are not newly created are not incrementally synced.",
+        "examples": [
+          60
+        ],
+        "maximum": 576000,
+        "minimum": 0,
+        "order": 5,
+        "title": "Lookback window",
+        "type": "integer"
+      },
+      "projects": {
+        "description": "List of Jira project keys to replicate data for, or leave it empty if you want to replicate data for all projects.",
+        "examples": [
+          "PROJ1",
+          "PROJ2"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "order": 3,
+        "title": "Projects",
+        "type": "array"
+      },
+      "render_fields": {
+        "default": false,
+        "description": "(DEPRECATED) Render issue fields in HTML format in addition to Jira JSON-like format.",
+        "title": "Render Issue Fields",
+        "type": "boolean"
+      },
+      "start_date": {
+        "description": "The date from which you want to replicate data from Jira, use the format YYYY-MM-DDT00:00:00Z. Note that this field only applies to certain streams, and only data generated on or after the start date will be replicated. Or leave it empty if you want to replicate all data. For more information, refer to the documentation: https://go.estuary.dev/Bk7fII",
+        "examples": [
+          "2021-03-01T00:00:00Z"
+        ],
+        "format": "date-time",
+        "order": 4,
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+        "title": "Start Date",
+        "type": "string"
+      }
+    },
+    "required": [
+      "api_token",
+      "domain",
+      "email"
+    ],
+    "title": "Jira Spec",
+    "type": "object"
+  },
+  "documentationUrl": "https://go.estuary.dev/Bk7fII",
+  "oauth2": {},
+  "protocol": 3032023,
+  "resourceConfigSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "cursorField": {
+        "items": {
+          "type": "string"
+        },
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "namespace": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "stream": {
+        "type": "string"
+      },
+      "syncMode": {
+        "enum": [
+          "incremental",
+          "full_refresh"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "stream",
+      "syncMode"
+    ],
+    "title": "ResourceSpec",
+    "type": "object"
+  },
+  "resourcePathPointers": [
+    "/namespace",
+    "/stream"
+  ]
+}

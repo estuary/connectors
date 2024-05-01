@@ -1,0 +1,135 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+description: List of all permission schemes.
+properties:
+  description:
+    description: A description for the permission scheme.
+    type: string
+  expand:
+    description: The expand options available for the permission scheme.
+    readOnly: true
+    type: string
+  id:
+    description: The ID of the permission scheme.
+    readOnly: true
+    type: integer
+  name:
+    description: The name of the permission scheme. Must be unique.
+    type: string
+  permissions:
+    description: "The permission scheme to create or update. See [About permission schemes and grants](#about-permission-schemes-and-grants) for more information."
+    items:
+      properties:
+        holder:
+          description: "The user or group being granted the permission. It consists of a `type` and a type-dependent `parameter`. See [Holder object](#holder-object) in *Get all permission schemes* for more information."
+          properties:
+            expand:
+              description: Expand options that include additional permission holder details in the response.
+              readOnly: true
+              type: string
+            parameter:
+              description: The identifier of permission holder.
+              type: string
+            type:
+              description: The type of permission holder.
+              type: string
+            value:
+              type:
+                - "null"
+                - string
+          type: object
+        id:
+          description: The ID of the permission granted details.
+          readOnly: true
+          type: integer
+        permission:
+          description: "The permission to grant. This permission can be one of the built-in permissions or a custom permission added by an app. See [Built-in permissions](#built-in-permissions) in *Get all permission schemes* for more information about the built-in permissions. See the [project permission](https://developer.atlassian.com/cloud/jira/platform/modules/project-permission/) and [global permission](https://developer.atlassian.com/cloud/jira/platform/modules/global-permission/) module documentation for more information about custom permissions."
+          type: string
+        self:
+          description: The URL of the permission granted details.
+          readOnly: true
+          type: string
+      type: object
+    type: array
+  scope:
+    description: The scope of the permission scheme.
+    properties:
+      project:
+        description: The project the item has scope in.
+        properties:
+          avatarUrls:
+            description: "The URLs of the project's avatars."
+            properties:
+              16x16:
+                description: "The URL of the item's 16x16 pixel avatar."
+                type: string
+              24x24:
+                description: "The URL of the item's 24x24 pixel avatar."
+                type: string
+              32x32:
+                description: "The URL of the item's 32x32 pixel avatar."
+                type: string
+              48x48:
+                description: "The URL of the item's 48x48 pixel avatar."
+                type: string
+            readOnly: true
+            type: object
+          id:
+            description: The ID of the project.
+            type: string
+          key:
+            description: The key of the project.
+            readOnly: true
+            type: string
+          name:
+            description: The name of the project.
+            readOnly: true
+            type: string
+          projectCategory:
+            description: The category the project belongs to.
+            properties:
+              description:
+                description: The name of the project category.
+                readOnly: true
+                type: string
+              id:
+                description: The ID of the project category.
+                readOnly: true
+                type: string
+              name:
+                description: The description of the project category.
+                readOnly: true
+                type: string
+              self:
+                description: The URL of the project category.
+                readOnly: true
+                type: string
+            readOnly: true
+            type: object
+          projectTypeKey:
+            description: "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project."
+            readOnly: true
+            type: string
+          self:
+            description: The URL of the project details.
+            readOnly: true
+            type: string
+          simplified:
+            description: Whether or not the project is simplified.
+            readOnly: true
+            type: boolean
+        readOnly: true
+        type: object
+      type:
+        description: The type of scope.
+        readOnly: true
+        type: string
+    type: object
+  self:
+    description: The URL of the permission scheme.
+    readOnly: true
+    type: string
+required:
+  - id
+type: object

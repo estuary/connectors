@@ -1,0 +1,341 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-jira:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-jira:v1"
+        config: connector_config.yaml
+    bindings:
+      - resource:
+          stream: application_roles
+          syncMode: full_refresh
+          cursorField:
+            - key
+        target: acmeCo/application_roles
+      - resource:
+          stream: avatars
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/avatars
+      - resource:
+          stream: boards
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/boards
+      - resource:
+          stream: board_issues
+          syncMode: incremental
+          cursorField:
+            - updated
+        target: acmeCo/board_issues
+      - resource:
+          stream: dashboards
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/dashboards
+      - resource:
+          stream: filters
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/filters
+      - resource:
+          stream: filter_sharing
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/filter_sharing
+      - resource:
+          stream: groups
+          syncMode: full_refresh
+          cursorField:
+            - groupId
+        target: acmeCo/groups
+      - resource:
+          stream: issues
+          syncMode: incremental
+          cursorField:
+            - updated
+        target: acmeCo/issues
+      - resource:
+          stream: issue_comments
+          syncMode: incremental
+          cursorField:
+            - updated
+        target: acmeCo/issue_comments
+      - resource:
+          stream: issue_fields
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_fields
+      - resource:
+          stream: issue_field_configurations
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_field_configurations
+      - resource:
+          stream: issue_custom_field_contexts
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_custom_field_contexts
+      - resource:
+          stream: issue_custom_field_options
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_custom_field_options
+      - resource:
+          stream: issue_link_types
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_link_types
+      - resource:
+          stream: issue_navigator_settings
+          syncMode: full_refresh
+          cursorField:
+            - value
+        target: acmeCo/issue_navigator_settings
+      - resource:
+          stream: issue_notification_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_notification_schemes
+      - resource:
+          stream: issue_priorities
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_priorities
+      - resource:
+          stream: issue_properties
+          syncMode: full_refresh
+          cursorField:
+            - key
+        target: acmeCo/issue_properties
+      - resource:
+          stream: issue_remote_links
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_remote_links
+      - resource:
+          stream: issue_resolutions
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_resolutions
+      - resource:
+          stream: issue_security_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_security_schemes
+      - resource:
+          stream: issue_transitions
+          syncMode: full_refresh
+          cursorField:
+            - issueId
+            - id
+        target: acmeCo/issue_transitions
+      - resource:
+          stream: issue_type_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_type_schemes
+      - resource:
+          stream: issue_types
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_types
+      - resource:
+          stream: issue_type_screen_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_type_screen_schemes
+      - resource:
+          stream: issue_votes
+          syncMode: full_refresh
+          cursorField:
+            - self
+        target: acmeCo/issue_votes
+      - resource:
+          stream: issue_watchers
+          syncMode: full_refresh
+          cursorField:
+            - self
+        target: acmeCo/issue_watchers
+      - resource:
+          stream: issue_worklogs
+          syncMode: incremental
+          cursorField:
+            - updated
+        target: acmeCo/issue_worklogs
+      - resource:
+          stream: jira_settings
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/jira_settings
+      - resource:
+          stream: labels
+          syncMode: full_refresh
+          cursorField:
+            - label
+        target: acmeCo/labels
+      - resource:
+          stream: permissions
+          syncMode: full_refresh
+          cursorField:
+            - key
+        target: acmeCo/permissions
+      - resource:
+          stream: permission_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/permission_schemes
+      - resource:
+          stream: projects
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/projects
+      - resource:
+          stream: project_roles
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/project_roles
+      - resource:
+          stream: project_avatars
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/project_avatars
+      - resource:
+          stream: project_categories
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/project_categories
+      - resource:
+          stream: project_components
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/project_components
+      - resource:
+          stream: project_email
+          syncMode: full_refresh
+          cursorField:
+            - projectId
+        target: acmeCo/project_email
+      - resource:
+          stream: project_permission_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/project_permission_schemes
+      - resource:
+          stream: project_types
+          syncMode: full_refresh
+          cursorField:
+            - key
+        target: acmeCo/project_types
+      - resource:
+          stream: project_versions
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/project_versions
+      - resource:
+          stream: screens
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/screens
+      - resource:
+          stream: screen_tabs
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/screen_tabs
+      - resource:
+          stream: screen_tab_fields
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/screen_tab_fields
+      - resource:
+          stream: screen_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/screen_schemes
+      - resource:
+          stream: sprints
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/sprints
+      - resource:
+          stream: sprint_issues
+          syncMode: incremental
+          cursorField:
+            - updated
+        target: acmeCo/sprint_issues
+      - resource:
+          stream: time_tracking
+          syncMode: full_refresh
+          cursorField:
+            - key
+        target: acmeCo/time_tracking
+      - resource:
+          stream: users
+          syncMode: full_refresh
+          cursorField:
+            - accountId
+        target: acmeCo/users
+      - resource:
+          stream: users_groups_detailed
+          syncMode: full_refresh
+          cursorField:
+            - accountId
+        target: acmeCo/users_groups_detailed
+      - resource:
+          stream: workflows
+          syncMode: full_refresh
+          cursorField:
+            - id/name
+        target: acmeCo/workflows
+      - resource:
+          stream: workflow_schemes
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/workflow_schemes
+      - resource:
+          stream: workflow_statuses
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/workflow_statuses
+      - resource:
+          stream: workflow_status_categories
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/workflow_status_categories

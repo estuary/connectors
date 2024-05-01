@@ -1,0 +1,36 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+description: Details of an application property.
+properties:
+  allowedValues:
+    description: "The allowed values, if applicable."
+    items:
+      type: string
+    type: array
+  defaultValue:
+    description: The default value of the application property.
+    type: string
+  desc:
+    description: The description of the application property.
+    type: string
+  example:
+    type: string
+  id:
+    description: The ID of the application property. The ID and key are the same.
+    type: string
+  key:
+    description: The key of the application property. The ID and key are the same.
+    type: string
+  name:
+    description: The name of the application property.
+    type: string
+  type:
+    description: The data type of the application property.
+    type: string
+  value:
+    description: The new value.
+    type: string
+required:
+  - id
+type: object

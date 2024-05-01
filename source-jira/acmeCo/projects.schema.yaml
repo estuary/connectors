@@ -1,0 +1,138 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+description: Details about a project.
+properties:
+  archived:
+    description: Whether the project is archived.
+    readOnly: true
+    type: boolean
+  archivedBy:
+    description: The user who archived the project.
+    readOnly: true
+  archivedDate:
+    description: The date when the project was archived.
+    format: date-time
+    readOnly: true
+    type: string
+  assigneeType:
+    description: The default assignee when creating issues for this project.
+    readOnly: true
+    type: string
+  avatarUrls:
+    description: "The URLs of the project's avatars."
+    readOnly: true
+  components:
+    description: List of the components contained in the project.
+    readOnly: true
+    type: array
+  deleted:
+    description: Whether the project is marked as deleted.
+    readOnly: true
+    type: boolean
+  deletedBy:
+    description: The user who marked the project as deleted.
+    readOnly: true
+  deletedDate:
+    description: The date when the project was marked as deleted.
+    format: date-time
+    readOnly: true
+    type: string
+  description:
+    description: A brief description of the project.
+    readOnly: true
+    type: string
+  email:
+    description: An email address associated with the project.
+    type: string
+  entityId:
+    type:
+      - "null"
+      - string
+  expand:
+    description: Expand options that include additional project details in the response.
+    readOnly: true
+    type: string
+  favourite:
+    description: Whether the project is selected as a favorite.
+    type: boolean
+  id:
+    description: The ID of the project.
+    type: string
+  insight:
+    description: Insights about the project.
+    readOnly: true
+  isPrivate:
+    description: Whether the project is private.
+    readOnly: true
+    type: boolean
+  issueTypeHierarchy:
+    description: The issue type hierarchy for the project
+    readOnly: true
+  issueTypes:
+    description: List of the issue types available in the project.
+    readOnly: true
+    type: array
+  key:
+    description: The key of the project.
+    readOnly: true
+    type: string
+  lead:
+    description: The username of the project lead.
+    readOnly: true
+  name:
+    description: The name of the project.
+    readOnly: true
+    type: string
+  permissions:
+    description: User permissions on the project
+    readOnly: true
+  projectCategory:
+    description: The category the project belongs to.
+    readOnly: true
+  projectTypeKey:
+    description: "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project."
+    readOnly: true
+    type: string
+  properties:
+    additionalProperties: true
+    description: Map of project properties
+    readOnly: true
+    type: object
+  retentionTillDate:
+    description: The date when the project is deleted permanently.
+    format: date-time
+    readOnly: true
+    type: string
+  roles:
+    additionalProperties: true
+    description: "The name and self URL for each role defined in the project. For more information, see [Create project role](#api-rest-api-3-role-post)."
+    readOnly: true
+    type: object
+  self:
+    description: The URL of the project details.
+    readOnly: true
+    type: string
+  simplified:
+    description: Whether the project is simplified.
+    readOnly: true
+    type: boolean
+  style:
+    description: The type of the project.
+    readOnly: true
+    type: string
+  url:
+    description: "A link to information about this project, such as project documentation."
+    readOnly: true
+    type: string
+  uuid:
+    description: Unique ID for next-gen projects.
+    readOnly: true
+    type: string
+  versions:
+    description: "The versions defined in the project. For more information, see [Create version](#api-rest-api-3-version-post)."
+    readOnly: true
+    type: array
+required:
+  - id
+type: object
