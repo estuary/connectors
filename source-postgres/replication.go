@@ -700,7 +700,7 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 			for idx, val := range row {
 				logFields[string(keys[idx].Name)] = val
 			}
-			logrus.WithFields(logFields).Info("got row")
+			logrus.WithFields(logFields).Info("got diagnostic row")
 		}
 		if numResults == 0 {
 			logrus.WithField("query", q).Info("no results")
