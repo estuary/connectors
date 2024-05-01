@@ -905,7 +905,7 @@ func (db *mysqlDatabase) ReplicationDiagnostics(ctx context.Context) error {
 				}
 				logFields[key] = val
 			}
-			logrus.WithFields(logFields).Info("got row")
+			logrus.WithFields(logFields).Info("got diagnostic row")
 		}
 	}
 
