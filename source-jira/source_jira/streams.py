@@ -779,7 +779,7 @@ class IssueNavigatorSettings(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-navigator-settings/#api-rest-api-3-settings-columns-get
     """
 
-    primary_key = None
+    primary_key = "value"
 
     def path(self, **kwargs) -> str:
         return "settings/columns"
@@ -1027,7 +1027,7 @@ class IssueVotes(StartDateJiraStream):
     """
 
     # extract_field = "voters"
-    primary_key = None
+    primary_key = "self"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1067,7 +1067,7 @@ class IssueWatchers(StartDateJiraStream):
     """
 
     # extract_field = "watchers"
-    primary_key = None
+    primary_key = "self"
     skip_http_status_codes = [
         # Issue is not found or the user does not have permission to view it.
         requests.codes.NOT_FOUND,
@@ -1395,7 +1395,7 @@ class ProjectTypes(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-project-types/#api-rest-api-3-project-type-get
     """
 
-    primary_key = None
+    primary_key = "key"
 
     def path(self, **kwargs) -> str:
         return "project/type"
@@ -1842,6 +1842,7 @@ class Workflows(JiraStream):
     """
 
     extract_field = "values"
+    primary_key = [["id", "name"]]
 
     def path(self, **kwargs) -> str:
         return "workflow/search"
