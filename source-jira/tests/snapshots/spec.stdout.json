@@ -35,18 +35,21 @@
         "type": "boolean"
       },
       "expand_issue_changelog": {
+        "airbyte_hidden": true,
         "default": false,
         "description": "(DEPRECATED) Expand the changelog when replicating issues.",
         "title": "Expand Issue Changelog",
         "type": "boolean"
       },
       "expand_issue_transition": {
+        "airbyte_hidden": true,
         "default": false,
         "description": "(DEPRECATED) Expand the transitions when replicating issues.",
         "title": "Expand Issue Transitions",
         "type": "boolean"
       },
       "issues_stream_expand_with": {
+        "airbyte_hidden": true,
         "default": [],
         "description": "Select fields to Expand the `Issues` stream when replicating with: ",
         "items": {
@@ -86,6 +89,7 @@
         "type": "array"
       },
       "render_fields": {
+        "airbyte_hidden": true,
         "default": false,
         "description": "(DEPRECATED) Render issue fields in HTML format in addition to Jira JSON-like format.",
         "title": "Render Issue Fields",
@@ -112,34 +116,35 @@
     "type": "object"
   },
   "documentationUrl": "https://go.estuary.dev/Bk7fII",
-  "oauth2": {},
   "protocol": 3032023,
   "resourceConfigSchema": {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "description": "ResourceConfig encodes a configured resource stream",
     "properties": {
       "cursorField": {
         "items": {
           "type": "string"
         },
-        "type": [
-          "array",
-          "null"
-        ]
+        "title": "Cursor Field",
+        "type": "array"
       },
       "namespace": {
-        "type": [
-          "string",
-          "null"
-        ]
+        "description": "Enclosing schema namespace of this resource",
+        "title": "Namespace",
+        "type": "string"
       },
       "stream": {
+        "description": "Name of this stream",
+        "title": "Stream",
         "type": "string"
       },
       "syncMode": {
+        "description": "Sync this resource incrementally, or fully refresh it every run",
         "enum": [
-          "incremental",
-          "full_refresh"
+          "full_refresh",
+          "incremental"
         ],
+        "title": "Sync Mode",
         "type": "string"
       }
     },
@@ -147,7 +152,7 @@
       "stream",
       "syncMode"
     ],
-    "title": "ResourceSpec",
+    "title": "ResourceConfig",
     "type": "object"
   },
   "resourcePathPointers": [

@@ -1,20 +1,26 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  id:
+    type: integer
+    description: The ID of the field configuration.
+  name:
+    type: string
+    description: The name of the field configuration.
+  description:
+    type: string
+    description: The description of the field configuration.
+  isDefault:
+    type: boolean
+    description: Whether the field configuration is the default.
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 additionalProperties: true
 description: Details of a field configuration.
-properties:
-  description:
-    description: The description of the field configuration.
-    type: string
-  id:
-    description: The ID of the field configuration.
-    type: integer
-  isDefault:
-    description: Whether the field configuration is the default.
-    type: boolean
-  name:
-    description: The name of the field configuration.
-    type: string
-required:
-  - id
-type: object
+x-infer-schema: true

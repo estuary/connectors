@@ -1,64 +1,454 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
-additionalProperties: true
+type: object
 properties:
-  changelog:
-    description: Details of changelogs associated with the issue.
+  expand:
+    type: string
+    description: Expand options that include additional issue details in the response.
+    readOnly: true
+  id:
+    type: string
+    description: The ID of the issue.
+    readOnly: true
+  self:
+    type: string
+    description: The URL of the issue details.
+    readOnly: true
+  key:
+    type: string
+    description: The key of the issue.
+    readOnly: true
+  renderedFields:
+    type: object
+    additionalProperties: true
+    description: The rendered value of each field present on the issue.
+    readOnly: true
     properties:
-      histories:
+      statuscategorychangedate:
+        type:
+          - "null"
+          - string
+      issuetype:
+        type:
+          - "null"
+          - string
+      timespent:
+        type:
+          - "null"
+          - string
+      project:
+        type:
+          - "null"
+          - string
+      fixVersions:
+        type:
+          - "null"
+          - string
+      aggregatetimespent:
+        type:
+          - "null"
+          - string
+      resolution:
+        type:
+          - "null"
+          - string
+      resolutiondate:
+        type:
+          - "null"
+          - string
+      workratio:
+        type:
+          - "null"
+          - string
+      watches:
+        type:
+          - "null"
+          - string
+      lastViewed:
+        type:
+          - "null"
+          - string
+      issuerestriction:
+        type:
+          - "null"
+          - string
+      created:
+        type:
+          - "null"
+          - string
+      priority:
+        type:
+          - "null"
+          - string
+      labels:
+        type:
+          - "null"
+          - array
         items:
-          properties:
-            author:
+          type:
+            - "null"
+            - string
+      timeestimate:
+        type:
+          - "null"
+          - string
+      aggregatetimeoriginalestimate:
+        type:
+          - "null"
+          - string
+      versions:
+        type:
+          - "null"
+          - string
+      issuelinks:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - string
+      assignee:
+        type:
+          - "null"
+          - string
+      updated:
+        type:
+          - "null"
+          - string
+      status:
+        type:
+          - "null"
+          - string
+      components:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - object
+      timeoriginalestimate:
+        type:
+          - "null"
+          - string
+      description:
+        type:
+          - "null"
+          - string
+      timetracking:
+        type:
+          - "null"
+          - object
+      security:
+        type:
+          - "null"
+          - string
+      aggregatetimeestimate:
+        type:
+          - "null"
+          - string
+      attachment:
+        type:
+          - "null"
+          - array
+      summary:
+        type:
+          - "null"
+          - string
+      creator:
+        type:
+          - "null"
+          - string
+      subtasks:
+        type:
+          - "null"
+          - array
+      reporter:
+        type:
+          - "null"
+          - string
+      aggregateprogress:
+        type:
+          - "null"
+          - string
+      environment:
+        type:
+          - "null"
+          - string
+      duedate:
+        type:
+          - "null"
+          - string
+      progress:
+        type:
+          - "null"
+          - string
+      comment:
+        type:
+          - "null"
+          - object
+        properties:
+          comments:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
               properties:
-                accountId:
-                  type:
-                    - "null"
-                    - string
-                accountType:
-                  type:
-                    - "null"
-                    - string
-                active:
-                  type: boolean
-                avatarUrls:
-                  properties:
-                    16x16:
-                      type:
-                        - "null"
-                        - string
-                    24x24:
-                      type:
-                        - "null"
-                        - string
-                    32x32:
-                      type:
-                        - "null"
-                        - string
-                    48x48:
-                      type:
-                        - "null"
-                        - string
-                  type:
-                    - "null"
-                    - object
-                displayName:
-                  type: string
-                emailAddress:
-                  type:
-                    - "null"
-                    - string
                 self:
                   type:
                     - "null"
                     - string
-                timeZone:
+                id:
                   type:
                     - "null"
                     - string
+                author:
+                  type:
+                    - "null"
+                    - object
+                  properties:
+                    self:
+                      type:
+                        - "null"
+                        - string
+                    accountId:
+                      type:
+                        - "null"
+                        - string
+                    emailAddress:
+                      type:
+                        - "null"
+                        - string
+                    avatarUrls:
+                      type:
+                        - "null"
+                        - object
+                      properties:
+                        48x48:
+                          type:
+                            - "null"
+                            - string
+                        24x24:
+                          type:
+                            - "null"
+                            - string
+                        16x16:
+                          type:
+                            - "null"
+                            - string
+                        32x32:
+                          type:
+                            - "null"
+                            - string
+                    displayName:
+                      type:
+                        - "null"
+                        - string
+                    active:
+                      type: boolean
+                    timeZone:
+                      type:
+                        - "null"
+                        - string
+                    accountType:
+                      type:
+                        - "null"
+                        - string
+                body:
+                  type:
+                    - "null"
+                    - object
+                  properties:
+                    version:
+                      type:
+                        - "null"
+                        - integer
+                    type:
+                      type:
+                        - "null"
+                        - string
+                    content:
+                      type:
+                        - "null"
+                        - array
+                      items:
+                        type:
+                          - "null"
+                          - object
+                        properties:
+                          type:
+                            type:
+                              - "null"
+                              - string
+                          content:
+                            type: array
+                            items:
+                              type:
+                                - "null"
+                                - object
+                              properties:
+                                type:
+                                  type:
+                                    - "null"
+                                    - string
+                                text:
+                                  type:
+                                    - "null"
+                                    - string
+                updateAuthor:
+                  type:
+                    - "null"
+                    - object
+                  properties:
+                    self:
+                      type:
+                        - "null"
+                        - string
+                    accountId:
+                      type:
+                        - "null"
+                        - string
+                    emailAddress:
+                      type:
+                        - "null"
+                        - string
+                    avatarUrls:
+                      type:
+                        - "null"
+                        - object
+                      properties:
+                        48x48:
+                          type:
+                            - "null"
+                            - string
+                        24x24:
+                          type:
+                            - "null"
+                            - string
+                        16x16:
+                          type:
+                            - "null"
+                            - string
+                        32x32:
+                          type:
+                            - "null"
+                            - string
+                    displayName:
+                      type:
+                        - "null"
+                        - string
+                    active:
+                      type: boolean
+                    timeZone:
+                      type:
+                        - "null"
+                        - string
+                    accountType:
+                      type:
+                        - "null"
+                        - string
+                created:
+                  type:
+                    - "null"
+                    - string
+                updated:
+                  type:
+                    - "null"
+                    - string
+                jsdPublic:
+                  type: boolean
+          self:
+            type:
+              - "null"
+              - string
+          maxResults:
+            type:
+              - "null"
+              - integer
+          total:
+            type:
+              - "null"
+              - integer
+          startAt:
+            type:
+              - "null"
+              - integer
+      votes:
+        type:
+          - "null"
+          - string
+      worklog:
+        type:
+          - "null"
+          - object
+        properties:
+          startAt:
+            type:
+              - "null"
+              - integer
+          maxResults:
+            type:
+              - "null"
+              - integer
+          total:
+            type: integer
+          worklogs:
+            type:
+              - "null"
+              - array
+  properties:
+    type: object
+    additionalProperties: true
+    description: Details of the issue properties identified in the request.
+    readOnly: true
+  names:
+    type: object
+    additionalProperties: true
+    description: The ID and name of each field present on the issue.
+    readOnly: true
+  schema:
+    type: object
+    description: The schema describing each field present on the issue.
+    readOnly: true
+  transitions:
+    type: array
+    description: The transitions that can be performed on the issue.
+    readOnly: true
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        id:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        to:
+          type:
+            - "null"
+            - object
+          properties:
+            self:
               type:
                 - "null"
-                - object
-            created:
+                - string
+            description:
+              type:
+                - "null"
+                - string
+            iconUrl:
+              type:
+                - "null"
+                - string
+            name:
               type:
                 - "null"
                 - string
@@ -66,14 +456,155 @@ properties:
               type:
                 - "null"
                 - string
+            statusCategory:
+              type:
+                - "null"
+                - object
+              properties:
+                self:
+                  type:
+                    - "null"
+                    - string
+                id:
+                  type:
+                    - "null"
+                    - integer
+                key:
+                  type:
+                    - "null"
+                    - string
+                colorName:
+                  type:
+                    - "null"
+                    - string
+                name:
+                  type:
+                    - "null"
+                    - string
+        hasScreen:
+          type: boolean
+        isGlobal:
+          type: boolean
+        isInitial:
+          type: boolean
+        isAvailable:
+          type: boolean
+        isConditional:
+          type: boolean
+        isLooped:
+          type: boolean
+  operations:
+    type:
+      - object
+      - "null"
+    description: The operations that can be performed on the issue.
+    readOnly: true
+  editmeta:
+    type:
+      - object
+      - "null"
+    description: The metadata for the fields on the issue that can be amended.
+    readOnly: true
+  changelog:
+    type:
+      - object
+      - "null"
+    description: Details of changelogs associated with the issue.
+    readOnly: true
+    properties:
+      startAt:
+        type:
+          - "null"
+          - integer
+      maxResults:
+        type:
+          - "null"
+          - integer
+      total:
+        type:
+          - "null"
+          - integer
+      histories:
+        type:
+          - "null"
+          - array
+        items:
+          type:
+            - "null"
+            - object
+          properties:
+            id:
+              type:
+                - "null"
+                - string
+            author:
+              type:
+                - "null"
+                - object
+              properties:
+                self:
+                  type:
+                    - "null"
+                    - string
+                accountId:
+                  type:
+                    - "null"
+                    - string
+                emailAddress:
+                  type:
+                    - "null"
+                    - string
+                avatarUrls:
+                  type:
+                    - "null"
+                    - object
+                  properties:
+                    48x48:
+                      type:
+                        - "null"
+                        - string
+                    24x24:
+                      type:
+                        - "null"
+                        - string
+                    16x16:
+                      type:
+                        - "null"
+                        - string
+                    32x32:
+                      type:
+                        - "null"
+                        - string
+                displayName:
+                  type: string
+                active:
+                  type: boolean
+                timeZone:
+                  type:
+                    - "null"
+                    - string
+                accountType:
+                  type:
+                    - "null"
+                    - string
+            created:
+              type:
+                - "null"
+                - string
             items:
+              type:
+                - "null"
+                - array
               items:
+                type:
+                  - "null"
+                  - object
                 properties:
-                  field:
+                  fieldId:
                     type:
                       - "null"
                       - string
-                  fieldId:
+                  field:
                     type:
                       - "null"
                       - string
@@ -89,14 +620,6 @@ properties:
                     type:
                       - "null"
                       - string
-                  tmpFromAccountId:
-                    type:
-                      - "null"
-                      - string
-                  tmpToAccountId:
-                    type:
-                      - "null"
-                      - string
                   to:
                     type:
                       - "null"
@@ -105,55 +628,40 @@ properties:
                     type:
                       - "null"
                       - string
-                type:
-                  - "null"
-                  - object
-              type:
-                - "null"
-                - array
-          type:
-            - "null"
-            - object
-        type:
-          - "null"
-          - array
-      maxResults:
-        type:
-          - "null"
-          - integer
-      startAt:
-        type:
-          - "null"
-          - integer
-      total:
-        type:
-          - "null"
-          - integer
-    readOnly: true
-    type:
-      - object
-      - "null"
-  created:
-    description: This field transformed from fields attr
-    format: date-time
-    readOnly: true
-    type:
-      - string
-      - "null"
-  editmeta:
-    description: The metadata for the fields on the issue that can be amended.
-    readOnly: true
-    type:
-      - object
-      - "null"
-  expand:
-    description: Expand options that include additional issue details in the response.
-    readOnly: true
-    type: string
-  fields:
+                  tmpFromAccountId:
+                    type:
+                      - "null"
+                      - string
+                  tmpToAccountId:
+                    type:
+                      - "null"
+                      - string
+  versionedRepresentations:
+    type: object
     additionalProperties: true
+    description: The versions of each field on the issue.
+    readOnly: true
+  fieldsToInclude:
+    type: object
+  fields:
+    type: object
     properties:
+      created:
+        type:
+          - string
+          - "null"
+        format: date-time
+        description: "This field is not shown in schema / swagger, but exists in records and we use it as cursor field. Updated may be absent. Added to solve the #4341"
+      updated:
+        type:
+          - string
+          - "null"
+        format: date-time
+        description: "This field is not shown in schema / swagger, but exists in records and we use it as cursor field. Updated may be absent. Added to solve the #4341"
       aggregateprogress:
+        type:
+          - "null"
+          - object
         properties:
           percent:
             type:
@@ -167,22 +675,10 @@ properties:
             type:
               - "null"
               - integer
+      assignee:
         type:
           - "null"
           - object
-      aggregatetimeestimate:
-        type:
-          - "null"
-          - integer
-      aggregatetimeoriginalestimate:
-        type:
-          - "null"
-          - integer
-      aggregatetimespent:
-        type:
-          - "null"
-          - integer
-      assignee:
         properties:
           accountId:
             type:
@@ -197,6 +693,9 @@ properties:
               - "null"
               - boolean
           avatarUrls:
+            type:
+              - "null"
+              - object
             properties:
               16x16:
                 type:
@@ -214,9 +713,6 @@ properties:
                 type:
                   - "null"
                   - string
-            type:
-              - "null"
-              - object
           displayName:
             type:
               - "null"
@@ -233,14 +729,26 @@ properties:
             type:
               - "null"
               - string
+      aggregatetimeestimate:
         type:
           - "null"
-          - object
+          - integer
+      aggregatetimeoriginalestimate:
+        type:
+          - "null"
+          - integer
+      aggregatetimespent:
+        type:
+          - "null"
+          - integer
       attachment:
         type:
           - "null"
           - array
       comment:
+        type:
+          - "null"
+          - object
         properties:
           comments:
             type:
@@ -262,20 +770,14 @@ properties:
             type:
               - "null"
               - integer
-        type:
-          - "null"
-          - object
       components:
         type:
           - "null"
           - array
-      created:
-        description: "This field is not shown in schema / swagger, but exists in records and we use it as cursor field. Updated may be absent. Added to solve the #4341"
-        format: date-time
-        type:
-          - string
-          - "null"
       creator:
+        type:
+          - "null"
+          - object
         properties:
           accountId:
             type:
@@ -290,6 +792,9 @@ properties:
               - "null"
               - boolean
           avatarUrls:
+            type:
+              - "null"
+              - object
             properties:
               16x16:
                 type:
@@ -307,9 +812,6 @@ properties:
                 type:
                   - "null"
                   - string
-            type:
-              - "null"
-              - object
           displayName:
             type:
               - "null"
@@ -326,16 +828,28 @@ properties:
             type:
               - "null"
               - string
+      description:
         type:
           - "null"
           - object
-      description:
         properties:
           content:
+            type:
+              - "null"
+              - array
             items:
+              type:
+                - "null"
+                - object
               properties:
                 content:
+                  type:
+                    - "null"
+                    - array
                   items:
+                    type:
+                      - "null"
+                      - object
                     properties:
                       text:
                         type:
@@ -345,22 +859,10 @@ properties:
                         type:
                           - "null"
                           - string
-                    type:
-                      - "null"
-                      - object
-                  type:
-                    - "null"
-                    - array
                 type:
                   type:
                     - "null"
                     - string
-              type:
-                - "null"
-                - object
-            type:
-              - "null"
-              - array
           type:
             type:
               - "null"
@@ -369,9 +871,6 @@ properties:
             type:
               - "null"
               - integer
-        type:
-          - "null"
-          - object
       fixVersions:
         type:
           - "null"
@@ -381,6 +880,9 @@ properties:
           - "null"
           - array
       issuerestriction:
+        type:
+          - "null"
+          - object
         properties:
           issuerestrictions:
             type:
@@ -390,10 +892,10 @@ properties:
             type:
               - "null"
               - boolean
+      issuetype:
         type:
           - "null"
           - object
-      issuetype:
         properties:
           avatarId:
             type:
@@ -431,23 +933,23 @@ properties:
             type:
               - "null"
               - boolean
+      labels:
         type:
           - "null"
-          - object
-      labels:
+          - array
         items:
           type:
             - "null"
             - string
-        type:
-          - "null"
-          - array
       lastViewed:
-        format: date-time
         type:
           - "null"
           - string
+        format: date-time
       priority:
+        type:
+          - "null"
+          - object
         properties:
           iconUrl:
             type:
@@ -465,10 +967,10 @@ properties:
             type:
               - "null"
               - string
+      progress:
         type:
           - "null"
           - object
-      progress:
         properties:
           percent:
             type:
@@ -482,12 +984,15 @@ properties:
             type:
               - "null"
               - integer
+      project:
         type:
           - "null"
           - object
-      project:
         properties:
           avatarUrls:
+            type:
+              - "null"
+              - object
             properties:
               16x16:
                 type:
@@ -505,9 +1010,6 @@ properties:
                 type:
                   - "null"
                   - string
-            type:
-              - "null"
-              - object
           id:
             type:
               - "null"
@@ -521,6 +1023,9 @@ properties:
               - "null"
               - string
           projectCategory:
+            type:
+              - "null"
+              - object
             properties:
               description:
                 type:
@@ -538,9 +1043,6 @@ properties:
                 type:
                   - "null"
                   - string
-            type:
-              - "null"
-              - object
           projectTypeKey:
             type:
               - "null"
@@ -553,10 +1055,10 @@ properties:
             type:
               - "null"
               - boolean
+      reporter:
         type:
           - "null"
           - object
-      reporter:
         properties:
           accountId:
             type:
@@ -571,6 +1073,9 @@ properties:
               - "null"
               - boolean
           avatarUrls:
+            type:
+              - "null"
+              - object
             properties:
               16x16:
                 type:
@@ -588,9 +1093,6 @@ properties:
                 type:
                   - "null"
                   - string
-            type:
-              - "null"
-              - object
           displayName:
             type:
               - "null"
@@ -607,10 +1109,10 @@ properties:
             type:
               - "null"
               - string
+      resolution:
         type:
           - "null"
           - object
-      resolution:
         properties:
           description:
             type:
@@ -628,15 +1130,15 @@ properties:
             type:
               - "null"
               - string
-        type:
-          - "null"
-          - object
       resolutiondate:
-        format: date-time
         type:
           - "null"
           - string
+        format: date-time
       status:
+        type:
+          - "null"
+          - object
         properties:
           description:
             type:
@@ -659,8 +1161,11 @@ properties:
               - "null"
               - string
           statusCategory:
+            type:
+              - "null"
+              - object
             properties:
-              colorName:
+              self:
                 type:
                   - "null"
                   - string
@@ -672,25 +1177,19 @@ properties:
                 type:
                   - "null"
                   - string
+              colorName:
+                type:
+                  - "null"
+                  - string
               name:
                 type:
                   - "null"
                   - string
-              self:
-                type:
-                  - "null"
-                  - string
-            type:
-              - "null"
-              - object
-        type:
-          - "null"
-          - object
       statuscategorychangedate:
-        format: date-time
         type:
           - "null"
           - string
+        format: date-time
       subtasks:
         type:
           - "null"
@@ -712,15 +1211,10 @@ properties:
           - "null"
           - integer
       timetracking:
+        type:
+          - "null"
+          - object
         properties:
-          originalEstimate:
-            type:
-              - "null"
-              - string
-          originalEstimateSeconds:
-            type:
-              - "null"
-              - integer
           remainingEstimate:
             type:
               - "null"
@@ -737,20 +1231,22 @@ properties:
             type:
               - "null"
               - integer
-        type:
-          - "null"
-          - object
-      updated:
-        description: "This field is not shown in schema / swagger, but exists in records and we use it as cursor field. Updated may be absent. Added to solve the #4341"
-        format: date-time
-        type:
-          - string
-          - "null"
+          originalEstimate:
+            type:
+              - "null"
+              - string
+          originalEstimateSeconds:
+            type:
+              - "null"
+              - integer
       versions:
         type:
           - "null"
           - array
       votes:
+        type:
+          - "null"
+          - object
         properties:
           hasVoted:
             type:
@@ -764,10 +1260,10 @@ properties:
             type:
               - "null"
               - integer
+      watches:
         type:
           - "null"
           - object
-      watches:
         properties:
           isWatching:
             type:
@@ -781,10 +1277,10 @@ properties:
             type:
               - "null"
               - integer
+      worklog:
         type:
           - "null"
           - object
-      worklog:
         properties:
           maxResults:
             type:
@@ -799,9 +1295,18 @@ properties:
               - "null"
               - integer
           worklogs:
+            type:
+              - "null"
+              - array
             items:
+              type:
+                - "null"
+                - object
               properties:
                 author:
+                  type:
+                    - "null"
+                    - object
                   properties:
                     accountId:
                       type:
@@ -816,6 +1321,9 @@ properties:
                         - "null"
                         - boolean
                     avatarUrls:
+                      type:
+                        - "null"
+                        - object
                       properties:
                         16x16:
                           type:
@@ -833,9 +1341,6 @@ properties:
                           type:
                             - "null"
                             - string
-                      type:
-                        - "null"
-                        - object
                     displayName:
                       type:
                         - "null"
@@ -852,55 +1357,62 @@ properties:
                       type:
                         - "null"
                         - string
+                comment:
                   type:
                     - "null"
                     - object
-                comment:
                   properties:
-                    content:
-                      items:
-                        properties:
-                          content:
-                            items:
-                              properties:
-                                text:
-                                  type:
-                                    - "null"
-                                    - string
-                                type:
-                                  type:
-                                    - "null"
-                                    - string
-                              type:
-                                - "null"
-                                - object
-                            type: array
-                          type:
-                            type:
-                              - "null"
-                              - string
-                        type:
-                          - "null"
-                          - object
-                      type:
-                        - "null"
-                        - array
-                    type:
-                      type:
-                        - "null"
-                        - string
                     version:
                       type:
                         - "null"
                         - integer
-                  type:
-                    - "null"
-                    - object
+                    type:
+                      type:
+                        - "null"
+                        - string
+                    content:
+                      type:
+                        - "null"
+                        - array
+                      items:
+                        type:
+                          - "null"
+                          - object
+                        properties:
+                          type:
+                            type:
+                              - "null"
+                              - string
+                          content:
+                            type: array
+                            items:
+                              type:
+                                - "null"
+                                - object
+                              properties:
+                                type:
+                                  type:
+                                    - "null"
+                                    - string
+                                text:
+                                  type:
+                                    - "null"
+                                    - string
                 created:
-                  format: date-time
                   type:
                     - "null"
                     - string
+                  format: date-time
+                started:
+                  type:
+                    - "null"
+                    - string
+                  format: date-time
+                updated:
+                  type:
+                    - "null"
+                    - string
+                  format: date-time
                 id:
                   type:
                     - "null"
@@ -913,11 +1425,6 @@ properties:
                   type:
                     - "null"
                     - string
-                started:
-                  format: date-time
-                  type:
-                    - "null"
-                    - string
                 timeSpent:
                   type:
                     - "null"
@@ -927,6 +1434,9 @@ properties:
                     - "null"
                     - integer
                 updateAuthor:
+                  type:
+                    - "null"
+                    - object
                   properties:
                     accountId:
                       type:
@@ -941,6 +1451,9 @@ properties:
                         - "null"
                         - boolean
                     avatarUrls:
+                      type:
+                        - "null"
+                        - object
                       properties:
                         16x16:
                           type:
@@ -958,9 +1471,6 @@ properties:
                           type:
                             - "null"
                             - string
-                      type:
-                        - "null"
-                        - object
                     displayName:
                       type:
                         - "null"
@@ -977,543 +1487,39 @@ properties:
                       type:
                         - "null"
                         - string
-                  type:
-                    - "null"
-                    - object
-                updated:
-                  format: date-time
-                  type:
-                    - "null"
-                    - string
-              type:
-                - "null"
-                - object
-            type:
-              - "null"
-              - array
-        type:
-          - "null"
-          - object
       workratio:
         type:
           - "null"
           - integer
-    type: object
-  fieldsToInclude:
-    type: object
-  id:
-    description: The ID of the issue.
-    readOnly: true
-    type: string
-  key:
-    description: The key of the issue.
-    readOnly: true
-    type: string
-  names:
     additionalProperties: true
-    description: The ID and name of each field present on the issue.
-    readOnly: true
-    type: object
-  operations:
-    description: The operations that can be performed on the issue.
-    readOnly: true
-    type:
-      - object
-      - "null"
   projectId:
+    type: string
     description: The ID of the project containing the issue.
     readOnly: true
-    type: string
   projectKey:
+    type: string
     description: The key of the project containing the issue.
     readOnly: true
-    type: string
-  properties:
-    additionalProperties: true
-    description: Details of the issue properties identified in the request.
-    readOnly: true
-    type: object
-  renderedFields:
-    additionalProperties: true
-    description: The rendered value of each field present on the issue.
-    properties:
-      aggregateprogress:
-        type:
-          - "null"
-          - string
-      aggregatetimeestimate:
-        type:
-          - "null"
-          - string
-      aggregatetimeoriginalestimate:
-        type:
-          - "null"
-          - string
-      aggregatetimespent:
-        type:
-          - "null"
-          - string
-      assignee:
-        type:
-          - "null"
-          - string
-      attachment:
-        type:
-          - "null"
-          - array
-      comment:
-        properties:
-          comments:
-            items:
-              properties:
-                author:
-                  properties:
-                    accountId:
-                      type:
-                        - "null"
-                        - string
-                    accountType:
-                      type:
-                        - "null"
-                        - string
-                    active:
-                      type: boolean
-                    avatarUrls:
-                      properties:
-                        16x16:
-                          type:
-                            - "null"
-                            - string
-                        24x24:
-                          type:
-                            - "null"
-                            - string
-                        32x32:
-                          type:
-                            - "null"
-                            - string
-                        48x48:
-                          type:
-                            - "null"
-                            - string
-                      type:
-                        - "null"
-                        - object
-                    displayName:
-                      type:
-                        - "null"
-                        - string
-                    emailAddress:
-                      type:
-                        - "null"
-                        - string
-                    self:
-                      type:
-                        - "null"
-                        - string
-                    timeZone:
-                      type:
-                        - "null"
-                        - string
-                  type:
-                    - "null"
-                    - object
-                body:
-                  properties:
-                    content:
-                      items:
-                        properties:
-                          content:
-                            items:
-                              properties:
-                                text:
-                                  type:
-                                    - "null"
-                                    - string
-                                type:
-                                  type:
-                                    - "null"
-                                    - string
-                              type:
-                                - "null"
-                                - object
-                            type: array
-                          type:
-                            type:
-                              - "null"
-                              - string
-                        type:
-                          - "null"
-                          - object
-                      type:
-                        - "null"
-                        - array
-                    type:
-                      type:
-                        - "null"
-                        - string
-                    version:
-                      type:
-                        - "null"
-                        - integer
-                  type:
-                    - "null"
-                    - object
-                created:
-                  type:
-                    - "null"
-                    - string
-                id:
-                  type:
-                    - "null"
-                    - string
-                jsdPublic:
-                  type: boolean
-                self:
-                  type:
-                    - "null"
-                    - string
-                updateAuthor:
-                  properties:
-                    accountId:
-                      type:
-                        - "null"
-                        - string
-                    accountType:
-                      type:
-                        - "null"
-                        - string
-                    active:
-                      type: boolean
-                    avatarUrls:
-                      properties:
-                        16x16:
-                          type:
-                            - "null"
-                            - string
-                        24x24:
-                          type:
-                            - "null"
-                            - string
-                        32x32:
-                          type:
-                            - "null"
-                            - string
-                        48x48:
-                          type:
-                            - "null"
-                            - string
-                      type:
-                        - "null"
-                        - object
-                    displayName:
-                      type:
-                        - "null"
-                        - string
-                    emailAddress:
-                      type:
-                        - "null"
-                        - string
-                    self:
-                      type:
-                        - "null"
-                        - string
-                    timeZone:
-                      type:
-                        - "null"
-                        - string
-                  type:
-                    - "null"
-                    - object
-                updated:
-                  type:
-                    - "null"
-                    - string
-              type:
-                - "null"
-                - object
-            type:
-              - "null"
-              - array
-          maxResults:
-            type:
-              - "null"
-              - integer
-          self:
-            type:
-              - "null"
-              - string
-          startAt:
-            type:
-              - "null"
-              - integer
-          total:
-            type:
-              - "null"
-              - integer
-        type:
-          - "null"
-          - object
-      components:
-        items:
-          type:
-            - "null"
-            - object
-        type:
-          - "null"
-          - array
-      created:
-        type:
-          - "null"
-          - string
-      creator:
-        type:
-          - "null"
-          - string
-      description:
-        type:
-          - "null"
-          - string
-      duedate:
-        type:
-          - "null"
-          - string
-      environment:
-        type:
-          - "null"
-          - string
-      fixVersions:
-        type:
-          - "null"
-          - string
-      issuelinks:
-        items:
-          type:
-            - "null"
-            - string
-        type:
-          - "null"
-          - array
-      issuerestriction:
-        type:
-          - "null"
-          - string
-      issuetype:
-        type:
-          - "null"
-          - string
-      labels:
-        items:
-          type:
-            - "null"
-            - string
-        type:
-          - "null"
-          - array
-      lastViewed:
-        type:
-          - "null"
-          - string
-      priority:
-        type:
-          - "null"
-          - string
-      progress:
-        type:
-          - "null"
-          - string
-      project:
-        type:
-          - "null"
-          - string
-      reporter:
-        type:
-          - "null"
-          - string
-      resolution:
-        type:
-          - "null"
-          - string
-      resolutiondate:
-        type:
-          - "null"
-          - string
-      security:
-        type:
-          - "null"
-          - string
-      status:
-        type:
-          - "null"
-          - string
-      statuscategorychangedate:
-        type:
-          - "null"
-          - string
-      subtasks:
-        type:
-          - "null"
-          - array
-      summary:
-        type:
-          - "null"
-          - string
-      timeestimate:
-        type:
-          - "null"
-          - string
-      timeoriginalestimate:
-        type:
-          - "null"
-          - string
-      timespent:
-        type:
-          - "null"
-          - string
-      timetracking:
-        type:
-          - "null"
-          - object
-      updated:
-        type:
-          - "null"
-          - string
-      versions:
-        type:
-          - "null"
-          - string
-      votes:
-        type:
-          - "null"
-          - string
-      watches:
-        type:
-          - "null"
-          - string
-      worklog:
-        properties:
-          maxResults:
-            type:
-              - "null"
-              - integer
-          startAt:
-            type:
-              - "null"
-              - integer
-          total:
-            type: integer
-          worklogs:
-            type:
-              - "null"
-              - array
-        type:
-          - "null"
-          - object
-      workratio:
-        type:
-          - "null"
-          - string
-    readOnly: true
-    type: object
-  schema:
-    description: The schema describing each field present on the issue.
-    readOnly: true
-    type: object
-  self:
-    description: The URL of the issue details.
-    readOnly: true
-    type: string
-  transitions:
-    description: The transitions that can be performed on the issue.
-    items:
-      properties:
-        hasScreen:
-          type: boolean
-        id:
-          type:
-            - "null"
-            - string
-        isAvailable:
-          type: boolean
-        isConditional:
-          type: boolean
-        isGlobal:
-          type: boolean
-        isInitial:
-          type: boolean
-        isLooped:
-          type: boolean
-        name:
-          type:
-            - "null"
-            - string
-        to:
-          properties:
-            description:
-              type:
-                - "null"
-                - string
-            iconUrl:
-              type:
-                - "null"
-                - string
-            id:
-              type:
-                - "null"
-                - string
-            name:
-              type:
-                - "null"
-                - string
-            self:
-              type:
-                - "null"
-                - string
-            statusCategory:
-              properties:
-                colorName:
-                  type:
-                    - "null"
-                    - string
-                id:
-                  type:
-                    - "null"
-                    - integer
-                key:
-                  type:
-                    - "null"
-                    - string
-                name:
-                  type:
-                    - "null"
-                    - string
-                self:
-                  type:
-                    - "null"
-                    - string
-              type:
-                - "null"
-                - object
-          type:
-            - "null"
-            - object
-      type:
-        - "null"
-        - object
-    readOnly: true
-    type: array
-  updated:
-    description: This field transformed from fields attr
-    format: date-time
-    readOnly: true
+  created:
     type:
       - string
       - "null"
-  versionedRepresentations:
-    additionalProperties: true
-    description: The versions of each field on the issue.
+    format: date-time
+    description: This field transformed from fields attr
     readOnly: true
+  updated:
+    type:
+      - string
+      - "null"
+    format: date-time
+    description: This field transformed from fields attr
+    readOnly: true
+  _meta:
     type: object
-required:
-  - id
-type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+additionalProperties: true
+x-infer-schema: true

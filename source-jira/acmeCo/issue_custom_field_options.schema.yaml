@@ -1,33 +1,41 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+type: object
 description: Details of the custom field options for a context.
 properties:
-  contextId:
+  id:
     type:
       - "null"
       - string
+    description: The ID of the custom field option.
+  value:
+    type:
+      - "null"
+      - string
+    description: The value of the custom field option.
+  optionId:
+    type:
+      - "null"
+      - string
+    description: "For cascading options, the ID of the custom field option containing the cascading option."
   disabled:
-    description: Whether the option is disabled.
     type:
       - "null"
       - boolean
+    description: Whether the option is disabled.
   fieldId:
     type:
       - "null"
       - string
-  id:
-    description: The ID of the custom field option.
-    type: string
-  optionId:
-    description: "For cascading options, the ID of the custom field option containing the cascading option."
+  contextId:
     type:
       - "null"
       - string
-  value:
-    description: The value of the custom field option.
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

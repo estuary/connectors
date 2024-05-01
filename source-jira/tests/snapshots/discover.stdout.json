@@ -5,6 +5,17 @@
       "additionalProperties": true,
       "description": "Details of an application role.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "defaultGroups": {
           "description": "The groups that are granted default access for this application role.",
           "items": {
@@ -106,19 +117,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "key"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/key"
     ],
     "recommendedName": "application_roles",
     "resourceConfig": {
-      "cursorField": [
-        "key"
-      ],
       "stream": "application_roles",
       "syncMode": "full_refresh"
     }
@@ -129,6 +135,17 @@
       "additionalProperties": true,
       "description": "List of system avatars.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "fileName": {
           "description": "The file name of the avatar icon. Returned for system avatars.",
           "readOnly": true,
@@ -165,19 +182,14 @@
           "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "avatars",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "avatars",
       "syncMode": "full_refresh"
     }
@@ -186,8 +198,22 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "id": {
-          "type": "integer"
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "location": {
           "properties": {
@@ -282,19 +308,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "boards",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "boards",
       "syncMode": "full_refresh"
     }
@@ -303,6 +324,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "boardId": {
           "type": "integer"
         },
@@ -416,10 +448,8 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
@@ -439,6 +469,17 @@
       "additionalProperties": true,
       "description": "Details of a dashboard.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "type": "string"
         },
@@ -626,6 +667,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "type": "string"
                       },
                       "active": {
@@ -811,6 +858,10 @@
                   },
                   "assigneeType": {
                     "description": "The default assignee when creating issues for this project.",
+                    "enum": [
+                      "PROJECT_LEAD",
+                      "UNASSIGNED"
+                    ],
                     "type": "string"
                   },
                   "avatarUrls": {
@@ -849,6 +900,12 @@
                             },
                             "accountType": {
                               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                              "enum": [
+                                "atlassian",
+                                "app",
+                                "customer",
+                                "unknown"
+                              ],
                               "type": "string"
                             },
                             "active": {
@@ -1029,6 +1086,12 @@
                         },
                         "assigneeType": {
                           "description": "The nominal user type used to determine the assignee for issues created with this component. See `realAssigneeType` for details on how the type of the user, and hence the user, assigned to issues is determined. Can take the following values:\n\n *  `PROJECT_LEAD` the assignee to any issues created with this component is nominally the lead for the project the component is in.\n *  `COMPONENT_LEAD` the assignee to any issues created with this component is nominally the lead for the component.\n *  `UNASSIGNED` an assignee is not set for issues created with this component.\n *  `PROJECT_DEFAULT` the assignee to any issues created with this component is nominally the default assignee for the project that the component is in.\n\nDefault value: `PROJECT_DEFAULT`.  \nOptional when creating or updating a component.",
+                          "enum": [
+                            "PROJECT_DEFAULT",
+                            "COMPONENT_LEAD",
+                            "PROJECT_LEAD",
+                            "UNASSIGNED"
+                          ],
                           "type": "string"
                         },
                         "description": {
@@ -1053,6 +1116,12 @@
                             },
                             "accountType": {
                               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                              "enum": [
+                                "atlassian",
+                                "app",
+                                "customer",
+                                "unknown"
+                              ],
                               "type": "string"
                             },
                             "active": {
@@ -1263,6 +1332,12 @@
                             },
                             "accountType": {
                               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                              "enum": [
+                                "atlassian",
+                                "app",
+                                "customer",
+                                "unknown"
+                              ],
                               "type": "string"
                             },
                             "active": {
@@ -1443,6 +1518,12 @@
                         },
                         "realAssigneeType": {
                           "description": "The type of the assignee that is assigned to issues created with this component, when an assignee cannot be set from the `assigneeType`. For example, `assigneeType` is set to `COMPONENT_LEAD` but no component lead is set. This property is set to one of the following values:\n\n *  `PROJECT_LEAD` when `assigneeType` is `PROJECT_LEAD` and the project lead has permission to be assigned issues in the project that the component is in.\n *  `COMPONENT_LEAD` when `assignee`Type is `COMPONENT_LEAD` and the component lead has permission to be assigned issues in the project that the component is in.\n *  `UNASSIGNED` when `assigneeType` is `UNASSIGNED` and Jira is configured to allow unassigned issues.\n *  `PROJECT_DEFAULT` when none of the preceding cases are true.",
+                          "enum": [
+                            "PROJECT_DEFAULT",
+                            "COMPONENT_LEAD",
+                            "PROJECT_LEAD",
+                            "UNASSIGNED"
+                          ],
                           "type": "string"
                         },
                         "self": {
@@ -1468,6 +1549,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "type": "string"
                       },
                       "active": {
@@ -1706,6 +1793,11 @@
                               "type": "string"
                             },
                             "globalHierarchyLevel": {
+                              "enum": [
+                                "SUBTASK",
+                                "BASE",
+                                "EPIC"
+                              ],
                               "type": "string"
                             },
                             "id": {
@@ -1830,6 +1922,11 @@
                                 },
                                 "projectTypeKey": {
                                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                                  "enum": [
+                                    "software",
+                                    "service_desk",
+                                    "business"
+                                  ],
                                   "type": "string"
                                 },
                                 "self": {
@@ -1845,6 +1942,10 @@
                             },
                             "type": {
                               "description": "The type of scope.",
+                              "enum": [
+                                "PROJECT",
+                                "TEMPLATE"
+                              ],
                               "type": "string"
                             }
                           },
@@ -1877,6 +1978,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "type": "string"
                       },
                       "active": {
@@ -2093,6 +2200,11 @@
                   },
                   "projectTypeKey": {
                     "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                    "enum": [
+                      "software",
+                      "service_desk",
+                      "business"
+                    ],
                     "type": "string"
                   },
                   "properties": {
@@ -2119,6 +2231,10 @@
                   },
                   "style": {
                     "description": "The type of the project.",
+                    "enum": [
+                      "classic",
+                      "next-gen"
+                    ],
                     "type": "string"
                   },
                   "url": {
@@ -2303,6 +2419,10 @@
                         },
                         "type": {
                           "description": "The type of role actor.",
+                          "enum": [
+                            "atlassian-group-role-actor",
+                            "atlassian-user-role-actor"
+                          ],
                           "type": "string"
                         }
                       },
@@ -2402,6 +2522,11 @@
                           },
                           "projectTypeKey": {
                             "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                            "enum": [
+                              "software",
+                              "service_desk",
+                              "business"
+                            ],
                             "type": "string"
                           },
                           "self": {
@@ -2417,6 +2542,10 @@
                       },
                       "type": {
                         "description": "The type of scope.",
+                        "enum": [
+                          "PROJECT",
+                          "TEMPLATE"
+                        ],
                         "type": "string"
                       }
                     },
@@ -2435,6 +2564,15 @@
               },
               "type": {
                 "description": "The type of share permission:\n\n *  `group` Shared with a group. If set in a request, then specify `sharePermission.group` as well.\n *  `project` Shared with a project. If set in a request, then specify `sharePermission.project` as well.\n *  `projectRole` Share with a project role in a project. This value is not returned in responses. It is used in requests, where it needs to be specify with `projectId` and `projectRoleId`.\n *  `global` Shared globally. If set in a request, no other `sharePermission` properties need to be specified.\n *  `loggedin` Shared with all logged-in users. Note: This value is set in a request by specifying `authenticated` as the `type`.\n *  `project-unknown` Shared with a project that the user does not have access to. Cannot be set in a request.",
+                "enum": [
+                  "group",
+                  "project",
+                  "projectRole",
+                  "global",
+                  "loggedin",
+                  "authenticated",
+                  "project-unknown"
+                ],
                 "type": "string"
               }
             },
@@ -2453,19 +2591,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "dashboards",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "dashboards",
       "syncMode": "full_refresh"
     }
@@ -2476,6 +2609,17 @@
       "additionalProperties": true,
       "description": "Details of a filter.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "approximateLastUsed": {
           "format": "date-time",
           "type": [
@@ -2527,6 +2671,12 @@
             },
             "accountType": {
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -2776,6 +2926,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       },
@@ -2975,6 +3131,10 @@
                   },
                   "assigneeType": {
                     "description": "The default assignee when creating issues for this project.",
+                    "enum": [
+                      "PROJECT_LEAD",
+                      "UNASSIGNED"
+                    ],
                     "readOnly": true,
                     "type": "string"
                   },
@@ -3015,6 +3175,12 @@
                             },
                             "accountType": {
                               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                              "enum": [
+                                "atlassian",
+                                "app",
+                                "customer",
+                                "unknown"
+                              ],
                               "readOnly": true,
                               "type": "string"
                             },
@@ -3208,6 +3374,12 @@
                         },
                         "assigneeType": {
                           "description": "The nominal user type used to determine the assignee for issues created with this component. See `realAssigneeType` for details on how the type of the user, and hence the user, assigned to issues is determined. Can take the following values:\n\n *  `PROJECT_LEAD` the assignee to any issues created with this component is nominally the lead for the project the component is in.\n *  `COMPONENT_LEAD` the assignee to any issues created with this component is nominally the lead for the component.\n *  `UNASSIGNED` an assignee is not set for issues created with this component.\n *  `PROJECT_DEFAULT` the assignee to any issues created with this component is nominally the default assignee for the project that the component is in.\n\nDefault value: `PROJECT_DEFAULT`.  \nOptional when creating or updating a component.",
+                          "enum": [
+                            "PROJECT_DEFAULT",
+                            "COMPONENT_LEAD",
+                            "PROJECT_LEAD",
+                            "UNASSIGNED"
+                          ],
                           "type": "string"
                         },
                         "description": {
@@ -3234,6 +3406,12 @@
                             },
                             "accountType": {
                               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                              "enum": [
+                                "atlassian",
+                                "app",
+                                "customer",
+                                "unknown"
+                              ],
                               "readOnly": true,
                               "type": "string"
                             },
@@ -3458,6 +3636,12 @@
                             },
                             "accountType": {
                               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                              "enum": [
+                                "atlassian",
+                                "app",
+                                "customer",
+                                "unknown"
+                              ],
                               "readOnly": true,
                               "type": "string"
                             },
@@ -3651,6 +3835,12 @@
                         },
                         "realAssigneeType": {
                           "description": "The type of the assignee that is assigned to issues created with this component, when an assignee cannot be set from the `assigneeType`. For example, `assigneeType` is set to `COMPONENT_LEAD` but no component lead is set. This property is set to one of the following values:\n\n *  `PROJECT_LEAD` when `assigneeType` is `PROJECT_LEAD` and the project lead has permission to be assigned issues in the project that the component is in.\n *  `COMPONENT_LEAD` when `assignee`Type is `COMPONENT_LEAD` and the component lead has permission to be assigned issues in the project that the component is in.\n *  `UNASSIGNED` when `assigneeType` is `UNASSIGNED` and Jira is configured to allow unassigned issues.\n *  `PROJECT_DEFAULT` when none of the preceding cases are true.",
+                          "enum": [
+                            "PROJECT_DEFAULT",
+                            "COMPONENT_LEAD",
+                            "PROJECT_LEAD",
+                            "UNASSIGNED"
+                          ],
                           "readOnly": true,
                           "type": "string"
                         },
@@ -3680,6 +3870,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       },
@@ -3938,6 +4134,11 @@
                               "type": "string"
                             },
                             "globalHierarchyLevel": {
+                              "enum": [
+                                "SUBTASK",
+                                "BASE",
+                                "EPIC"
+                              ],
                               "type": "string"
                             },
                             "id": {
@@ -4078,6 +4279,11 @@
                                 },
                                 "projectTypeKey": {
                                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                                  "enum": [
+                                    "software",
+                                    "service_desk",
+                                    "business"
+                                  ],
                                   "readOnly": true,
                                   "type": "string"
                                 },
@@ -4097,6 +4303,10 @@
                             },
                             "type": {
                               "description": "The type of scope.",
+                              "enum": [
+                                "PROJECT",
+                                "TEMPLATE"
+                              ],
                               "readOnly": true,
                               "type": "string"
                             }
@@ -4135,6 +4345,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       },
@@ -4370,6 +4586,11 @@
                   },
                   "projectTypeKey": {
                     "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                    "enum": [
+                      "software",
+                      "service_desk",
+                      "business"
+                    ],
                     "readOnly": true,
                     "type": "string"
                   },
@@ -4403,6 +4624,10 @@
                   },
                   "style": {
                     "description": "The type of the project.",
+                    "enum": [
+                      "classic",
+                      "next-gen"
+                    ],
                     "readOnly": true,
                     "type": "string"
                   },
@@ -4609,6 +4834,10 @@
                         },
                         "type": {
                           "description": "The type of role actor.",
+                          "enum": [
+                            "atlassian-group-role-actor",
+                            "atlassian-user-role-actor"
+                          ],
                           "readOnly": true,
                           "type": "string"
                         }
@@ -4723,6 +4952,11 @@
                           },
                           "projectTypeKey": {
                             "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                            "enum": [
+                              "software",
+                              "service_desk",
+                              "business"
+                            ],
                             "readOnly": true,
                             "type": "string"
                           },
@@ -4742,6 +4976,10 @@
                       },
                       "type": {
                         "description": "The type of scope.",
+                        "enum": [
+                          "PROJECT",
+                          "TEMPLATE"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       }
@@ -4763,6 +5001,15 @@
               },
               "type": {
                 "description": "The type of share permission:\n\n *  `group` Shared with a group. If set in a request, then specify `sharePermission.group` as well.\n *  `project` Shared with a project. If set in a request, then specify `sharePermission.project` as well.\n *  `projectRole` Share with a project role in a project. This value is not returned in responses. It is used in requests, where it needs to be specify with `projectId` and `projectRoleId`.\n *  `global` Shared globally. If set in a request, no other `sharePermission` properties need to be specified.\n *  `loggedin` Shared with all logged-in users. Note: This value is set in a request by specifying `authenticated` as the `type`.\n *  `project-unknown` Shared with a project that the user does not have access to. Cannot be set in a request.",
+                "enum": [
+                  "group",
+                  "project",
+                  "projectRole",
+                  "global",
+                  "loggedin",
+                  "authenticated",
+                  "project-unknown"
+                ],
                 "type": "string"
               }
             },
@@ -4805,6 +5052,12 @@
                   },
                   "accountType": {
                     "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                    "enum": [
+                      "atlassian",
+                      "app",
+                      "customer",
+                      "unknown"
+                    ],
                     "readOnly": true,
                     "type": "string"
                   },
@@ -5008,19 +5261,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "filters",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "filters",
       "syncMode": "full_refresh"
     }
@@ -5031,6 +5279,17 @@
       "additionalProperties": true,
       "description": "Details of a share permission for the filter.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "filterId": {
           "description": "Id of the related filter",
           "type": [
@@ -5082,6 +5341,12 @@
                 },
                 "accountType": {
                   "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                  "enum": [
+                    "atlassian",
+                    "app",
+                    "customer",
+                    "unknown"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -5281,6 +5546,10 @@
             },
             "assigneeType": {
               "description": "The default assignee when creating issues for this project.",
+              "enum": [
+                "PROJECT_LEAD",
+                "UNASSIGNED"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -5321,6 +5590,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       },
@@ -5514,6 +5789,12 @@
                   },
                   "assigneeType": {
                     "description": "The nominal user type used to determine the assignee for issues created with this component. See `realAssigneeType` for details on how the type of the user, and hence the user, assigned to issues is determined. Can take the following values:\n\n *  `PROJECT_LEAD` the assignee to any issues created with this component is nominally the lead for the project the component is in.\n *  `COMPONENT_LEAD` the assignee to any issues created with this component is nominally the lead for the component.\n *  `UNASSIGNED` an assignee is not set for issues created with this component.\n *  `PROJECT_DEFAULT` the assignee to any issues created with this component is nominally the default assignee for the project that the component is in.\n\nDefault value: `PROJECT_DEFAULT`.  \nOptional when creating or updating a component.",
+                    "enum": [
+                      "PROJECT_DEFAULT",
+                      "COMPONENT_LEAD",
+                      "PROJECT_LEAD",
+                      "UNASSIGNED"
+                    ],
                     "type": "string"
                   },
                   "description": {
@@ -5540,6 +5821,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       },
@@ -5764,6 +6051,12 @@
                       },
                       "accountType": {
                         "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                        "enum": [
+                          "atlassian",
+                          "app",
+                          "customer",
+                          "unknown"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       },
@@ -5957,6 +6250,12 @@
                   },
                   "realAssigneeType": {
                     "description": "The type of the assignee that is assigned to issues created with this component, when an assignee cannot be set from the `assigneeType`. For example, `assigneeType` is set to `COMPONENT_LEAD` but no component lead is set. This property is set to one of the following values:\n\n *  `PROJECT_LEAD` when `assigneeType` is `PROJECT_LEAD` and the project lead has permission to be assigned issues in the project that the component is in.\n *  `COMPONENT_LEAD` when `assignee`Type is `COMPONENT_LEAD` and the component lead has permission to be assigned issues in the project that the component is in.\n *  `UNASSIGNED` when `assigneeType` is `UNASSIGNED` and Jira is configured to allow unassigned issues.\n *  `PROJECT_DEFAULT` when none of the preceding cases are true.",
+                    "enum": [
+                      "PROJECT_DEFAULT",
+                      "COMPONENT_LEAD",
+                      "PROJECT_LEAD",
+                      "UNASSIGNED"
+                    ],
                     "readOnly": true,
                     "type": "string"
                   },
@@ -5986,6 +6285,12 @@
                 },
                 "accountType": {
                   "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                  "enum": [
+                    "atlassian",
+                    "app",
+                    "customer",
+                    "unknown"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -6244,6 +6549,11 @@
                         "type": "string"
                       },
                       "globalHierarchyLevel": {
+                        "enum": [
+                          "SUBTASK",
+                          "BASE",
+                          "EPIC"
+                        ],
                         "type": "string"
                       },
                       "id": {
@@ -6384,6 +6694,11 @@
                           },
                           "projectTypeKey": {
                             "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                            "enum": [
+                              "software",
+                              "service_desk",
+                              "business"
+                            ],
                             "readOnly": true,
                             "type": "string"
                           },
@@ -6403,6 +6718,10 @@
                       },
                       "type": {
                         "description": "The type of scope.",
+                        "enum": [
+                          "PROJECT",
+                          "TEMPLATE"
+                        ],
                         "readOnly": true,
                         "type": "string"
                       }
@@ -6441,6 +6760,12 @@
                 },
                 "accountType": {
                   "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                  "enum": [
+                    "atlassian",
+                    "app",
+                    "customer",
+                    "unknown"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -6676,6 +7001,11 @@
             },
             "projectTypeKey": {
               "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+              "enum": [
+                "software",
+                "service_desk",
+                "business"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -6709,6 +7039,10 @@
             },
             "style": {
               "description": "The type of the project.",
+              "enum": [
+                "classic",
+                "next-gen"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -6915,6 +7249,10 @@
                   },
                   "type": {
                     "description": "The type of role actor.",
+                    "enum": [
+                      "atlassian-group-role-actor",
+                      "atlassian-user-role-actor"
+                    ],
                     "readOnly": true,
                     "type": "string"
                   }
@@ -7029,6 +7367,11 @@
                     },
                     "projectTypeKey": {
                       "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                      "enum": [
+                        "software",
+                        "service_desk",
+                        "business"
+                      ],
                       "readOnly": true,
                       "type": "string"
                     },
@@ -7048,6 +7391,10 @@
                 },
                 "type": {
                   "description": "The type of scope.",
+                  "enum": [
+                    "PROJECT",
+                    "TEMPLATE"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 }
@@ -7069,22 +7416,26 @@
         },
         "type": {
           "description": "The type of share permission:\n\n *  `group` Shared with a group. If set in a request, then specify `sharePermission.group` as well.\n *  `project` Shared with a project. If set in a request, then specify `sharePermission.project` as well.\n *  `projectRole` Share with a project role in a project. This value is not returned in responses. It is used in requests, where it needs to be specify with `projectId` and `projectRoleId`.\n *  `global` Shared globally. If set in a request, no other `sharePermission` properties need to be specified.\n *  `loggedin` Shared with all logged-in users. Note: This value is set in a request by specifying `authenticated` as the `type`.\n *  `project-unknown` Shared with a project that the user does not have access to. Cannot be set in a request.",
+          "enum": [
+            "group",
+            "project",
+            "projectRole",
+            "global",
+            "loggedin",
+            "authenticated",
+            "project-unknown"
+          ],
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "filter_sharing",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "filter_sharing",
       "syncMode": "full_refresh"
     }
@@ -7095,9 +7446,23 @@
       "additionalProperties": true,
       "description": "The list of groups found in a search, including header text (Showing X of Y matching groups) and total of matched groups.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "groupId": {
           "description": "The ID of the group, if available, which uniquely identifies the group across all Atlassian products. For example, *952d12c3-5b5b-4d04-bb32-44d383afc4b2*.",
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
           "description": "The name of the group.",
@@ -7107,19 +7472,14 @@
           ]
         }
       },
-      "required": [
-        "groupId"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/groupId"
     ],
     "recommendedName": "groups",
     "resourceConfig": {
-      "cursorField": [
-        "groupId"
-      ],
       "stream": "groups",
       "syncMode": "full_refresh"
     }
@@ -7129,6 +7489,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "changelog": {
           "description": "Details of changelogs associated with the issue.",
           "properties": {
@@ -9399,10 +9770,8 @@
           "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
@@ -9422,6 +9791,17 @@
       "additionalProperties": true,
       "description": "A comment.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "author": {
           "description": "The ID of the user who created the comment.",
           "readOnly": true
@@ -9486,6 +9866,10 @@
           "properties": {
             "type": {
               "description": "Whether visibility of this item is restricted to a group or role.",
+              "enum": [
+                "group",
+                "role"
+              ],
               "type": "string"
             },
             "value": {
@@ -9499,10 +9883,8 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
@@ -9522,6 +9904,17 @@
       "additionalProperties": true,
       "description": "Details about a field.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "clauseNames": {
           "description": "The names that can be used to reference the field in an advanced search. For more information, see [Advanced searching - fields reference](https://confluence.atlassian.com/x/gwORLQ).",
           "items": {
@@ -9663,6 +10056,11 @@
                 },
                 "projectTypeKey": {
                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                  "enum": [
+                    "software",
+                    "service_desk",
+                    "business"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -9682,6 +10080,10 @@
             },
             "type": {
               "description": "The type of scope.",
+              "enum": [
+                "PROJECT",
+                "TEMPLATE"
+              ],
               "readOnly": true,
               "type": "string"
             }
@@ -9702,19 +10104,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_fields",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_fields",
       "syncMode": "full_refresh"
     }
@@ -9725,6 +10122,17 @@
       "additionalProperties": true,
       "description": "Details of a field configuration.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the field configuration.",
           "type": "string"
@@ -9742,19 +10150,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_field_configurations",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_field_configurations",
       "syncMode": "full_refresh"
     }
@@ -9764,6 +10167,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "description": "The details of a custom field context.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the context.",
           "type": [
@@ -9786,7 +10200,10 @@
         },
         "id": {
           "description": "The ID of the context.",
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "isAnyIssueType": {
           "description": "Whether the context apply to all issue types.",
@@ -9810,19 +10227,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_custom_field_contexts",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_custom_field_contexts",
       "syncMode": "full_refresh"
     }
@@ -9832,6 +10244,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "description": "Details of the custom field options for a context.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "contextId": {
           "type": [
             "null",
@@ -9853,7 +10276,10 @@
         },
         "id": {
           "description": "The ID of the custom field option.",
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "optionId": {
           "description": "For cascading options, the ID of the custom field option containing the cascading option.",
@@ -9870,19 +10296,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_custom_field_options",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_custom_field_options",
       "syncMode": "full_refresh"
     }
@@ -9893,6 +10314,17 @@
       "additionalProperties": true,
       "description": "A list of issue link type beans.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "id": {
           "description": "The ID of the issue link type and is used as follows:\n\n *  In the [ issueLink](#api-rest-api-3-issueLink-post) resource it is the type of issue link. Required on create when `name` isn't provided. Otherwise, read only.\n *  In the [ issueLinkType](#api-rest-api-3-issueLinkType-post) resource it is read only.",
           "type": "string"
@@ -9915,19 +10347,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_link_types",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_link_types",
       "syncMode": "full_refresh"
     }
@@ -9938,6 +10365,17 @@
       "additionalProperties": true,
       "description": "Details of an issue navigator column item.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "label": {
           "description": "The issue navigator column label.",
           "type": "string"
@@ -9947,19 +10385,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "value"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/value"
     ],
     "recommendedName": "issue_navigator_settings",
     "resourceConfig": {
-      "cursorField": [
-        "value"
-      ],
       "stream": "issue_navigator_settings",
       "syncMode": "full_refresh"
     }
@@ -9970,6 +10403,17 @@
       "additionalProperties": true,
       "description": "Details about a notification scheme.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the notification scheme.",
           "type": "string"
@@ -10162,6 +10606,11 @@
                                 },
                                 "projectTypeKey": {
                                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                                  "enum": [
+                                    "software",
+                                    "service_desk",
+                                    "business"
+                                  ],
                                   "readOnly": true,
                                   "type": "string"
                                 },
@@ -10181,6 +10630,10 @@
                             },
                             "type": {
                               "description": "The type of scope.",
+                              "enum": [
+                                "PROJECT",
+                                "TEMPLATE"
+                              ],
                               "readOnly": true,
                               "type": "string"
                             }
@@ -10215,6 +10668,20 @@
                     },
                     "notificationType": {
                       "description": "Identifies the recipients of the notification.",
+                      "enum": [
+                        "CurrentAssignee",
+                        "Reporter",
+                        "CurrentUser",
+                        "ProjectLead",
+                        "ComponentLead",
+                        "User",
+                        "Group",
+                        "ProjectRole",
+                        "EmailAddress",
+                        "AllWatchers",
+                        "UserCustomField",
+                        "GroupCustomField"
+                      ],
                       "type": "string"
                     },
                     "parameter": {
@@ -10276,6 +10743,10 @@
                               },
                               "type": {
                                 "description": "The type of role actor.",
+                                "enum": [
+                                  "atlassian-group-role-actor",
+                                  "atlassian-user-role-actor"
+                                ],
                                 "readOnly": true,
                                 "type": "string"
                               }
@@ -10390,6 +10861,11 @@
                                 },
                                 "projectTypeKey": {
                                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                                  "enum": [
+                                    "software",
+                                    "service_desk",
+                                    "business"
+                                  ],
                                   "readOnly": true,
                                   "type": "string"
                                 },
@@ -10409,6 +10885,10 @@
                             },
                             "type": {
                               "description": "The type of scope.",
+                              "enum": [
+                                "PROJECT",
+                                "TEMPLATE"
+                              ],
                               "readOnly": true,
                               "type": "string"
                             }
@@ -10587,6 +11067,11 @@
                 },
                 "projectTypeKey": {
                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                  "enum": [
+                    "software",
+                    "service_desk",
+                    "business"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -10606,6 +11091,10 @@
             },
             "type": {
               "description": "The type of scope.",
+              "enum": [
+                "PROJECT",
+                "TEMPLATE"
+              ],
               "readOnly": true,
               "type": "string"
             }
@@ -10619,19 +11108,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_notification_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_notification_schemes",
       "syncMode": "full_refresh"
     }
@@ -10642,6 +11126,17 @@
       "additionalProperties": true,
       "description": "An issue priority.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the issue priority.",
           "type": "string"
@@ -10673,19 +11168,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_priorities",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_priorities",
       "syncMode": "full_refresh"
     }
@@ -10695,6 +11185,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "description": "An entity property, for more information see [Entity properties](https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/).",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "isdefault": {
           "type": [
             "null",
@@ -10717,19 +11218,14 @@
           "description": "The value of the property. Required on create and update."
         }
       },
-      "required": [
-        "key"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/key"
     ],
     "recommendedName": "issue_properties",
     "resourceConfig": {
-      "cursorField": [
-        "key"
-      ],
       "stream": "issue_properties",
       "syncMode": "full_refresh"
     }
@@ -10740,6 +11236,17 @@
       "additionalProperties": true,
       "description": "Details of an issue remote link.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "application": {
           "description": "Details of the remote application the linked item is in.",
           "properties": {
@@ -10842,19 +11349,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_remote_links",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_remote_links",
       "syncMode": "full_refresh"
     }
@@ -10865,6 +11367,17 @@
       "additionalProperties": true,
       "description": "Details of an issue resolution.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the issue resolution.",
           "type": "string"
@@ -10888,19 +11401,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_resolutions",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_resolutions",
       "syncMode": "full_refresh"
     }
@@ -10911,6 +11419,17 @@
       "additionalProperties": true,
       "description": "List of security schemes.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "defaultSecurityLevelId": {
           "description": "The ID of the default security level.",
           "readOnly": true,
@@ -10965,19 +11484,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_security_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_security_schemes",
       "syncMode": "full_refresh"
     }
@@ -10986,6 +11500,17 @@
     "documentSchema": {
       "$schema": "https://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "fields": {
           "type": [
             "null",
@@ -10999,7 +11524,10 @@
           ]
         },
         "id": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "isAvailable": {
           "type": [
@@ -11032,7 +11560,10 @@
           ]
         },
         "issueId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
           "type": [
@@ -11117,12 +11648,9 @@
           ]
         }
       },
-      "required": [
-        "issueId",
-        "id"
-      ],
       "title": "Issue Transitions",
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/issueId",
@@ -11130,10 +11658,6 @@
     ],
     "recommendedName": "issue_transitions",
     "resourceConfig": {
-      "cursorField": [
-        "issueId",
-        "id"
-      ],
       "stream": "issue_transitions",
       "syncMode": "full_refresh"
     }
@@ -11144,6 +11668,17 @@
       "additionalProperties": true,
       "description": "Details of an issue type scheme.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "defaultIssueTypeId": {
           "description": "The ID of the default issue type of the issue type scheme.",
           "type": "string"
@@ -11165,19 +11700,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_type_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_type_schemes",
       "syncMode": "full_refresh"
     }
@@ -11187,6 +11717,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "description": "Details about an issue type.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "avatarId": {
           "description": "The ID of the issue type's avatar.",
           "readOnly": true,
@@ -11230,7 +11771,10 @@
         "id": {
           "description": "The ID of the issue type.",
           "readOnly": true,
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
           "description": "The name of the issue type.",
@@ -11351,6 +11895,11 @@
                 },
                 "projectTypeKey": {
                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                  "enum": [
+                    "software",
+                    "service_desk",
+                    "business"
+                  ],
                   "readOnly": true,
                   "type": [
                     "null",
@@ -11415,21 +11964,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": [
-        "object"
-      ]
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_types",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_types",
       "syncMode": "full_refresh"
     }
@@ -11440,6 +11982,17 @@
       "additionalProperties": true,
       "description": "Details of an issue type screen scheme.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the issue type screen scheme.",
           "type": "string"
@@ -11453,19 +12006,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "issue_type_screen_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "issue_type_screen_schemes",
       "syncMode": "full_refresh"
     }
@@ -11476,6 +12024,17 @@
       "additionalProperties": true,
       "description": "The details of votes on an issue.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "hasVoted": {
           "description": "Whether the user making this request has voted on the issue.",
           "readOnly": true,
@@ -11505,6 +12064,12 @@
               },
               "accountType": {
                 "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+                "enum": [
+                  "atlassian",
+                  "app",
+                  "customer",
+                  "unknown"
+                ],
                 "readOnly": true,
                 "type": "string"
               },
@@ -11704,19 +12269,14 @@
           "type": "integer"
         }
       },
-      "required": [
-        "self"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/self"
     ],
     "recommendedName": "issue_votes",
     "resourceConfig": {
-      "cursorField": [
-        "self"
-      ],
       "stream": "issue_votes",
       "syncMode": "full_refresh"
     }
@@ -11727,6 +12287,17 @@
       "additionalProperties": true,
       "description": "The details of watchers on an issue.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "isWatching": {
           "description": "Whether the calling user is watching this issue.",
           "readOnly": true,
@@ -11828,19 +12399,14 @@
           "type": "array"
         }
       },
-      "required": [
-        "self"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/self"
     ],
     "recommendedName": "issue_watchers",
     "resourceConfig": {
-      "cursorField": [
-        "self"
-      ],
       "stream": "issue_watchers",
       "syncMode": "full_refresh"
     }
@@ -11851,6 +12417,17 @@
       "additionalProperties": true,
       "description": "Details of a worklog.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "author": {
           "description": "Details of the user who created the worklog.",
           "properties": {
@@ -12066,6 +12643,10 @@
           "properties": {
             "type": {
               "description": "Whether visibility of this item is restricted to a group or role.",
+              "enum": [
+                "group",
+                "role"
+              ],
               "type": "string"
             },
             "value": {
@@ -12076,10 +12657,8 @@
           "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
@@ -12099,6 +12678,17 @@
       "additionalProperties": true,
       "description": "Details of an application property.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "allowedValues": {
           "description": "The allowed values, if applicable.",
           "items": {
@@ -12138,19 +12728,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "jira_settings",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "jira_settings",
       "syncMode": "full_refresh"
     }
@@ -12158,25 +12743,34 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "label": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
-      "required": [
-        "label"
-      ],
       "type": [
         "object"
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/label"
     ],
     "recommendedName": "labels",
     "resourceConfig": {
-      "cursorField": [
-        "label"
-      ],
       "stream": "labels",
       "syncMode": "full_refresh"
     }
@@ -12187,6 +12781,17 @@
       "additionalProperties": true,
       "description": "Details about permissions.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "type": [
             "null",
@@ -12194,7 +12799,10 @@
           ]
         },
         "key": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
           "type": [
@@ -12209,19 +12817,14 @@
           ]
         }
       },
-      "required": [
-        "key"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/key"
     ],
     "recommendedName": "permissions",
     "resourceConfig": {
-      "cursorField": [
-        "key"
-      ],
       "stream": "permissions",
       "syncMode": "full_refresh"
     }
@@ -12232,6 +12835,17 @@
       "additionalProperties": true,
       "description": "List of all permission schemes.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "A description for the permission scheme.",
           "type": "string"
@@ -12370,6 +12984,11 @@
                 },
                 "projectTypeKey": {
                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                  "enum": [
+                    "software",
+                    "service_desk",
+                    "business"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -12389,6 +13008,10 @@
             },
             "type": {
               "description": "The type of scope.",
+              "enum": [
+                "PROJECT",
+                "TEMPLATE"
+              ],
               "readOnly": true,
               "type": "string"
             }
@@ -12401,19 +13024,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "permission_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "permission_schemes",
       "syncMode": "full_refresh"
     }
@@ -12424,6 +13042,17 @@
       "additionalProperties": true,
       "description": "Details about a project.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "description": "Whether the project is archived.",
           "readOnly": true,
@@ -12441,6 +13070,10 @@
         },
         "assigneeType": {
           "description": "The default assignee when creating issues for this project.",
+          "enum": [
+            "PROJECT_LEAD",
+            "UNASSIGNED"
+          ],
           "readOnly": true,
           "type": "string"
         },
@@ -12538,6 +13171,11 @@
         },
         "projectTypeKey": {
           "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+          "enum": [
+            "software",
+            "service_desk",
+            "business"
+          ],
           "readOnly": true,
           "type": "string"
         },
@@ -12571,6 +13209,10 @@
         },
         "style": {
           "description": "The type of the project.",
+          "enum": [
+            "classic",
+            "next-gen"
+          ],
           "readOnly": true,
           "type": "string"
         },
@@ -12590,19 +13232,14 @@
           "type": "array"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "projects",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "projects",
       "syncMode": "full_refresh"
     }
@@ -12612,6 +13249,17 @@
       "$schema": "https://json-schema.org/draft-07/schema#",
       "description": "Project Roles",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "actors": {
           "items": {
             "properties": {
@@ -12721,7 +13369,10 @@
           ]
         },
         "id": {
-          "type": "integer"
+          "type": [
+            "null",
+            "integer"
+          ]
         },
         "name": {
           "type": [
@@ -12891,19 +13542,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "project_roles",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "project_roles",
       "syncMode": "full_refresh"
     }
@@ -12914,6 +13560,17 @@
       "additionalProperties": true,
       "description": "List of project avatars.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "fileName": {
           "description": "The file name of the avatar icon. Returned for system avatars.",
           "readOnly": true,
@@ -12957,19 +13614,14 @@
           "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "project_avatars",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "project_avatars",
       "syncMode": "full_refresh"
     }
@@ -12980,6 +13632,17 @@
       "additionalProperties": true,
       "description": "A project category.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the project category. Required on create, optional on update.",
           "type": "string"
@@ -12999,19 +13662,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "project_categories",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "project_categories",
       "syncMode": "full_refresh"
     }
@@ -13022,6 +13680,17 @@
       "additionalProperties": true,
       "description": "Details about a project component.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "assignee": {
           "description": "The details of the user associated with `assigneeType`, if any. See `realAssignee` for details of the user assigned to issues created with this component.",
           "properties": {
@@ -13032,6 +13701,12 @@
             },
             "accountType": {
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -13230,6 +13905,12 @@
         },
         "assigneeType": {
           "description": "The nominal user type used to determine the assignee for issues created with this component. See `realAssigneeType` for details on how the type of the user, and hence the user, assigned to issues is determined. Can take the following values:\n\n *  `PROJECT_LEAD` the assignee to any issues created with this component is nominally the lead for the project the component is in.\n *  `COMPONENT_LEAD` the assignee to any issues created with this component is nominally the lead for the component.\n *  `UNASSIGNED` an assignee is not set for issues created with this component.\n *  `PROJECT_DEFAULT` the assignee to any issues created with this component is nominally the default assignee for the project that the component is in.\n\nDefault value: `PROJECT_DEFAULT`.  \nOptional when creating or updating a component.",
+          "enum": [
+            "PROJECT_DEFAULT",
+            "COMPONENT_LEAD",
+            "PROJECT_LEAD",
+            "UNASSIGNED"
+          ],
           "type": "string"
         },
         "componentBean": {
@@ -13268,6 +13949,12 @@
             },
             "accountType": {
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -13494,6 +14181,12 @@
         },
         "realAssigneeType": {
           "description": "The type of the assignee that is assigned to issues created with this component, when an assignee cannot be set from the `assigneeType`. For example, `assigneeType` is set to `COMPONENT_LEAD` but no component lead is set. This property is set to one of the following values:\n\n *  `PROJECT_LEAD` when `assigneeType` is `PROJECT_LEAD` and the project lead has permission to be assigned issues in the project that the component is in.\n *  `COMPONENT_LEAD` when `assignee`Type is `COMPONENT_LEAD` and the component lead has permission to be assigned issues in the project that the component is in.\n *  `UNASSIGNED` when `assigneeType` is `UNASSIGNED` and Jira is configured to allow unassigned issues.\n *  `PROJECT_DEFAULT` when none of the preceding cases are true.",
+          "enum": [
+            "PROJECT_DEFAULT",
+            "COMPONENT_LEAD",
+            "PROJECT_LEAD",
+            "UNASSIGNED"
+          ],
           "readOnly": true,
           "type": "string"
         },
@@ -13503,19 +14196,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "project_components",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "project_components",
       "syncMode": "full_refresh"
     }
@@ -13526,6 +14214,17 @@
       "additionalProperties": true,
       "description": "A project's sender email address.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "emailAddress": {
           "description": "The email address.",
           "type": "string"
@@ -13534,19 +14233,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "projectId"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/projectId"
     ],
     "recommendedName": "project_email",
     "resourceConfig": {
-      "cursorField": [
-        "projectId"
-      ],
       "stream": "project_email",
       "syncMode": "full_refresh"
     }
@@ -13557,6 +14251,17 @@
       "additionalProperties": true,
       "description": "Details about a security scheme.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the issue level security item.",
           "type": [
@@ -13566,7 +14271,10 @@
         },
         "id": {
           "description": "The ID of the issue level security item.",
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "name": {
           "description": "The name of the issue level security item.",
@@ -13590,19 +14298,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "project_permission_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "project_permission_schemes",
       "syncMode": "full_refresh"
     }
@@ -13613,6 +14316,17 @@
       "additionalProperties": true,
       "description": "Details about a project type.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "color": {
           "description": "The color of the project type.",
           "readOnly": true,
@@ -13639,19 +14353,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "key"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/key"
     ],
     "recommendedName": "project_types",
     "resourceConfig": {
-      "cursorField": [
-        "key"
-      ],
       "stream": "project_types",
       "syncMode": "full_refresh"
     }
@@ -13660,6 +14369,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "archived": {
           "description": "Indicates that the version is archived. Optional when creating or updating a version.",
           "type": "boolean"
@@ -13790,19 +14510,14 @@
         }
       },
       "readOnly": true,
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "project_versions",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "project_versions",
       "syncMode": "full_refresh"
     }
@@ -13812,6 +14527,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the screen.",
           "readOnly": true,
@@ -13899,6 +14625,11 @@
                 },
                 "projectTypeKey": {
                   "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
+                  "enum": [
+                    "software",
+                    "service_desk",
+                    "business"
+                  ],
                   "readOnly": true,
                   "type": "string"
                 },
@@ -13918,6 +14649,10 @@
             },
             "type": {
               "description": "The type of scope.",
+              "enum": [
+                "PROJECT",
+                "TEMPLATE"
+              ],
               "readOnly": true,
               "type": "string"
             }
@@ -13925,19 +14660,14 @@
           "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "screens",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "screens",
       "syncMode": "full_refresh"
     }
@@ -13948,6 +14678,17 @@
       "additionalProperties": true,
       "description": "A screen tab.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "id": {
           "description": "The ID of the screen tab.",
           "readOnly": true,
@@ -13966,19 +14707,16 @@
         }
       },
       "required": [
-        "name",
-        "id"
+        "name"
       ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "screen_tabs",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "screen_tabs",
       "syncMode": "full_refresh"
     }
@@ -13989,6 +14727,17 @@
       "additionalProperties": true,
       "description": "A screen tab field.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "id": {
           "description": "The ID of the screen tab field.",
           "readOnly": true,
@@ -14013,19 +14762,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "screen_tab_fields",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "screen_tab_fields",
       "syncMode": "full_refresh"
     }
@@ -14036,6 +14780,17 @@
       "additionalProperties": true,
       "description": "A screen scheme.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the screen scheme.",
           "type": "string"
@@ -14074,19 +14829,14 @@
           "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "screen_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "screen_schemes",
       "syncMode": "full_refresh"
     }
@@ -14095,6 +14845,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "boardId": {
           "description": "Used to determine which board the sprint is a part of. (Not always the same as originBoardId)",
           "type": "integer"
@@ -14137,19 +14898,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "sprints",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "sprints",
       "syncMode": "full_refresh"
     }
@@ -14158,6 +14914,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "created": {
           "description": "This field transformed from fields attr",
           "format": "date-time",
@@ -14350,10 +15117,8 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
@@ -14373,6 +15138,17 @@
       "additionalProperties": true,
       "description": "Details about the time tracking provider.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "key": {
           "description": "The key for the time tracking provider. For example, *JIRA*.",
           "type": "string"
@@ -14390,16 +15166,14 @@
       "required": [
         "key"
       ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/key"
     ],
     "recommendedName": "time_tracking",
     "resourceConfig": {
-      "cursorField": [
-        "key"
-      ],
       "stream": "time_tracking",
       "syncMode": "full_refresh"
     }
@@ -14410,6 +15184,17 @@
       "additionalProperties": true,
       "description": "A user with details as permitted by the user's Atlassian Account privacy settings. However, be aware of these exceptions:\n\n *  User record deleted from Atlassian: This occurs as the result of a right to be forgotten request. In this case, `displayName` provides an indication and other parameters have default values or are blank (for example, email is blank).\n *  User record corrupted: This occurs as a results of events such as a server import and can only happen to deleted users. In this case, `accountId` returns *unknown* and all other parameters have fallback values.\n *  User record unavailable: This usually occurs due to an internal service outage. In this case, all parameters have fallback values.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "accountId": {
           "description": "The account ID of the user, which uniquely identifies the user across all Atlassian products. For example, *5b10ac8d82e05b22cc7d4ef5*. Required in requests.",
           "maxLength": 128,
@@ -14417,6 +15202,12 @@
         },
         "accountType": {
           "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+          "enum": [
+            "atlassian",
+            "app",
+            "customer",
+            "unknown"
+          ],
           "readOnly": true,
           "type": "string"
         },
@@ -14605,19 +15396,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "accountId"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/accountId"
     ],
     "recommendedName": "users",
     "resourceConfig": {
-      "cursorField": [
-        "accountId"
-      ],
       "stream": "users",
       "syncMode": "full_refresh"
     }
@@ -14628,6 +15414,17 @@
       "additionalProperties": true,
       "description": "A user with details as permitted by the user's Atlassian Account privacy settings. However, be aware of these exceptions:\n\n *  User record deleted from Atlassian: This occurs as the result of a right to be forgotten request. In this case, `displayName` provides an indication and other parameters have default values or are blank (for example, email is blank).\n *  User record corrupted: This occurs as a results of events such as a server import and can only happen to deleted users. In this case, `accountId` returns *unknown* and all other parameters have fallback values.\n *  User record unavailable: This usually occurs due to an internal service outage. In this case, all parameters have fallback values.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "accountId": {
           "description": "The account ID of the user, which uniquely identifies the user across all Atlassian products. For example, *5b10ac8d82e05b22cc7d4ef5*. Required in requests.",
           "maxLength": 128,
@@ -14635,6 +15432,12 @@
         },
         "accountType": {
           "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+          "enum": [
+            "atlassian",
+            "app",
+            "customer",
+            "unknown"
+          ],
           "readOnly": true,
           "type": "string"
         },
@@ -14829,19 +15632,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "accountId"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/accountId"
     ],
     "recommendedName": "users_groups_detailed",
     "resourceConfig": {
-      "cursorField": [
-        "accountId"
-      ],
       "stream": "users_groups_detailed",
       "syncMode": "full_refresh"
     }
@@ -14850,6 +15648,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "created": {
           "format": "date-time",
           "type": [
@@ -14874,9 +15683,6 @@
               "type": "string"
             }
           },
-          "required": [
-            "name"
-          ],
           "type": "object"
         },
         "statuses": {
@@ -14997,6 +15803,11 @@
               },
               "type": {
                 "description": "The type of the transition.",
+                "enum": [
+                  "global",
+                  "initial",
+                  "directed"
+                ],
                 "type": "string"
               }
             },
@@ -15013,19 +15824,14 @@
         }
       },
       "readOnly": true,
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id/name"
     ],
     "recommendedName": "workflows",
     "resourceConfig": {
-      "cursorField": [
-        "id/name"
-      ],
       "stream": "workflows",
       "syncMode": "full_refresh"
     }
@@ -15034,6 +15840,17 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "defaultWorkflow": {
           "description": "The name of the default workflow for the workflow scheme. The default workflow has *All Unassigned Issue Types* assigned to it in Jira. If `defaultWorkflow` is not specified when creating a workflow scheme, it is set to *Jira Workflow (jira)*.",
           "type": "string"
@@ -15077,6 +15894,12 @@
             },
             "accountType": {
               "description": "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk",
+              "enum": [
+                "atlassian",
+                "app",
+                "customer",
+                "unknown"
+              ],
               "readOnly": true,
               "type": "string"
             },
@@ -15293,19 +16116,14 @@
         }
       },
       "readOnly": true,
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "workflow_schemes",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "workflow_schemes",
       "syncMode": "full_refresh"
     }
@@ -15316,6 +16134,17 @@
       "additionalProperties": true,
       "description": "A status.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "description": {
           "description": "The description of the status.",
           "readOnly": true,
@@ -15386,19 +16215,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "workflow_statuses",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "workflow_statuses",
       "syncMode": "full_refresh"
     }
@@ -15409,6 +16233,17 @@
       "additionalProperties": true,
       "description": "A status category.",
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "colorName": {
           "description": "The name of the color used to represent the status category.",
           "readOnly": true,
@@ -15435,19 +16270,14 @@
           "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "workflow_status_categories",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "workflow_status_categories",
       "syncMode": "full_refresh"
     }

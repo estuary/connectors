@@ -1,119 +1,127 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
+type: object
 properties:
-  created:
-    format: date-time
-    type:
-      - "null"
-      - string
-  description:
-    description: The description of the workflow.
-    type: string
   id:
+    type: object
     properties:
       entityId:
         type:
           - "null"
           - string
       name:
-        description: The name of the workflow.
         type: string
-    required:
-      - name
-    type: object
-  statuses:
-    description: The statuses of the workflow.
-    items:
-      properties:
-        id:
-          description: The ID of the issue status.
-          type: string
-        name:
-          description: The name of the status in the workflow.
-          type: string
-        properties:
-          properties:
-            issueEditable:
-              description: Whether issues are editable in this status.
-              type: boolean
-          type: object
-      type: object
-    type: array
+        description: The name of the workflow.
+  description:
+    type: string
+    description: The description of the workflow.
   transitions:
+    type: array
     description: The transitions of the workflow.
     items:
+      type: object
       properties:
-        description:
-          description: The description of the transition.
+        id:
           type: string
+          description: The ID of the transition.
+        name:
+          type: string
+          description: The name of the transition.
+        description:
+          type: string
+          description: The description of the transition.
         from:
+          type: array
           description: The statuses the transition can start from.
           items:
-            description: The statuses the transition can start from.
             type: string
-          type: array
-        id:
-          description: The ID of the transition.
+            description: The statuses the transition can start from.
+        to:
           type: string
-        name:
-          description: The name of the transition.
+          description: The status the transition goes to.
+        type:
           type: string
-        rules:
-          properties:
-            conditions:
-              description: The workflow conditions.
-              items:
-                properties:
-                  configuration:
-                    description: The configuration of the transition rule. This is currently returned only for some of the rule types. Availability of this property is subject to change.
-                  type:
-                    description: The type of the transition rule.
-                    type: string
-                type: object
-              type: array
-            postFunctions:
-              description: The workflow post functions.
-              items:
-                properties:
-                  configuration:
-                    description: The configuration of the transition rule. This is currently returned only for some of the rule types. Availability of this property is subject to change.
-                  type:
-                    description: The type of the transition rule.
-                    type: string
-                type: object
-              type: array
-            validators:
-              description: The workflow validators.
-              items:
-                properties:
-                  configuration:
-                    description: The configuration of the transition rule. This is currently returned only for some of the rule types. Availability of this property is subject to change.
-                  type:
-                    description: The type of the transition rule.
-                    type: string
-                type: object
-              type: array
-          type: object
+          description: The type of the transition.
+          enum:
+            - global
+            - initial
+            - directed
         screen:
+          type: object
           properties:
             id:
-              description: The ID of the screen.
               type: string
+              description: The ID of the screen.
+        rules:
           type: object
-        to:
-          description: The status the transition goes to.
-          type: string
-        type:
-          description: The type of the transition.
-          type: string
-      type: object
+          properties:
+            conditions:
+              type: array
+              description: The workflow conditions.
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    description: The type of the transition rule.
+                  configuration:
+                    description: The configuration of the transition rule. This is currently returned only for some of the rule types. Availability of this property is subject to change.
+            validators:
+              type: array
+              description: The workflow validators.
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    description: The type of the transition rule.
+                  configuration:
+                    description: The configuration of the transition rule. This is currently returned only for some of the rule types. Availability of this property is subject to change.
+            postFunctions:
+              type: array
+              description: The workflow post functions.
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    description: The type of the transition rule.
+                  configuration:
+                    description: The configuration of the transition rule. This is currently returned only for some of the rule types. Availability of this property is subject to change.
+  statuses:
     type: array
-  updated:
-    format: date-time
+    description: The statuses of the workflow.
+    items:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The ID of the issue status.
+        name:
+          type: string
+          description: The name of the status in the workflow.
+        properties:
+          type: object
+          properties:
+            issueEditable:
+              type: boolean
+              description: Whether issues are editable in this status.
+  created:
     type:
       - "null"
       - string
+    format: date-time
+  updated:
+    type:
+      - "null"
+      - string
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 readOnly: true
-required:
-  - id
-type: object
+x-infer-schema: true

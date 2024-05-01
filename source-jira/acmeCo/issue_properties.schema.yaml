@@ -1,22 +1,28 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
-description: "An entity property, for more information see [Entity properties](https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/)."
+type: object
 properties:
+  key:
+    type: string
+    description: The key of the property. Required on create and update.
+  issueId:
+    type:
+      - "null"
+      - string
+    description: Id of the related issue.
+    readOnly: true
+  value:
+    description: The value of the property. Required on create and update.
   isdefault:
     type:
       - "null"
       - boolean
-  issueId:
-    description: Id of the related issue.
-    readOnly: true
-    type:
-      - "null"
-      - string
-  key:
-    description: The key of the property. Required on create and update.
-    type: string
-  value:
-    description: The value of the property. Required on create and update.
-required:
-  - key
-type: object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+description: "An entity property, for more information see [Entity properties](https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/)."
+x-infer-schema: true

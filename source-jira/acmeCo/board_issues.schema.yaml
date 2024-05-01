@@ -1,83 +1,89 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
+type: object
 properties:
-  boardId:
-    type: integer
-  created:
-    description: This field transformed from fields attr
-    format: date-time
-    readOnly: true
-    type:
-      - string
-      - "null"
   expand:
     type: string
+  id:
+    type: string
+  self:
+    type: string
+  key:
+    type: string
   fields:
+    type: object
     properties:
-      closedSprints:
-        type:
-          - "null"
-          - object
-      comment:
-        items:
-          type: object
-        type:
-          - "null"
-          - array
-      created:
-        format: date-time
-        type:
-          - "null"
-          - string
-      description:
-        type:
-          - "null"
-          - string
-      epic:
-        type:
-          - "null"
-          - object
       flagged:
         type:
           - "null"
           - boolean
-      project:
-        type:
-          - "null"
-          - object
       sprint:
         type:
           - "null"
           - object
+      closedSprints:
+        type:
+          - "null"
+          - object
+      description:
+        type:
+          - "null"
+          - string
+      project:
+        type:
+          - "null"
+          - object
+      comment:
+        type:
+          - "null"
+          - array
+        items:
+          type: object
+      epic:
+        type:
+          - "null"
+          - object
+      worklog:
+        type:
+          - "null"
+          - array
+        items:
+          type: object
+      created:
+        type:
+          - "null"
+          - string
+        format: date-time
+      updated:
+        type:
+          - "null"
+          - string
+        format: date-time
       timetracking:
         type:
           - "null"
           - object
-      updated:
-        format: date-time
-        type:
-          - "null"
-          - string
-      worklog:
-        items:
-          type: object
-        type:
-          - "null"
-          - array
-    type: object
-  id:
-    type: string
-  key:
-    type: string
-  self:
-    type: string
-  updated:
-    description: This field transformed from fields attr
-    format: date-time
-    readOnly: true
+  boardId:
+    type: integer
+  created:
     type:
       - string
       - "null"
-required:
-  - id
-type: object
+    format: date-time
+    description: This field transformed from fields attr
+    readOnly: true
+  updated:
+    type:
+      - string
+      - "null"
+    format: date-time
+    description: This field transformed from fields attr
+    readOnly: true
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

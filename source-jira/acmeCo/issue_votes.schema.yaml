@@ -1,176 +1,187 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
-additionalProperties: true
-description: The details of votes on an issue.
+type: object
 properties:
-  hasVoted:
-    description: Whether the user making this request has voted on the issue.
+  self:
+    type: string
+    description: The URL of these issue vote details.
     readOnly: true
-    type: boolean
   issueId:
-    description: Id of the related issue.
-    readOnly: true
     type:
       - "null"
       - string
-  self:
-    description: The URL of these issue vote details.
+    description: Id of the related issue.
     readOnly: true
-    type: string
+  votes:
+    type: integer
+    description: The number of votes on the issue.
+    readOnly: true
+  hasVoted:
+    type: boolean
+    description: Whether the user making this request has voted on the issue.
+    readOnly: true
   voters:
+    type: array
     description: "List of the users who have voted on this issue. An empty list is returned when the calling user doesn't have the *View voters and watchers* project permission."
+    readOnly: true
     items:
+      type: object
       properties:
+        self:
+          type: string
+          description: The URL of the user.
+          readOnly: true
+        key:
+          type: string
+          description: "This property is no longer available and will be removed from the documentation soon. See the [deprecation notice](https://developer.atlassian.com/cloud/jira/platform/deprecation-notice-user-privacy-api-migration-guide/) for details."
         accountId:
-          description: "The account ID of the user, which uniquely identifies the user across all Atlassian products. For example, *5b10ac8d82e05b22cc7d4ef5*. Required in requests."
           maxLength: 128
           type: string
+          description: "The account ID of the user, which uniquely identifies the user across all Atlassian products. For example, *5b10ac8d82e05b22cc7d4ef5*. Required in requests."
         accountType:
+          type: string
           description: "The user account type. Can take the following values:\n\n *  `atlassian` regular Atlassian user account\n *  `app` system account used for Connect applications and OAuth to represent external systems\n *  `customer` Jira Service Desk account representing an external service desk"
           readOnly: true
+          enum:
+            - atlassian
+            - app
+            - customer
+            - unknown
+        name:
           type: string
+          description: "This property is no longer available and will be removed from the documentation soon. See the [deprecation notice](https://developer.atlassian.com/cloud/jira/platform/deprecation-notice-user-privacy-api-migration-guide/) for details."
+        emailAddress:
+          type: string
+          description: "The email address of the user. Depending on the user’s privacy setting, this may be returned as null."
+          readOnly: true
+        avatarUrls:
+          description: The avatars of the user.
+          readOnly: true
+          type: object
+          properties:
+            16x16:
+              type: string
+              description: "The URL of the item's 16x16 pixel avatar."
+            24x24:
+              type: string
+              description: "The URL of the item's 24x24 pixel avatar."
+            32x32:
+              type: string
+              description: "The URL of the item's 32x32 pixel avatar."
+            48x48:
+              type: string
+              description: "The URL of the item's 48x48 pixel avatar."
+        displayName:
+          type: string
+          description: "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value."
+          readOnly: true
         active:
+          type: boolean
           description: Whether the user is active.
           readOnly: true
-          type: boolean
-        applicationRoles:
-          description: The application roles the user is assigned to.
+        timeZone:
+          type: string
+          description: "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null."
+          readOnly: true
+        locale:
+          type: string
+          description: "The locale of the user. Depending on the user’s privacy setting, this may be returned as null."
+          readOnly: true
+        groups:
+          description: The groups that the user belongs to.
+          readOnly: true
+          type: object
           properties:
+            size:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: The name of group.
+                  self:
+                    type: string
+                    description: The URL for these group details.
+                    readOnly: true
+            pagingCallback:
+              type: object
             callback:
               type: object
+            max-results:
+              type: integer
+        applicationRoles:
+          description: The application roles the user is assigned to.
+          readOnly: true
+          type: object
+          properties:
+            size:
+              type: integer
             items:
+              type: array
               items:
+                type: object
                 properties:
-                  defaultGroups:
-                    description: The groups that are granted default access for this application role.
-                    items:
-                      type: string
-                    type: array
-                    uniqueItems: true
-                  defined:
-                    description: Deprecated.
-                    type: boolean
+                  key:
+                    type: string
+                    description: The key of the application role.
                   groups:
+                    uniqueItems: true
+                    type: array
                     description: The groups associated with the application role.
                     items:
                       type: string
-                    type: array
+                  name:
+                    type: string
+                    description: The display name of the application role.
+                  defaultGroups:
                     uniqueItems: true
+                    type: array
+                    description: The groups that are granted default access for this application role.
+                    items:
+                      type: string
+                  selectedByDefault:
+                    type: boolean
+                    description: Determines whether this application role should be selected by default on user creation.
+                  defined:
+                    type: boolean
+                    description: Deprecated.
+                  numberOfSeats:
+                    type: integer
+                    description: The maximum count of users on your license.
+                  remainingSeats:
+                    type: integer
+                    description: The count of users remaining on your license.
+                  userCount:
+                    type: integer
+                    description: The number of users counting against your license.
+                  userCountDescription:
+                    type: string
+                    description: "The [type of users](https://confluence.atlassian.com/x/lRW3Ng) being counted against your license."
                   hasUnlimitedSeats:
                     type: boolean
-                  key:
-                    description: The key of the application role.
-                    type: string
-                  name:
-                    description: The display name of the application role.
-                    type: string
-                  numberOfSeats:
-                    description: The maximum count of users on your license.
-                    type: integer
                   platform:
+                    type: boolean
                     description: "Indicates if the application role belongs to Jira platform (`jira-core`)."
-                    type: boolean
-                  remainingSeats:
-                    description: The count of users remaining on your license.
-                    type: integer
-                  selectedByDefault:
-                    description: Determines whether this application role should be selected by default on user creation.
-                    type: boolean
-                  userCount:
-                    description: The number of users counting against your license.
-                    type: integer
-                  userCountDescription:
-                    description: "The [type of users](https://confluence.atlassian.com/x/lRW3Ng) being counted against your license."
-                    type: string
-                type: object
-              type: array
-            max-results:
-              type: integer
             pagingCallback:
               type: object
-            size:
-              type: integer
-          readOnly: true
-          type: object
-        avatarUrls:
-          description: The avatars of the user.
-          properties:
-            16x16:
-              description: "The URL of the item's 16x16 pixel avatar."
-              type: string
-            24x24:
-              description: "The URL of the item's 24x24 pixel avatar."
-              type: string
-            32x32:
-              description: "The URL of the item's 32x32 pixel avatar."
-              type: string
-            48x48:
-              description: "The URL of the item's 48x48 pixel avatar."
-              type: string
-          readOnly: true
-          type: object
-        displayName:
-          description: "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value."
-          readOnly: true
-          type: string
-        emailAddress:
-          description: "The email address of the user. Depending on the user’s privacy setting, this may be returned as null."
-          readOnly: true
-          type: string
-        expand:
-          description: Expand options that include additional user details in the response.
-          readOnly: true
-          type: string
-        groups:
-          description: The groups that the user belongs to.
-          properties:
             callback:
               type: object
-            items:
-              items:
-                properties:
-                  name:
-                    description: The name of group.
-                    type: string
-                  self:
-                    description: The URL for these group details.
-                    readOnly: true
-                    type: string
-                type: object
-              type: array
             max-results:
               type: integer
-            pagingCallback:
-              type: object
-            size:
-              type: integer
+        expand:
+          type: string
+          description: Expand options that include additional user details in the response.
           readOnly: true
-          type: object
-        key:
-          description: "This property is no longer available and will be removed from the documentation soon. See the [deprecation notice](https://developer.atlassian.com/cloud/jira/platform/deprecation-notice-user-privacy-api-migration-guide/) for details."
-          type: string
-        locale:
-          description: "The locale of the user. Depending on the user’s privacy setting, this may be returned as null."
-          readOnly: true
-          type: string
-        name:
-          description: "This property is no longer available and will be removed from the documentation soon. See the [deprecation notice](https://developer.atlassian.com/cloud/jira/platform/deprecation-notice-user-privacy-api-migration-guide/) for details."
-          type: string
-        self:
-          description: The URL of the user.
-          readOnly: true
-          type: string
-        timeZone:
-          description: "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null."
-          readOnly: true
-          type: string
-      type: object
-    readOnly: true
-    type: array
-  votes:
-    description: The number of votes on the issue.
-    readOnly: true
-    type: integer
-required:
-  - self
-type: object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+additionalProperties: true
+description: The details of votes on an issue.
+x-infer-schema: true

@@ -1,50 +1,20 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
+type: object
 properties:
   id:
-    type: integer
-  location:
-    properties:
-      avatarURI:
-        type:
-          - "null"
-          - string
-      displayName:
-        type:
-          - "null"
-          - string
-      name:
-        type:
-          - "null"
-          - string
-      projectId:
-        type:
-          - "null"
-          - integer
-      projectKey:
-        type:
-          - "null"
-          - string
-      projectName:
-        type:
-          - "null"
-          - string
-      projectTypeKey:
-        type:
-          - "null"
-          - string
-      userAccountId:
-        type:
-          - "null"
-          - string
-      userId:
-        type:
-          - "null"
-          - integer
     type:
       - "null"
-      - object
+      - integer
+  self:
+    type:
+      - "null"
+      - string
   name:
+    type:
+      - "null"
+      - string
+  type:
     type:
       - "null"
       - string
@@ -56,14 +26,52 @@ properties:
     type:
       - string
       - "null"
-  self:
+  location:
     type:
       - "null"
-      - string
-  type:
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+      - object
+    properties:
+      projectId:
+        type:
+          - "null"
+          - integer
+      userId:
+        type:
+          - "null"
+          - integer
+      userAccountId:
+        type:
+          - "null"
+          - string
+      displayName:
+        type:
+          - "null"
+          - string
+      projectName:
+        type:
+          - "null"
+          - string
+      projectKey:
+        type:
+          - "null"
+          - string
+      projectTypeKey:
+        type:
+          - "null"
+          - string
+      avatarURI:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

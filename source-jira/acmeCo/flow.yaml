@@ -59,18 +59,24 @@ collections:
   acmeCo/issue_navigator_settings:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: Details of an issue navigator column item.
+      type: object
       properties:
         label:
+          type: string
           description: The issue navigator column label.
-          type: string
         value:
-          description: The issue navigator column value.
           type: string
-      required:
-        - value
-      type: object
+          description: The issue navigator column value.
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an issue navigator column item.
+      x-infer-schema: true
     key:
       - /value
   acmeCo/issue_notification_schemes:
@@ -107,23 +113,7 @@ collections:
     key:
       - /id
   acmeCo/issue_type_screen_schemes:
-    schema:
-      $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: Details of an issue type screen scheme.
-      properties:
-        description:
-          description: The description of the issue type screen scheme.
-          type: string
-        id:
-          description: The ID of the issue type screen scheme.
-          type: string
-        name:
-          description: The name of the issue type screen scheme.
-          type: string
-      required:
-        - id
-      type: object
+    schema: issue_type_screen_schemes.schema.yaml
     key:
       - /id
   acmeCo/issue_types:
@@ -152,13 +142,21 @@ collections:
       - /id
   acmeCo/labels:
     schema:
-      properties:
-        label:
-          type: string
-      required:
-        - label
       type:
         - object
+      properties:
+        label:
+          type:
+            - string
+            - "null"
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /label
   acmeCo/permission_schemes:
@@ -168,15 +166,12 @@ collections:
   acmeCo/permissions:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: Details about permissions.
+      type: object
       properties:
-        description:
+        key:
           type:
             - "null"
             - string
-        key:
-          type: string
         name:
           type:
             - "null"
@@ -185,9 +180,20 @@ collections:
           type:
             - "null"
             - string
-      required:
-        - key
-      type: object
+        description:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about permissions.
+      x-infer-schema: true
     key:
       - /key
   acmeCo/project_avatars:
@@ -205,17 +211,23 @@ collections:
   acmeCo/project_email:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: "A project's sender email address."
+      type: object
       properties:
-        emailAddress:
-          description: The email address.
-          type: string
         projectId:
           type: string
-      required:
-        - projectId
-      type: object
+        emailAddress:
+          type: string
+          description: The email address.
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: "A project's sender email address."
+      x-infer-schema: true
     key:
       - /projectId
   acmeCo/project_permission_schemes:
@@ -247,27 +259,7 @@ collections:
     key:
       - /id
   acmeCo/screen_tabs:
-    schema:
-      $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: A screen tab.
-      properties:
-        id:
-          description: The ID of the screen tab.
-          readOnly: true
-          type: integer
-        name:
-          description: The name of the screen tab. The maximum length is 255 characters.
-          type: string
-        screenId:
-          description: Id of the related screen.
-          type:
-            - "null"
-            - integer
-      required:
-        - name
-        - id
-      type: object
+    schema: screen_tabs.schema.yaml
     key:
       - /id
   acmeCo/screens:

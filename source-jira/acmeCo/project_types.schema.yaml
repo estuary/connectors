@@ -1,28 +1,34 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
-additionalProperties: true
-description: Details about a project type.
+type: object
 properties:
-  color:
-    description: The color of the project type.
-    readOnly: true
-    type: string
-  descriptionI18nKey:
-    description: "The key of the project type's description."
-    readOnly: true
-    type: string
-  formattedKey:
-    description: The formatted key of the project type.
-    readOnly: true
-    type: string
-  icon:
-    description: The icon of the project type.
-    readOnly: true
-    type: string
   key:
+    type: string
     description: The key of the project type.
     readOnly: true
+  formattedKey:
     type: string
-required:
-  - key
-type: object
+    description: The formatted key of the project type.
+    readOnly: true
+  descriptionI18nKey:
+    type: string
+    description: "The key of the project type's description."
+    readOnly: true
+  icon:
+    type: string
+    description: The icon of the project type.
+    readOnly: true
+  color:
+    type: string
+    description: The color of the project type.
+    readOnly: true
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+additionalProperties: true
+description: Details about a project type.
+x-infer-schema: true
