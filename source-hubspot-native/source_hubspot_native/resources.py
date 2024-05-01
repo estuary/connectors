@@ -1,7 +1,7 @@
 import functools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import AsyncGenerator, Awaitable, Iterable
+from typing import AsyncGenerator
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import LogCursor, PageCursor, Resource, open_binding
@@ -24,7 +24,6 @@ from .api import (
 from .models import (
     EMAIL_EVENT_HORIZON_DELTA,
     OAUTH2_SPEC,
-    BaseCRMObject,
     Company,
     Contact,
     CRMObject,
@@ -45,18 +44,18 @@ async def all_resources(
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     return [
-        crm_object(Company, http, fetch_recent_companies),
-        crm_object(Contact, http, fetch_recent_contacts),
-        crm_object(Deal, http, fetch_recent_deals),
-        crm_object(Engagement, http, fetch_recent_engagements),
-        crm_object(Ticket, http, fetch_recent_tickets),
+        crm_object(Company, Names.companies, http, fetch_recent_companies),
+        crm_object(Contact, Names.contacts, http, fetch_recent_contacts),
+        crm_object(Deal, Names.deals, http, fetch_recent_deals),
+        crm_object(Engagement, Names.engagements, http, fetch_recent_engagements),
+        crm_object(Ticket, Names.tickets, http, fetch_recent_tickets),
         properties(http),
         email_events(http),
     ]
 
 
 def crm_object(
-    cls: type[CRMObject], http: HTTPSession, fetch_recent: FetchRecentFn
+    cls: type[CRMObject], object_name, http: HTTPSession, fetch_recent: FetchRecentFn
 ) -> Resource:
 
     def open(
@@ -71,14 +70,14 @@ def crm_object(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http),
-            fetch_page=functools.partial(fetch_page, cls, http),
+            fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http, object_name),
+            fetch_page=functools.partial(fetch_page, cls, http, object_name),
         )
 
     started_at = datetime.now(tz=UTC)
 
     return Resource(
-        name=cls.NAME,
+        name=object_name,
         key=["/id"],
         model=cls,
         open=open,
@@ -86,7 +85,7 @@ def crm_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=object_name),
         schema_inference=True,
     )
 
@@ -94,15 +93,16 @@ def crm_object(
 def properties(http: HTTPSession) -> Resource:
 
     async def snapshot(log: Logger) -> AsyncGenerator[Property, None]:
-        classes: list[type[BaseCRMObject]] = [
-            Company,
-            Contact,
-            Engagement,
-            Deal,
-            Ticket,
+        built_ins: list[str] = [
+            Names.companies,
+            Names.contacts,
+            Names.engagements,
+            Names.deals,
+            Names.tickets,
+
         ]
-        for cls in classes:
-            properties = await fetch_properties(log, cls, http)
+        for obj in built_ins:
+            properties = await fetch_properties(log, http, obj)
             for prop in properties.results:
                 yield prop
 
