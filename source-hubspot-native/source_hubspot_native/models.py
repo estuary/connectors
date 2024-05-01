@@ -1,7 +1,7 @@
 import urllib.parse
 from datetime import datetime, timedelta
 from enum import StrEnum, auto
-from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, Self, TypeVar
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -114,10 +114,7 @@ class Properties(BaseDocument, extra="forbid"):
 
 # Base Struct for all CRM Objects within HubSpot.
 class BaseCRMObject(BaseDocument, extra="forbid"):
-    # Class-scoped metadata attached to concrete subclasses.
-    NAME: ClassVar[str]
     ASSOCIATED_ENTITIES: ClassVar[list[str]]
-    CACHED_PROPERTIES: ClassVar[Properties]
 
     class History(BaseDocument, extra="forbid"):
         timestamp: datetime
@@ -151,7 +148,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     ] = {}
 
     @model_validator(mode="after")
-    def _post_init(self) -> "BaseCRMObject":
+    def _post_init(self) -> Self:
         # Clear properties and history which don't have current values.
         self.properties = {k: v for k, v in self.properties.items() if v is not None}
         self.propertiesWithHistory = {
@@ -173,7 +170,6 @@ CRMObject = TypeVar("CRMObject", bound=BaseCRMObject)
 
 
 class Company(BaseCRMObject):
-    NAME = Names.companies
     ASSOCIATED_ENTITIES = [Names.contacts, Names.deals]
 
     contacts: list[int] = []
@@ -181,14 +177,12 @@ class Company(BaseCRMObject):
 
 
 class Contact(BaseCRMObject):
-    NAME = Names.contacts
     ASSOCIATED_ENTITIES = [Names.companies]
 
     companies: list[int] = []
 
 
 class Deal(BaseCRMObject):
-    NAME = Names.deals
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
@@ -197,14 +191,12 @@ class Deal(BaseCRMObject):
 
 
 class Engagement(BaseCRMObject):
-    NAME = Names.engagements
     ASSOCIATED_ENTITIES = [Names.deals]
 
     deals: list[int] = []
 
 
 class Ticket(BaseCRMObject):
-    NAME = Names.tickets
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
