@@ -455,7 +455,7 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 			for idx, name := range cnames {
 				logFields[name] = vals[idx]
 			}
-			log.WithFields(logFields).Info("got row")
+			log.WithFields(logFields).Info("got diagnostic row")
 		}
 		if numResults == 0 {
 			logEntry.Info("no results")
