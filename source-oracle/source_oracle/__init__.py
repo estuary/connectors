@@ -72,6 +72,7 @@ class Connector(
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         pool = create_pool(open.capture.config)
+        await validate_flashback(log, open.capture.config, pool)
         resources = await all_resources(log, self, open.capture.config, pool)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
