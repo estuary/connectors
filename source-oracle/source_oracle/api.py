@@ -138,10 +138,8 @@ async def fetch_page(
     is_first_query = False
     if page is None:
         is_first_query = True
-        async with pool.acquire() as conn:
-            with conn.cursor() as c:
-                await c.execute(f"select min(ROWID) from {table.table_name}")
-                page = (await c.fetchone())[0]
+        # ROWID is a base64 encoded string, so this string is the minimum value possible
+        page = 'AAAAAAAAAAAAAAAAAA'
 
     query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
 
