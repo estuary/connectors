@@ -123,6 +123,8 @@ async def fetch_columns(
 
             return columns
 
+CHECKPOINT_EVERY = 1000
+
 
 async def fetch_page(
     # Closed over via functools.partial:
@@ -146,6 +148,7 @@ async def fetch_page(
     log.debug("fetch_page", query, page)
 
     last_rowid = None
+    i = 0
     async with pool.acquire() as conn:
         with conn.cursor() as c:
             await c.execute(query)
@@ -168,7 +171,12 @@ async def fetch_page(
 
                 yield doc
 
-    if last_rowid is not None:
+                i = i + 1
+
+                if i % CHECKPOINT_EVERY == 0:
+                    yield last_rowid
+
+    if last_rowid is not None and (i % CHECKPOINT_EVERY != 0):
         yield last_rowid
 
 
@@ -191,7 +199,13 @@ async def fetch_changes(
 
     log.debug("fetch_changes", query, log_cursor)
 
-    last_scn = log_cursor
+    # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
+    # for a transaction at the end, when all documents of that transaction have been emitted
+    # so we have to keep track of the first two transaction SCNs we have to check whether we have all the documents
+    # of the current SCN before moving on to the next one.
+    first_transaction = None
+    current_transaction = None
+    scn = log_cursor
     async with pool.acquire() as conn:
         with conn.cursor() as c:
             await c.execute(query)
@@ -201,21 +215,13 @@ async def fetch_changes(
                 row = {k: v for (k, v) in row.items() if v is not None}
                 log.debug("change", row)
 
-                if scn_column_name not in row or op_column_name not in row:
-                    continue
-
-                if row[scn_column_name] > last_scn:
-                    last_scn = row[scn_column_name] + 1
-                elif last_scn == log_cursor:
-                    last_scn = last_scn + 1
-                log.debug("setting last_scn to", last_scn)
-
+                scn = row[scn_column_name]
                 op = row[op_column_name]
 
                 doc = Document()
                 source = Document.Meta.Source(
                     table=table.table_name,
-                    scn=row[scn_column_name]
+                    scn=scn
                 )
                 doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
                 for (k, v) in row.items():
@@ -225,8 +231,23 @@ async def fetch_changes(
 
                 yield doc
 
-    if last_scn != log_cursor:
-        yield last_scn
+                # The query to fetch incremental changes uses "VERSIONS BETWEEN X and Y" where
+                # BETWEEN is an inclusive operator. So once we have processed all items of one SCN,
+                # in order to move on to the next SCN we need to increment the SCN by one. Since the query
+                # is always inclusive, this does not risk losing any subsequent events.
+                if first_transaction is None:
+                    first_transaction = scn
+                elif current_transaction is None and scn > first_transaction:
+                    current_transaction = scn
+                    yield scn + 1
+                elif current_transaction is not None and scn > current_transaction:
+                    yield current_transaction + 1
+                    current_transaction = scn
+
+    if first_transaction is not None and current_transaction is None:
+        yield first_transaction + 1
+    elif current_transaction is not None and current_transaction > scn:
+        yield current_transaction + 1
 
 
 # datetime and some other data types must be cast to string
@@ -278,6 +299,7 @@ SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, {% for c in table.columns -%}
 {{ c | cast }}
 {%- endfor %} FROM {{ table.table_name }}
     VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
+    WHERE VERSIONS_STARTSCN IS NOT NULL
     ORDER BY VERSIONS_STARTSCN ASC
 """
 }))
