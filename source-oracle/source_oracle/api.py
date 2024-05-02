@@ -29,16 +29,6 @@ from .models import (
 )
 
 
-async def init_session(connection, _requested_tag):
-    with connection.cursor() as cursor:
-        await cursor.execute(
-            """
-            alter session set
-                time_zone = 'UTC'
-            """
-        )
-
-
 def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
     # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
     # the pool contains 4 connections, which will allow 4 concurrent users.
@@ -63,7 +53,6 @@ def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
         min=4,
         max=4,
         increment=0,
-        session_callback=init_session,
         cclass="ESTUARY",
         purity=oracledb.ATTR_PURITY_SELF,
         **credentials,
