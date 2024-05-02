@@ -1,7 +1,8 @@
 import functools
+import itertools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import LogCursor, PageCursor, Resource, open_binding
@@ -11,22 +12,24 @@ from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 from .api import (
     FetchRecentFn,
     fetch_changes,
-    fetch_email_events_changes,
     fetch_email_events_page,
     fetch_page,
     fetch_properties,
     fetch_recent_companies,
     fetch_recent_contacts,
+    fetch_recent_custom_objects,
     fetch_recent_deals,
+    fetch_recent_email_events,
     fetch_recent_engagements,
     fetch_recent_tickets,
+    list_custom_objects,
 )
 from .models import (
-    EMAIL_EVENT_HORIZON_DELTA,
     OAUTH2_SPEC,
     Company,
     Contact,
     CRMObject,
+    CustomObject,
     Deal,
     EmailEvent,
     EndpointConfig,
@@ -43,14 +46,33 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+
+    standard_object_names: list[str] = [
+        Names.companies,
+        Names.contacts,
+        Names.deals,
+        Names.engagements,
+        Names.tickets,
+    ]
+
+    custom_object_names = await list_custom_objects(log, http)
+
+    custom_object_resources = [
+        crm_object(
+            CustomObject, n, http, functools.partial(fetch_recent_custom_objects, n)
+        )
+        for n in custom_object_names
+    ]
+
     return [
         crm_object(Company, Names.companies, http, fetch_recent_companies),
         crm_object(Contact, Names.contacts, http, fetch_recent_contacts),
         crm_object(Deal, Names.deals, http, fetch_recent_deals),
         crm_object(Engagement, Names.engagements, http, fetch_recent_engagements),
         crm_object(Ticket, Names.tickets, http, fetch_recent_tickets),
-        properties(http),
+        properties(http, itertools.chain(standard_object_names, custom_object_names)),
         email_events(http),
+        *custom_object_resources,
     ]
 
 
@@ -90,18 +112,10 @@ def crm_object(
     )
 
 
-def properties(http: HTTPSession) -> Resource:
+def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
 
     async def snapshot(log: Logger) -> AsyncGenerator[Property, None]:
-        built_ins: list[str] = [
-            Names.companies,
-            Names.contacts,
-            Names.engagements,
-            Names.deals,
-            Names.tickets,
-
-        ]
-        for obj in built_ins:
+        for obj in object_names:
             properties = await fetch_properties(log, http, obj)
             for prop in properties.results:
                 yield prop
@@ -147,15 +161,11 @@ def email_events(http: HTTPSession) -> Resource:
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_email_events_changes, http),
+            fetch_changes=functools.partial(fetch_recent_email_events, http),
             fetch_page=functools.partial(fetch_email_events_page, http),
         )
 
-    # started_at is set in the past per the horizon delta, otherwise we might miss events happening
-    # simultaneously with the stream's initialization. It is set with millisecond precision, since
-    # the API doesn't support anything beyond milliseconds.
-    started_at = datetime.now(tz=UTC) - EMAIL_EVENT_HORIZON_DELTA
-    started_at = started_at.replace(microsecond=started_at.microsecond // 1000 * 1000)
+    started_at = datetime.now(tz=UTC)
 
     return Resource(
         name=Names.email_events,
@@ -166,8 +176,6 @@ def email_events(http: HTTPSession) -> Resource:
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(
-            name=Names.email_events, interval=timedelta(minutes=5)
-        ),
+        initial_config=ResourceConfig(name=Names.email_events),
         schema_inference=True,
     )
