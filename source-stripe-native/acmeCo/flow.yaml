@@ -1,0 +1,10 @@
+---
+collections:
+  acmeCo/Cards:
+    schema: Cards.schema.yaml
+    key:
+      - /id
+  acmeCo/Customers:
+    schema: Customers.schema.yaml
+    key:
+      - /id
