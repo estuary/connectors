@@ -75,6 +75,12 @@ resources_json_template='[
       "table": "unsigned_bigint"
     },
     "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 

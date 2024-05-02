@@ -104,6 +104,34 @@
        },
        "key": ["/id"]
     },
+    "tests/deletions": {
+      "schema": {
+        "properties": {
+           "id": { "type": "integer" },
+        },
+        "required": ["id"],
+        "type": "object",
+
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "lastWriteWins"
+          }
+        }
+      },
+      "key": ["/id"]
+    }
   },
 
   "materializations": {
