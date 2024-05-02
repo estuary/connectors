@@ -236,6 +236,7 @@ def build_table(
             field_type = datetime
         elif col.is_datetime:
             field_type = str
+            field_schema_extra = {"format": "local-datetime"}
         elif col.data_type.startswith(col.Type.INTERVAL):
             field_type = str
         else:
