@@ -134,7 +134,7 @@ async def all_resources(
                 fetch_changes=functools.partial(fetch_changes, table, pool),
             )
         resources_list.append(common.Resource(
-            name=t.table_name,
+            name=f"{t.owner}.{t.table_name}",
             key=[f"/{c.column_name}" for c in t.primary_key],
             model=t.create_model(),
             open=functools.partial(open, t),
