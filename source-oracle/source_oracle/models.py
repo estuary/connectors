@@ -63,6 +63,11 @@ class EndpointConfig(BaseModel):
 
 
 class ResourceConfig(GenericResourceConfig):
+    schema: str = Field(
+        default=False,
+        title="The schema or the owner of the table",
+        description="In Oracle tables reside in a schema that points to the user that owns the table.",
+    )
     pass
 
 
@@ -104,6 +109,7 @@ class OracleTable(BaseModel, extra="forbid"):
     Oracle all_tables records. docs: https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_TABLES.html
     """
 
+    owner: str = Field(alias="OWNER")  # OWNER is closest to the concept of "schema" in other SQL technologies
     table_name: str = Field(alias="TABLE_NAME")  # "OA_FOOBAR" for system tables, or e.x. "Account"
 
 
@@ -134,6 +140,7 @@ class OracleColumn(BaseModel, extra="forbid"):
         WITH_LOCAL_TIMEZONE = "WITH LOCAL TIME ZONE"
         INTERVAL = "INTERVAL"
 
+    owner: str = Field(alias="OWNER")  # OWNER is closest to the concept of "schema" in other SQL technologies
     table_name: str = Field(alias="TABLE_NAME")  # "CUSTOMRECORD_ABC_PRODUCTION_SERIALS",
     column_name: str = Field(alias="COLUMN_NAME")  # Ex 'recordid'
 
@@ -169,6 +176,7 @@ class OracleColumn(BaseModel, extra="forbid"):
 class Table:
     """Table is an extracted representation of a table built from its OracleColumns"""
 
+    owner: str  # owner is closest to the concept of "schema" in other SQL technologies
     table_name: str
     columns: list[OracleColumn]
     primary_key: list[OracleColumn]
@@ -185,6 +193,7 @@ class Table:
 
 def build_table(
     config: EndpointConfig,
+    owner: str,
     table_name: str,
     columns: list[OracleColumn],
 ) -> Table:
@@ -253,6 +262,7 @@ def build_table(
         model_fields[col.column_name] = (field_info.annotation, field_info)
 
     return Table(
+        owner,
         table_name,
         columns,
         primary_key,
