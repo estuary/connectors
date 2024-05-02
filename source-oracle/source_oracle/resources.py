@@ -95,7 +95,8 @@ async def all_resources(
     resources_list = []
 
     oracle_tables = await fetch_tables(log, pool)
-    oracle_columns = await fetch_columns(log, pool)
+    owners = set([t.owner for t in oracle_tables])
+    oracle_columns = await fetch_columns(log, pool, owners)
 
     current_scn = None
     async with pool.acquire() as conn:
@@ -104,13 +105,13 @@ async def all_resources(
             current_scn = (await c.fetchone())[0]
 
     for ot in oracle_tables:
-        columns = [col for col in oracle_columns if col.table_name == ot.table_name]
-        t = build_table(config, ot.table_name, columns)
+        columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
+        t = build_table(config, ot.owner, ot.table_name, columns)
 
         max_rowid = None
         async with pool.acquire() as conn:
             with conn.cursor() as c:
-                await c.execute(f"SELECT max(ROWID) FROM {t.table_name}")
+                await c.execute(f"SELECT max(ROWID) FROM {t.owner}.{t.table_name}")
                 max_rowid = (await c.fetchone())[0]
         # if max_rowid is None, that maens there are no rows in the table, so we
         # skip backfill
@@ -142,6 +143,7 @@ async def all_resources(
                 inc=ResourceState.Incremental(cursor=current_scn),
             ),
             initial_config=ResourceConfig(
+                schema=t.owner,
                 name=t.table_name,
                 interval=timedelta(seconds=0),
             ),
