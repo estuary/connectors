@@ -1,0 +1,153 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: issuing.authorization
+    enum:
+      - issuing.authorization
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  amount_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Amount Details
+  approved:
+    title: Approved
+    type: boolean
+  authorization_method:
+    title: Authorization Method
+    type: string
+  balance_transactions:
+    items:
+      type: object
+    title: Balance Transactions
+    type: array
+  card:
+    title: Card
+    type: object
+  cardholder:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Cardholder
+  created:
+    title: Created
+    type: integer
+  currency:
+    title: Currency
+    type: string
+  livemode:
+    title: Livemode
+    type: boolean
+  merchant_amount:
+    title: Merchant Amount
+    type: integer
+  merchant_currency:
+    title: Merchant Currency
+    type: string
+  merchant_data:
+    title: Merchant Data
+    type: object
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  network_data:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Network Data
+  pending_request:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Pending Request
+  redaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Redaction
+  request_history:
+    items:
+      type: object
+    title: Request History
+    type: array
+  status:
+    title: Status
+    type: string
+  transactions:
+    items:
+      type: object
+    title: Transactions
+    type: array
+  verification_data:
+    title: Verification Data
+    type: object
+  wallet:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Wallet
+required:
+  - id
+  - object
+  - amount
+  - approved
+  - authorization_method
+  - balance_transactions
+  - card
+  - created
+  - currency
+  - livemode
+  - merchant_amount
+  - merchant_currency
+  - merchant_data
+  - request_history
+  - status
+  - transactions
+  - verification_data
+title: Authorizations
+type: object
+x-infer-schema: true

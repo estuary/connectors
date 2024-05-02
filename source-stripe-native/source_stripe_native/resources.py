@@ -12,8 +12,16 @@ from .api import fetch_incremental, fetch_backfill, fetch_incremental_substreams
 
 from .models import (
     Accounts,
+    Authorizations,
+    Bank_Accounts,
+    CardHolders,
     Customers,
     Cards,
+    Persons,
+    ExternalAccountCards,
+    ExternalBankAccount,
+    ApplicationFees,
+    ApplicationFeesRefunds,
     Bank_Accounts,
     EndpointConfig,
     )
@@ -23,8 +31,17 @@ async def all_resources(
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     return [
+        base_object(Accounts, http),
+        base_object(ApplicationFees, http),
         base_object(Customers, http),
-        child_object(Customers, Cards, http)
+        base_object(Authorizations, http),
+        base_object(CardHolders, http),
+        child_object(Accounts, Persons, http),
+        #child_object(Accounts, ExternalAccountCards, http),
+        #child_object(Accounts, ExternalBankAccount, http),
+        child_object(ApplicationFees, ApplicationFeesRefunds, http),
+        child_object(Customers, Cards, http),
+        child_object(Customers, Bank_Accounts, http),
     ]
 
 

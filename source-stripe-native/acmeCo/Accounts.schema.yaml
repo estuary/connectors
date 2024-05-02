@@ -1,0 +1,135 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: account
+    enum:
+      - account
+    title: Object
+    type: string
+  business_profile:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Business Profile
+  business_type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Business Type
+  capabilities:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Capabilities
+  charges_enabled:
+    title: Charges Enabled
+    type: boolean
+  controller:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Controller
+  country:
+    title: Country
+    type: string
+  created:
+    title: Created
+    type: integer
+  default_currency:
+    title: Default Currency
+    type: string
+  details_submitted:
+    title: Details Submitted
+    type: boolean
+  email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Email
+  external_accounts:
+    title: External Accounts
+    type: object
+  future_requirements:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Future Requirements
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  payouts_enabled:
+    title: Payouts Enabled
+    type: boolean
+  requirements:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Requirements
+  settings:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Settings
+  tos_acceptance:
+    title: Tos Acceptance
+    type: object
+  type:
+    title: Type
+    type: string
+required:
+  - id
+  - object
+  - charges_enabled
+  - country
+  - created
+  - default_currency
+  - details_submitted
+  - external_accounts
+  - payouts_enabled
+  - tos_acceptance
+  - type
+title: Accounts
+type: object
+x-infer-schema: true
