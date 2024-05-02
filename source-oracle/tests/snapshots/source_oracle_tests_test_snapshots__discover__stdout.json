@@ -108,6 +108,7 @@
             }
           ],
           "default": null,
+          "format": "local-datetime",
           "title": "Datetime"
         },
         "DOUBLE_PRECISION": {
@@ -228,6 +229,7 @@
             }
           ],
           "default": null,
+          "format": "local-datetime",
           "title": "Ts"
         },
         "TS_LOCAL_TZ": {
@@ -266,6 +268,7 @@
             }
           ],
           "default": null,
+          "format": "local-datetime",
           "title": "Ts Nine"
         },
         "TS_TZ": {
