@@ -49,10 +49,14 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 class NumberType(StrEnum):
+    TEXT = "TEXT"
+    NUMBER = "NUMBER"
+    TIME = "TIME"
     CURRENCY = "CURRENCY"
     DATE = "DATE"
     DATE_TIME = "DATE_TIME"
     PERCENT = "PERCENT"
+    SCIENTIFIC = "SCIENTIFIC"
 
 
 class Sheet(BaseModel, extra="allow"):
