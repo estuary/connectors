@@ -55,7 +55,7 @@ class EndpointConfig(BaseModel):
         )
 
         default_interval: timedelta = Field(
-            default=timedelta(minutes=10), description="Default interval between updates for all resources. Can be overwritten by each resource."
+            default=timedelta(minutes=1), description="Default interval between updates for all resources. Can be overwritten by each resource."
         )
 
     advanced: Advanced = Field(
