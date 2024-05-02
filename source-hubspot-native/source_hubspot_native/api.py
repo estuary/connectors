@@ -219,7 +219,7 @@ async def fetch_changes(
 
     recent.sort()  # Oldest updates first.
 
-    for batch_it in itertools.batched(recent, 100):
+    for batch_it in itertools.batched(recent, 50):
         batch = list(batch_it)
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
