@@ -12,10 +12,37 @@ captures:
         config: config.yaml
     bindings:
       - resource:
+          name: Accounts
+        target: acmeCo/Accounts
+      - resource:
+          name: Application_Fees
+        target: acmeCo/Application_Fees
+      - resource:
           name: Customers
         target: acmeCo/Customers
       - resource:
+          name: Authorizations
+        target: acmeCo/Authorizations
+      - resource:
+          name: CardHolders
+        target: acmeCo/CardHolders
+      - resource:
+          name: Persons
+        target: acmeCo/Persons
+      - resource:
+          name: External_Account_Cards
+        target: acmeCo/External_Account_Cards
+      - resource:
+          name: External_Bank_Account
+        target: acmeCo/External_Bank_Account
+      - resource:
+          name: Application_Fees_Refunds
+        target: acmeCo/Application_Fees_Refunds
+      - resource:
           name: Cards
         target: acmeCo/Cards
+      - resource:
+          name: Bank_Accounts
+        target: acmeCo/Bank_Accounts
     shards:
       logLevel: debug

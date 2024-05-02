@@ -27,7 +27,7 @@ async def fetch_incremental(
     stop = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": 100}
+    parameters = {"types": cls.TYPES, "limit": 100}
     recent = []
 
 
@@ -40,6 +40,8 @@ async def fetch_incremental(
         for results in result.data:
             if _s_to_dt(results.created) > log_cursor:
                 recent.append(_s_to_dt(results.created))
+                doc = _cls.model_validate(results.data.object)
+                doc.meta_ = _cls.Meta(op="u")
                 yield _cls.model_validate(results.data.object)
         
             elif _s_to_dt(results.created) < log_cursor:
@@ -64,7 +66,7 @@ async def fetch_incremental_substreams(
     stop = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": 100}
+    parameters = {"types": cls.TYPES, "limit": 100}
     recent = []
 
 
@@ -93,6 +95,7 @@ async def fetch_incremental_substreams(
                 if child_data is None:
                     pass # move to next customer
                 async for doc in child_data:
+                    doc.meta_ = cls_child.Meta(op="u")
                     yield doc 
         
             elif _s_to_dt(results.created) < log_cursor:
@@ -145,6 +148,7 @@ async def fetch_backfill_substreams(
             if child_data is None:
                 pass # move to next customer
             async for doc in child_data:
+                doc.meta_ = cls_child.Meta(op="u")
                 yield doc 
 
 
@@ -201,6 +205,7 @@ async def fetch_backfill(
 
     for doc in result.data:
         if _s_to_dt(doc.created) < cutoff:
+            doc.meta_ = _cls.Meta(op="u")
             yield doc
 
     if result.has_more:

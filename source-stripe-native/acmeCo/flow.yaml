@@ -1,10 +1,46 @@
 ---
 collections:
+  acmeCo/Accounts:
+    schema: Accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/Application_Fees:
+    schema: Application_Fees.schema.yaml
+    key:
+      - /id
+  acmeCo/Application_Fees_Refunds:
+    schema: Application_Fees_Refunds.schema.yaml
+    key:
+      - /id
+  acmeCo/Authorizations:
+    schema: Authorizations.schema.yaml
+    key:
+      - /id
+  acmeCo/Bank_Accounts:
+    schema: Bank_Accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/CardHolders:
+    schema: CardHolders.schema.yaml
+    key:
+      - /id
   acmeCo/Cards:
     schema: Cards.schema.yaml
     key:
       - /id
   acmeCo/Customers:
     schema: Customers.schema.yaml
+    key:
+      - /id
+  acmeCo/External_Account_Cards:
+    schema: External_Account_Cards.schema.yaml
+    key:
+      - /id
+  acmeCo/External_Bank_Account:
+    schema: External_Bank_Account.schema.yaml
+    key:
+      - /id
+  acmeCo/Persons:
+    schema: Persons.schema.yaml
     key:
       - /id
