@@ -1,6 +1,6 @@
 [
   {
-    "recommendedName": "TEST_ALL_TYPES",
+    "recommendedName": "ADMIN_TEST_ALL_TYPES",
     "resourceConfig": {
       "name": "TEST_ALL_TYPES",
       "interval": "PT1M",
@@ -330,7 +330,7 @@
     ]
   },
   {
-    "recommendedName": "TEST_CHANGES",
+    "recommendedName": "ADMIN_TEST_CHANGES",
     "resourceConfig": {
       "name": "TEST_CHANGES",
       "interval": "PT1M",
@@ -452,7 +452,7 @@
     ]
   },
   {
-    "recommendedName": "TEST",
+    "recommendedName": "FLOW_CAPTURE_TEST",
     "resourceConfig": {
       "name": "TEST",
       "interval": "PT1M",

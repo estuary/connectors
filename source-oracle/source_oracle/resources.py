@@ -117,6 +117,9 @@ async def all_resources(
         # skip backfill
         backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
 
+        # TODO: backfill state must be accessible by the fetch_changes task
+        # so that we don't emit updates to rows which have a ROWID that has not been processed yet
+
         def open(
             table: Table,
             binding: CaptureBinding[ResourceConfig],
@@ -134,7 +137,7 @@ async def all_resources(
                 fetch_changes=functools.partial(fetch_changes, table, pool),
             )
         resources_list.append(common.Resource(
-            name=f"{t.owner}.{t.table_name}",
+            name=f"{t.owner}_{t.table_name}",
             key=[f"/{c.column_name}" for c in t.primary_key],
             model=t.create_model(),
             open=functools.partial(open, t),
