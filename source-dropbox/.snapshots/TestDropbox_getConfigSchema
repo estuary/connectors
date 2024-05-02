@@ -13,7 +13,7 @@
 			},
 			"credentials": {
 				"title": "Credentials",
-				"Description": "OAuth2 credentials for Dropbox. Those are automatically handled by the Web UI.",
+				"description": "OAuth2 credentials for Dropbox. Those are automatically handled by the Web UI.",
 				"type": "object",
 				"x-oauth2-provider": "dropbox",
 				"properties": {
@@ -36,7 +36,7 @@
 						"secret": true
 					}
 				},
-				"required": ["access_token"],
+				"required": ["refresh_token", "client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {

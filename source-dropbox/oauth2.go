@@ -29,12 +29,6 @@ func oauth2Spec() *pf.OAuth2 {
 		AccessTokenBody:           "client_id={{{ client_id }}}&client_secret={{{ client_secret }}}&code={{{ code }}}&grant_type=authorization_code&redirect_uri={{{ redirect_uri }}}",
 		AccessTokenResponseJsonMap: map[string]json.RawMessage{
 			"refresh_token": json.RawMessage(`"/refresh_token"`),
-			// "access_token":  json.RawMessage(`"/access_token"`),
-			// "token_type":    json.RawMessage(`"/token_type"`),
-			// "expires_in":    json.RawMessage(`"/expires_in"`),
-			// "scope":         json.RawMessage(`"/scope"`),
-			// "uid":           json.RawMessage(`"/uid"`),
-			// "account_id":    json.RawMessage(`"/account_id"`),
 		},
 	}
 
@@ -45,14 +39,13 @@ type Credentials struct {
 	ClientID     string `json:"client_id" yaml:"client_id_sops"`
 	ClientSecret string `json:"client_secret" yaml:"client_secret_sops"`
 	RefreshToken string `json:"refresh_token" yaml:"refresh_token_sops"`
-	// ExpiresIn    time.Duration `json:"expires_in"`
 }
 
 func (c *Credentials) Validate() error {
 	requiredProperties := [][]string{
 		{"RefreshToken", c.RefreshToken},
-		// {"ClientID", c.ClientID},
-		// {"ClientSecret", c.ClientSecret},
+		{"ClientID", c.ClientID},
+		{"ClientSecret", c.ClientSecret},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {

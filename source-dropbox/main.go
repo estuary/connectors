@@ -141,14 +141,14 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 		if !l.files.HasMore {
 			return filesource.ObjectInfo{}, io.EOF
 		} else {
-			// TODO: Fetch next page
 			resp, err := l.client.ListFolderContinue(&files.ListFolderContinueArg{Cursor: l.files.Cursor})
 			if err != nil {
 				return filesource.ObjectInfo{}, err
 			}
 			l.files = *resp
+			l.index = 0
+			return l.Next()
 		}
-		return filesource.ObjectInfo{}, io.EOF
 	}
 
 	switch entry := l.files.Entries[l.index].(type) {
@@ -220,7 +220,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 						"secret": true
 					}
 				},
-				"required": ["access_token"],
+				"required": ["refresh_token", "client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {
