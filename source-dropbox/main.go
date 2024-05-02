@@ -13,15 +13,14 @@ import (
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
-	Path        string         `json:"path"`
-	Credentials *Credentials   `json:"credentials"`
-	Parser      *parser.Config `json:"parser"`
-	MatchKeys   string         `json:"matchKeys,omitempty"`
-	Advanced    advancedConfig `json:"advanced"`
+	Path        string         `json:"path" yaml:"path"`
+	Credentials *Credentials   `json:"credentials" yaml:"credentials"`
+	Parser      *parser.Config `json:"parser" yaml:"parser"`
+	MatchKeys   string         `json:"matchKeys,omitempty" yaml:"matchKeys,omitempty"`
+	Advanced    advancedConfig `json:"advanced" yaml:"advanced"`
 }
 
 type advancedConfig struct {
@@ -61,11 +60,7 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
-	log.Debug("Creating Dropbox client")
-	oauthClient, err := cfg.Credentials.GetOauthClient(ctx)
-	if err != nil {
-		return &dropboxStore{}, err
-	}
+	oauthClient := cfg.Credentials.GetOauthClient(ctx)
 	config := dropbox.Config{
 		//! Note: This Client property was originally build for testing purposes. So, it can change in the future.
 		Client:   oauthClient,
@@ -88,44 +83,19 @@ type dropboxStore struct {
 	config config
 }
 
-// check checks the connection to the Azure Blob Storage container.
-// It returns an error if the container is not found, the account is disabled, or if there is an authorization failure.
-// If the listing is successful, it returns nil.
+// check checks if the specified path exists in the Dropbox store.
+// It returns an error if the path does not exist or if there was an error
+// while checking the path.
 func (dbx *dropboxStore) check() error {
-	resp, err := dbx.client.ListFolder(&files.ListFolderArg{Path: dbx.config.Path})
+	_, err := dbx.client.ListFolder(&files.ListFolderArg{Path: dbx.config.Path, Limit: 1})
 	if err != nil {
-		log.Error("Failed to list files")
 		return err
 	}
-	for _, entry := range resp.Entries {
-		fileEntry, ok := entry.(*files.FileMetadata)
-		if !ok {
-			continue
-		}
-		meta, reader, err := dbx.client.Download(&files.DownloadArg{Path: fileEntry.PathDisplay})
-		if err != nil {
-			log.Error("Failed to download file: ", fileEntry.PathDisplay)
-			return err
-		}
-		log.Debug("File metadata: ", meta)
-		defer reader.Close()
-		content := make([]byte, meta.Size)
-		if _, err := reader.Read(content); err != nil {
-			log.Error("Failed to download file: ", fileEntry.PathDisplay)
-			return err
-		}
-
-		// log.Debug("File content: ", string(content))
-		break
-	}
-	log.Debug("Successfully connected to Dropbox")
 	return nil
 }
 
 func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
-	log.Debug("Listing files in path: ", dbx.config.Path)
-	log.Debug("Query: ", query)
-	files, err := dbx.client.ListFolder(&files.ListFolderArg{Path: query.Prefix, Recursive: query.Recursive})
+	files, err := dbx.client.ListFolder(&files.ListFolderArg{Path: query.Prefix, Recursive: query.Recursive, Limit: 2})
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +110,6 @@ func (dbx *dropboxStore) List(ctx context.Context, query filesource.Query) (file
 }
 
 func (dbx *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	log.Debug("Reading object: ", obj.Path)
 	meta, reader, err := dbx.client.Download(&files.DownloadArg{Path: obj.Path})
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
@@ -165,46 +134,51 @@ type dropboxListing struct {
 }
 
 func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
-	log.Debug("Listing next file")
-
 	if len(l.files.Entries) == 0 {
 		return filesource.ObjectInfo{}, io.EOF
 	}
 	if l.index > len(l.files.Entries)-1 {
-		log.Debug("No more files to list")
+		if !l.files.HasMore {
+			return filesource.ObjectInfo{}, io.EOF
+		} else {
+			// TODO: Fetch next page
+			resp, err := l.client.ListFolderContinue(&files.ListFolderContinueArg{Cursor: l.files.Cursor})
+			if err != nil {
+				return filesource.ObjectInfo{}, err
+			}
+			l.files = *resp
+		}
 		return filesource.ObjectInfo{}, io.EOF
 	}
 
-	fileEntry, ok := l.files.Entries[l.index].(*files.FileMetadata)
-	if ok {
-		log.Debug("Listing object: ", fileEntry.PathDisplay)
+	switch entry := l.files.Entries[l.index].(type) {
+	case *files.FileMetadata:
 		l.index++
-
 		obj := filesource.ObjectInfo{
-			Path:    fileEntry.PathDisplay,
-			ModTime: fileEntry.ClientModified,
-			Size:    int64(fileEntry.Size),
+			Path:    entry.PathDisplay,
+			ModTime: entry.ClientModified,
+			Size:    int64(entry.Size),
 		}
-		if fileEntry.ExportInfo != nil {
-			obj.ContentType = fileEntry.ExportInfo.ExportAs
+		if entry.ExportInfo != nil {
+			obj.ContentType = entry.ExportInfo.ExportAs
 		}
 		return obj, nil
-
-	}
-	folderEntry, ok := l.files.Entries[l.index].(*files.FolderMetadata)
-	if ok {
-		log.Debug("Skipping folder: ", folderEntry.PathDisplay)
+	case *files.FolderMetadata:
 		l.index++
 		if !l.recursive {
 			return filesource.ObjectInfo{
-				Path:     folderEntry.PathDisplay,
+				Path:     entry.PathDisplay,
 				IsPrefix: true,
 			}, nil
 		}
-
 		return l.Next()
+	case *files.DeletedMetadata:
+		l.index++
+		return l.Next()
+	default:
+		l.index++
+		return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
 	}
-	return filesource.ObjectInfo{}, fmt.Errorf("unexpected entry type")
 }
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
 
@@ -223,39 +197,27 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 			},
 			"credentials": {
 				"title": "Credentials",
+				"description": "OAuth2 credentials for Dropbox. Those are automatically handled by the Web UI.",
 				"type": "object",
 				"x-oauth2-provider": "dropbox",
 				"properties": {
-					"access_token": {
-						"type": "string",
-						"secret": true
-					},
 					"refresh_token": {
+						"title": "Refresh Token",
+						"description": "The refresh token for the Dropbox account.",
 						"type": "string",
 						"secret": true
 					},
 					"client_id": {
+						"title": "Client ID",
+						"description": "The client ID for the Dropbox account.",
 						"type": "string",
 						"secret": true
 					},
 					"client_secret": {
+						"title": "Client Secret",
+						"description": "The client secret for the Dropbox account.",
 						"type": "string",
 						"secret": true
-					},
-					"token_type": {
-						"type": "string"
-					},
-					"expires_in": {
-						"type": "integer"
-					},
-					"scope": {
-						"type": "string"
-					},
-					"uid": {
-						"type": "string"
-					},
-					"account_id": {
-						"type": "string"
 					}
 				},
 				"required": ["access_token"],
@@ -266,7 +228,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 				"title": "Match Keys",
 				"format": "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 2
+				"order": 3
 			},
 			"advanced": {
 				"properties": {
@@ -281,7 +243,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 				"type": "object",
 				"description": "Options for advanced users. You should not typically need to modify these.",
 				"advanced": true,
-				"order": 3
+				"order": 4
 			},
 			"parser": ` + string(parserSchema) + `
 		}
@@ -305,7 +267,7 @@ func main() {
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
 		TimeHorizonDelta: time.Second * -30,
-		Oauth2:           OAuth2Spec(),
+		Oauth2:           oauth2Spec(),
 	}
 
 	src.Main()
