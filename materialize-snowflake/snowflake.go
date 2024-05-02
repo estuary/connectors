@@ -294,7 +294,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	var subqueries = make(map[int]string)
-	var toDelete []string
+	var filesToCleanup []string
 	for i, b := range d.bindings {
 		if !b.load.stage.started {
 			// Pass.
@@ -303,10 +303,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if subqueries[i], err = RenderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			toDelete = append(toDelete, dir)
+			filesToCleanup = append(filesToCleanup, dir)
 		}
 	}
-	defer d.deleteFiles(ctx, toDelete)
+	defer d.deleteFiles(ctx, filesToCleanup)
 
 	log.Info("load: finished encoding and uploading of files")
 
@@ -403,9 +403,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
+		var flowDocument = it.RawJSON
+		if it.Delete {
+			flowDocument = json.RawMessage("null")
+		}
+
 		if err := b.store.stage.start(ctx, d.db); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)

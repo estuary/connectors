@@ -15,6 +15,7 @@ dropTable "multiple_types"
 dropTable "formatted_strings"
 dropTable "symbols"
 dropTable "unsigned_bigint"
+dropTable "deletions"
 
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.
