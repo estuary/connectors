@@ -1,0 +1,21 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-stripe-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_stripe_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: Customers
+        target: acmeCo/Customers
+      - resource:
+          name: Cards
+        target: acmeCo/Cards
+    shards:
+      logLevel: debug
