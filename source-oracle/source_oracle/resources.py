@@ -145,7 +145,7 @@ async def all_resources(
             initial_config=ResourceConfig(
                 schema=t.owner,
                 name=t.table_name,
-                interval=timedelta(seconds=0),
+                interval=config.advanced.default_interval,
             ),
             schema_inference=False,
         ))
