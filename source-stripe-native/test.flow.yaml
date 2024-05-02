@@ -30,12 +30,6 @@ captures:
           name: Persons
         target: acmeCo/Persons
       - resource:
-          name: External_Account_Cards
-        target: acmeCo/External_Account_Cards
-      - resource:
-          name: External_Bank_Account
-        target: acmeCo/External_Bank_Account
-      - resource:
           name: Application_Fees_Refunds
         target: acmeCo/Application_Fees_Refunds
       - resource:

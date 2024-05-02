@@ -54,7 +54,7 @@ class BackfillResult(BaseModel, Generic[Item], extra="forbid"):
 
 class Accounts(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Accounts"
-    TYPES: ClassVar[list[str]] =  ["accounts.updated"]
+    TYPES: ClassVar[str] =  "accounts.updated"
     SEARCH_NAME: ClassVar[str] = "accounts"
 
     id: str
@@ -163,7 +163,7 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
 
 class ApplicationFees(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Application_Fees"
-    TYPES: ClassVar[list[str]] =  ["application_fee.refunded"]
+    TYPES: ClassVar[str] =  "application_fee.refunded"
     SEARCH_NAME: ClassVar[str] = "application_fees"
 
     id: str
@@ -200,7 +200,7 @@ class ApplicationFeesRefunds(BaseDocument, extra="forbid"):
 
 class Authorizations(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Authorizations"
-    TYPES: ClassVar[list[str]] =  ["issuing_authorization.updated"]
+    TYPES: ClassVar[str] =  "issuing_authorization.updated"
     SEARCH_NAME: ClassVar[str] = "issuing/authorizations"
 
     id: str
@@ -230,7 +230,7 @@ class Authorizations(BaseDocument, extra="forbid"):
 
 class Customers(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Customers"
-    TYPES: ClassVar[list[str]] =  ["customer.updated"]
+    TYPES: ClassVar[str] =  "customer.updated"
     SEARCH_NAME: ClassVar[str] = "customers"
 
     id: str
@@ -316,7 +316,7 @@ class Bank_Accounts(BaseDocument, extra="forbid"):
 
 class CardHolders(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "CardHolders"
-    TYPES: ClassVar[list[str]] =  ["issuing_cardholder.updated"]
+    TYPES: ClassVar[str] =  "issuing_cardholder.updated"
     SEARCH_NAME: ClassVar[str] = "issuing/cardholders"
 
     id: str
