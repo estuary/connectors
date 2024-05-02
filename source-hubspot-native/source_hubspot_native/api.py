@@ -20,10 +20,11 @@ from estuary_cdk.http import HTTPSession
 from pydantic import TypeAdapter
 
 from .models import (
-    EMAIL_EVENT_HORIZON_DELTA,
     Association,
     BatchResult,
     CRMObject,
+    CustomObjectSchema,
+    CustomObjectSearchResult,
     EmailEvent,
     EmailEventsResponse,
     OldRecentCompanies,
@@ -33,9 +34,17 @@ from .models import (
     OldRecentTicket,
     PageResult,
     Properties,
+    SearchPageResult,
 )
 
 HUB = "https://api.hubapi.com"
+
+# Various HubSpot APIs (namely, v3 search and email events) are eventually consistent, and may not
+# produce monotonic ordering for very recent updates with respect to their updated timestamps. The
+# best we can do is hold back reading very recent documents, and assume that slightly older
+# documents are monotonic.  The value chosen here is largely arbitrary as there is no HubSpot
+# documentation regarding this eventual consistency at the moment.
+CONSISTENCY_HORIZON_DELTA: timedelta = timedelta(minutes=5)
 
 
 properties_cache: dict[str, Properties]= {}
@@ -300,7 +309,103 @@ async def fetch_recent_tickets(
     return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 
 
-async def fetch_email_events_changes(
+# TODO(whb): As we add more object types that might need to use the search API for getting recent
+# changes, this function will probably make sense to generalize.
+async def fetch_recent_custom_objects(
+    object_name: str,
+    log: Logger,
+    http: HTTPSession,
+    since: datetime,
+    cursor: PageCursor,
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    
+    url = f"{HUB}/crm/v3/objects/{object_name}/search"
+
+    # The search API has known inconsistencies with very recent data.
+    horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
+
+    if horizon <= since:
+        return [], None
+
+    input = {
+        "filters": [
+            {
+                "propertyName": "hs_lastmodifieddate",
+                "operator": "BETWEEN",
+                "highValue": horizon.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            },
+        ],
+        # Sort newest to oldest since paging stops when an item as old or older than `since` is
+        # encountered per the handling in `fetch_changes`.
+        "sorts": [
+            {
+                "propertyName": "hs_lastmodifieddate",
+                "direction": "DESCENDING"
+            }
+        ],
+        "limit": 100,
+    }
+
+    if cursor:
+        input["after"] = cursor
+
+    result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
+        await http.request(log, url, method="POST", json=input)
+    )
+
+    newCursor = result.paging.next.after if result.paging else None
+
+    return ((r.properties.hs_lastmodifieddate, str(r.id)) for r in result.results), newCursor
+
+
+async def list_custom_objects(
+    log: Logger,
+    http: HTTPSession,
+) -> list[str]:
+    
+    url = f"{HUB}/crm/v3/schemas"
+    
+    # Note: The schemas endpoint always returns all items in a single call, so there's never
+    # pagination.
+    result = PageResult[CustomObjectSchema].model_validate_json(
+        await http.request(log, url, method="GET")
+    )
+
+    return [r.name for r in result.results if not r.archived]
+
+
+async def fetch_email_events_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[EmailEvent | PageCursor, None]:
+    
+    assert isinstance(cutoff, datetime)
+    
+    url = f"{HUB}/email/public/v1/events"
+
+    input: Dict[str, Any] = {
+        "endTimestamp": _dt_to_ms(cutoff) - 1, # endTimestamp is inclusive.
+        "limit": 1000,
+    }
+
+    if page:
+        input["offset"] = page
+
+    result = EmailEventsResponse.model_validate_json(
+        await http.request(log, url, params=input)
+    )
+
+    for event in result.events:
+        yield event
+
+    if result.hasMore:
+        yield result.offset
+
+
+async def fetch_recent_email_events(
     http: HTTPSession, log: Logger, log_cursor: LogCursor
 ) -> AsyncGenerator[EmailEvent | LogCursor, None]:
 
@@ -308,11 +413,15 @@ async def fetch_email_events_changes(
 
     url = f"{HUB}/email/public/v1/events"
 
-    horizon = int((datetime.now(tz=UTC) - EMAIL_EVENT_HORIZON_DELTA).timestamp() * 1000)
+    # The email events API has known inconsistencies with very recent data.
+    horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
+
+    if horizon <= log_cursor:
+        return
 
     input: Dict[str, Any] = {
         "startTimestamp": _dt_to_ms(log_cursor),
-        "endTimestamp": horizon,
+        "endTimestamp": _dt_to_ms(horizon),
         "limit": 1000,
     }
 
@@ -341,42 +450,8 @@ async def fetch_email_events_changes(
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 
-async def fetch_email_events_page(
-    # Closed over via functools.partial:
-    http: HTTPSession,
-    # Remainder is common.FetchPageFn:
-    log: Logger,
-    page: PageCursor | None,
-    cutoff: LogCursor,
-) -> AsyncGenerator[EmailEvent | PageCursor, None]:
-    
-    assert isinstance(cutoff, datetime)
-    
-    url = f"{HUB}/email/public/v1/events"
-
-    input: Dict[str, Any] = {
-        "endTimestamp": _dt_to_ms(cutoff) - 1, # endTimestamp is inclusive.
-        "limit": 1000,
-    }
-    if page:
-        input["offset"] = page
-
-    result = EmailEventsResponse.model_validate_json(
-        await http.request(log, url, params=input)
-    )
-
-    for event in result.events:
-        yield event
-
-    if result.hasMore:
-        yield result.offset
-
-
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
 
 def _dt_to_ms(dt: datetime) -> int:
-    v = dt.timestamp() * 1000
-    if v % 1 != 0:
-        raise ValueError("Only millisecond precision is supported")
-    return int(v)
+    return int(dt.timestamp() * 1000)

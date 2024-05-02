@@ -236,7 +236,8 @@ class Association(BaseModel, extra="forbid"):
 Item = TypeVar("Item")
 
 
-# Common shape of a v3 API paged listing.
+# Common shape of a v3 API paged listing for a GET request to the objects endpoint for a particular
+# object.
 class PageResult(BaseModel, Generic[Item], extra="forbid"):
 
     class Cursor(BaseModel, extra="forbid"):
@@ -248,6 +249,21 @@ class PageResult(BaseModel, Generic[Item], extra="forbid"):
 
     results: list[Item]
     paging: Paging | None = None
+
+
+# Common shape of a v3 search API listing, which is the same as PageResult but includes a field for
+# the total number of records returned, and doesn't have a "link" in the paging.next object.
+class SearchPageResult(BaseModel, Generic[Item], extra="forbid"):
+
+    class Cursor(BaseModel, extra="forbid"):
+        after: str
+
+    class Paging(BaseModel, extra="forbid"):
+        next: "SearchPageResult.Cursor"
+
+    results: list[Item]
+    paging: Paging | None = None
+    total: int
 
 
 # Common shape of a v3 API batch read.
@@ -370,9 +386,8 @@ class EmailEvent(BaseDocument, extra="allow"):
         "UNBOUNCE", # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
     ] = Field(
         default="UNBOUNCE",
-        json_schema_extra=lambda x: x.pop('default'),
+        json_schema_extra=lambda x: x.pop('default'), # Don't schematize the default value.
     )
-
 
 
 class EmailEventsResponse(BaseModel, extra="forbid"):
@@ -380,8 +395,31 @@ class EmailEventsResponse(BaseModel, extra="forbid"):
     offset: str
     events: list[EmailEvent]
 
-# The email events API is eventually consistent, and there may be delays in receiving particularly
-# recent events. As a result, we can't count on it being monotonic, and do the best we can to assume
-# its monotonic by only capturing documents that are older than HORIZON_DELTA from the present. The
-# value chosen here is largely arbitrary as there is no documented maximum event delay.
-EMAIL_EVENT_HORIZON_DELTA: timedelta = timedelta(minutes=30)
+
+# Custom objects can be associated with contacts, companies, deals, tickets, and any other custom
+# object. For simplicity we are only capturing associations with the non-custom objects for now.
+class CustomObject(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.companies, Names.deals, Names.tickets]
+
+    contacts: list[int] = []
+    companies: list[int] = []
+    deals: list[int] = []
+    tickets: list[int] = []
+
+
+# There's quite a bit more information available from v3/schemas, but none of it seems particularly
+# useful right now.
+class CustomObjectSchema(BaseDocument, extra="allow"):
+    name: str
+    archived: bool
+
+
+# This is the shape of a response from the V3 search API for custom objects. As above, we are
+# modeling only the minimum needed to get the IDs and modification time.
+class CustomObjectSearchResult(BaseModel):
+
+    class Properties(BaseModel):
+        hs_lastmodifieddate: AwareDatetime
+
+    id: int
+    properties: Properties
