@@ -27,7 +27,7 @@ async def fetch_incremental(
     stop = True
 
     url = f"{API}/events"
-    parameters = {"types": cls.TYPES, "limit": 100}
+    parameters = {"type": cls.TYPES, "limit": 100}
     recent = []
 
 
@@ -66,7 +66,7 @@ async def fetch_incremental_substreams(
     stop = True
 
     url = f"{API}/events"
-    parameters = {"types": cls.TYPES, "limit": 100}
+    parameters = {"type": cls.TYPES, "limit": 100}
     recent = []
 
 
