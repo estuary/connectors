@@ -8,14 +8,14 @@ import tempfile
 from pathlib import Path
 
 
-def connect(request):
+def connect(request, user=None, password=None):
     sops = subprocess.run(['sops', '--decrypt', request.fspath.dirname + "/../config.yaml"], capture_output=True, text=True)
     config = yaml.safe_load(sops.stdout)
 
     dsn = config['address']
     creds = config['credentials']
-    user = creds['username']
-    password = creds['password_sops']
+    user = user or creds['username']
+    password = password or creds['password_sops']
     credentials = {}
     if creds['credentials_title'] == 'Wallet':
         tmpdir = tempfile.TemporaryDirectory(delete=False)
@@ -159,6 +159,32 @@ def test_capture_changes(request, snapshot):
 
 
 def test_discover(request, snapshot):
+    conn = connect(request)
+
+    # seed the test database first
+    for query in ["DROP TABLE test_changes", "DROP TABLE test_all_types", "DROP TABLE flow_capture.test", "DROP USER flow_capture"]:
+        try:
+            with conn.cursor() as c:
+                c.execute(query)
+        except Exception as e:
+            # do nothing
+            print("tables did not exist, ignoring", e)
+
+    with conn.cursor() as c:
+        for f in ['create_test_all_types.sql', 'create_test_changes.sql']:
+            q = Path(request.fspath.dirname + "/db_seeds/" + f).read_text()
+            c.execute(q)
+        qs = Path(request.fspath.dirname + "/db_seeds/create_flow_capture_user.sql").read_text().split('\n')
+        for q in qs:
+            c.execute(q)
+    conn.commit()
+
+    conn_flow_capture = connect(request, user='flow_capture', password='Secret1234ABCDEFG')
+    with conn_flow_capture.cursor() as c:
+        q = Path(request.fspath.dirname + "/db_seeds/create_flow_capture_table.sql").read_text()
+        c.execute(q)
+    conn_flow_capture.commit()
+
     result = subprocess.run(
         [
             "flowctl",

@@ -79,8 +79,7 @@ async def fetch_tables(
         with conn.cursor() as c:
             sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
 
-            query = f"SELECT {sql_columns} FROM user_tables"
-
+            query = f"SELECT {sql_columns} FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')"  # noqa
             tables = []
             await c.execute(query)
             async for values in c:
@@ -94,23 +93,26 @@ async def fetch_tables(
 
 
 async def fetch_columns(
-    log: Logger, pool: oracledb.AsyncConnectionPool,
+    log: Logger, pool: oracledb.AsyncConnectionPool, owners: [str]
 ) -> list[OracleColumn]:
     async with pool.acquire() as conn:
         with conn.cursor() as c:
             sql_columns = ','.join(["t." + f.alias for (k, f) in OracleColumn.model_fields.items() if f.alias != 'COL_IS_PK' and not f.exclude])
 
+            owners_comma = "'" + "','".join(owners) + "'"
             query = f"""
-            SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM user_tab_columns t
+            SELECT {sql_columns}, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
                 LEFT JOIN (
-                        SELECT c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
+                        SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
                             INNER JOIN all_cons_columns ac ON (
                                 c.constraint_name = ac.constraint_name
                                 AND c.table_name = ac.table_name
+                                AND c.owner = ac.owner
                                 AND c.constraint_type = 'P'
                             )
                         ) c
-                ON (t.table_name = c.table_name AND t.column_name = c.column_name)
+                ON (t.owner = c.owner AND t.table_name = c.table_name AND t.column_name = c.column_name)
+                WHERE t.owner IN ({owners_comma})
             """
 
             columns = []
