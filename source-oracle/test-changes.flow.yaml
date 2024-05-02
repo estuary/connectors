@@ -12,6 +12,7 @@ captures:
         config: config.yaml
     bindings:
       - resource:
+          schema: ADMIN
           name: TEST_CHANGES
           interval: PT0S
         target: acmeCo/TEST_CHANGES
