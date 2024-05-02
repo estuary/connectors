@@ -54,6 +54,10 @@ class EndpointConfig(BaseModel):
             description="Skip Flashback retention checks. Use this cautiously as we cannot guarantee consistency if Flashback retention is not sufficient.",
         )
 
+        default_interval: timedelta = Field(
+            default=timedelta(minutes=10), description="Default interval between updates for all resources. Can be overwritten by each resource."
+        )
+
     advanced: Advanced = Field(
         default_factory=Advanced,
         title="Advanced Config",
@@ -65,10 +69,12 @@ class EndpointConfig(BaseModel):
 class ResourceConfig(GenericResourceConfig):
     schema: str = Field(
         default=False,
-        title="The schema or the owner of the table",
+        title="The schema (the owner) of the table",
         description="In Oracle tables reside in a schema that points to the user that owns the table.",
     )
-    pass
+
+    def path(self) -> list[str]:
+        return [self.schema, self.name]
 
 
 ConnectorState = GenericConnectorState[ResourceState]
