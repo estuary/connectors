@@ -91,10 +91,10 @@ class Document(BaseDocument, extra="allow"):
             table: str = Field(
                 description="Database table of the event"
             )
-            row_id: str | None = Field(
+            row_id: str = Field(
                 title='Row ID',
                 default=None,
-                description="Row ID of the Document, available for backfilled documents",
+                description="Row ID of the Document",
             )
             scn: int | None = Field(
                 title='SCN',
@@ -237,7 +237,8 @@ def build_table(
             field_type = datetime
         elif col.is_datetime:
             field_type = str
-            field_schema_extra = {"format": "local-datetime"}
+            # TODO: enable this after we have added local-datetime to flow
+            # field_schema_extra = {"format": "local-datetime"}
         elif col.data_type.startswith(col.Type.INTERVAL):
             field_type = str
         else:

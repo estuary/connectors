@@ -115,8 +115,7 @@ async def fetch_columns(
 
             return columns
 
-# CHECKPOINT_EVERY = 10000
-CHECKPOINT_EVERY = 1
+CHECKPOINT_EVERY = 1000
 
 
 async def fetch_page(
@@ -209,19 +208,20 @@ async def fetch_changes(
 
                 scn = row[scn_column_name]
                 op = row[op_column_name]
-                rowid = row[rowid_column_name]
+                row_id = row[rowid_column_name]
 
-                if full_state.backfill is not None and rowid > full_state.backfill.next_page:
+                if full_state.backfill is not None and row_id > full_state.backfill.next_page:
                     # we are reading updates for documents which have not yet been backfilled
                     # in order to ensure data consistency, we do not emit these updates until they have been backfilled first
                     # so here we return and wait for another interval
-                    log.debug("got event for a row which as not been backfilled yet, looping, rowid:", rowid, "next_page:", full_state.backfill.next_page)
+                    log.debug("got event for a row which as not been backfilled yet, looping, row_id:", row_id, "next_page:", full_state.backfill.next_page)
                     return
 
                 doc = Document()
                 source = Document.Meta.Source(
                     table=table.table_name,
-                    scn=scn
+                    row_id=row_id,
+                    scn=scn,
                 )
                 doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
                 for (k, v) in row.items():
