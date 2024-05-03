@@ -13,42 +13,30 @@
 			},
 			"credentials": {
 				"title": "Credentials",
+				"description": "OAuth2 credentials for Dropbox. Those are automatically handled by the Web UI.",
 				"type": "object",
 				"x-oauth2-provider": "dropbox",
 				"properties": {
-					"access_token": {
-						"type": "string",
-						"secret": true
-					},
 					"refresh_token": {
+						"title": "Refresh Token",
+						"description": "The refresh token for the Dropbox account.",
 						"type": "string",
 						"secret": true
 					},
 					"client_id": {
+						"title": "Client ID",
+						"description": "The client ID for the Dropbox account.",
 						"type": "string",
 						"secret": true
 					},
 					"client_secret": {
+						"title": "Client Secret",
+						"description": "The client secret for the Dropbox account.",
 						"type": "string",
 						"secret": true
-					},
-					"token_type": {
-						"type": "string"
-					},
-					"expires_in": {
-						"type": "integer"
-					},
-					"scope": {
-						"type": "string"
-					},
-					"uid": {
-						"type": "string"
-					},
-					"account_id": {
-						"type": "string"
 					}
 				},
-				"required": ["access_token"],
+				"required": ["refresh_token", "client_id", "client_secret"],
 				"order": 2
 			},
 			"matchKeys": {
@@ -56,7 +44,7 @@
 				"title": "Match Keys",
 				"format": "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 2
+				"order": 3
 			},
 			"advanced": {
 				"properties": {
@@ -71,7 +59,7 @@
 				"type": "object",
 				"description": "Options for advanced users. You should not typically need to modify these.",
 				"advanced": true,
-				"order": 3
+				"order": 4
 			},
 			"parser": {"type": "object", "properties": {"name": {"type": "string"}}}
 		}
