@@ -31,7 +31,6 @@ async def validate_flashback(
     log: Logger, config: EndpointConfig, pool: oracledb.AsyncConnectionPool,
 ):
     skip_retention_checks = config.advanced.skip_flashback_retention_checks
-    conn = pool.acquire()
     async with pool.acquire() as conn:
         with conn.cursor() as c:
             await c.execute("SELECT flashback_on FROM V$DATABASE")
@@ -116,9 +115,6 @@ async def all_resources(
         # if max_rowid is None, that maens there are no rows in the table, so we
         # skip backfill
         backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
-
-        # TODO: backfill state must be accessible by the fetch_changes task
-        # so that we don't emit updates to rows which have a ROWID that has not been processed yet
 
         def open(
             table: Table,
