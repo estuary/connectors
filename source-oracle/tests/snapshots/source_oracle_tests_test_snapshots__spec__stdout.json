@@ -10,6 +10,13 @@
               "description": "Skip Flashback retention checks. Use this cautiously as we cannot guarantee consistency if Flashback retention is not sufficient.",
               "title": "Skip Flashback Retention Checks",
               "type": "boolean"
+            },
+            "default_interval": {
+              "default": "PT1M",
+              "description": "Default interval between updates for all resources. Can be overwritten by each resource.",
+              "format": "duration",
+              "title": "Default Interval",
+              "type": "string"
             }
           },
           "title": "Advanced",
@@ -149,6 +156,12 @@
           "description": "Interval between updates for this resource",
           "format": "duration",
           "title": "Interval",
+          "type": "string"
+        },
+        "schema": {
+          "default": false,
+          "description": "In Oracle tables reside in a schema that points to the user that owns the table.",
+          "title": "The schema (the owner) of the table",
           "type": "string"
         }
       },
