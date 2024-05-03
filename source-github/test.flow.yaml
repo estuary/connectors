@@ -1,0 +1,231 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-github:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-github:dev"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: assignees
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/assignees
+      - resource:
+          stream: branches
+          syncMode: full_refresh
+          cursorField:
+            - repository
+            - name
+        target: acmeCo/branches
+      - resource:
+          stream: collaborators
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/collaborators
+      - resource:
+          stream: comments
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/comments
+      - resource:
+          stream: commit_comment_reactions
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/commit_comment_reactions
+      - resource:
+          stream: commit_comments
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/commit_comments
+      - resource:
+          stream: commits
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/commits
+      - resource:
+          stream: deployments
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/deployments
+      - resource:
+          stream: events
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/events
+      - resource:
+          stream: issue_comment_reactions
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/issue_comment_reactions
+      - resource:
+          stream: issue_events
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/issue_events
+      - resource:
+          stream: issue_labels
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/issue_labels
+      - resource:
+          stream: issue_milestones
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/issue_milestones
+      - resource:
+          stream: issue_reactions
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/issue_reactions
+      - resource:
+          stream: issues
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/issues
+      - resource:
+          stream: organizations
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/organizations
+      - resource:
+          stream: project_cards
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/project_cards
+      - resource:
+          stream: project_columns
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/project_columns
+      - resource:
+          stream: projects
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/projects
+      - resource:
+          stream: pull_request_comment_reactions
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/pull_request_comment_reactions
+      - resource:
+          stream: pull_request_commits
+          syncMode: full_refresh
+          cursorField:
+            - sha
+        target: acmeCo/pull_request_commits
+      - resource:
+          stream: pull_request_stats
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/pull_request_stats
+      - resource:
+          stream: pull_requests
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/pull_requests
+      - resource:
+          stream: releases
+          syncMode: incremental
+          cursorField:
+            - created_at
+        target: acmeCo/releases
+      - resource:
+          stream: repositories
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/repositories
+      - resource:
+          stream: review_comments
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/review_comments
+      - resource:
+          stream: reviews
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/reviews
+      - resource:
+          stream: stargazers
+          syncMode: incremental
+          cursorField:
+            - starred_at
+        target: acmeCo/stargazers
+      - resource:
+          stream: tags
+          syncMode: full_refresh
+          cursorField:
+            - repository
+            - name
+        target: acmeCo/tags
+      - resource:
+          stream: teams
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/teams
+      - resource:
+          stream: team_members
+          syncMode: full_refresh
+          cursorField:
+            - id
+            - team_slug
+        target: acmeCo/team_members
+      - resource:
+          stream: users
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/users
+      - resource:
+          stream: workflows
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/workflows
+      - resource:
+          stream: workflow_runs
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/workflow_runs
+      - resource:
+          stream: workflow_jobs
+          syncMode: incremental
+          cursorField:
+            - completed_at
+        target: acmeCo/workflow_jobs
+      - resource:
+          stream: team_memberships
+          syncMode: full_refresh
+          cursorField:
+            - url
+        target: acmeCo/team_memberships
+    shards:
+      logLevel: debug

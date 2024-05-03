@@ -1,0 +1,148 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  closed_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  closed_issues:
+    type:
+      - "null"
+      - integer
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  creator:
+    properties:
+      avatar_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      followers_url:
+        type:
+          - "null"
+          - string
+      following_url:
+        type:
+          - "null"
+          - string
+      gists_url:
+        type:
+          - "null"
+          - string
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      html_url:
+        type:
+          - "null"
+          - string
+      id:
+        type:
+          - "null"
+          - integer
+      login:
+        type:
+          - "null"
+          - string
+      node_id:
+        type:
+          - "null"
+          - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+      starred_url:
+        type:
+          - "null"
+          - string
+      subscriptions_url:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  description:
+    type:
+      - "null"
+      - string
+  due_on:
+    format: date-time
+    type:
+      - "null"
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  labels_url:
+    type:
+      - "null"
+      - string
+  node_id:
+    type:
+      - "null"
+      - string
+  number:
+    type:
+      - "null"
+      - integer
+  open_issues:
+    type:
+      - "null"
+      - integer
+  repository:
+    type:
+      - string
+  state:
+    type:
+      - "null"
+      - string
+  title:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

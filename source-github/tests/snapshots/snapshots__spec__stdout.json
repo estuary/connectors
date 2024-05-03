@@ -1,0 +1,177 @@
+[
+  {
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "branch": {
+          "description": "Space-delimited list of GitHub repository branches to pull commits for, e.g. `estuary/flow/your-branch`. If no branches are specified for a repository, the default branch will be pulled.",
+          "examples": [
+            "estuary/flow/examples estuary/flow/scripts"
+          ],
+          "order": 2,
+          "title": "Branch (Optional)",
+          "type": "string"
+        },
+        "credentials": {
+          "description": "Choose how to authenticate to GitHub",
+          "discriminator": {
+            "propertyName": "option_title"
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "access_token": {
+                  "airbyte_secret": true,
+                  "description": "OAuth access token",
+                  "title": "Access Token",
+                  "type": "string"
+                },
+                "client_id": {
+                  "airbyte_secret": true,
+                  "description": "client_id",
+                  "title": "client_id",
+                  "type": "string"
+                },
+                "client_secret": {
+                  "airbyte_secret": true,
+                  "description": "client_secret",
+                  "title": "client_secret",
+                  "type": "string"
+                },
+                "option_title": {
+                  "const": "OAuth Credentials",
+                  "default": "OAuth Credentials",
+                  "order": 0,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "access_token"
+              ],
+              "title": "OAuth",
+              "type": "object",
+              "x-oauth2-provider": "github"
+            },
+            {
+              "properties": {
+                "option_title": {
+                  "const": "PAT Credentials",
+                  "default": "PAT Credentials",
+                  "order": 0,
+                  "type": "string"
+                },
+                "personal_access_token": {
+                  "airbyte_secret": true,
+                  "description": "Log into GitHub and then generate a personal access token: https://github.com/settings/tokens. To load balance your API quota consumption across multiple API tokens, input multipletokens separated with \",\"",
+                  "title": "Personal Access Tokens",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "personal_access_token"
+              ],
+              "title": "Personal Access Token",
+              "type": "object"
+            }
+          ],
+          "order": 4,
+          "title": "Authentication",
+          "type": "object"
+        },
+        "page_size_for_large_streams": {
+          "default": 10,
+          "description": "The GitHub connector contains several streams with a large amount of data. The page size of such streams depends on the size of your repository. We recommended that you specify values between 10 and 30.",
+          "maximum": 100,
+          "minimum": 1,
+          "order": 3,
+          "title": "Page size for large streams (Optional)",
+          "type": "integer"
+        },
+        "repository": {
+          "description": "Space-delimited list of GitHub organizations/repositories, e.g. `estuary/flow` for single repository, `estuary/*`to get all repositories from organization and `estuary/flow estuary/another-repo` for multiple repositories.",
+          "examples": [
+            "estuary/flow estuary/another-repo",
+            "estuary/*",
+            "estuary/connectors"
+          ],
+          "order": 1,
+          "title": "GitHub Repositories",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "The date from which you'd like to replicate data from GitHub in the format YYYY-MM-DDT00:00:00Z. For the streams which support this configuration, only data generated on or after the startdate will be replicated. This field doesn't apply to all streams, see the docs for more info: https://go.estuary.dev/xLGlPL",
+          "examples": [
+            "2021-03-01T00:00:00Z"
+          ],
+          "format": "date-time",
+          "order": 0,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "title": "Start date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_date",
+        "repository",
+        "credentials"
+      ],
+      "title": "GitHub Source Spec",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/xLGlPL",
+    "oauth2": {
+      "accessTokenBody": "{\"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
+      "accessTokenHeaders": {
+        "Accept": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      },
+      "accessTokenUrlTemplate": "https://github.com/login/oauth/access_token",
+      "authUrlTemplate": "https://github.com/login/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=repo%20read:org%20read:repo_hook%20read:user%20read:discussion%20workflow&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "provider": "github"
+    },
+    "protocol": 3032023,
+    "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "cursorField": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "title": "ResourceSpec",
+      "type": "object"
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]
