@@ -433,7 +433,7 @@ def open_binding(
         async def closure(task: Task):
             assert state.inc
             await _binding_incremental_task(
-                binding, binding_index, fetch_changes, state.inc, task
+                binding, binding_index, fetch_changes, state.inc, state, task,
             )
 
         task.spawn_child(f"{prefix}.incremental", closure)
@@ -443,7 +443,7 @@ def open_binding(
         async def closure(task: Task):
             assert state.backfill
             await _binding_backfill_task(
-                binding, binding_index, fetch_page, state.backfill, task
+                binding, binding_index, fetch_page, state.backfill, state, task,
             )
 
         task.spawn_child(f"{prefix}.backfill", closure)
@@ -548,6 +548,7 @@ async def _binding_backfill_task(
     binding_index: int,
     fetch_page: FetchPageFn[_BaseDocument],
     state: ResourceState.Backfill,
+    full_state: _ResourceState,
     task: Task,
 ):
     connector_state = ConnectorState(
@@ -566,7 +567,7 @@ async def _binding_backfill_task(
         # Track if fetch_page returns without having yielded a PageCursor.
         done = True
 
-        async for item in fetch_page(task.log, state.next_page, state.cutoff):
+        async for item in fetch_page(task.log, state.next_page, state.cutoff, full_state):
             if isinstance(item, BaseDocument):
                 task.captured(binding_index, item)
                 done = True
@@ -597,6 +598,7 @@ async def _binding_incremental_task(
     binding_index: int,
     fetch_changes: FetchChangesFn[_BaseDocument],
     state: ResourceState.Incremental,
+    full_state: _ResourceState,
     task: Task,
 ):
     connector_state = ConnectorState(
@@ -611,7 +613,7 @@ async def _binding_incremental_task(
         checkpoints = 0
         pending = False
 
-        async for item in fetch_changes(task.log, state.cursor):
+        async for item in fetch_changes(task.log, state.cursor, full_state):
             if isinstance(item, BaseDocument):
                 task.captured(binding_index, item)
                 pending = True
