@@ -26,6 +26,7 @@ from .models import (
     Table,
     Document,
     Wallet,
+    ConnectorState,
 )
 
 
@@ -114,7 +115,8 @@ async def fetch_columns(
 
             return columns
 
-CHECKPOINT_EVERY = 1000
+# CHECKPOINT_EVERY = 10000
+CHECKPOINT_EVERY = 1
 
 
 async def fetch_page(
@@ -125,6 +127,7 @@ async def fetch_page(
     log: Logger,
     page: str | None,
     cutoff: Tuple[str],
+    full_state: ConnectorState,
 ) -> AsyncGenerator[Document | str, None]:
     is_first_query = False
     if page is None:
@@ -154,11 +157,13 @@ async def fetch_page(
                 )
                 doc.meta_ = Document.Meta(op='c', source=source)
                 for (k, v) in row.items():
-                    if k == rowid_column_name:
+                    if k in (rowid_column_name,):
                         continue
                     setattr(doc, k, v)
 
                 yield doc
+
+                await asyncio.sleep(10)
 
                 i = i + 1
 
@@ -183,6 +188,7 @@ async def fetch_changes(
     # Remainder is common.FetchPageFn:
     log: Logger,
     log_cursor: LogCursor,
+    full_state: ConnectorState,
 ) -> AsyncGenerator[Document | LogCursor, None]:
     query = template_env.get_template("inc").render(table=table, cursor=log_cursor)
 
@@ -202,10 +208,17 @@ async def fetch_changes(
                 cols = [col[0] for col in c.description]
                 row = dict(zip(cols, values))
                 row = {k: v for (k, v) in row.items() if v is not None}
-                log.debug("change", row)
 
                 scn = row[scn_column_name]
                 op = row[op_column_name]
+                rowid = row[rowid_column_name]
+
+                if full_state.backfill is not None and rowid > full_state.backfill.next_page:
+                    # we are reading updates for documents which have not yet been backfilled
+                    # in order to ensure data consistency, we do not emit these updates until they have been backfilled first
+                    # so here we return and wait for another interval
+                    log.debug("got event for a row which as not been backfilled yet, looping, rowid:", rowid, "next_page:", full_state.backfill.next_page)
+                    return
 
                 doc = Document()
                 source = Document.Meta.Source(
@@ -214,7 +227,7 @@ async def fetch_changes(
                 )
                 doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
                 for (k, v) in row.items():
-                    if k in (scn_column_name, op_column_name):
+                    if k in (scn_column_name, op_column_name, rowid_column_name):
                         continue
                     setattr(doc, k, v)
 
@@ -283,7 +296,7 @@ SELECT ROWID, {% for c in table.columns -%}
     ORDER BY ROWID ASC
 """,
     'inc': """
-SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, {% for c in table.columns -%}
+SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
 {{ c | cast }}
 {%- endfor %} FROM {{ table.table_name }}
