@@ -132,9 +132,14 @@ async def all_resources(
                 fetch_page=functools.partial(fetch_page, table, pool),
                 fetch_changes=functools.partial(fetch_changes, table, pool),
             )
+
+        keys = [f"/{c.column_name}" for c in t.primary_key]
+        if len(keys) < 1:
+            keys = ["/_meta/row_id"]
+
         resources_list.append(common.Resource(
             name=f"{t.owner}_{t.table_name}",
-            key=[f"/{c.column_name}" for c in t.primary_key],
+            key=keys,
             model=t.create_model(),
             open=functools.partial(open, t),
             initial_state=ResourceState(
