@@ -77,24 +77,65 @@ async def fetch_page(
     assert isinstance(cutoff, datetime)
 
     url = f"{HUB}/crm/v3/objects/{object_name}"
+    output: list[CRMObject] = []
     properties = await fetch_properties(log, http, object_name)
-    property_names = ",".join(p.name for p in properties.results if not p.calculated)
 
-    input = {
-        "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-        "limit": 50, # Maximum when requesting history.
-        "properties": property_names,
-        "propertiesWithHistory": property_names,
-    }
-    if page:
-        input["after"] = page
-
-    _cls: Any = cls  # Silence mypy false-positive.
-    result: PageResult[CRMObject] = PageResult[_cls].model_validate_json(
-        await http.request(log, url, method="GET", params=input)
+    # There is a limit on how large a URL can be when making a GET request to HubSpot. Exactly what
+    # this limit is is a bit mysterious to me. Empirical testing indicates that a single property
+    # with an alphanumeric name ~32k characters long will push it over the limit. However, this ~32k
+    # length limit assumption does not seem to hold when considering huge amounts of shorter
+    # property names, which is more common. The chunk size here is a best guess then based on
+    # something that works for actual rea;-world use cases. Note that the length is effectively
+    # doubled by the fact that we request both properties and properties with history.
+    #
+    # If this calculation results in more than one chunk of properties to retrieve based on the
+    # cumulative byte lengths, we will issue multiple requests for different sets of properties and
+    # combine the results together in the output documents.
+    chunked_properties = _chunk_props(
+        [p.name for p in properties.results if not p.calculated],
+        5 * 1024,
     )
 
-    for doc in result.results:
+    for props in chunked_properties:
+        property_names = ",".join(props)
+
+        input = {
+            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
+            "limit": 50, # Maximum when requesting history.
+            "properties": property_names,
+            "propertiesWithHistory": property_names,
+        }
+        if page:
+            input["after"] = page
+
+        _cls: Any = cls  # Silence mypy false-positive.
+        result: PageResult[CRMObject] = PageResult[_cls].model_validate_json(
+            await http.request(log, url, method="GET", params=input)
+        )
+
+        for idx, doc in enumerate(result.results):
+            if idx == len(output):
+                # Populate the document at idx the first time around.
+                output.append(doc)
+            else:
+                # When fetching values for additional chunks of properties, we require that
+                # documents are received in the same order.
+                assert output[idx].id == doc.id
+
+                # An additional requirement is that if a document gets updated while we are fetching
+                # a separate chunk of properties, that its `updatedAt` value will be increased to
+                # the point that it will be beyond the cutoff for the backfill and the updated
+                # document will be captured via the incremental stream. This will prevent any
+                # inconsistencies arising from a document being updated in the midst of us fetching
+                # its properties.
+                if output[idx].updatedAt != doc.updatedAt:
+                    assert doc.updatedAt >= cutoff
+                    output[idx].updatedAt = doc.updatedAt # We'll discard this document per the check a little further down.
+
+                output[idx].properties.update(doc.properties)
+                output[idx].propertiesWithHistory.update(doc.propertiesWithHistory)
+
+    for doc in output:
         if doc.updatedAt < cutoff:
             yield doc
 
@@ -320,10 +361,8 @@ async def fetch_recent_custom_objects(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
-
     # The search API has known inconsistencies with very recent data.
     horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
-
     if horizon <= since:
         return [], None
 
@@ -346,7 +385,6 @@ async def fetch_recent_custom_objects(
         ],
         "limit": 100,
     }
-
     if cursor:
         input["after"] = cursor
 
@@ -355,7 +393,6 @@ async def fetch_recent_custom_objects(
     )
 
     newCursor = result.paging.next.after if result.paging else None
-
     return ((r.properties.hs_lastmodifieddate, str(r.id)) for r in result.results), newCursor
 
 
@@ -365,7 +402,6 @@ async def list_custom_objects(
 ) -> list[str]:
     
     url = f"{HUB}/crm/v3/schemas"
-    
     # Note: The schemas endpoint always returns all items in a single call, so there's never
     # pagination.
     result = PageResult[CustomObjectSchema].model_validate_json(
@@ -385,12 +421,10 @@ async def fetch_email_events_page(
     assert isinstance(cutoff, datetime)
     
     url = f"{HUB}/email/public/v1/events"
-
     input: Dict[str, Any] = {
         "endTimestamp": _dt_to_ms(cutoff) - 1, # endTimestamp is inclusive.
         "limit": 1000,
     }
-
     if page:
         input["offset"] = page
 
@@ -412,10 +446,8 @@ async def fetch_recent_email_events(
     assert isinstance(log_cursor, datetime)
 
     url = f"{HUB}/email/public/v1/events"
-
     # The email events API has known inconsistencies with very recent data.
     horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
-
     if horizon <= log_cursor:
         return
 
@@ -455,3 +487,25 @@ def _ms_to_dt(ms: int) -> datetime:
 
 def _dt_to_ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
+
+def _chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
+    result: list[list[str]] = []
+
+    current_chunk: list[str] = []
+    current_size = 0
+
+    for p in props:
+        sz = len(p.encode('utf-8'))
+
+        if current_size + sz > max_bytes:
+            result.append(current_chunk)
+            current_chunk = []
+            current_size = 0
+
+        current_chunk.append(p)
+        current_size += sz
+
+    if current_chunk:
+        result.append(current_chunk)
+
+    return result
