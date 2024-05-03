@@ -67,14 +67,15 @@ class EndpointConfig(BaseModel):
 
 
 class ResourceConfig(GenericResourceConfig):
-    schema: str = Field(
+    schema_name: str = Field(
+        alias='schema',
         default=False,
         title="The schema (the owner) of the table",
         description="In Oracle tables reside in a schema that points to the user that owns the table.",
     )
 
     def path(self) -> list[str]:
-        return [self.schema, self.name]
+        return [self.schema_name, self.name]
 
 
 ConnectorState = GenericConnectorState[ResourceState]

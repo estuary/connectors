@@ -163,8 +163,6 @@ async def fetch_page(
 
                 yield doc
 
-                await asyncio.sleep(10)
-
                 i = i + 1
 
                 if i % CHECKPOINT_EVERY == 0:
