@@ -49,6 +49,7 @@ async def fetch_page(
     log: Logger,
     page: str | None,
     cutoff: datetime,
+    _full_state,
 ) -> AsyncGenerator[CRMObject | str, None]:
 
     url = f"{HUB}/crm/v3/objects/{cls.NAME}"
@@ -168,6 +169,7 @@ async def fetch_changes(
     # Remainder is common.FetchChangesFn:
     log: Logger,
     log_cursor: LogCursor,
+    _full_state,
 ) -> AsyncGenerator[CRMObject | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
