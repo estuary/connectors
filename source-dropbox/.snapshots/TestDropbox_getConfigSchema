@@ -1,0 +1,78 @@
+{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"title": "Dropbox Source",
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string",
+				"title": "Path",
+				"format": "string",
+				"pattern": "^/.+",
+				"description": "The path to the Dropbox folder to read from. For example, \"/my-folder\".",
+				"order": 1
+			},
+			"credentials": {
+				"title": "Credentials",
+				"type": "object",
+				"x-oauth2-provider": "dropbox",
+				"properties": {
+					"access_token": {
+						"type": "string",
+						"secret": true
+					},
+					"refresh_token": {
+						"type": "string",
+						"secret": true
+					},
+					"client_id": {
+						"type": "string",
+						"secret": true
+					},
+					"client_secret": {
+						"type": "string",
+						"secret": true
+					},
+					"token_type": {
+						"type": "string"
+					},
+					"expires_in": {
+						"type": "integer"
+					},
+					"scope": {
+						"type": "string"
+					},
+					"uid": {
+						"type": "string"
+					},
+					"account_id": {
+						"type": "string"
+					}
+				},
+				"required": ["access_token"],
+				"order": 2
+			},
+			"matchKeys": {
+				"type": "string",
+				"title": "Match Keys",
+				"format": "regex",
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
+				"order": 2
+			},
+			"advanced": {
+				"properties": {
+				  "ascendingKeys": {
+					"type":        "boolean",
+					"title":       "Ascending Keys",
+					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+					"default":     false
+				  }
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"description": "Options for advanced users. You should not typically need to modify these.",
+				"advanced": true,
+				"order": 3
+			},
+			"parser": {"type": "object", "properties": {"name": {"type": "string"}}}
+		}
+	}
