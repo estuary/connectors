@@ -140,32 +140,41 @@ async def fetch_page(
 
     last_rowid = None
     i = 0
+    rownum_page = 0
     async with pool.acquire() as conn:
         with conn.cursor() as c:
-            await c.execute(query)
-            async for values in c:
-                cols = [col[0] for col in c.description]
-                row = dict(zip(cols, values))
-                row = {k: v for (k, v) in row.items() if v is not None}
-                last_rowid = row[rowid_column_name]
+            while True:
+                rownum_start = rownum_page * CHECKPOINT_EVERY
+                rownum_end = (rownum_page + 1) * CHECKPOINT_EVERY
+                await c.execute(query, rownum_start=rownum_start, rownum_end=rownum_end)
+                async for values in c:
+                    cols = [col[0] for col in c.description]
+                    row = dict(zip(cols, values))
+                    row = {k: v for (k, v) in row.items() if v is not None}
+                    last_rowid = row[rowid_column_name]
 
-                doc = Document()
-                source = Document.Meta.Source(
-                    table=table.table_name,
-                    row_id=row[rowid_column_name]
-                )
-                doc.meta_ = Document.Meta(op='c', source=source)
-                for (k, v) in row.items():
-                    if k in (rowid_column_name,):
-                        continue
-                    setattr(doc, k, v)
+                    doc = Document()
+                    source = Document.Meta.Source(
+                        table=table.table_name,
+                        row_id=row[rowid_column_name]
+                    )
+                    doc.meta_ = Document.Meta(op='c', source=source)
+                    for (k, v) in row.items():
+                        if k in (rowid_column_name,):
+                            continue
+                        setattr(doc, k, v)
 
-                yield doc
+                    yield doc
 
-                i = i + 1
+                    i = i + 1
 
-                if i % CHECKPOINT_EVERY == 0:
-                    yield last_rowid
+                    if i % CHECKPOINT_EVERY == 0:
+                        yield last_rowid
+
+                if c.rowcount < CHECKPOINT_EVERY:
+                    break
+
+                rownum_page = rownum_page + 1
 
     if last_rowid is not None and (i % CHECKPOINT_EVERY != 0):
         yield last_rowid
@@ -291,6 +300,8 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- endfor %} FROM {{ table.table_name }}
     WHERE ROWID >{% if is_first_query %}={% endif %} '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
+      AND ROWNUM > :rownum_start
+      AND ROWNUM < :rownum_end
     ORDER BY ROWID ASC
 """,
     'inc': """
