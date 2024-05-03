@@ -47,7 +47,8 @@ HUB = "https://api.hubapi.com"
 CONSISTENCY_HORIZON_DELTA: timedelta = timedelta(minutes=5)
 
 
-properties_cache: dict[str, Properties]= {}
+properties_cache: dict[str, Properties] = {}
+
 
 async def fetch_properties(
     log: Logger, http: HTTPSession, object_name: str
@@ -70,10 +71,11 @@ async def fetch_page(
     object_name: str,
     # Remainder is common.FetchPageFn:
     log: Logger,
-    page: PageCursor | None,
-    cutoff: LogCursor,
+    page: str | None,
+    cutoff: datetime,
+    _full_state,
 ) -> AsyncGenerator[CRMObject | str, None]:
-    
+
     assert isinstance(cutoff, datetime)
 
     url = f"{HUB}/crm/v3/objects/{object_name}"
@@ -101,7 +103,7 @@ async def fetch_page(
 
         input = {
             "associations": ",".join(cls.ASSOCIATED_ENTITIES),
-            "limit": 50, # Maximum when requesting history.
+            "limit": 50,  # Maximum when requesting history.
             "properties": property_names,
             "propertiesWithHistory": property_names,
         }
@@ -130,7 +132,7 @@ async def fetch_page(
                 # its properties.
                 if output[idx].updatedAt != doc.updatedAt:
                     assert doc.updatedAt >= cutoff
-                    output[idx].updatedAt = doc.updatedAt # We'll discard this document per the check a little further down.
+                    output[idx].updatedAt = doc.updatedAt  # We'll discard this document per the check a little further down.
 
                 output[idx].properties.update(doc.properties)
                 output[idx].propertiesWithHistory.update(doc.propertiesWithHistory)
@@ -238,6 +240,7 @@ async def fetch_changes(
     # Remainder is common.FetchChangesFn:
     log: Logger,
     log_cursor: LogCursor,
+    _full_state,
 ) -> AsyncGenerator[CRMObject | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
@@ -359,7 +362,7 @@ async def fetch_recent_custom_objects(
     since: datetime,
     cursor: PageCursor,
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    
+
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     # The search API has known inconsistencies with very recent data.
     horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
@@ -400,7 +403,7 @@ async def list_custom_objects(
     log: Logger,
     http: HTTPSession,
 ) -> list[str]:
-    
+
     url = f"{HUB}/crm/v3/schemas"
     # Note: The schemas endpoint always returns all items in a single call, so there's never
     # pagination.
@@ -417,12 +420,12 @@ async def fetch_email_events_page(
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[EmailEvent | PageCursor, None]:
-    
+
     assert isinstance(cutoff, datetime)
-    
+
     url = f"{HUB}/email/public/v1/events"
     input: Dict[str, Any] = {
-        "endTimestamp": _dt_to_ms(cutoff) - 1, # endTimestamp is inclusive.
+        "endTimestamp": _dt_to_ms(cutoff) - 1,  # endTimestamp is inclusive.
         "limit": 1000,
     }
     if page:
@@ -479,14 +482,16 @@ async def fetch_recent_email_events(
         input["offset"] = result.offset
 
     if max_ts != log_cursor:
-        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
+        yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
 
 
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
 
+
 def _dt_to_ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
+
 
 def _chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
     result: list[list[str]] = []
