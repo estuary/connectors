@@ -19,8 +19,8 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: true
-description: "Child Stream\nParent Stream: Accounts"
+additionalProperties: false
+description: "Child Stream\nParent Stream: Transfers"
 properties:
   _meta:
     allOf:
@@ -39,74 +39,56 @@ properties:
     default: ~
     title: Parent Id
   object:
-    const: person
+    const: transfer_reversal
     enum:
-      - person
+      - transfer_reversal
     title: Object
     type: string
-  account:
-    title: Account
-    type: string
+  amount:
+    title: Amount
+    type: integer
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
   created:
     title: Created
     type: integer
-  dob:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Dob
-  first_name:
+  currency:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: First Name
-  future_requirements:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Future Requirements
-  id_number_provided:
-    title: Id Number Provided
-    type: boolean
-  last_name:
+    title: Currency
+  destination_payment_refund:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Last Name
+    title: Destination Payment Refund
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  relationship:
-    title: Relationship
-    type: object
-  requirements:
+  source_refund:
     anyOf:
-      - type: object
+      - type: string
       - type: "null"
     default: ~
-    title: Requirements
-  ssn_last_4_provided:
-    title: Ssn Last 4 Provided
-    type: boolean
-  verification:
-    title: Verification
-    type: object
+    title: Source Refund
+  transfer:
+    title: Transfer
+    type: string
 required:
   - id
   - object
-  - account
+  - amount
   - created
-  - id_number_provided
-  - relationship
-  - ssn_last_4_provided
-  - verification
-title: Persons
+  - transfer
+title: TransferReversals
 type: object
 x-infer-schema: true

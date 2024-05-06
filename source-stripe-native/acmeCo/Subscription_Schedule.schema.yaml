@@ -20,7 +20,6 @@ $defs:
     title: Meta
     type: object
 additionalProperties: false
-description: "Child Stream\nParent Stream: Customers"
 properties:
   _meta:
     allOf:
@@ -32,83 +31,109 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Parent Id
   object:
-    const: bank_account
+    const: subscription_schedule
     enum:
-      - bank_account
+      - subscription_schedule
     title: Object
     type: string
-  account_holder_name:
+  application:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Account Holder Name
-  account_holder_type:
+    title: Application
+  canceled_at:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
     default: ~
-    title: Account Holder Type
-  account_type:
+    title: Canceled At
+  completed_at:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
     default: ~
-    title: Account Type
-  bank_name:
+    title: Completed At
+  created:
+    title: Created
+    type: integer
+  current_phase:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
-    title: Bank Name
-  country:
-    title: Country
-    type: string
-  currency:
-    title: Currency
-    type: string
+    title: Current Phase
   customer:
     title: Customer
     type: string
-  fingerprint:
+  default_settings:
+    title: Default Settings
+    type: object
+  end_behavior:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Fingerprint
-  last4:
-    title: Last4
-    type: string
+    title: End Behavior
+  livemode:
+    title: Livemode
+    type: boolean
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  routing_number:
+  phases:
+    items:
+      type: object
+    title: Phases
+    type: array
+  released_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Released At
+  released_subscription:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Routing Number
+    title: Released Subscription
+  renewal_interval:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Renewal Interval
   status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
     title: Status
-    type: string
+  subscription:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Subscription
+  test_clock:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Test Clock
 required:
   - id
   - object
-  - country
-  - currency
+  - created
   - customer
-  - last4
-  - status
-title: Bank_Accounts
+  - default_settings
+  - livemode
+  - phases
+title: SubscriptionsSchedule
 type: object
 x-infer-schema: true

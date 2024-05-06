@@ -32,35 +32,38 @@ properties:
     title: Id
     type: string
   object:
-    const: issuing.cardholder
+    const: product
     enum:
-      - issuing.cardholder
+      - product
     title: Object
     type: string
-  billing:
-    title: Billing
-    type: object
-  company:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Company
+  active:
+    title: Active
+    type: boolean
   created:
     title: Created
     type: integer
-  email:
+  default_price:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Email
-  individual:
+    title: Default Price
+  description:
     anyOf:
-      - type: object
+      - type: string
       - type: "null"
     default: ~
-    title: Individual
+    title: Description
+  images:
+    items:
+      type: string
+    title: Images
+    type: array
+  features:
+    items: {}
+    title: Features
+    type: array
   livemode:
     title: Livemode
     type: boolean
@@ -73,41 +76,55 @@ properties:
   name:
     title: Name
     type: string
-  phone_number:
+  package_dimensions:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Package Dimensions
+  shippable:
+    anyOf:
+      - type: boolean
+      - type: "null"
+    default: ~
+    title: Shippable
+  statement_descriptor:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Phone Number
-  redaction:
+    title: Statement Descriptor
+  tax_code:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Redaction
-  requirements:
-    title: Requirements
-    type: object
-  spending_controls:
-    title: Spending Controls
-    type: object
-  status:
-    title: Status
-    type: string
-  type:
-    title: Type
-    type: string
+    title: Tax Code
+  unit_label:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Unit Label
+  updated:
+    title: Updated
+    type: integer
+  url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Url
 required:
   - id
   - object
-  - billing
+  - active
   - created
+  - images
+  - features
   - livemode
   - name
-  - requirements
-  - spending_controls
-  - status
-  - type
-title: CardHolders
+  - updated
+title: Products
 type: object
 x-infer-schema: true

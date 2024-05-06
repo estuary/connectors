@@ -20,7 +20,6 @@ $defs:
     title: Meta
     type: object
 additionalProperties: false
-description: "Child Stream\nParent Stream: Customers"
 properties:
   _meta:
     allOf:
@@ -32,83 +31,107 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Parent Id
   object:
-    const: bank_account
+    const: plan
     enum:
-      - bank_account
+      - plan
     title: Object
     type: string
-  account_holder_name:
+  active:
+    title: Active
+    type: boolean
+  aggregate_usage:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Account Holder Name
-  account_holder_type:
+    title: Aggregate Usage
+  amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Amount
+  amount_decimal:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Account Holder Type
-  account_type:
+    title: Amount Decimal
+  billing_scheme:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Account Type
-  bank_name:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Bank Name
-  country:
-    title: Country
-    type: string
+    title: Billing Scheme
+  created:
+    title: Created
+    type: integer
   currency:
-    title: Currency
-    type: string
-  customer:
-    title: Customer
-    type: string
-  fingerprint:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Fingerprint
-  last4:
-    title: Last4
+    title: Currency
+  interval:
+    title: Interval
     type: string
+  interval_count:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Interval Count
+  livemode:
+    title: Livemode
+    type: boolean
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  routing_number:
+  nickname:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Routing Number
-  status:
-    title: Status
+    title: Nickname
+  product:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Product
+  tiers_mode:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Tiers Mode
+  transform_usage:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Transform Usage
+  trial_period_days:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Trial Period Days
+  usage_type:
+    title: Usage Type
     type: string
 required:
   - id
   - object
-  - country
-  - currency
-  - customer
-  - last4
-  - status
-title: Bank_Accounts
+  - active
+  - created
+  - interval
+  - livemode
+  - usage_type
+title: Plans
 type: object
 x-infer-schema: true

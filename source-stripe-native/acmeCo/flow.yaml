@@ -12,35 +12,123 @@ collections:
     schema: Application_Fees_Refunds.schema.yaml
     key:
       - /id
-  acmeCo/Authorizations:
-    schema: Authorizations.schema.yaml
-    key:
-      - /id
   acmeCo/Bank_Accounts:
     schema: Bank_Accounts.schema.yaml
-    key:
-      - /id
-  acmeCo/CardHolders:
-    schema: CardHolders.schema.yaml
     key:
       - /id
   acmeCo/Cards:
     schema: Cards.schema.yaml
     key:
       - /id
+  acmeCo/Charges:
+    schema: Charges.schema.yaml
+    key:
+      - /id
+  acmeCo/CheckoutSessions:
+    schema: CheckoutSessions.schema.yaml
+    key:
+      - /id
+  acmeCo/CheckoutSessionsLine:
+    schema: CheckoutSessionsLine.schema.yaml
+    key:
+      - /id
+  acmeCo/Coupons:
+    schema: Coupons.schema.yaml
+    key:
+      - /id
+  acmeCo/CreditNotes:
+    schema: CreditNotes.schema.yaml
+    key:
+      - /id
+  acmeCo/CreditNotesLines:
+    schema: CreditNotesLines.schema.yaml
+    key:
+      - /id
+  acmeCo/Customer_Balance_Transaction:
+    schema: Customer_Balance_Transaction.schema.yaml
+    key:
+      - /id
   acmeCo/Customers:
     schema: Customers.schema.yaml
     key:
       - /id
-  acmeCo/External_Account_Cards:
-    schema: External_Account_Cards.schema.yaml
+  acmeCo/Disputes:
+    schema: Disputes.schema.yaml
     key:
       - /id
-  acmeCo/External_Bank_Account:
-    schema: External_Bank_Account.schema.yaml
+  acmeCo/Early_Fraud_Warning:
+    schema: Early_Fraud_Warning.schema.yaml
+    key:
+      - /id
+  acmeCo/InvoiceItems:
+    schema: InvoiceItems.schema.yaml
+    key:
+      - /id
+  acmeCo/InvoiceLineItems:
+    schema: InvoiceLineItems.schema.yaml
+    key:
+      - /id
+  acmeCo/Invoices:
+    schema: Invoices.schema.yaml
+    key:
+      - /id
+  acmeCo/PaymentIntents:
+    schema: PaymentIntents.schema.yaml
+    key:
+      - /id
+  acmeCo/Payment_Methods:
+    schema: Payment_Methods.schema.yaml
+    key:
+      - /id
+  acmeCo/Payouts:
+    schema: Payouts.schema.yaml
     key:
       - /id
   acmeCo/Persons:
     schema: Persons.schema.yaml
+    key:
+      - /id
+  acmeCo/Plans:
+    schema: Plans.schema.yaml
+    key:
+      - /id
+  acmeCo/Products:
+    schema: Products.schema.yaml
+    key:
+      - /id
+  acmeCo/PromotionCode:
+    schema: PromotionCode.schema.yaml
+    key:
+      - /id
+  acmeCo/Refunds:
+    schema: Refunds.schema.yaml
+    key:
+      - /id
+  acmeCo/Reviews:
+    schema: Reviews.schema.yaml
+    key:
+      - /id
+  acmeCo/Setup_Intents:
+    schema: Setup_Intents.schema.yaml
+    key:
+      - /id
+  acmeCo/Subscription_Schedule:
+    schema: Subscription_Schedule.schema.yaml
+    key:
+      - /id
+  acmeCo/Subscriptions:
+    schema: Subscriptions.schema.yaml
+    key:
+      - /id
+  acmeCo/TopUps:
+    schema: TopUps.schema.yaml
+    key:
+      - /id
+  acmeCo/TransferReversals:
+    schema: TransferReversals.schema.yaml
+    key:
+      - /id
+  acmeCo/Transfers:
+    schema: Transfers.schema.yaml
     key:
       - /id

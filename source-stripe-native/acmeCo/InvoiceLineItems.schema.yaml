@@ -20,6 +20,7 @@ $defs:
     title: Meta
     type: object
 additionalProperties: false
+description: "Child Stream\nParent Stream: Invoices"
 properties:
   _meta:
     allOf:
@@ -31,123 +32,131 @@ properties:
   id:
     title: Id
     type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
   object:
-    const: issuing.authorization
+    const: line_item
     enum:
-      - issuing.authorization
+      - line_item
     title: Object
     type: string
   amount:
     title: Amount
     type: integer
-  amount_details:
+  amount_excluding_tax:
     anyOf:
-      - type: object
+      - type: integer
       - type: "null"
     default: ~
-    title: Amount Details
-  approved:
-    title: Approved
-    type: boolean
-  authorization_method:
-    title: Authorization Method
-    type: string
-  balance_transactions:
-    items:
-      type: object
-    title: Balance Transactions
-    type: array
-  card:
-    title: Card
-    type: object
-  cardholder:
+    title: Amount Excluding Tax
+  currency:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Cardholder
-  created:
-    title: Created
-    type: integer
-  currency:
     title: Currency
-    type: string
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  discount_amounts:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Discount Amounts
+  discountable:
+    title: Discountable
+    type: boolean
+  discounts:
+    items:
+      type: string
+    title: Discounts
+    type: array
+  invoice_item:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice Item
   livemode:
     title: Livemode
     type: boolean
-  merchant_amount:
-    title: Merchant Amount
-    type: integer
-  merchant_currency:
-    title: Merchant Currency
-    type: string
-  merchant_data:
-    title: Merchant Data
-    type: object
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  network_data:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Network Data
-  pending_request:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Pending Request
-  redaction:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Redaction
-  request_history:
-    items:
-      type: object
-    title: Request History
-    type: array
-  status:
-    title: Status
-    type: string
-  transactions:
-    items:
-      type: object
-    title: Transactions
-    type: array
-  verification_data:
-    title: Verification Data
+  period:
+    title: Period
     type: object
-  wallet:
+  price:
+    title: Price
+    type: object
+  proration:
+    title: Proration
+    type: boolean
+  proration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Proration Details
+  quantity:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Quantity
+  subscription:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Wallet
+    title: Subscription
+  tax_amounts:
+    items:
+      type: object
+    title: Tax Amounts
+    type: array
+  tax_rates:
+    items:
+      type: object
+    title: Tax Rates
+    type: array
+  type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Type
+  unit_amount_excluding_tax:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Unit Amount Excluding Tax
 required:
   - id
   - object
   - amount
-  - approved
-  - authorization_method
-  - balance_transactions
-  - card
-  - created
-  - currency
+  - discountable
+  - discounts
   - livemode
-  - merchant_amount
-  - merchant_currency
-  - merchant_data
-  - request_history
-  - status
-  - transactions
-  - verification_data
-title: Authorizations
+  - period
+  - price
+  - proration
+  - tax_amounts
+  - tax_rates
+title: InvoiceLineItems
 type: object
 x-infer-schema: true

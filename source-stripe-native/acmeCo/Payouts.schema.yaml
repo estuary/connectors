@@ -19,8 +19,7 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: true
-description: "Child Stream\nParent Stream: Accounts"
+additionalProperties: false
 properties:
   _meta:
     allOf:
@@ -33,138 +32,122 @@ properties:
     title: Id
     type: string
   object:
-    const: card
+    const: payout
     enum:
-      - card
+      - payout
     title: Object
     type: string
-  address_city:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address City
-  address_country:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address Country
-  address_line1:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address Line1
-  address_line1_check:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address Line1 Check
-  address_line2:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address Line2
-  address_state:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address State
-  address_zip:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address Zip
-  address_zip_check:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Address Zip Check
-  brand:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Brand
-  country:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Country
-  customer:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Customer
-  cvc_check:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Cvc Check
-  dynamic_last4:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Dynamic Last4
-  exp_month:
-    title: Exp Month
+  amount:
+    title: Amount
     type: integer
-  exp_year:
-    title: Exp Year
+  arrival_date:
+    title: Arrival Date
     type: integer
-  fingerprint:
+  automatic:
+    title: Automatic
+    type: boolean
+  balance_transaction:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Fingerprint
-  funding:
-    title: Funding
-    type: string
-  last4:
-    title: Last4
-    type: string
+    title: Balance Transaction
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  destination:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Destination
+  failure_balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Balance Transaction
+  failure_code:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Code
+  failure_message:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Message
+  livemode:
+    title: Livemode
+    type: boolean
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  name:
+  method:
+    title: Method
+    type: string
+  original_payout:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Name
-  tokenization_method:
+    title: Original Payout
+  reconciliation_status:
+    title: Reconciliation Status
+    type: string
+  reversed_by:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Tokenization Method
-  wallet:
+    title: Reversed By
+  source_type:
+    title: Source Type
+    type: string
+  statement_descriptor:
     anyOf:
-      - type: object
+      - type: string
       - type: "null"
     default: ~
-    title: Wallet
+    title: Statement Descriptor
+  status:
+    title: Status
+    type: string
+  type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Type
 required:
   - id
   - object
-  - exp_month
-  - exp_year
-  - funding
-  - last4
-title: ExternalAccountCards
+  - amount
+  - arrival_date
+  - automatic
+  - created
+  - livemode
+  - method
+  - reconciliation_status
+  - source_type
+  - status
+title: Payouts
 type: object
 x-infer-schema: true

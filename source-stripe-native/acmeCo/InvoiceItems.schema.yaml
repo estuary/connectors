@@ -1,0 +1,145 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: invoiceitem
+    enum:
+      - invoiceitem
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  customer:
+    title: Customer
+    type: string
+  date:
+    title: Date
+    type: integer
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  discountable:
+    title: Discountable
+    type: boolean
+  discounts:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Discounts
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  period:
+    title: Period
+    type: object
+  plan:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Plan
+  price:
+    title: Price
+    type: object
+  proration:
+    title: Proration
+    type: boolean
+  quantity:
+    title: Quantity
+    type: integer
+  subscription:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Subscription
+  tax_rates:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Tax Rates
+  test_clock:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Test Clock
+  unit_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Unit Amount
+required:
+  - id
+  - object
+  - amount
+  - customer
+  - date
+  - discountable
+  - livemode
+  - period
+  - price
+  - proration
+  - quantity
+title: InvoiceItems
+type: object
+x-infer-schema: true

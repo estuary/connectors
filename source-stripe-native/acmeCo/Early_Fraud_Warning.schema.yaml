@@ -20,7 +20,6 @@ $defs:
     title: Meta
     type: object
 additionalProperties: false
-description: "Child Stream\nParent Stream: ApplicationFees"
 properties:
   _meta:
     allOf:
@@ -32,49 +31,35 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Parent Id
   object:
-    const: fee_refund
+    const: radar.early_fraud_warning
     enum:
-      - fee_refund
+      - radar.early_fraud_warning
     title: Object
     type: string
-  amount:
-    title: Amount
-    type: integer
-  balance_transaction:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Balance Transaction
+  actionable:
+    title: Actionable
+    type: boolean
+  charge:
+    title: Charge
+    type: string
   created:
     title: Created
     type: integer
-  currency:
-    title: Currency
+  fraud_type:
+    title: Fraud Type
     type: string
-  fee:
-    title: Fee
-    type: string
-  metadata:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Metadata
+  livemode:
+    title: Livemode
+    type: boolean
 required:
   - id
   - object
-  - amount
+  - actionable
+  - charge
   - created
-  - currency
-  - fee
-title: ApplicationFeesRefunds
+  - fraud_type
+  - livemode
+title: EarlyFraudWarning
 type: object
 x-infer-schema: true

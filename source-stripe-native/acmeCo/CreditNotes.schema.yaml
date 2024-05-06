@@ -1,0 +1,171 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: credit_note
+    enum:
+      - credit_note
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  amount_shipping:
+    title: Amount Shipping
+    type: integer
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  customer:
+    title: Customer
+    type: string
+  customer_balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Balance Transaction
+  discount_amounts:
+    items:
+      type: object
+    title: Discount Amounts
+    type: array
+  invoice:
+    title: Invoice
+    type: string
+  livemode:
+    title: Livemode
+    type: boolean
+  memo:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Memo
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  number:
+    title: Number
+    type: string
+  out_of_band_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Out Of Band Amount
+  pdf:
+    title: Pdf
+    type: string
+  reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Reason
+  refund:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Refund
+  shipping_cost:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping Cost
+  status:
+    title: Status
+    type: string
+  subtotal:
+    title: Subtotal
+    type: integer
+  subtotal_excluding_tax:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Subtotal Excluding Tax
+  tax_amounts:
+    items:
+      type: object
+    title: Tax Amounts
+    type: array
+  total:
+    title: Total
+    type: integer
+  total_excluding_tax:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Total Excluding Tax
+  type:
+    title: Type
+    type: string
+  voided_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Voided At
+required:
+  - id
+  - object
+  - amount
+  - amount_shipping
+  - created
+  - customer
+  - discount_amounts
+  - invoice
+  - livemode
+  - number
+  - pdf
+  - status
+  - subtotal
+  - tax_amounts
+  - total
+  - type
+title: CreditNotes
+type: object
+x-infer-schema: true
