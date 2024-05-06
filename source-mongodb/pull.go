@@ -37,7 +37,7 @@ const (
 	// progress report is currently just the count of stream documents that have been processed,
 	// which provides a nice indication in the logs of what the capture is doing when it is reading
 	// change streams.
-	streamLoggerInterval = 1 * time.Minute
+	streamLoggerInterval = 5 * time.Minute
 )
 
 // Pull is a very long lived RPC through which the Flow runtime and a
