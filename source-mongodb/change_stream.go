@@ -137,7 +137,7 @@ func (c *capture) initializeStreams(
 			return nil, fmt.Errorf("initializing change stream on database %q: %w", db, err)
 		}
 
-		logEntry.Info("intialized change stream")
+		logEntry.Debug("intialized change stream")
 
 		out = append(out, changeStream{
 			ms: ms,
@@ -236,9 +236,9 @@ func (c *capture) streamCatchup(
 
 			ts := time.Now()
 			logEntry := log.WithField("database", s.db)
-			logEntry.Info("started catching up stream for database")
+			logEntry.Debug("started catching up stream for database")
 			defer func() {
-				logEntry.WithField("took", time.Since(ts).String()).Info("finished catching up stream for database")
+				logEntry.WithField("took", time.Since(ts).String()).Debug("finished catching up stream for database")
 			}()
 
 			if err := c.tryStream(groupCtx, s, &opTime); err != nil {
@@ -273,7 +273,7 @@ func (c *capture) tryStream(
 			log.WithFields(log.Fields{
 				"database":         s.db,
 				"eventClusterTime": ev.ClusterTime,
-			}).Info("catch up stream reached cluster OpTime high watermark")
+			}).Debug("catch up stream reached cluster OpTime high watermark")
 			// Early return without a checkpoint for the "post batch resume token", since by
 			// definition we have received a document that corresponds to a specific resume
 			// token.
