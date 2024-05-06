@@ -15,7 +15,7 @@ from .models import EventResult, BackfillResult, ListResult
 
 
 API = "https://api.stripe.com/v1"
-
+#TODO add stop date to backfilling
 
 async def fetch_incremental(
     cls,
@@ -42,7 +42,7 @@ async def fetch_incremental(
                 recent.append(_s_to_dt(results.created))
                 doc = _cls.model_validate(results.data.object)
                 doc.meta_ = _cls.Meta(op="u")
-                yield _cls.model_validate(results.data.object)
+                yield doc
         
             elif _s_to_dt(results.created) < log_cursor:
                 stop = False
@@ -95,6 +95,7 @@ async def fetch_incremental_substreams(
                 if child_data is None:
                     pass # move to next customer
                 async for doc in child_data:
+                    doc.parent_id = parent_data.id
                     doc.meta_ = cls_child.Meta(op="u")
                     yield doc 
         
@@ -131,8 +132,6 @@ async def fetch_backfill_substreams(
 
     for doc in result.data:
         if _s_to_dt(doc.created) < cutoff:
-
-
             parent_data = doc
             search_name = _cls.SEARCH_NAME
             id = parent_data.id
@@ -148,6 +147,7 @@ async def fetch_backfill_substreams(
             if child_data is None:
                 pass # move to next customer
             async for doc in child_data:
+                doc.parent_id = parent_data.id
                 doc.meta_ = cls_child.Meta(op="u")
                 yield doc 
 
@@ -212,6 +212,44 @@ async def fetch_backfill(
         yield result.data[-1].id
     else:
         return
+
+async def fetch_incremental_no_events(
+    cls,
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator:
+
+    stop = True
+
+    url = f"{API}/{cls.SEARCH_NAME}"
+    parameters = {"limit": 100}
+    recent = []
+
+
+    _cls: Any = cls  # Silence mypy false-positive
+
+    while stop:
+        result = ListResult.model_validate_json(
+        await http.request(log, url, method="GET", params=parameters)
+    )
+        for results in result.data:
+            if _s_to_dt(results.created) > log_cursor:
+                recent.append(_s_to_dt(results.created))
+                doc = _cls.model_validate(results.data.object)
+                doc.meta_ = _cls.Meta(op="u")
+                yield doc
+        
+            elif _s_to_dt(results.created) < log_cursor:
+                stop = False
+                break
+        if result.has_more is True:
+            parameters["starting_after"] = result.data[-1].id
+        else:
+            break
+    if recent:
+        recent.sort()
+        yield recent[-1]
 
 def _s_to_dt(s: int) -> datetime:
     return datetime.fromtimestamp(s,tz=UTC)

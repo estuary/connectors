@@ -21,11 +21,68 @@ captures:
           name: Customers
         target: acmeCo/Customers
       - resource:
-          name: Authorizations
-        target: acmeCo/Authorizations
+          name: Customer_Balance_Transaction
+        target: acmeCo/Customer_Balance_Transaction
       - resource:
-          name: CardHolders
-        target: acmeCo/CardHolders
+          name: Charges
+        target: acmeCo/Charges
+      - resource:
+          name: CheckoutSessions
+        target: acmeCo/CheckoutSessions
+      - resource:
+          name: Coupons
+        target: acmeCo/Coupons
+      - resource:
+          name: CreditNotes
+        target: acmeCo/CreditNotes
+      - resource:
+          name: Disputes
+        target: acmeCo/Disputes
+      - resource:
+          name: Early_Fraud_Warning
+        target: acmeCo/Early_Fraud_Warning
+      - resource:
+          name: InvoiceItems
+        target: acmeCo/InvoiceItems
+      - resource:
+          name: Invoices
+        target: acmeCo/Invoices
+      - resource:
+          name: PaymentIntents
+        target: acmeCo/PaymentIntents
+      - resource:
+          name: Payouts
+        target: acmeCo/Payouts
+      - resource:
+          name: Plans
+        target: acmeCo/Plans
+      - resource:
+          name: Products
+        target: acmeCo/Products
+      - resource:
+          name: PromotionCode
+        target: acmeCo/PromotionCode
+      - resource:
+          name: Refunds
+        target: acmeCo/Refunds
+      - resource:
+          name: Reviews
+        target: acmeCo/Reviews
+      - resource:
+          name: Setup_Intents
+        target: acmeCo/Setup_Intents
+      - resource:
+          name: Subscriptions
+        target: acmeCo/Subscriptions
+      - resource:
+          name: Subscription_Schedule
+        target: acmeCo/Subscription_Schedule
+      - resource:
+          name: TopUps
+        target: acmeCo/TopUps
+      - resource:
+          name: Transfers
+        target: acmeCo/Transfers
       - resource:
           name: Persons
         target: acmeCo/Persons
@@ -38,5 +95,20 @@ captures:
       - resource:
           name: Bank_Accounts
         target: acmeCo/Bank_Accounts
+      - resource:
+          name: Payment_Methods
+        target: acmeCo/Payment_Methods
+      - resource:
+          name: CheckoutSessionsLine
+        target: acmeCo/CheckoutSessionsLine
+      - resource:
+          name: CreditNotesLines
+        target: acmeCo/CreditNotesLines
+      - resource:
+          name: InvoiceLineItems
+        target: acmeCo/InvoiceLineItems
+      - resource:
+          name: TransferReversals
+        target: acmeCo/TransferReversals
     shards:
       logLevel: debug

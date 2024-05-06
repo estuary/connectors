@@ -19,8 +19,7 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: true
-description: "Child Stream\nParent Stream: Accounts"
+additionalProperties: false
 properties:
   _meta:
     allOf:
@@ -33,84 +32,82 @@ properties:
     title: Id
     type: string
   object:
-    const: bank_account
+    const: coupon
     enum:
-      - bank_account
+      - coupon
     title: Object
     type: string
-  account_holder_name:
+  amount_off:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
     default: ~
-    title: Account Holder Name
-  account_holder_type:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Account Holder Type
-  account_type:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Account Type
-  available_payout_methods:
-    anyOf:
-      - items:
-          type: string
-        type: array
-      - type: "null"
-    default: ~
-    title: Available Payout Methods
-  bank_name:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Bank Name
-  country:
-    title: Country
-    type: string
+    title: Amount Off
+  created:
+    title: Created
+    type: integer
   currency:
-    title: Currency
-    type: string
-  customer:
-    title: Customer
-    type: string
-  fingerprint:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Fingerprint
-  last4:
-    title: Last4
+    title: Currency
+  duration:
+    title: Duration
     type: string
+  duration_in_months:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Duration In Months
+  livemode:
+    title: Livemode
+    type: boolean
+  max_redemptions:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Max Redemptions
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  routing_number:
+  name:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Routing Number
-  status:
-    title: Status
-    type: string
+    title: Name
+  percent_off:
+    anyOf:
+      - type: number
+      - type: "null"
+    default: ~
+    title: Percent Off
+  redeem_by:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Redeem By
+  times_redeemed:
+    title: Times Redeemed
+    type: integer
+  valid:
+    title: Valid
+    type: boolean
 required:
   - id
   - object
-  - country
-  - currency
-  - customer
-  - last4
-  - status
-title: ExternalBankAccount
+  - created
+  - duration
+  - livemode
+  - times_redeemed
+  - valid
+title: Coupons
 type: object
 x-infer-schema: true

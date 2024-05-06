@@ -19,8 +19,7 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: true
-description: "Child Stream\nParent Stream: Accounts"
+additionalProperties: false
 properties:
   _meta:
     allOf:
@@ -32,81 +31,75 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Parent Id
   object:
-    const: person
+    const: dispute
     enum:
-      - person
+      - dispute
     title: Object
     type: string
-  account:
-    title: Account
+  amount:
+    title: Amount
+    type: integer
+  balance_transactions:
+    items:
+      type: object
+    title: Balance Transactions
+    type: array
+  charge:
+    title: Charge
     type: string
   created:
     title: Created
     type: integer
-  dob:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Dob
-  first_name:
+  currency:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: First Name
-  future_requirements:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Future Requirements
-  id_number_provided:
-    title: Id Number Provided
+    title: Currency
+  evidence:
+    title: Evidence
+    type: object
+  evidence_details:
+    title: Evidence Details
+    type: object
+  is_charge_refundable:
+    title: Is Charge Refundable
     type: boolean
-  last_name:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Last Name
+  livemode:
+    title: Livemode
+    type: boolean
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  relationship:
-    title: Relationship
-    type: object
-  requirements:
+  payment_intent:
     anyOf:
-      - type: object
+      - type: string
       - type: "null"
     default: ~
-    title: Requirements
-  ssn_last_4_provided:
-    title: Ssn Last 4 Provided
-    type: boolean
-  verification:
-    title: Verification
-    type: object
+    title: Payment Intent
+  reason:
+    title: Reason
+    type: string
+  status:
+    title: Status
+    type: string
 required:
   - id
   - object
-  - account
+  - amount
+  - balance_transactions
+  - charge
   - created
-  - id_number_provided
-  - relationship
-  - ssn_last_4_provided
-  - verification
-title: Persons
+  - evidence
+  - evidence_details
+  - is_charge_refundable
+  - livemode
+  - reason
+  - status
+title: Disputes
 type: object
 x-infer-schema: true

@@ -19,8 +19,7 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: true
-description: "Child Stream\nParent Stream: Accounts"
+additionalProperties: false
 properties:
   _meta:
     allOf:
@@ -32,81 +31,79 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
+  object:
+    const: topup
+    enum:
+      - topup
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  balance_transaction:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Parent Id
-  object:
-    const: person
-    enum:
-      - person
-    title: Object
-    type: string
-  account:
-    title: Account
-    type: string
+    title: Balance Transaction
   created:
     title: Created
     type: integer
-  dob:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Dob
-  first_name:
+  currency:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: First Name
-  future_requirements:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Future Requirements
-  id_number_provided:
-    title: Id Number Provided
-    type: boolean
-  last_name:
+    title: Currency
+  description:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Last Name
-  metadata:
+    title: Description
+  expected_availability_date:
     anyOf:
-      - type: object
+      - type: integer
       - type: "null"
     default: ~
-    title: Metadata
-  relationship:
-    title: Relationship
-    type: object
-  requirements:
+    title: Expected Availability Date
+  failure_code:
     anyOf:
-      - type: object
+      - type: string
       - type: "null"
     default: ~
-    title: Requirements
-  ssn_last_4_provided:
-    title: Ssn Last 4 Provided
+    title: Failure Code
+  failure_message:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Message
+  livemode:
+    title: Livemode
     type: boolean
-  verification:
-    title: Verification
-    type: object
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  status:
+    title: Status
+    type: string
+  transfer_group:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Transfer Group
 required:
   - id
   - object
-  - account
+  - amount
   - created
-  - id_number_provided
-  - relationship
-  - ssn_last_4_provided
-  - verification
-title: Persons
+  - livemode
+  - status
+title: TopUps
 type: object
 x-infer-schema: true

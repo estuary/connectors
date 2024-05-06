@@ -19,8 +19,7 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: true
-description: "Child Stream\nParent Stream: Accounts"
+additionalProperties: false
 properties:
   _meta:
     allOf:
@@ -32,81 +31,77 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
+  object:
+    const: review
+    enum:
+      - review
+    title: Object
+    type: string
+  billing_zip:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Parent Id
-  object:
-    const: person
-    enum:
-      - person
-    title: Object
-    type: string
-  account:
-    title: Account
-    type: string
+    title: Billing Zip
+  charge:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Charge
+  closed_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Closed Reason
   created:
     title: Created
     type: integer
-  dob:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Dob
-  first_name:
+  ip_address:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: First Name
-  future_requirements:
+    title: Ip Address
+  ip_address_location:
     anyOf:
       - type: object
       - type: "null"
     default: ~
-    title: Future Requirements
-  id_number_provided:
-    title: Id Number Provided
+    title: Ip Address Location
+  livemode:
+    title: Livemode
     type: boolean
-  last_name:
+  open:
+    title: Open
+    type: boolean
+  opened_reason:
+    title: Opened Reason
+    type: string
+  payment_intent:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Last Name
-  metadata:
+    title: Payment Intent
+  reason:
+    title: Reason
+    type: string
+  session:
     anyOf:
       - type: object
       - type: "null"
     default: ~
-    title: Metadata
-  relationship:
-    title: Relationship
-    type: object
-  requirements:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Requirements
-  ssn_last_4_provided:
-    title: Ssn Last 4 Provided
-    type: boolean
-  verification:
-    title: Verification
-    type: object
+    title: Session
 required:
   - id
   - object
-  - account
   - created
-  - id_number_provided
-  - relationship
-  - ssn_last_4_provided
-  - verification
-title: Persons
+  - livemode
+  - open
+  - opened_reason
+  - reason
+title: Reviews
 type: object
 x-infer-schema: true
