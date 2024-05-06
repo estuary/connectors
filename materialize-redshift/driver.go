@@ -231,15 +231,30 @@ func newRedshiftDriver() *sql.Driver {
 				}
 			}
 
+			db, err := stdsql.Open("pgx", cfg.toURI())
+			if err != nil {
+				return nil, fmt.Errorf("opening db: %w", err)
+			}
+			defer db.Close()
+
+			var caseSensitiveIdentifier string
+			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
+				return nil, fmt.Errorf("querying enable_case_sensitive_identifier: %w", err)
+			}
+
+			var caseSensitiveIdentifierEnabled = strings.EqualFold(caseSensitiveIdentifier, "on")
+			var dialect = rsDialect(caseSensitiveIdentifierEnabled)
+			var templates = renderTemplates(dialect)
+
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             rsDialect,
+				Dialect:             dialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(templates, caseSensitiveIdentifierEnabled),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
 			}, nil
@@ -250,77 +265,87 @@ func newRedshiftDriver() *sql.Driver {
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
+	templates   templates
+	dialect     sql.Dialect
 	fence       sql.Fence
 	bindings    []*binding
 	cfg         *config
 	updateDelay time.Duration
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-	open pm.Request_Open,
-) (_ m.Transactor, err error) {
-	var cfg = ep.Config.(*config)
+func prepareNewTransactor(
+	templates templates,
+	caseSensitiveIdentifierEnabled bool,
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+		open pm.Request_Open,
+	) (_ m.Transactor, err error) {
+		var cfg = ep.Config.(*config)
 
-	var d = &transactor{
-		fence: fence,
-		cfg:   cfg,
-	}
-
-	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
-		return nil, err
-	}
-
-	s3client, err := d.cfg.toS3Client(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := stdsql.Open("pgx", d.cfg.toURI())
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	schemas := []string{}
-	for _, b := range bindings {
-		if !slices.Contains(schemas, b.InfoLocation.TableSchema) {
-			schemas = append(schemas, b.InfoLocation.TableSchema)
+		var d = &transactor{
+			templates: templates,
+			dialect:   ep.Dialect,
+			fence:     fence,
+			cfg:       cfg,
 		}
-	}
 
-	catalog := cfg.Database
-	if catalog == "" {
-		// An endpoint-level database configuration is not required, so query for the active
-		// database if that's the case.
-		if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
-			return nil, fmt.Errorf("querying for connected database: %w", err)
+		if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+			return nil, err
 		}
-	}
-	resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
-	for _, b := range open.Materialization.Bindings {
-		resourcePaths = append(resourcePaths, b.ResourcePath)
-	}
-	is, err := sql.StdFetchInfoSchema(ctx, db, rsDialect, catalog, resourcePaths)
-	if err != nil {
-		return nil, err
-	}
 
-	for idx, target := range bindings {
-		if err = d.addBinding(
-			idx,
-			target,
-			s3client,
-			is,
-		); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+		s3client, err := d.cfg.toS3Client(ctx)
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	return d, nil
+		db, err := stdsql.Open("pgx", d.cfg.toURI())
+		if err != nil {
+			return nil, err
+		}
+		defer db.Close()
+
+		schemas := []string{}
+		for _, b := range bindings {
+			if !slices.Contains(schemas, b.InfoLocation.TableSchema) {
+				schemas = append(schemas, b.InfoLocation.TableSchema)
+			}
+		}
+
+		catalog := cfg.Database
+		if catalog == "" {
+			// An endpoint-level database configuration is not required, so query for the active
+			// database if that's the case.
+			if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
+				return nil, fmt.Errorf("querying for connected database: %w", err)
+			}
+		}
+		resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
+		for _, b := range open.Materialization.Bindings {
+			resourcePaths = append(resourcePaths, b.ResourcePath)
+		}
+		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, catalog, resourcePaths)
+		if err != nil {
+			return nil, err
+		}
+
+		for idx, target := range bindings {
+			if err = d.addBinding(
+				idx,
+				target,
+				s3client,
+				is,
+				caseSensitiveIdentifierEnabled,
+			); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+			}
+		}
+
+		return d, nil
+	}
 }
 
 type binding struct {
@@ -350,6 +375,7 @@ func (t *transactor) addBinding(
 	target sql.Table,
 	client *s3.Client,
 	is *boilerplate.InfoSchema,
+	caseSensitiveIdentifierEnabled bool,
 ) error {
 	var b = &binding{
 		target:    target,
@@ -359,23 +385,22 @@ func (t *transactor) addBinding(
 
 	// Render templates that require specific S3 "COPY INTO" parameters.
 	for _, m := range []struct {
-		sql             *string
-		target          string
-		columns         []*sql.Column
-		truncateColumns bool
-		stagedFile      *stagedFile
+		sql        *string
+		target     string
+		columns    []*sql.Column
+		stagedFile *stagedFile
 	}{
-		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
-		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
-		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
+		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), b.loadFile},
+		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), b.storeFile},
+		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), b.storeFile},
 	} {
 		var sql strings.Builder
-		if err := tplCopyFromS3.Execute(&sql, copyFromS3Params{
-			Target:          m.target,
-			Columns:         m.columns,
-			ManifestURL:     m.stagedFile.fileURI(manifestFile),
-			Config:          t.cfg,
-			TruncateColumns: m.truncateColumns,
+		if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
+			Target:                         m.target,
+			Columns:                        m.columns,
+			ManifestURL:                    m.stagedFile.fileURI(manifestFile),
+			Config:                         t.cfg,
+			CaseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
 		}); err != nil {
 			return err
 		}
@@ -387,9 +412,9 @@ func (t *transactor) addBinding(
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createStoreTableSQL, tplCreateStoreTable},
-		{&b.mergeIntoSQL, tplMergeInto},
-		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.createStoreTableSQL, t.templates.createStoreTable},
+		{&b.mergeIntoSQL, t.templates.mergeInto},
+		{&b.loadQuerySQL, t.templates.loadQuery},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -399,7 +424,7 @@ func (t *transactor) addBinding(
 
 	// The load table template is re-evaluated every transaction to account for the specific string
 	// lengths observed for string keys in the load key set.
-	b.createLoadTableTemplate = tplCreateLoadTable
+	b.createLoadTableTemplate = t.templates.createLoadTable
 
 	// Retain column metadata information for this binding as a snapshot of the target table
 	// configuration when the connector started, indexed in the same order as values will be
@@ -647,7 +672,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.fence); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
@@ -661,14 +686,6 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
 	defer conn.Close(ctx)
-
-	// Truncate strings within SUPER types by setting this option, since these have the same limits
-	// on maximum VARCHAR lengths as table columns do. Notably, this will truncate any strings in
-	// `flow_document` (stored as a SUPER column) that otherwise would prevent the row from being
-	// added to the table.
-	if _, err := conn.Exec(ctx, "SET json_parse_truncate_strings=ON;"); err != nil {
-		return fmt.Errorf("configuring json_parse_truncate_strings=ON: %w", err)
-	}
 
 	// Update any columns that require setting to VARCHAR(MAX) for storing large strings. ALTER
 	// TABLE ALTER COLUMN statements cannot be run inside transaction blocks.
@@ -714,7 +731,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	// checkpoints table. For best performance, a single materialization per database should be
 	// used, or separate materializations within the same database should use a different schema for
 	// their metadata.
-	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...))); err != nil {
+	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", d.dialect.Identifier(d.fence.TablePath...))); err != nil {
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 

@@ -102,7 +102,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", rsDialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -159,7 +159,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
-	return sql.StdCreateSchema(ctx, c.db, rsDialect, schemaName)
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
