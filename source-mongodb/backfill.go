@@ -141,7 +141,7 @@ func (c *capture) doBackfill(
 		"collection":         binding.resource.Collection,
 		"estimatedTotalDocs": estimatedTotalDocs,
 	})
-	logEntry.Info("starting backfill for collection")
+	logEntry.Debug("starting backfill for collection")
 
 	// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
 	// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
