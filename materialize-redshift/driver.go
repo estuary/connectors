@@ -231,6 +231,21 @@ func newRedshiftDriver() *sql.Driver {
 				}
 			}
 
+			db, err := stdsql.Open("pgx", cfg.toURI())
+			if err != nil {
+				return nil, fmt.Errorf("opening db: %w", err)
+			}
+			defer db.Close()
+
+			var caseSensitiveIdentifier string
+			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
+				return nil, fmt.Errorf("querying enable_case_sensitive_identifier: %w", err)
+			}
+
+			var caseSensitiveIdentifierEnabled = strings.EqualFold(caseSensitiveIdentifier, "on")
+
+			log.WithField("caseSensitiveIdentifierEnabled", caseSensitiveIdentifierEnabled).Info("detected value for enable_case_sensitive_identifier")
+
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             rsDialect,
