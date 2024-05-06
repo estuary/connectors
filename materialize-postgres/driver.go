@@ -87,12 +87,7 @@ func (c *config) ToURI() string {
 		address = "localhost:5432"
 	}
 
-	// If the user did not specify a port (or no network tunnel is being used), default to port
-	// 5432. pgx ends up doing this anyway, but we do it here to make it more explicit and stable in
-	// case that underlying behavior changes in the future.
-	if !strings.Contains(address, ":") {
-		address = address + ":5432"
-	}
+	address = ensurePort(address)
 
 	var uri = url.URL{
 		Scheme: "postgres",
@@ -111,6 +106,17 @@ func (c *config) ToURI() string {
 	}
 
 	return uri.String()
+}
+
+func ensurePort(addr string) string {
+	// If the user did not specify a port, default to 5432 since that is almost always what is
+	// desired. pgx ends up doing this anyway, and we also need it for cases where a network tunnel
+	// is being used and the port is not set.
+	if !strings.Contains(addr, ":") {
+		addr = addr + ":5432"
+	}
+
+	return addr
 }
 
 type tableConfig struct {
@@ -172,7 +178,7 @@ func newPostgresDriver() *sql.Driver {
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(cfg.Address)
+				host, port, err := net.SplitHostPort(ensurePort(cfg.Address))
 				if err != nil {
 					return nil, fmt.Errorf("splitting address to host and port: %w", err)
 				}
