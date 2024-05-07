@@ -169,6 +169,12 @@ properties:
       - type: "null"
     default: ~
     title: Payment Method Options
+  payment_method_configuration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Configuration Details
   payment_method_types:
     anyOf:
       - items:

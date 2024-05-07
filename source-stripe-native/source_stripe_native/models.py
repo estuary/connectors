@@ -29,7 +29,7 @@ class EventResult(BaseModel,  Generic[Item], extra="forbid"):
     class Data(BaseModel):
         class CLSDATA(BaseModel):
             object: Item
-            previous_attributes: Dict
+            previous_attributes: Dict | None = None
         id: str
         object: Literal["event"]
         api_version: str
@@ -46,7 +46,8 @@ class ListResult(BaseModel,  Generic[Item], extra="forbid"):
     has_more: bool
     data: List[Item]
 
-class BackfillResult(BaseModel, Generic[Item], extra="forbid"):
+class BackfillResult(BaseModel, Generic[Item], extra="allow"):
+    # Set extra as allow since Refunds has one aditional field
     object: str
     url: str
     has_more: bool
@@ -415,6 +416,7 @@ class PaymentMethods(BaseDocument, extra="forbid"):
     created: int
     customer: str | None = None
     livemode: bool
+    allow_redisplay: str | None = None
     metadata: Dict | None = None
     type: str | None = None
 
@@ -462,6 +464,11 @@ class Charges(BaseDocument, extra="forbid"):
     customer: str | None = None
     description: str | None = None
     disputed: bool
+    destination: str | None = None
+    dispute: str | None = None
+    order: str | None = None
+    radar_options: Dict | None = None
+    source: str | None = None
     failure_balance_transaction: str | None = None
     failure_code: str | None = None
     failure_message: str | None = None
@@ -656,6 +663,7 @@ class Disputes(BaseDocument, extra="forbid"):
     amount: int
     balance_transactions: list[Dict]
     charge: str
+    count: int
     created: int
     currency: str | None = None
     evidence: Dict
@@ -717,7 +725,7 @@ class Invoices(BaseDocument, extra="forbid"):
     object: Literal["invoice"]
     account_country: str | None = None
     account_name: str | None = None
-    account_tax_ids: list[str]
+    account_tax_ids: list[str] | None = None
     amount_due: int
     amount_paid: int
     amount_remaining: int
@@ -746,10 +754,12 @@ class Invoices(BaseDocument, extra="forbid"):
     default_source: str | None = None
     default_tax_rates: list[Dict]
     description: str | None = None
-    #"discount": null, docs claim to be Deprecated
+    discount: str | None = None
     discounts: list[str]
     due_date: int | None = None
     ending_balance: int | None = None
+    effective_at: int | None = None
+    rendering: Dict | None = None
     footer: str | None = None
     from_invoice: Dict | None = None
     hosted_invoice_url: str | None = None
@@ -781,6 +791,7 @@ class Invoices(BaseDocument, extra="forbid"):
     status: str | None = None
     status_transitions: Dict
     subscription: str | None = None
+    subscription_details: Dict | None = None
     subtotal: int
     subtotal_excluding_tax: int | None = None
     tax: int | None = None
@@ -815,7 +826,10 @@ class InvoiceLineItems(BaseDocument, extra="forbid"):
     metadata: Dict | None = None
     period: Dict
     price: Dict
+    invoice: str | None = None
     proration: bool
+    plan: Dict | None = None
+    subscription_item: str | None = None
     proration_details: Dict | None = None
     quantity: int | None = None
     subscription: str | None = None
@@ -856,6 +870,7 @@ class PaymentIntent(BaseDocument, extra="forbid"):
     on_behalf_of: str | None = None
     payment_method: str | None = None
     payment_method_options: Dict | None = None
+    payment_method_configuration_details: Dict | None = None
     payment_method_types: list[str] | None = None
     processing: Dict | None = None
     receipt_email: str | None = None
@@ -910,6 +925,7 @@ class Plans(BaseDocument, extra="forbid"):
     amount: int | None = None
     amount_decimal: str | None = None
     billing_scheme: str | None = None
+    meter: str | None = None
     created: int
     currency: str | None = None
     interval: str
@@ -948,6 +964,8 @@ class Products(BaseDocument, extra="forbid"):
     tax_code: str | None = None
     unit_label: str | None = None
     updated: int
+    caption: str | None = None
+    deactivate_on: list[str] | None = None
     url: str | None = None
 
 class PromotionCode(BaseDocument, extra="forbid"):
@@ -979,6 +997,7 @@ class Refunds(BaseDocument, extra="forbid"):
     amount: int
     balance_transaction: str | None = None
     charge: str | None = None
+    count: int
     created: int
     currency: str | None = None
     destination_details: Dict | None = None
@@ -1038,6 +1057,7 @@ class SetupIntents(BaseDocument, extra="forbid"):
     id: str
     object: Literal["setup_intent"]
     application: str | None = None
+    automatic_payment_methods: Dict | None = None
     cancellation_reason: str | None = None
     client_secret: str | None = None
     created: int
@@ -1052,6 +1072,7 @@ class SetupIntents(BaseDocument, extra="forbid"):
     next_action: Dict | None = None
     on_behalf_of: str | None = None
     payment_method: str | None = None
+    payment_method_configuration_details: Dict | None = None
     payment_method_options: Dict | None = None
     payment_method_types: list[str] | None = None
     single_use_mandate: str | None = None
@@ -1070,6 +1091,7 @@ class Subscriptions(BaseDocument, extra="forbid"):
     application_fee_percent: float | None = None
     automatic_tax: Dict
     billing_cycle_anchor: int
+    billing_cycle_anchor_config: Dict | None = None
     billing_thresholds: Dict | None = None
     cancel_at: int | None = None
     cancel_at_period_end: bool
@@ -1087,6 +1109,7 @@ class Subscriptions(BaseDocument, extra="forbid"):
     default_tax_rates: list[Dict] | None = None
     description: str | None = None
     discounts: list[str] | None = None
+    discount: Dict | None = None
     ended_at: int | None = None
     invoice_settings: Dict
     items: Dict = Field(exclude=True)
@@ -1108,6 +1131,8 @@ class Subscriptions(BaseDocument, extra="forbid"):
     trial_end: int | None = None
     trial_settings: Dict
     trial_start: int | None = None
+    plan: Dict
+    quantity: int
 
 class SubscriptionItems(BaseDocument, extra="forbid"):
     """
