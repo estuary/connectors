@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FGeneric_ReplicationDeletes_65713151":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FGeneric_ReplicationDeletes_65713151":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
