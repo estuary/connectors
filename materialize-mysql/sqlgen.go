@@ -49,7 +49,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
-		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
+		sql.BINARY:  sql.NewStaticMapper("LONGTEXT"),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.PrimaryKeyMapper{
 				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),

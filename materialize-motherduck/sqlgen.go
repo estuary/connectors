@@ -14,7 +14,7 @@ var duckDialect = func() sql.Dialect {
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:   sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.ARRAY:    sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:   sql.NewStaticMapper("BLOB"),
+		sql.BINARY:   sql.NewStaticMapper("VARCHAR"),
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("VARCHAR"),

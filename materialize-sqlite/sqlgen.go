@@ -10,7 +10,7 @@ import (
 var sqliteDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:   sql.NewStaticMapper("TEXT"),
-		sql.BINARY:  sql.NewStaticMapper("BLOB"),
+		sql.BINARY:  sql.NewStaticMapper("TEXT"),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
 		sql.INTEGER: sql.NewStaticMapper("INTEGER"),
 		sql.NUMBER:  sql.NewStaticMapper("REAL"),
