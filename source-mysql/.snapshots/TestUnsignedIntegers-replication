@@ -1,0 +1,9 @@
+# ================================
+# Collection "acmeCo/test/test_unsignedintegers_45511171": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnsignedIntegers_45511171","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":2,"v1":-34,"v2":-9981,"v3":-5666105,"v4":-961633963,"v8":-668966295931773839}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FUnsignedIntegers_45511171":{"backfilled":1,"key_columns":["id"],"metadata":{"schema":{"columns":["id","v1","v2","v3","v4","v8"],"types":{"id":"int","v1":"tinyint","v2":"smallint","v3":"mediumint","v4":"int","v8":"bigint"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
