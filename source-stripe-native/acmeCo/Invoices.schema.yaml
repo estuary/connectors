@@ -208,10 +208,13 @@ properties:
     default: ~
     title: Discount
   discounts:
-    items:
-      type: string
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
     title: Discounts
-    type: array
   due_date:
     anyOf:
       - type: integer
@@ -463,7 +466,6 @@ required:
   - automatic_tax
   - created
   - default_tax_rates
-  - discounts
   - livemode
   - paid
   - paid_out_of_band

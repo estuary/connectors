@@ -20,6 +20,7 @@ $defs:
     title: Meta
     type: object
 additionalProperties: false
+description: "Child Stream\nParent Stream: Subscriptions"
 properties:
   _meta:
     allOf:
@@ -31,36 +32,33 @@ properties:
   id:
     title: Id
     type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
   object:
-    const: invoiceitem
+    const: subscription_item
     enum:
-      - invoiceitem
+      - subscription_item
     title: Object
     type: string
-  amount:
-    title: Amount
-    type: integer
-  currency:
+  billing_thresholds:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
-    title: Currency
-  customer:
-    title: Customer
-    type: string
-  date:
-    title: Date
+    title: Billing Thresholds
+  created:
+    title: Created
     type: integer
-  description:
+  metadata:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
-    title: Description
-  discountable:
-    title: Discountable
-    type: boolean
+    title: Metadata
   discounts:
     anyOf:
       - items:
@@ -69,45 +67,24 @@ properties:
       - type: "null"
     default: ~
     title: Discounts
-  invoice:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Invoice
-  livemode:
-    title: Livemode
-    type: boolean
-  metadata:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Metadata
-  period:
-    title: Period
-    type: object
   plan:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
     title: Plan
   price:
     title: Price
     type: object
-  proration:
-    title: Proration
-    type: boolean
   quantity:
-    title: Quantity
-    type: integer
-  subscription:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
     default: ~
+    title: Quantity
+  subscription:
     title: Subscription
+    type: string
   tax_rates:
     anyOf:
       - items:
@@ -116,30 +93,12 @@ properties:
       - type: "null"
     default: ~
     title: Tax Rates
-  test_clock:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Test Clock
-  unit_amount:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Unit Amount
 required:
   - id
   - object
-  - amount
-  - customer
-  - date
-  - discountable
-  - livemode
-  - period
+  - created
   - price
-  - proration
-  - quantity
-title: InvoiceItems
+  - subscription
+title: SubscriptionItems
 type: object
 x-infer-schema: true

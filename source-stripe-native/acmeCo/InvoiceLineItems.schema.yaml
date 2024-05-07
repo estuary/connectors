@@ -77,10 +77,13 @@ properties:
     title: Discountable
     type: boolean
   discounts:
-    items:
-      type: string
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
     title: Discounts
-    type: array
   invoice_item:
     anyOf:
       - type: string
@@ -168,7 +171,6 @@ required:
   - object
   - amount
   - discountable
-  - discounts
   - livemode
   - period
   - price

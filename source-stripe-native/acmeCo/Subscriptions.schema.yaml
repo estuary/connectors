@@ -150,7 +150,7 @@ properties:
   discounts:
     anyOf:
       - items:
-          type: string
+          type: object
         type: array
       - type: "null"
     default: ~
