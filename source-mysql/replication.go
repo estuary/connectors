@@ -681,13 +681,16 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 }
 
 func translateDataType(t sqlparser.ColumnType) any {
-	var typeName = strings.ToLower(t.Type)
-	if typeName == "enum" {
+	switch typeName := strings.ToLower(t.Type); typeName {
+	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
-	} else if typeName == "set" {
+	case "set":
 		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
+		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
+	default:
+		return typeName
 	}
-	return typeName
 }
 
 // unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted

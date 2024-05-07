@@ -5,5 +5,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FUnsignedIntegers_45511171":{"backfilled":1,"key_columns":["id"],"metadata":{"schema":{"columns":["id","v1","v2","v3","v4","v8"],"types":{"id":"int","v1":"tinyint","v2":"smallint","v3":"mediumint","v4":"int","v8":"bigint"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FUnsignedIntegers_45511171":{"backfilled":1,"key_columns":["id"],"metadata":{"schema":{"columns":["id","v1","v2","v3","v4","v8"],"types":{"id":{"type":"int"},"v1":{"type":"tinyint","unsigned":true},"v2":{"type":"smallint","unsigned":true},"v3":{"type":"mediumint","unsigned":true},"v4":{"type":"int","unsigned":true},"v8":{"type":"bigint","unsigned":true}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
