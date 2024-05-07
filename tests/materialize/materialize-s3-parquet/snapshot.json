@@ -180,6 +180,7 @@
 {
   "_meta/flow_truncated": false,
   "array_int": "[91,92]",
+  "binary_field": "aGVsbG8K",
   "bool_field": false,
   "float_field": 9.9,
   "flow_published_at": "2023-07-12T18:25:11.322369Z",
@@ -191,6 +192,7 @@
 {
   "_meta/flow_truncated": false,
   "array_int": "[1,2]",
+  "binary_field": "Z29vZGJ5ZQo=",
   "bool_field": true,
   "float_field": 10.1,
   "flow_published_at": "2023-07-12T18:25:20.45195Z",
@@ -238,6 +240,7 @@
 {
   "_meta/flow_truncated": false,
   "array_int": "[91,92]",
+  "binary_field": "YWxvaGEK",
   "bool_field": false,
   "float_field": 99.99,
   "flow_published_at": "2023-07-12T18:28:55.677252Z",
@@ -249,6 +252,7 @@
 {
   "_meta/flow_truncated": false,
   "array_int": "[1,2]",
+  "binary_field": "c2F5xY1uYXJhCg==",
   "bool_field": true,
   "float_field": 1010.101,
   "flow_published_at": "2023-07-12T18:29:04.671352Z",
