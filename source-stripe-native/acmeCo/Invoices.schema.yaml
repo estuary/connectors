@@ -50,10 +50,13 @@ properties:
     default: ~
     title: Account Name
   account_tax_ids:
-    items:
-      type: string
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
     title: Account Tax Ids
-    type: array
   amount_due:
     title: Amount Due
     type: integer
@@ -198,6 +201,12 @@ properties:
       - type: "null"
     default: ~
     title: Description
+  discount:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Discount
   discounts:
     items:
       type: string
@@ -215,6 +224,18 @@ properties:
       - type: "null"
     default: ~
     title: Ending Balance
+  effective_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Effective At
+  rendering:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Rendering
   footer:
     anyOf:
       - type: string
@@ -368,6 +389,12 @@ properties:
       - type: "null"
     default: ~
     title: Subscription
+  subscription_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Subscription Details
   subtotal:
     title: Subtotal
     type: integer
@@ -426,7 +453,6 @@ properties:
 required:
   - id
   - object
-  - account_tax_ids
   - amount_due
   - amount_paid
   - amount_remaining

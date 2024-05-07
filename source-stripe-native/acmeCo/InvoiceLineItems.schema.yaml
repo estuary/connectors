@@ -102,9 +102,27 @@ properties:
   price:
     title: Price
     type: object
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
   proration:
     title: Proration
     type: boolean
+  plan:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Plan
+  subscription_item:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Subscription Item
   proration_details:
     anyOf:
       - type: object

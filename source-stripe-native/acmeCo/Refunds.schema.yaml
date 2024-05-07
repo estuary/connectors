@@ -52,6 +52,9 @@ properties:
       - type: "null"
     default: ~
     title: Charge
+  count:
+    title: Count
+    type: integer
   created:
     title: Created
     type: integer
@@ -113,6 +116,7 @@ required:
   - id
   - object
   - amount
+  - count
   - created
 title: Refunds
 type: object

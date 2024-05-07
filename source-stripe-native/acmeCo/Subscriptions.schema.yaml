@@ -55,6 +55,12 @@ properties:
   billing_cycle_anchor:
     title: Billing Cycle Anchor
     type: integer
+  billing_cycle_anchor_config:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Billing Cycle Anchor Config
   billing_thresholds:
     anyOf:
       - type: object
@@ -149,6 +155,12 @@ properties:
       - type: "null"
     default: ~
     title: Discounts
+  discount:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Discount
   ended_at:
     anyOf:
       - type: integer
@@ -254,6 +266,12 @@ properties:
       - type: "null"
     default: ~
     title: Trial Start
+  plan:
+    title: Plan
+    type: object
+  quantity:
+    title: Quantity
+    type: integer
 required:
   - id
   - object
@@ -268,6 +286,8 @@ required:
   - start_date
   - status
   - trial_settings
+  - plan
+  - quantity
 title: Subscriptions
 type: object
 x-infer-schema: true

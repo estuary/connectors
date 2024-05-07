@@ -202,10 +202,12 @@ async def fetch_backfill(
     result = BackfillResult[_cls].model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
+    log.debug(f"{result.model_dump()}")
 
     for doc in result.data:
         if _s_to_dt(doc.created) < cutoff:
             doc.meta_ = _cls.Meta(op="u")
+            log.debug(f"{doc}")
             yield doc
 
     if result.has_more:

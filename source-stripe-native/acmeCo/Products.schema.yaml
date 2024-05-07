@@ -40,6 +40,25 @@ properties:
   active:
     title: Active
     type: boolean
+  attributes:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Attributes
+  marketing_features:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Marketing Features
+  type:
+    title: Type
+    type: string
   created:
     title: Created
     type: integer
@@ -109,6 +128,20 @@ properties:
   updated:
     title: Updated
     type: integer
+  caption:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Caption
+  deactivate_on:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Deactivate On
   url:
     anyOf:
       - type: string
@@ -119,6 +152,7 @@ required:
   - id
   - object
   - active
+  - type
   - created
   - images
   - features

@@ -65,6 +65,12 @@ properties:
   livemode:
     title: Livemode
     type: boolean
+  allow_redisplay:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Allow Redisplay
   metadata:
     anyOf:
       - type: object

@@ -103,6 +103,36 @@ properties:
   disputed:
     title: Disputed
     type: boolean
+  destination:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Destination
+  dispute:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Dispute
+  order:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Order
+  radar_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Radar Options
+  source:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Source
   failure_balance_transaction:
     anyOf:
       - type: string

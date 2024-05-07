@@ -48,6 +48,9 @@ properties:
   charge:
     title: Charge
     type: string
+  count:
+    title: Count
+    type: integer
   created:
     title: Created
     type: integer
@@ -93,6 +96,7 @@ required:
   - amount
   - balance_transactions
   - charge
+  - count
   - created
   - evidence
   - evidence_details

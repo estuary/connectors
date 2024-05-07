@@ -43,6 +43,12 @@ properties:
       - type: "null"
     default: ~
     title: Application
+  automatic_payment_methods:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Automatic Payment Methods
   cancellation_reason:
     anyOf:
       - type: string
@@ -123,6 +129,12 @@ properties:
       - type: "null"
     default: ~
     title: Payment Method
+  payment_method_configuration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Configuration Details
   payment_method_options:
     anyOf:
       - type: object

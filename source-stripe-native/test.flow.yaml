@@ -21,9 +21,6 @@ captures:
           name: Customers
         target: acmeCo/Customers
       - resource:
-          name: Customer_Balance_Transaction
-        target: acmeCo/Customer_Balance_Transaction
-      - resource:
           name: Charges
         target: acmeCo/Charges
       - resource:
@@ -98,6 +95,9 @@ captures:
       - resource:
           name: Payment_Methods
         target: acmeCo/Payment_Methods
+      - resource:
+          name: Customer_Balance_Transaction
+        target: acmeCo/Customer_Balance_Transaction
       - resource:
           name: CheckoutSessionsLine
         target: acmeCo/CheckoutSessionsLine
