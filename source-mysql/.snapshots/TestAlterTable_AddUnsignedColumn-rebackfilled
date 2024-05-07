@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test_altertable_addunsignedcolumn_57413089": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddUnsignedColumn_57413089","cursor":"backfill:0"}},"data":"aaa","id":1,"uintval":null}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddUnsignedColumn_57413089","cursor":"backfill:1"}},"data":"bbb","id":2,"uintval":null}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddUnsignedColumn_57413089","cursor":"backfill:2"}},"data":"eee","id":3,"uintval":17777777777777777777}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddUnsignedColumn_57413089","cursor":"backfill:3"}},"data":"fff","id":4,"uintval":18000000000000000000}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FAlterTable_AddUnsignedColumn_57413089":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","uintval"],"types":{"data":"text","id":{"type":"int"},"uintval":{"type":"bigint","unsigned":true}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
