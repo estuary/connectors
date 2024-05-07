@@ -145,6 +145,7 @@ async def all_resources(
             initial_state=ResourceState(
                 backfill=backfill,
                 inc=ResourceState.Incremental(cursor=current_scn),
+                sync_counter=0,
             ),
             initial_config=ResourceConfig(
                 schema=t.owner,
