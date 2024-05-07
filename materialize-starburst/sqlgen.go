@@ -67,7 +67,7 @@ var starburstDialect = func(dateMapper sql.TypeMapper, dateTimeMapper sql.TypeMa
 
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("VARBINARY"),
+		sql.BINARY:   sql.NewStaticMapper("VARCHAR"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(doubleConverter)),

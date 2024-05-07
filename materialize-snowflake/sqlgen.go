@@ -42,7 +42,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    variantMapper,
-		sql.BINARY:   sql.NewStaticMapper("BINARY"),
+		sql.BINARY:   sql.NewStaticMapper("STRING"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.INTEGER:  sql.NewStaticMapper("INTEGER"),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),

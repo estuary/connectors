@@ -17,6 +17,10 @@
         "write_schema_json": {
           "$id": "file:///builder/materialize-snowflake/testdata/flow.yaml?ptr=/collections/key~1value/schema",
           "properties": {
+            "binary": {
+              "type": "string",
+              "contentEncoding": "base64"
+            },
             "boolean": {
               "type": "boolean"
             },
@@ -51,6 +55,19 @@
         ],
         "uuid_ptr": "/_meta/uuid",
         "projections": [
+          {
+            "ptr": "/binary",
+            "field": "binary",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "content_encoding": "base64"
+              },
+              "exists": 2
+            }
+          },
           {
             "ptr": "/boolean",
             "field": "boolean",
@@ -197,6 +214,7 @@
           "key2"
         ],
         "values": [
+          "binary",
           "boolean",
           "integer",
           "unsigned-integer",

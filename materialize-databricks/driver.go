@@ -213,10 +213,6 @@ type binding struct {
 	// into the target table. Note that in case of delta updates, "needsMerge"
 	// will always be false
 	needsMerge bool
-
-	mergeInto string
-
-	copyIntoDirect string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *pf.RangeSpec) error {

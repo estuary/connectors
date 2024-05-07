@@ -104,7 +104,12 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	for _, ty := range p.Inference.Types {
 		switch ty {
 		case "string":
-			types = append(types, STRING)
+
+			if p.Inference.String_.ContentEncoding == "base64" {
+				types = append(types, BINARY)
+			} else {
+				types = append(types, STRING)
+			}
 		case "integer":
 			types = append(types, INTEGER)
 		case "number", "fractional":
