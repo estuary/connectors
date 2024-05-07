@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FScanKeyTypes_Bool_754161260000":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FScanKeyTypes_Bool_754161260000":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":{"type":"tinyint"}}}},"mode":"Backfill","scanned":"FA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FScanKeyTypes_Bool_754161260000":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FQE="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FScanKeyTypes_Bool_754161260000":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":{"type":"tinyint"}}}},"mode":"Backfill","scanned":"FQE="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -30,7 +30,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FScanKeyTypes_Bool_754161260000":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FScanKeyTypes_Bool_754161260000":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":{"type":"tinyint"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
 
 

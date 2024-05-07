@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FEmptyBlobs_11214558":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","a_varchar","a_varbinary"],"types":{"a_varbinary":"varbinary","a_varchar":"varchar","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FEmptyBlobs_11214558":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","a_varchar","a_varbinary"],"types":{"a_varbinary":"varbinary","a_varchar":"varchar","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

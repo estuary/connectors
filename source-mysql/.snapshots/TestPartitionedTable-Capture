@@ -104,5 +104,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FPartitionedTable_83812828":{"backfilled":100,"key_columns":["grp","id"],"metadata":{"schema":{"columns":["grp","id","data"],"types":{"data":"text","grp":"int","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FPartitionedTable_83812828":{"backfilled":100,"key_columns":["grp","id"],"metadata":{"schema":{"columns":["grp","id","data"],"types":{"data":"text","grp":{"type":"int"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

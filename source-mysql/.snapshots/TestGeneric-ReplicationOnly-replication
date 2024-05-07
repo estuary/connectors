@@ -2052,5 +2052,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FGeneric_ReplicationOnly_34322067":{"backfilled":0,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FGeneric_ReplicationOnly_34322067":{"backfilled":0,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
