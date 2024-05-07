@@ -169,6 +169,7 @@
         91,
         92
       ],
+      "binary_field": "aGVsbG8K",
       "bool_field": false,
       "float_field": 9.9,
       "id": 9,
@@ -191,6 +192,7 @@
         1,
         2
       ],
+      "binary_field": "Z29vZGJ5ZQo=",
       "bool_field": true,
       "float_field": 10.1,
       "id": 10,
@@ -661,6 +663,7 @@
   "rows": [
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
       "flow_document": {
@@ -691,6 +694,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
       "flow_document": {
@@ -721,6 +725,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
       "flow_document": {
@@ -751,6 +756,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
       "flow_document": {
@@ -781,6 +787,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
       "flow_document": {
@@ -811,6 +818,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
       "flow_document": {
@@ -845,6 +853,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
       "flow_document": {
@@ -877,6 +886,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
       "flow_document": {
@@ -907,6 +917,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
       "flow_document": {
@@ -917,6 +928,7 @@
           91,
           92
         ],
+        "binary_field": "YWxvaGEK",
         "bool_field": false,
         "float_field": 99.99,
         "id": 9,
@@ -936,6 +948,7 @@
     },
     {
       "_meta/flow_truncated": false,
+      "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,
       "flow_document": {
@@ -946,6 +959,7 @@
           1,
           2
         ],
+        "binary_field": "c2F5xY1uYXJhCg==",
         "bool_field": true,
         "float_field": 1010.101,
         "id": 10,
