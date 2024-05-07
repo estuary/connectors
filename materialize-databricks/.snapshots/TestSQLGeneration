@@ -21,29 +21,29 @@ SELECT 0, `a-schema`.target_table.flow_document
 	USING (
 		(
 			SELECT
-			key1, key2, boolean, integer, `unsigned-integer`, number, string, flow_document
+			key1::BIGINT, key2::BOOLEAN, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1, key2, boolean, integer, `unsigned-integer`, number, string, flow_document
+			key1::BIGINT, key2::BOOLEAN, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
 			FROM json.`file2`
 		)
 	) AS r
-	ON l.key1 = r.key1::BIGINT AND l.key2 = r.key2::BOOLEAN
+	ON l.key1 = r.key1 AND l.key2 = r.key2
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET l.boolean = r.boolean::BOOLEAN, l.integer = r.integer::BIGINT, l.`unsigned-integer` = r.`unsigned-integer`::DECIMAL(20), l.number = r.number::DOUBLE, l.string = r.string::STRING, l.flow_document = r.flow_document
+		UPDATE SET l.binary = r.binary, l.boolean = r.boolean, l.integer = r.integer, l.`unsigned-integer` = r.`unsigned-integer`, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
-		INSERT (key1, key2, boolean, integer, `unsigned-integer`, number, string, flow_document)
-		VALUES (r.key1::BIGINT, r.key2::BOOLEAN, r.boolean::BOOLEAN, r.integer::BIGINT, r.`unsigned-integer`::DECIMAL(20), r.number::DOUBLE, r.string::STRING, r.flow_document::STRING);
+		INSERT (key1, key2, binary, boolean, integer, `unsigned-integer`, number, string, flow_document)
+		VALUES (r.key1, r.key2, r.binary, r.boolean, r.integer, r.`unsigned-integer`, r.number, r.string, r.flow_document);
 --- End `a-schema`.target_table mergeInto ---
 
 --- Begin `a-schema`.target_table copyIntoDirect ---
 	COPY INTO `a-schema`.target_table FROM (
     SELECT
-		key1::BIGINT, key2::BOOLEAN, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+		key1::BIGINT, key2::BOOLEAN, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
@@ -57,6 +57,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
   key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
   key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
+  binary BINARY COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
   boolean BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
   integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
   `unsigned-integer` DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /unsigned-integer with inferred types: [integer]',
@@ -75,21 +76,21 @@ SELECT -1, ""
 	USING (
 		(
 			SELECT
-			`theKey`, `aValue`
+			`theKey`::STRING, `aValue`::BIGINT
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			`theKey`, `aValue`
+			`theKey`::STRING, `aValue`::BIGINT
 			FROM json.`file2`
 		)
 	) AS r
-	ON l.`theKey` = r.`theKey`::STRING
+	ON l.`theKey` = r.`theKey`
 	WHEN MATCHED THEN
-		UPDATE SET l.`aValue` = r.`aValue`::BIGINT
+		UPDATE SET l.`aValue` = r.`aValue`
 	WHEN NOT MATCHED THEN
 		INSERT (`theKey`, `aValue`)
-		VALUES (r.`theKey`::STRING, r.`aValue`::BIGINT);
+		VALUES (r.`theKey`, r.`aValue`);
 --- End `default`.`Delta_Updates` mergeInto ---
 
 --- Begin `default`.`Delta_Updates` copyIntoDirect ---
@@ -124,23 +125,23 @@ ALTER TABLE `a-schema`.target_table ADD COLUMN
 	USING (
 		(
 			SELECT
-			key1, key2, flow_document
+			key1::BIGINT, key2::BOOLEAN, flow_document::STRING
 			FROM json.`file2`
 		)
 		 UNION ALL (
 			SELECT
-			key1, key2, flow_document
+			key1::BIGINT, key2::BOOLEAN, flow_document::STRING
 			FROM json.`file3`
 		)
 	) AS r
-	ON l.key1 = r.key1::BIGINT AND l.key2 = r.key2::BOOLEAN
+	ON l.key1 = r.key1 AND l.key2 = r.key2
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
 		INSERT (key1, key2, flow_document)
-		VALUES (r.key1::BIGINT, r.key2::BOOLEAN, r.flow_document::STRING);
+		VALUES (r.key1, r.key2, r.flow_document);
 --- End target_table_no_values_materialized mergeInto ---
 
 

@@ -16,7 +16,7 @@ var pgDialect = func() sql.Dialect {
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:   sql.NewStaticMapper("JSON"),
 		sql.ARRAY:    sql.NewStaticMapper("JSON"),
-		sql.BINARY:   sql.NewStaticMapper("BYTEA"),
+		sql.BINARY:   sql.NewStaticMapper("TEXT"),
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(

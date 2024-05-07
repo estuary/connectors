@@ -105,6 +105,7 @@ var databricksDialect = func() sql.Dialect {
 		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"binary"}, Validate: sql.BinaryCompatible},
 	)
 
 	return sql.Dialect{
@@ -160,7 +161,6 @@ func stringCompatible(p pf.Projection) bool {
 	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
-// TODO: use create table USING location instead of copying data into temporary table
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 -- Templated creation of a materialized table definition and comments:
@@ -219,7 +219,11 @@ SELECT -1, ""
 -- namely: ARRAY, MAP and INTERVAL. We don't have these types ourselves, but users may be able
 -- to specify them as a custom DDL
 {{ define "cast" -}}
-::{{- First (Split $ " ") -}}
+{{- if eq (First (Split $.DDL " ")) "BINARY" -}}
+	unbase64({{ $.Identifier }})::BINARY as {{ $.Identifier }}
+{{- else -}}
+	{{ $.Identifier }}::{{- First (Split $.DDL " ") -}}
+{{- end -}}
 {{- end }}
 
 -- Directly copy into the target table
@@ -228,7 +232,7 @@ SELECT -1, ""
     SELECT
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}{{ template "cast" $key.DDL -}}
+			{{ template "cast" $key -}}
 		{{- end }}
   FROM {{ Literal $.StagingPath }}
 	)
@@ -248,7 +252,7 @@ SELECT -1, ""
 			SELECT
 			{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
+			{{ template "cast" $key -}}
 			{{- end }}
 			FROM json.`+"`{{ $file }}`"+`
 		)
@@ -256,7 +260,7 @@ SELECT -1, ""
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Table.Document }}
 	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }} <=> NULL THEN
@@ -265,7 +269,7 @@ SELECT -1, ""
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end -}}
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
@@ -280,7 +284,7 @@ SELECT -1, ""
 		VALUES (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
+			r.{{ $key.Identifier }}
 		{{- end -}}
 	);
 {{ end }}

@@ -57,7 +57,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
 		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),
 		sql.ARRAY:   sql.NewStaticMapper(textType, jsonConverter),
-		sql.BINARY:  sql.NewStaticMapper("VARBINARY(MAX)"),
+		sql.BINARY:  sql.NewStaticMapper(textType),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.PrimaryKeyMapper{
 				// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in

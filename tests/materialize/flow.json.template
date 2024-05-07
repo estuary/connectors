@@ -34,7 +34,8 @@
            "nullable_int": {"type": ["null", "integer"]},
            "array_int": {"type": "array", "items": {"type": "integer"}},
            "nested": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}},
-           "multiple": {"type": ["array", "object", "string", "integer", "number", "boolean", "null"]}
+           "multiple": {"type": ["array", "object", "string", "integer", "number", "boolean", "null"]},
+           "binary_field": {"type": "string", "contentEncoding": "base64"}
           },
           "required": ["id", "str_field"],
           "type": "object"
