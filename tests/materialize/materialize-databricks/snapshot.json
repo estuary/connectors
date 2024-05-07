@@ -827,7 +827,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"unsigned_bigint\":18446744073709551615}",
       "flow_published_at": "2023-07-12T18:29:04.671352Z",
       "id": 1,
-      "unsigned_bigint": 18446744073709551615
+      "unsigned_bigint": 18446744073709552000
     }
   ],
   "table": "`main`.`some-schema`.unsigned_bigint"

@@ -175,6 +175,7 @@
         91,
         92
       ],
+      "binary_field": "aGVsbG8K",
       "bool_field": false,
       "float_field": 9.9,
       "id": 9,
@@ -197,6 +198,7 @@
         1,
         2
       ],
+      "binary_field": "Z29vZGJ5ZQo=",
       "bool_field": true,
       "float_field": 10.1,
       "id": 10,
@@ -585,6 +587,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "binary_field"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "bool_field"
       }
     },
@@ -622,6 +629,7 @@
         "numberValue": 1
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": false
@@ -657,6 +665,7 @@
         "numberValue": 2
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": true
@@ -696,6 +705,7 @@
         "numberValue": 3
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": false
@@ -731,6 +741,7 @@
         "numberValue": 4
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": true
@@ -770,6 +781,7 @@
         "numberValue": 5
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": false
@@ -805,6 +817,7 @@
         "numberValue": 6
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": true
@@ -844,6 +857,7 @@
         "numberValue": 7
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": false
@@ -879,6 +893,7 @@
         "numberValue": 8
       }
     },
+    {},
     {
       "userEnteredValue": {
         "boolValue": true
@@ -920,6 +935,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "YWxvaGEK"
+      }
+    },
+    {
+      "userEnteredValue": {
         "boolValue": false
       }
     },
@@ -951,6 +971,11 @@
     {
       "userEnteredValue": {
         "numberValue": 10
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "c2F5xY1uYXJhCg=="
       }
     },
     {
