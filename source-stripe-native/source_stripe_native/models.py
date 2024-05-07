@@ -57,7 +57,9 @@ class Files(BaseDocument, extra="forbid"):
     """
     Incremental stream with no Events
     """
-    #TODO add resource to no events
+    NAME: ClassVar[str] = "Files"
+    SEARCH_NAME: ClassVar[str] = "files"
+
     id: str
     object: Literal["file"]
     created: int
@@ -74,7 +76,9 @@ class FilesLink(BaseDocument, extra="forbid"):
     """
     Incremental stream with no Events
     """
-    #TODO add resource to no events
+    NAME: ClassVar[str] = "FilesLink"
+    SEARCH_NAME: ClassVar[str] = "file_links"
+
     id: str
     object: Literal["file_link"]
     created: int
@@ -89,7 +93,9 @@ class BalanceTransactions(BaseDocument, extra="forbid"):
     """
     Incremental stream with no Events
     """
-    #TODO add resource to no events
+    NAME: ClassVar[str] = "BalanceTransactions"
+    SEARCH_NAME: ClassVar[str] = "balance_transactions"
+
     id: str
     object: Literal["balance_transaction"]
     amount: int
@@ -139,6 +145,7 @@ class Persons(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "Persons"
     SEARCH_NAME: ClassVar[str] = "persons"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -164,6 +171,7 @@ class ExternalAccountCards(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "External_Account_Cards"
     SEARCH_NAME: ClassVar[str] = "external_account"
     # TODO add Params: {object=”card”}
+    PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"card"}   
 
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -199,6 +207,7 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "External_Bank_Account"
     SEARCH_NAME: ClassVar[str] = "external_account"
     # TODO add Params: {object=bank_account”}
+    PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"bank_account"} 
 
     
     id: str
@@ -245,6 +254,7 @@ class ApplicationFeesRefunds(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "Application_Fees_Refunds"
     SEARCH_NAME: ClassVar[str] = "refunds"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -321,6 +331,7 @@ class Cards(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "Cards"
     SEARCH_NAME: ClassVar[str] = "cards"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -356,6 +367,7 @@ class Bank_Accounts(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "Bank_Accounts"
     SEARCH_NAME: ClassVar[str] = "bank_accounts"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     
     id: str
@@ -381,6 +393,7 @@ class CustomerBalanceTransaction(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "Customer_Balance_Transaction"
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
 
     id: str
@@ -407,6 +420,7 @@ class PaymentMethods(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "Payment_Methods"
     SEARCH_NAME: ClassVar[str] = "payment_methods"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
     
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -556,6 +570,7 @@ class CheckoutSessionsLine(BaseDocument, extra="forbid"):
 
     NAME: ClassVar[str] = "CheckoutSessionsLine"
     SEARCH_NAME: ClassVar[str] = "line_items"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None
@@ -634,6 +649,7 @@ class CreditNotesLines(BaseDocument, extra="forbid"):
 
     NAME: ClassVar[str] = "CreditNotesLines"
     SEARCH_NAME: ClassVar[str] = "lines"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -702,7 +718,7 @@ class InvoiceItems(BaseDocument, extra="forbid"):
     date: int
     description: str | None = None
     discountable: bool
-    discounts: list[str] | None = None
+    discounts: list[Dict] | None = None
     invoice: str | None = None
     livemode: bool
     metadata: Dict | None = None
@@ -755,7 +771,7 @@ class Invoices(BaseDocument, extra="forbid"):
     default_tax_rates: list[Dict]
     description: str | None = None
     discount: str | None = None
-    discounts: list[str]
+    discounts: list[Dict] | None = None
     due_date: int | None = None
     ending_balance: int | None = None
     effective_at: int | None = None
@@ -810,6 +826,7 @@ class InvoiceLineItems(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "InvoiceLineItems"
     SEARCH_NAME: ClassVar[str] = "lines"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None # Custom Added Field
@@ -820,7 +837,7 @@ class InvoiceLineItems(BaseDocument, extra="forbid"):
     description: str | None = None
     discount_amounts: list[Dict] | None = None
     discountable: bool
-    discounts: list[str]
+    discounts: list[Dict] | None = None
     invoice_item: str | None = None
     livemode: bool
     metadata: Dict | None = None
@@ -1029,26 +1046,6 @@ class Reviews(BaseDocument, extra="forbid"):
     reason: str
     session: Dict | None = None
 
-class SetupAttemps(BaseDocument, extra="forbid"):
-    NAME: ClassVar[str] = "Setup_Attemps"
-    # TYPES: ClassVar[str] =  "review.*" TODO no events
-    SEARCH_NAME: ClassVar[str] = "setup_attempts"
-
-    id: str
-    object: Literal["setup_attempt"]
-    application: str | None = None
-    created: int
-    customer: str | None = None
-    flow_directions: list[str] | None = None
-    livemode: bool
-    on_behalf_of: str | None = None
-    payment_method: str
-    payment_method_details: Dict
-    setup_error: Dict | None = None
-    setup_intent: str
-    status: str
-    usage: str
-
 class SetupIntents(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Setup_Intents"
     TYPES: ClassVar[str] =  "setup_intent.*"
@@ -1079,6 +1076,31 @@ class SetupIntents(BaseDocument, extra="forbid"):
     status: str | None = None
     usage: str | None = None
 
+class SetupAttempts(BaseDocument, extra="forbid"):
+    """
+    Child Stream
+    Parent Stream: SetupIntents
+    """
+    NAME: ClassVar[str] = "Setup_Attempts"
+    SEARCH_NAME: ClassVar[str] = "setup_attempts"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100, "setup_intent": None} 
+
+    id: str
+    parent_id: str | None = None
+    object: Literal["setup_attempt"]
+    application: str | None = None
+    created: int
+    customer: str | None = None
+    flow_directions: list[str] | None = None
+    livemode: bool
+    on_behalf_of: str | None = None
+    payment_method: str
+    payment_method_details: Dict
+    setup_error: Dict | None = None
+    setup_intent: str
+    status: str
+    usage: str
+
 
 class Subscriptions(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Subscriptions"
@@ -1108,7 +1130,7 @@ class Subscriptions(BaseDocument, extra="forbid"):
     default_source: str | None = None
     default_tax_rates: list[Dict] | None = None
     description: str | None = None
-    discounts: list[str] | None = None
+    discounts: list[Dict] | None = None
     discount: Dict | None = None
     ended_at: int | None = None
     invoice_settings: Dict
@@ -1136,37 +1158,41 @@ class Subscriptions(BaseDocument, extra="forbid"):
 
 class SubscriptionItems(BaseDocument, extra="forbid"):
     """
-    Incremental stream with no Events
+    Child Stream
+    Parent Stream: Subscriptions
     """
-    #TODO add resource to no events
-    NAME: ClassVar[str] = "Subscription Items"
+    NAME: ClassVar[str] = "SubscriptionItems"
     SEARCH_NAME: ClassVar[str] = "subscription_items"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100, "subscription": None} 
 
     id: str
+    parent_id: str | None = None
     object: Literal["subscription_item"]
     billing_thresholds: Dict | None = None
     created: int
     metadata: Dict | None = None
+    discounts: list[Dict] | None = None
+    plan: Dict | None = None
     price: Dict
     quantity: int | None = None
     subscription: str
     tax_rates: list[Dict] | None = None
 
-class UsageRecords(BaseDocument, extra="forbid"):
-    """
-    Child Stream
-    Parent Stream: SubscriptionItems
-    """
-    NAME: ClassVar[str] = "UsageRecords"
-    #TODO child stream of a No Event stream (Subscription)
+# class UsageRecords(BaseDocument, extra="forbid"):
+#     """
+#     Child Stream
+#     Parent Stream: SubscriptionItems
+#     """
+#     NAME: ClassVar[str] = "UsageRecords"
+#     #TODO child stream of a No Event stream (Subscription)
 
-    id: str
-    parent_id: str | None = None # Custom Added Field
-    object: Literal["usage_record"]
-    livemode: bool
-    quantity: int
-    subscription_item: str
-    timestamp: int
+#     id: str
+#     parent_id: str | None = None # Custom Added Field
+#     object: Literal["usage_record"]
+#     livemode: bool
+#     quantity: int
+#     subscription_item: str
+#     timestamp: int
 
 class SubscriptionsSchedule(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Subscription_Schedule"
@@ -1268,6 +1294,7 @@ class TransferReversals(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "TransferReversals"
     SEARCH_NAME: ClassVar[str] = "reversals"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     parent_id: str | None = None # Custom Added Field

@@ -12,6 +12,10 @@ collections:
     schema: Application_Fees_Refunds.schema.yaml
     key:
       - /id
+  acmeCo/BalanceTransactions:
+    schema: BalanceTransactions.schema.yaml
+    key:
+      - /id
   acmeCo/Bank_Accounts:
     schema: Bank_Accounts.schema.yaml
     key:
@@ -58,6 +62,14 @@ collections:
       - /id
   acmeCo/Early_Fraud_Warning:
     schema: Early_Fraud_Warning.schema.yaml
+    key:
+      - /id
+  acmeCo/Files:
+    schema: Files.schema.yaml
+    key:
+      - /id
+  acmeCo/FilesLink:
+    schema: FilesLink.schema.yaml
     key:
       - /id
   acmeCo/InvoiceItems:
@@ -108,8 +120,16 @@ collections:
     schema: Reviews.schema.yaml
     key:
       - /id
+  acmeCo/Setup_Attempts:
+    schema: Setup_Attempts.schema.yaml
+    key:
+      - /id
   acmeCo/Setup_Intents:
     schema: Setup_Intents.schema.yaml
+    key:
+      - /id
+  acmeCo/SubscriptionItems:
+    schema: SubscriptionItems.schema.yaml
     key:
       - /id
   acmeCo/Subscription_Schedule:

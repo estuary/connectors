@@ -8,12 +8,13 @@ from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import Resource, LogCursor, PageCursor, open_binding, ResourceConfig, ResourceState
 from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 
-from .api import fetch_incremental, fetch_backfill, fetch_incremental_substreams, fetch_backfill_substreams
+from .api import fetch_incremental, fetch_backfill, fetch_incremental_substreams, fetch_backfill_substreams, fetch_incremental_no_events
 
 from .models import (
     Accounts,
     Authorizations,
     Bank_Accounts,
+    BalanceTransactions,
     Cards,
     CardHolders,
     Coupons,
@@ -43,13 +44,17 @@ from .models import (
     PromotionCode,
     Refunds,
     Reviews,
+    SetupAttempts,
     SetupIntents,
     Subscriptions,
     SubscriptionsSchedule,
+    SubscriptionItems,
     TopUps,
     Transactions,
     Transfers,
     TransferReversals,
+    Files,
+    FilesLink,
     EndpointConfig,
     )
 
@@ -84,7 +89,9 @@ async def all_resources(
         base_object(TopUps, http),
         #base_object(Transactions, http),
         base_object(Transfers, http),
-
+        no_events_object(Files, http),
+        no_events_object(FilesLink, http),
+        no_events_object(BalanceTransactions, http),
 
 
 
@@ -101,7 +108,9 @@ async def all_resources(
         child_object(CheckoutSessions, CheckoutSessionsLine, http),
         child_object(CreditNotes, CreditNotesLines, http),
         child_object(Invoices, InvoiceLineItems, http),
-        child_object(Transfers, TransferReversals, http)
+        child_object(Transfers, TransferReversals, http),
+        child_object(Subscriptions, SubscriptionItems, http),
+        child_object(SetupIntents, SetupAttempts, http),
 
 
     ]
@@ -176,5 +185,40 @@ def child_object(
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
         initial_config=ResourceConfig(name=child_cls.NAME),
+        schema_inference=True,
+    )
+
+def no_events_object(
+    cls, http: HTTPSession,
+) -> Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_incremental_no_events, cls, http),
+            fetch_page=functools.partial(fetch_backfill, cls, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=cls.NAME,
+        key=["/id"],
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+        ),
+        initial_config=ResourceConfig(name=cls.NAME),
         schema_inference=True,
     )

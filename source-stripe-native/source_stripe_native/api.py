@@ -167,7 +167,13 @@ async def _capture_substreams(
 ):
 
     child_url = f"{API}/{search_name}/{id}/{cls_child.SEARCH_NAME}"
-    parameters = {"limit": 100}
+    parameters = cls_child.PARAMETERS
+    if "subscription" in parameters.keys():
+        parameters["subscription"] = id
+        child_url = f"{API}/{cls_child.SEARCH_NAME}"
+    elif "setup_intent" in parameters.keys():
+        parameters["setup_intent"] = id
+        child_url = f"{API}/{cls_child.SEARCH_NAME}"
 
     while True:
         result_child = ListResult[cls_child].model_validate_json(
