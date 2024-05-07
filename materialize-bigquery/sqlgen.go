@@ -58,7 +58,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 var bqDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("BYTES"),
+		sql.BINARY:   sql.NewStaticMapper("STRING"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
 		sql.INTEGER:  sql.NewStaticMapper("INT64"),
 		sql.NUMBER:   sql.NewStaticMapper("FLOAT64"),

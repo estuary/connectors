@@ -35,7 +35,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.ARRAY:    sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:   sql.NewStaticMapper("VARBYTE"),
+		sql.BINARY:   sql.NewStaticMapper("TEXT"),
 		sql.MULTIPLE: sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)), // Note: Actually a VARCHAR(256)
