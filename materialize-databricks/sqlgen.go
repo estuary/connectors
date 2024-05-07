@@ -50,12 +50,34 @@ var databricksDialect = func() sql.Dialect {
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
 	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter))
 
+	var customDDLMapper = func(mapper sql.TypeMapper) sql.FieldConfigMapper {
+		return sql.FieldConfigMapper{
+			Delegate: mapper,
+			Map: func(m *sql.MappedType, config json.RawMessage) error {
+				type customDDLFieldConfig struct {
+					DDL string `json:"DDL,omitempty"`
+				}
+
+				var fieldConfig customDDLFieldConfig
+				if err := json.Unmarshal(config, &fieldConfig); err != nil {
+					return err
+				}
+
+				if fieldConfig.DDL != "" {
+					m.DDL = fieldConfig.DDL
+				}
+
+				return nil
+			},
+		}
+	}
+
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    jsonMapper,
 		sql.BINARY:   sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
+		sql.INTEGER:  customDDLMapper(sql.NewStaticMapper("BIGINT")),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
 		sql.OBJECT:   jsonMapper,
 		sql.MULTIPLE: jsonMapper,
@@ -198,23 +220,9 @@ SELECT -1, ""
 {{ end -}}
 {{ end }}
 
-{{ define "cast" }}
-{{- if Contains $ "DATE" -}}
-	::DATE
-{{- else if Contains $ "TIMESTAMP" -}}
-	::TIMESTAMP
-{{- else if Contains $ "DOUBLE" -}}
-	::DOUBLE
-{{- else if Contains $ "BIGINT" -}}
-	::BIGINT
-{{- else if Contains $ "BOOLEAN" -}}
-	::BOOLEAN
-{{- else if Contains $ "BINARY" -}}
-	::BINARY
-{{- else if Contains $ "STRING" -}}
-	::STRING
-{{- end -}}
-{{ end }}
+{{ define "cast" -}}
+::{{- First (Split $ " ") -}}
+{{- end }}
 
 -- Directly copy into the target table
 {{ define "copyIntoDirect" }}
