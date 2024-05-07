@@ -424,19 +424,23 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 }
 
 func parseDataType(typeName, fullColumnType string) any {
-	if typeName == "enum" {
+	switch typeName {
+	case "enum":
 		// Illegal values are represented internally by MySQL as the integer 0. Adding
 		// this to the list as the zero-th element allows everything else to flow naturally.
 		return &mysqlColumnType{Type: "enum", EnumValues: append([]string{""}, parseEnumValues(fullColumnType)...)}
-	} else if typeName == "set" {
+	case "set":
 		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
+		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}
 	}
 	return typeName
 }
 
 type mysqlColumnType struct {
-	Type       string   `json:"type" mapstructure:"type"`           // The basic name of the column type.
-	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"` // The list of values which an enum (or set) column can contain.
+	Type       string   `json:"type" mapstructure:"type"`                   // The basic name of the column type.
+	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"`         // The list of values which an enum (or set) column can contain.
+	Unsigned   bool     `json:"unsigned,omitempty" mapstructure:"unsigned"` // True IFF an integer type is unsigned
 }
 
 func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, error) {
@@ -471,8 +475,48 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 			return string(bs), nil
 		}
 		return val, nil
+	case "tinyint":
+		if sval, ok := asInt64(val); ok && t.Unsigned {
+			return uint64(sval) & 0xFF, nil
+		}
+		return val, nil
+	case "smallint":
+		if sval, ok := asInt64(val); ok && t.Unsigned {
+			return uint64(sval) & 0xFFFF, nil
+		}
+		return val, nil
+	case "mediumint":
+		if sval, ok := asInt64(val); ok && t.Unsigned {
+			// A MySQL 'MEDIUMINT' is a 24-bit integer value.
+			return uint64(sval) & 0xFFFFFF, nil
+		}
+		return val, nil
+	case "int":
+		if sval, ok := asInt64(val); ok && t.Unsigned {
+			return uint64(sval) & 0xFFFFFFFF, nil
+		}
+		return val, nil
+	case "bigint":
+		if sval, ok := asInt64(val); ok && t.Unsigned {
+			return uint64(sval), nil
+		}
+		return val, nil
 	}
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
+}
+
+func asInt64(x any) (int64, bool) {
+	switch x := x.(type) {
+	case int8:
+		return int64(x), true
+	case int16:
+		return int64(x), true
+	case int32:
+		return int64(x), true
+	case int64:
+		return x, true
+	}
+	return 0, false
 }
 
 func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
@@ -484,6 +528,8 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 			}
 			return val, fmt.Errorf("internal error: failed to translate enum value %q to integer index", string(bs))
 		}
+		return val, nil
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return val, nil
 	}
 	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
