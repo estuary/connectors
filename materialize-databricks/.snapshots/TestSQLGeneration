@@ -21,12 +21,12 @@ SELECT 0, `a-schema`.target_table.flow_document
 	USING (
 		(
 			SELECT
-			key1, key2, boolean, integer, number, string, flow_document
+			key1, key2, boolean, integer, `unsigned-integer`, number, string, flow_document
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1, key2, boolean, integer, number, string, flow_document
+			key1, key2, boolean, integer, `unsigned-integer`, number, string, flow_document
 			FROM json.`file2`
 		)
 	) AS r
@@ -34,16 +34,16 @@ SELECT 0, `a-schema`.target_table.flow_document
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET l.boolean = r.boolean::BOOLEAN, l.integer = r.integer::BIGINT, l.number = r.number::DOUBLE, l.string = r.string::STRING, l.flow_document = r.flow_document
+		UPDATE SET l.boolean = r.boolean::BOOLEAN, l.integer = r.integer::BIGINT, l.`unsigned-integer` = r.`unsigned-integer`::DECIMAL(20), l.number = r.number::DOUBLE, l.string = r.string::STRING, l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
-		INSERT (key1, key2, boolean, integer, number, string, flow_document)
-		VALUES (r.key1::BIGINT, r.key2::BOOLEAN, r.boolean::BOOLEAN, r.integer::BIGINT, r.number::DOUBLE, r.string::STRING, r.flow_document::STRING);
+		INSERT (key1, key2, boolean, integer, `unsigned-integer`, number, string, flow_document)
+		VALUES (r.key1::BIGINT, r.key2::BOOLEAN, r.boolean::BOOLEAN, r.integer::BIGINT, r.`unsigned-integer`::DECIMAL(20), r.number::DOUBLE, r.string::STRING, r.flow_document::STRING);
 --- End `a-schema`.target_table mergeInto ---
 
 --- Begin `a-schema`.target_table copyIntoDirect ---
 	COPY INTO `a-schema`.target_table FROM (
     SELECT
-		key1::BIGINT, key2::BOOLEAN, boolean::BOOLEAN, integer::BIGINT, number::DOUBLE, string::STRING, flow_document::STRING
+		key1::BIGINT, key2::BOOLEAN, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
   key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
   boolean BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
   integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
+  `unsigned-integer` DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /unsigned-integer with inferred types: [integer]',
   number DOUBLE COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
   string STRING COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
   flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'

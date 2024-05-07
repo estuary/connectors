@@ -23,6 +23,9 @@
             "integer": {
               "type": "integer"
             },
+            "unsigned-integer": {
+              "type": "integer"
+            },
             "key1": {
               "type": "integer"
             },
@@ -119,6 +122,16 @@
               "string": {},
               "exists": 2
             }
+          },
+          {
+            "ptr": "/unsigned-integer",
+            "field": "unsigned-integer",
+            "inference": {
+              "types": [
+                "integer"
+              ],
+              "exists": 2
+            }
           }
         ],
         "ack_template_json": {
@@ -186,10 +199,14 @@
         "values": [
           "boolean",
           "integer",
+          "unsigned-integer",
           "number",
           "string"
         ],
-        "document": "flow_document"
+        "document": "flow_document",
+        "field_config_json_map": {
+          "unsigned-integer": {"DDL": "DECIMAL(20)"}
+        }
       },
       "journal_read_suffix": "materialize/test/sqlite/key_value"
     },

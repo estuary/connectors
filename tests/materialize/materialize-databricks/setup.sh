@@ -69,7 +69,10 @@ resources_json_template='[
       "include": {
         "nested": {},
         "array_int": {},
-        "multiple": {}
+        "multiple": {},
+        "nullable_int": {
+          "DDL": "DECIMAL(20)"
+        }
       }
     }
   },
