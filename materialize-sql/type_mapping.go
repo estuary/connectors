@@ -22,7 +22,7 @@ import (
 // * Hoisting JSON `null` out of the type representation and into a separate orthogonal concern.
 type FlatType string
 
-// FlatType constants that are used by ColumnMapper
+// FlatType constants that are used by TypeMapper
 const (
 	ARRAY    FlatType = "array"
 	BINARY   FlatType = "binary"
@@ -193,6 +193,33 @@ func WithElementConverter(converter ElementConverter) StaticMapperOption {
 	}
 }
 
+// FieldConfigWrapper wraps a TypeMapper to specify the type of the column in
+// the case that it is a primary key. This is useful for cases where specific
+// databases require certain variations of a type for primary keys. For example,
+// MySQL does not accept TEXT as a primary key, but a VARCHAR with specified
+// size works.
+type FieldConfigMapper struct {
+	Delegate TypeMapper
+	Map      func(*MappedType, json.RawMessage) error
+}
+
+var _ TypeMapper = FieldConfigMapper{}
+
+func (m FieldConfigMapper) MapType(p *Projection) (mapped MappedType, err error) {
+	delegated, err := m.Delegate.MapType(p)
+	if err != nil {
+		return MappedType{}, err
+	}
+
+	if p.RawFieldConfig != nil {
+		if err := m.Map(&delegated, p.RawFieldConfig); err != nil {
+			return MappedType{}, err
+		}
+	}
+
+	return delegated, nil
+}
+
 // JsonBytesConverter serializes a value to raw JSON bytes for storage in an endpoint compatible
 // with JSON bytes.
 func JsonBytesConverter(te tuple.TupleElement) (interface{}, error) {
@@ -335,7 +362,7 @@ func ClampDate() ElementConverter {
 	})
 }
 
-// NullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
+// NullableMapper wraps a TypeMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
 // depending on the nullability of the column. Most databases will assume that a column may contain
 // null as long as it isn't declared with a NOT NULL constraint, but some databases (e.g. ms sql
 // server) make that behavior configurable, requiring the DDL to explicitly declare a column with
@@ -360,7 +387,7 @@ func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	return
 }
 
-// PrimaryKeyMapper wraps a ColumnMapper to specify the type of the column in
+// PrimaryKeyMapper wraps a TypeMapper to specify the type of the column in
 // the case that it is a primary key. This is useful for cases where specific
 // databases require certain variations of a type for primary keys. For example,
 // MySQL does not accept TEXT as a primary key, but a VARCHAR with specified
