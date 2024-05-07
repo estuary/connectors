@@ -1,0 +1,113 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    required:
+      - op
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: issuing.cardholder
+    enum:
+      - issuing.cardholder
+    title: Object
+    type: string
+  billing:
+    title: Billing
+    type: object
+  company:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Company
+  created:
+    title: Created
+    type: integer
+  email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Email
+  individual:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Individual
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  name:
+    title: Name
+    type: string
+  phone_number:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Phone Number
+  redaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Redaction
+  requirements:
+    title: Requirements
+    type: object
+  spending_controls:
+    title: Spending Controls
+    type: object
+  status:
+    title: Status
+    type: string
+  type:
+    title: Type
+    type: string
+required:
+  - id
+  - object
+  - billing
+  - created
+  - livemode
+  - name
+  - requirements
+  - spending_controls
+  - status
+  - type
+title: CardHolders
+type: object
+x-infer-schema: true
