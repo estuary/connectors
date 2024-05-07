@@ -170,7 +170,6 @@ class ExternalAccountCards(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "External_Account_Cards"
     SEARCH_NAME: ClassVar[str] = "external_account"
-    # TODO add Params: {object=”card”}
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"card"}   
 
     id: str
@@ -206,7 +205,6 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "External_Bank_Account"
     SEARCH_NAME: ClassVar[str] = "external_account"
-    # TODO add Params: {object=bank_account”}
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"bank_account"} 
 
     

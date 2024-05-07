@@ -11,117 +11,135 @@ captures:
           - source_stripe_native
         config: config.yaml
     bindings:
-      # - resource:
-      #     name: Accounts
-      #   target: acmeCo/Accounts
-      # - resource:
-      #     name: Application_Fees
-      #   target: acmeCo/Application_Fees
-      # - resource:
-      #     name: Customers
-      #   target: acmeCo/Customers
-      # - resource:
-      #     name: Charges
-      #   target: acmeCo/Charges
-      # - resource:
-      #     name: CheckoutSessions
-      #   target: acmeCo/CheckoutSessions
-      # - resource:
-      #     name: Coupons
-      #   target: acmeCo/Coupons
-      # - resource:
-      #     name: CreditNotes
-      #   target: acmeCo/CreditNotes
-      # - resource:
-      #     name: Disputes
-      #   target: acmeCo/Disputes
-      # - resource:
-      #     name: Early_Fraud_Warning
-      #   target: acmeCo/Early_Fraud_Warning
-      # - resource:
-      #     name: InvoiceItems
-      #   target: acmeCo/InvoiceItems
-      # - resource:
-      #     name: Invoices
-      #   target: acmeCo/Invoices
-      # - resource:
-      #     name: PaymentIntents
-      #   target: acmeCo/PaymentIntents
-      # - resource:
-      #     name: Payouts
-      #   target: acmeCo/Payouts
-      # - resource:
-      #     name: Plans
-      #   target: acmeCo/Plans
-      # - resource:
-      #     name: Products
-      #   target: acmeCo/Products
-      # - resource:
-      #     name: PromotionCode
-      #   target: acmeCo/PromotionCode
-      # - resource:
-      #     name: Refunds
-      #   target: acmeCo/Refunds
-      # - resource:
-      #     name: Reviews
-      #   target: acmeCo/Reviews
-      # - resource:
-      #     name: Setup_Intents
-      #   target: acmeCo/Setup_Intents
-      # - resource:
-      #     name: Subscriptions
-      #   target: acmeCo/Subscriptions
-      # - resource:
-      #     name: Subscription_Schedule
-      #   target: acmeCo/Subscription_Schedule
-      # - resource:
-      #     name: TopUps
-      #   target: acmeCo/TopUps
-      # - resource:
-      #     name: Transfers
-      #   target: acmeCo/Transfers
-      # - resource:
-      #     name: Files
-      #   target: acmeCo/Files
-      # - resource:
-      #     name: FilesLink
-      #   target: acmeCo/FilesLink
-      # - resource:
-      #     name: BalanceTransactions
-      #   target: acmeCo/BalanceTransactions
-      # - resource:
-      #     name: Persons
-      #   target: acmeCo/Persons
-      # - resource:
-      #     name: Application_Fees_Refunds
-      #   target: acmeCo/Application_Fees_Refunds
-      # - resource:
-      #     name: Cards
-      #   target: acmeCo/Cards
-      # - resource:
-      #     name: Bank_Accounts
-      #   target: acmeCo/Bank_Accounts
-      # - resource:
-      #     name: Payment_Methods
-      #   target: acmeCo/Payment_Methods
-      # - resource:
-      #     name: Customer_Balance_Transaction
-      #   target: acmeCo/Customer_Balance_Transaction
-      # - resource:
-      #     name: CheckoutSessionsLine
-      #   target: acmeCo/CheckoutSessionsLine
-      # - resource:
-      #     name: CreditNotesLines
-      #   target: acmeCo/CreditNotesLines
-      # - resource:
-      #     name: InvoiceLineItems
-      #   target: acmeCo/InvoiceLineItems
-      # - resource:
-      #     name: TransferReversals
-      #   target: acmeCo/TransferReversals
-      # - resource:
-      #     name: SubscriptionItems
-      #   target: acmeCo/SubscriptionItems
+      - resource:
+          name: Accounts
+        target: acmeCo/Accounts
+      - resource:
+          name: Application_Fees
+        target: acmeCo/Application_Fees
+      - resource:
+          name: Customers
+        target: acmeCo/Customers
+      - resource:
+          name: Charges
+        target: acmeCo/Charges
+      - resource:
+          name: CheckoutSessions
+        target: acmeCo/CheckoutSessions
+      - resource:
+          name: Coupons
+        target: acmeCo/Coupons
+      - resource:
+          name: CreditNotes
+        target: acmeCo/CreditNotes
+      - resource:
+          name: Disputes
+        target: acmeCo/Disputes
+      - resource:
+          name: Early_Fraud_Warning
+        target: acmeCo/Early_Fraud_Warning
+      - resource:
+          name: InvoiceItems
+        target: acmeCo/InvoiceItems
+      - resource:
+          name: Invoices
+        target: acmeCo/Invoices
+      - resource:
+          name: PaymentIntents
+        target: acmeCo/PaymentIntents
+      - resource:
+          name: Payouts
+        target: acmeCo/Payouts
+      - resource:
+          name: Plans
+        target: acmeCo/Plans
+      - resource:
+          name: Products
+        target: acmeCo/Products
+      - resource:
+          name: PromotionCode
+        target: acmeCo/PromotionCode
+      - resource:
+          name: Refunds
+        target: acmeCo/Refunds
+      - resource:
+          name: Reviews
+        target: acmeCo/Reviews
+      - resource:
+          name: Setup_Intents
+        target: acmeCo/Setup_Intents
+      - resource:
+          name: Subscriptions
+        target: acmeCo/Subscriptions
+      - resource:
+          name: Subscription_Schedule
+        target: acmeCo/Subscription_Schedule
+      - resource:
+          name: TopUps
+        target: acmeCo/TopUps
+      - resource:
+          name: Transfers
+        target: acmeCo/Transfers
+      - resource:
+          name: Files
+        target: acmeCo/Files
+      - resource:
+          name: FilesLink
+        target: acmeCo/FilesLink
+      - resource:
+          name: BalanceTransactions
+        target: acmeCo/BalanceTransactions
+      - resource:
+          name: Authorizations
+        target: acmeCo/Authorizations
+        disable: true
+      - resource:
+          name: CardHolders
+        target: acmeCo/CardHolders
+        disable: true
+      - resource:
+          name: Transactions
+        target: acmeCo/Transactions
+        disable: true
+      - resource:
+          name: Persons
+        target: acmeCo/Persons
+      - resource:
+          name: External_Account_Cards
+        target: acmeCo/External_Account_Cards
+      - resource:
+          name: External_Bank_Account
+        target: acmeCo/External_Bank_Account
+      - resource:
+          name: Application_Fees_Refunds
+        target: acmeCo/Application_Fees_Refunds
+      - resource:
+          name: Cards
+        target: acmeCo/Cards
+      - resource:
+          name: Bank_Accounts
+        target: acmeCo/Bank_Accounts
+      - resource:
+          name: Payment_Methods
+        target: acmeCo/Payment_Methods
+      - resource:
+          name: Customer_Balance_Transaction
+        target: acmeCo/Customer_Balance_Transaction
+      - resource:
+          name: CheckoutSessionsLine
+        target: acmeCo/CheckoutSessionsLine
+      - resource:
+          name: CreditNotesLines
+        target: acmeCo/CreditNotesLines
+      - resource:
+          name: InvoiceLineItems
+        target: acmeCo/InvoiceLineItems
+      - resource:
+          name: TransferReversals
+        target: acmeCo/TransferReversals
+      - resource:
+          name: SubscriptionItems
+        target: acmeCo/SubscriptionItems
       - resource:
           name: Setup_Attempts
         target: acmeCo/Setup_Attempts

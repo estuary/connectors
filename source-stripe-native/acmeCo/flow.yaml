@@ -12,12 +12,20 @@ collections:
     schema: Application_Fees_Refunds.schema.yaml
     key:
       - /id
+  acmeCo/Authorizations:
+    schema: Authorizations.schema.yaml
+    key:
+      - /id
   acmeCo/BalanceTransactions:
     schema: BalanceTransactions.schema.yaml
     key:
       - /id
   acmeCo/Bank_Accounts:
     schema: Bank_Accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/CardHolders:
+    schema: CardHolders.schema.yaml
     key:
       - /id
   acmeCo/Cards:
@@ -62,6 +70,14 @@ collections:
       - /id
   acmeCo/Early_Fraud_Warning:
     schema: Early_Fraud_Warning.schema.yaml
+    key:
+      - /id
+  acmeCo/External_Account_Cards:
+    schema: External_Account_Cards.schema.yaml
+    key:
+      - /id
+  acmeCo/External_Bank_Account:
+    schema: External_Bank_Account.schema.yaml
     key:
       - /id
   acmeCo/Files:
@@ -142,6 +158,10 @@ collections:
       - /id
   acmeCo/TopUps:
     schema: TopUps.schema.yaml
+    key:
+      - /id
+  acmeCo/Transactions:
+    schema: Transactions.schema.yaml
     key:
       - /id
   acmeCo/TransferReversals:
