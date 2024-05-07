@@ -12,7 +12,7 @@ from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
     ResourceConfig as GenericResourceConfig,
-    ResourceState,
+    ResourceState as GenericResourceState,
 )
 
 
@@ -76,6 +76,10 @@ class ResourceConfig(GenericResourceConfig):
 
     def path(self) -> list[str]:
         return [self.schema_name, self.name]
+
+
+class ResourceState(GenericResourceState):
+    sync_counter: int
 
 
 ConnectorState = GenericConnectorState[ResourceState]
