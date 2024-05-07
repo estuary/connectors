@@ -128,6 +128,11 @@ async def fetch_page(
     cutoff: Tuple[str],
     full_state: ConnectorState,
 ) -> AsyncGenerator[Document | str, None]:
+    # fetch_page only runs on even sync counter numbers
+    if full_state.sync_counter % 2 == 0:
+        return
+    full_state.sync_counter = full_state.sync_counter + 1
+
     is_first_query = False
     if page is None:
         is_first_query = True
@@ -140,41 +145,32 @@ async def fetch_page(
 
     last_rowid = None
     i = 0
-    rownum_page = 0
     async with pool.acquire() as conn:
         with conn.cursor() as c:
-            while True:
-                rownum_start = rownum_page * CHECKPOINT_EVERY
-                rownum_end = (rownum_page + 1) * CHECKPOINT_EVERY
-                await c.execute(query, rownum_start=rownum_start, rownum_end=rownum_end)
-                async for values in c:
-                    cols = [col[0] for col in c.description]
-                    row = dict(zip(cols, values))
-                    row = {k: v for (k, v) in row.items() if v is not None}
-                    last_rowid = row[rowid_column_name]
+            await c.execute(query, rownum_start=0, rownum_end=CHECKPOINT_EVERY)
+            async for values in c:
+                cols = [col[0] for col in c.description]
+                row = dict(zip(cols, values))
+                row = {k: v for (k, v) in row.items() if v is not None}
+                last_rowid = row[rowid_column_name]
 
-                    doc = Document()
-                    source = Document.Meta.Source(
-                        table=table.table_name,
-                        row_id=row[rowid_column_name]
-                    )
-                    doc.meta_ = Document.Meta(op='c', source=source)
-                    for (k, v) in row.items():
-                        if k in (rowid_column_name,):
-                            continue
-                        setattr(doc, k, v)
+                doc = Document()
+                source = Document.Meta.Source(
+                    table=table.table_name,
+                    row_id=row[rowid_column_name]
+                )
+                doc.meta_ = Document.Meta(op='c', source=source)
+                for (k, v) in row.items():
+                    if k in (rowid_column_name,):
+                        continue
+                    setattr(doc, k, v)
 
-                    yield doc
+                yield doc
 
-                    i = i + 1
+                i = i + 1
 
-                    if i % CHECKPOINT_EVERY == 0:
-                        yield last_rowid
-
-                if c.rowcount < CHECKPOINT_EVERY:
-                    break
-
-                rownum_page = rownum_page + 1
+            if last_rowid is not None:
+                yield last_rowid
 
     if last_rowid is not None and (i % CHECKPOINT_EVERY != 0):
         yield last_rowid
@@ -196,7 +192,13 @@ async def fetch_changes(
     log_cursor: LogCursor,
     full_state: ConnectorState,
 ) -> AsyncGenerator[Document | LogCursor, None]:
-    query = template_env.get_template("inc").render(table=table, cursor=log_cursor)
+    # fetch_changes only runs on odd sync counter numbers
+    if full_state.sync_counter % 2 == 1:
+        return
+    full_state.sync_counter = full_state.sync_counter + 1
+
+    scn = log_cursor
+    query = template_env.get_template("inc").render(table=table, cursor=scn)
 
     log.debug("fetch_changes", query, log_cursor)
 
@@ -206,7 +208,6 @@ async def fetch_changes(
     # of the current SCN before moving on to the next one.
     first_transaction = None
     current_transaction = None
-    scn = log_cursor
     async with pool.acquire() as conn:
         with conn.cursor() as c:
             await c.execute(query)
@@ -218,13 +219,6 @@ async def fetch_changes(
                 scn = row[scn_column_name]
                 op = row[op_column_name]
                 row_id = row[rowid_column_name]
-
-                if full_state.backfill is not None and row_id > full_state.backfill.next_page:
-                    # we are reading updates for documents which have not yet been backfilled
-                    # in order to ensure data consistency, we do not emit these updates until they have been backfilled first
-                    # so here we return and wait for another interval
-                    log.debug("got event for a row which as not been backfilled yet, looping, row_id:", row_id, "next_page:", full_state.backfill.next_page)
-                    return
 
                 doc = Document()
                 source = Document.Meta.Source(
