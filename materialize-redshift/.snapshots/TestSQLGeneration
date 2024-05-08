@@ -117,7 +117,7 @@ UPDATE path."To".checkpoints
 	AND   fence     = 123;
 --- End Fence Update ---
 
---- Begin Copy From S3 Without Case Sensitive Identifiers---
+--- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---
 COPY my_temp_table
 FROM 's3://some_bucket/files.manifest'
 MANIFEST
@@ -127,9 +127,9 @@ JSON 'auto ignorecase'
 GZIP
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto';
---- End Copy From S3 Without Case Sensitive Identifier ---
+--- End Copy From S3 Without Case Sensitive Identifier or Truncation ---
 
---- Begin Copy From S3 With Case Sensitive Identifiers---
+--- Begin Copy From S3 With Case Sensitive Identifiers and Truncation ---
 COPY my_temp_table
 FROM 's3://some_bucket/files.manifest'
 MANIFEST
@@ -138,5 +138,6 @@ REGION 'us-somewhere-1'
 JSON 'auto'
 GZIP
 DATEFORMAT 'auto'
-TIMEFORMAT 'auto';
---- End Copy From S3 With Case Sensitive Identifiers ---
+TIMEFORMAT 'auto'
+TRUNCATECOLUMNS;
+--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---

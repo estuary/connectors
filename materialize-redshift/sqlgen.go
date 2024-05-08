@@ -154,6 +154,7 @@ type copyFromS3Params struct {
 	ManifestURL                    string
 	Config                         *config
 	CaseSensitiveIdentifierEnabled bool
+	TruncateColumns                bool
 }
 
 type loadTableParams struct {
@@ -296,7 +297,12 @@ JSON 'auto ignorecase'
 {{- end }}
 GZIP
 DATEFORMAT 'auto'
-TIMEFORMAT 'auto';
+TIMEFORMAT 'auto'
+{{- if $.TruncateColumns }}
+TRUNCATECOLUMNS;
+{{- else -}}
+;
+{{- end }}
 {{ end }}
 	`)
 	return templates{
