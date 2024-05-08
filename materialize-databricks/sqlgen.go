@@ -158,6 +158,17 @@ var databricksDialect = func() sql.Dialect {
 // stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
 // be materialized since they are all converted to strings.
 func stringCompatible(p pf.Projection) bool {
+	// TODO(whb): This is a hack for making sure that pre-existing base64 encoded columns that were
+	// materialized as string columns in v1 fail validation in v2, which will materialize these
+	// columns as binary. This is needed because we currently validate a pre-existing "string"
+	// column positively with a string field having any format, content-type, or content-encoding,
+	// see https://github.com/estuary/connectors/issues/1501.
+	if sql.TypesOrNull(p.Inference.Types, []string{"string"}) {
+		if p.Inference.String_.ContentEncoding == "base64" {
+			return false
+		}
+	}
+
 	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
