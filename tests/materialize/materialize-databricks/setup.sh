@@ -69,10 +69,7 @@ resources_json_template='[
       "include": {
         "nested": {},
         "array_int": {},
-        "multiple": {},
-        "nullable_int": {
-          "DDL": "DECIMAL(20)"
-        }
+        "multiple": {}
       }
     }
   },
@@ -83,6 +80,18 @@ resources_json_template='[
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
       "recommended": true
+    }
+  },
+  {
+    "resource": {
+      "table": "unsigned_bigint"
+    },
+    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}",
+    "fields": {
+      "recommended": true,
+      "include": {
+        "unsigned_bigint": {"DDL": "DECIMAL(20)"}
+      }
     }
   }
 ]'
