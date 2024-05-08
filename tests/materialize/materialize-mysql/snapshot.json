@@ -199,7 +199,7 @@
       "nested": {
         "id": "i10"
       },
-      "nullable_int": 10,
+      "nullable_int": 18446744073709552000,
       "str_field": "str10"
     }
   }
