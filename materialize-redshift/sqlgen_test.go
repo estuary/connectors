@@ -116,15 +116,16 @@ func TestSQLGeneration(t *testing.T) {
 		CaseSensitiveIdentifierEnabled: false,
 	}
 
-	snap.WriteString("--- Begin Copy From S3 Without Case Sensitive Identifiers---")
+	snap.WriteString("--- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---")
 	require.NoError(t, templates.copyFromS3.Execute(&snap, copyParams))
-	snap.WriteString("--- End Copy From S3 Without Case Sensitive Identifier ---\n\n")
+	snap.WriteString("--- End Copy From S3 Without Case Sensitive Identifier or Truncation ---\n\n")
 
 	copyParams.CaseSensitiveIdentifierEnabled = true
+	copyParams.TruncateColumns = true
 
-	snap.WriteString("--- Begin Copy From S3 With Case Sensitive Identifiers---")
+	snap.WriteString("--- Begin Copy From S3 With Case Sensitive Identifiers and Truncation ---")
 	require.NoError(t, templates.copyFromS3.Execute(&snap, copyParams))
-	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers ---")
+	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---")
 
 	cupaloy.SnapshotT(t, snap.String())
 }

@@ -389,14 +389,15 @@ func (t *transactor) addBinding(
 
 	// Render templates that require specific S3 "COPY INTO" parameters.
 	for _, m := range []struct {
-		sql        *string
-		target     string
-		columns    []*sql.Column
-		stagedFile *stagedFile
+		sql             *string
+		target          string
+		columns         []*sql.Column
+		truncateColumns bool
+		stagedFile      *stagedFile
 	}{
-		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), b.loadFile},
-		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), b.storeFile},
-		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), b.storeFile},
+		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
+		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
+		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
 	} {
 		var sql strings.Builder
 		if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
@@ -405,6 +406,7 @@ func (t *transactor) addBinding(
 			ManifestURL:                    m.stagedFile.fileURI(manifestFile),
 			Config:                         t.cfg,
 			CaseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
+			TruncateColumns:                m.truncateColumns,
 		}); err != nil {
 			return err
 		}
@@ -690,6 +692,14 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
 	defer conn.Close(ctx)
+
+	// Truncate strings within SUPER types by setting this option, since these have the same limits
+	// on maximum VARCHAR lengths as table columns do. Notably, this will truncate any strings in
+	// `flow_document` (stored as a SUPER column) that otherwise would prevent the row from being
+	// added to the table.
+	if _, err := conn.Exec(ctx, "SET json_parse_truncate_strings=ON;"); err != nil {
+		return fmt.Errorf("configuring json_parse_truncate_strings=ON: %w", err)
+	}
 
 	// Update any columns that require setting to VARCHAR(MAX) for storing large strings. ALTER
 	// TABLE ALTER COLUMN statements cannot be run inside transaction blocks.
