@@ -50,21 +50,16 @@ var databricksDialect = func() sql.Dialect {
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
 	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter))
 
-	var customDDLMapper = func(mapper sql.TypeMapper) sql.FieldConfigMapper {
-		return sql.FieldConfigMapper{
+	type customDDLFieldConfig struct {
+		DDL string `json:"DDL,omitempty"`
+	}
+
+	var customDDLMapper = func(mapper sql.TypeMapper) sql.FieldConfigMapper[customDDLFieldConfig] {
+		return sql.FieldConfigMapper[customDDLFieldConfig]{
 			Delegate: mapper,
-			Map: func(m *sql.MappedType, config json.RawMessage) error {
-				type customDDLFieldConfig struct {
-					DDL string `json:"DDL,omitempty"`
-				}
-
-				var fieldConfig customDDLFieldConfig
-				if err := json.Unmarshal(config, &fieldConfig); err != nil {
-					return err
-				}
-
-				if fieldConfig.DDL != "" {
-					m.DDL = fieldConfig.DDL
+			Map: func(m *sql.MappedType, config customDDLFieldConfig) error {
+				if config.DDL != "" {
+					m.DDL = config.DDL
 				}
 
 				return nil
@@ -220,6 +215,9 @@ SELECT -1, ""
 {{ end -}}
 {{ end }}
 
+-- TODO: this will not work with custom type definitions that require more than a single word
+-- namely: ARRAY, MAP and INTERVAL. We don't have these types ourselves, but users may be able
+-- to specify them as a custom DDL
 {{ define "cast" -}}
 ::{{- First (Split $ " ") -}}
 {{- end }}

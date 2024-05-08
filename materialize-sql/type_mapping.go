@@ -193,26 +193,25 @@ func WithElementConverter(converter ElementConverter) StaticMapperOption {
 	}
 }
 
-// FieldConfigWrapper wraps a TypeMapper to specify the type of the column in
-// the case that it is a primary key. This is useful for cases where specific
-// databases require certain variations of a type for primary keys. For example,
-// MySQL does not accept TEXT as a primary key, but a VARCHAR with specified
-// size works.
-type FieldConfigMapper struct {
+// FieldConfigWrapper wraps a TypeMapper to influence the type of a field
+// based on the field config (specified as part of field selection)
+type FieldConfigMapper[T any] struct {
 	Delegate TypeMapper
-	Map      func(*MappedType, json.RawMessage) error
+	Map      func(*MappedType, T) error
 }
 
-var _ TypeMapper = FieldConfigMapper{}
-
-func (m FieldConfigMapper) MapType(p *Projection) (mapped MappedType, err error) {
+func (m FieldConfigMapper[T]) MapType(p *Projection) (mapped MappedType, err error) {
 	delegated, err := m.Delegate.MapType(p)
 	if err != nil {
 		return MappedType{}, err
 	}
 
 	if p.RawFieldConfig != nil {
-		if err := m.Map(&delegated, p.RawFieldConfig); err != nil {
+		var conf T
+		if err := json.Unmarshal(p.RawFieldConfig, &conf); err != nil {
+			return MappedType{}, err
+		}
+		if err := m.Map(&delegated, conf); err != nil {
 			return MappedType{}, err
 		}
 	}
