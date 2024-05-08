@@ -26,7 +26,7 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) error {
+func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -52,10 +52,10 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			log.WithFields(log.Fields{
 				"stream":     streamID,
@@ -72,20 +72,20 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("unable to execute query %q: %w", query, err)
+		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Set up the necessary slices for generic scanning over query rows
 	cnames, err := rows.Columns()
 	if err != nil {
-		return err
+		return false, err
 	}
 	var vals = make([]any, len(cnames))
 	var vptrs = make([]any, len(vals))
@@ -94,10 +94,11 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	// Iterate over the result set appending change events to the list
+	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
-			return fmt.Errorf("error scanning result row: %w", err)
+			return false, fmt.Errorf("error scanning result row: %w", err)
 		}
 		var fields = make(map[string]interface{})
 		for idx, name := range cnames {
@@ -110,11 +111,11 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
-				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
-			return fmt.Errorf("error backfilling table %q: %w", table, err)
+			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		log.WithField("fields", fields).Trace("got row")
@@ -136,11 +137,14 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			After:  fields,
 		}
 		if err := callback(event); err != nil {
-			return fmt.Errorf("error processing change event: %w", err)
+			return false, fmt.Errorf("error processing change event: %w", err)
 		}
+		resultRows++
 		rowOffset++
 	}
-	return nil
+
+	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	return backfillComplete, nil
 }
 
 func (db *sqlserverDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
