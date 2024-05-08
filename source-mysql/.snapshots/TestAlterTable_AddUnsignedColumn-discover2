@@ -24,7 +24,6 @@ Binding 0:
               "type": "integer"
             },
             "uintval": {
-              "minimum": 0,
               "type": [
                 "integer",
                 "null"

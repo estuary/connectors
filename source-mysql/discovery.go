@@ -176,7 +176,10 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 			schema.extras["enum"] = options
 		case "tinyint", "smallint", "mediumint", "int", "bigint":
 			if columnType.Unsigned {
-				schema.extras["minimum"] = 0
+				// FIXME(wgd)(2024-05-08): We should be specifying `minimum: 0` for unsigned integer
+				// columns but currently there are collections and captures in production
+				// which this breaks. Re-enable this after we've fixed those.
+				// schema.extras["minimum"] = 0
 			}
 		}
 		// TODO(wgd): Is there a good way to describe possible SET values
