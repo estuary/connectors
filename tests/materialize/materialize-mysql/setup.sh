@@ -89,6 +89,12 @@ resources_json_template='[
       "table": "long-string"
     },
     "source": "${TEST_COLLECTION_LONG_STRING}"
+  },
+  {
+    "resource": {
+      "table": "unsigned_bigint"
+    },
+    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
   }
 ]'
 

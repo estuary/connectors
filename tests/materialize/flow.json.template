@@ -91,7 +91,18 @@
         "type": "object"
       },
       "key": ["/testing (%s)"]
-    }
+    },
+    "tests/unsigned-bigint": {
+       "schema": {
+       "properties": {
+           "id": { "type": "integer" },
+           "unsigned_bigint": { "type": "integer" },
+          },
+          "required": ["id"],
+          "type": "object"
+       },
+       "key": ["/id"]
+    },
   },
 
   "materializations": {
