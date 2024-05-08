@@ -26,7 +26,7 @@ func (db *mysqlDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) error {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -54,10 +54,10 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 
 			logrus.WithFields(logrus.Fields{
@@ -82,7 +82,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
@@ -95,13 +95,14 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	// so we have to drop down a level and prepare the statement ourselves here.
 	var stmt, err = db.conn.Prepare(query)
 	if err != nil {
-		return fmt.Errorf("error preparing query %q: %w", query, err)
+		return false, fmt.Errorf("error preparing query %q: %w", query, err)
 	}
 	defer stmt.Close()
 
 	var result mysql.Result
 	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
 
+	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
 	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
 		var fields = make(map[string]any)
@@ -141,12 +142,15 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		if err := callback(event); err != nil {
 			return fmt.Errorf("error processing change event: %w", err)
 		}
+		resultRows++
 		rowOffset++
 		return nil
 	}, nil, args...); err != nil {
-		return fmt.Errorf("error executing backfill: %w", err)
+		return false, fmt.Errorf("error executing backfill: %w", err)
 	}
-	return nil
+
+	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	return backfillComplete, nil
 }
 
 // The set of MySQL column types for which we need to specify `BINARY` ordering

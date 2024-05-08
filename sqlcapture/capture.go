@@ -649,7 +649,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	// Process backfill query results as a callback-driven stream.
 	var lastRowKey = streamState.Scanned
 	var eventCount int
-	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
+	var backfillComplete, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
 		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
@@ -685,13 +685,13 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 		"rows":   eventCount,
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
-	if eventCount == 0 {
+	state.BackfilledCount += eventCount
+	if backfillComplete {
 		logrus.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableModeActive
 		state.Scanned = nil
 	} else {
 		state.Scanned = lastRowKey
-		state.BackfilledCount += eventCount
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
