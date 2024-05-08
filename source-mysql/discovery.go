@@ -164,7 +164,8 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 		}
 		schema.nullable = column.IsNullable
 		schema.extras = make(map[string]interface{})
-		if columnType.Type == "enum" {
+		switch columnType.Type {
+		case "enum":
 			var options []interface{}
 			for _, val := range columnType.EnumValues {
 				options = append(options, val)
@@ -173,6 +174,10 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 				options = append(options, nil)
 			}
 			schema.extras["enum"] = options
+		case "tinyint", "smallint", "mediumint", "int", "bigint":
+			if columnType.Unsigned {
+				schema.extras["minimum"] = 0
+			}
 		}
 		// TODO(wgd): Is there a good way to describe possible SET values
 		// as a JSON schema? Currently discovery just says 'string'.
