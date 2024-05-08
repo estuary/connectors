@@ -26,7 +26,7 @@ transactions:
       - [false, { "id": 7, "str_field": "str7", "float_field": 7.7, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}, "multiple": {"object": "seven"}, "_meta": {"uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "id": 8, "str_field": "str8", "float_field": 8.8, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}, "multiple": null, "_meta": {"uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "id": 9, "str_field": "str9", "float_field": 9.9, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "nested": {"id": "i9"}, "_meta": {"uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"}}]
-      - [false, { "id": 10, "str_field": "str10", "float_field": 10.1, "bool_field": true , "nullable_int": 18446744073709551615   , "array_int":[1,   2], "nested": {"id": "i10"}, "_meta": {"uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "id": 10, "str_field": "str10", "float_field": 10.1, "bool_field": true , "nullable_int": 10, "array_int":[1,   2], "nested": {"id": "i10"}, "_meta": {"uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"}}]
     tests/compound-key:
       - [false, { "yin": "a", "yan": "b", "num": 0, "_meta": {"uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "yin": "b", "yan": "a", "num": 0, "_meta": {"uuid": "1b953992-20e1-11ee-990b-ffd12dfcd47f"}}]
@@ -34,6 +34,8 @@ transactions:
       - [false, { "yin": "", "yan": "ab", "num": 0, "_meta": {"uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"}}]
     tests/symbols:
       - [false, { "id": "test", "testing (%s)": "test", "_meta": {"uuid": "fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f"}}]
+    tests/unsigned-bigint:
+      - [false, { "id": 1, "unsigned_bigint": 18446744073709551615, "_meta": {"uuid": "fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f"}}]
 
   - tests/simple:
       - [false, { "id": 7, "canary": "pieced", "_meta": {"uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"}}]
