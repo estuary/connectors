@@ -116,6 +116,12 @@ properties:
       - type: "null"
     default: ~
     title: Small Int
+  INTEG:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Integ
   TS:
     anyOf:
       - type: string
