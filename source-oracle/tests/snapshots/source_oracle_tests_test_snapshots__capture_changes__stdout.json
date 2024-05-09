@@ -49,6 +49,7 @@
       "_meta": {
         "op": "u",
         "source": {
+          "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
         }
@@ -63,6 +64,7 @@
       "_meta": {
         "op": "d",
         "source": {
+          "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
         }
@@ -77,6 +79,7 @@
       "_meta": {
         "op": "u",
         "source": {
+          "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
         }
@@ -91,6 +94,7 @@
       "_meta": {
         "op": "u",
         "source": {
+          "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
         }

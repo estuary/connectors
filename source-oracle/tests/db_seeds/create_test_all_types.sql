@@ -6,6 +6,7 @@ CREATE TABLE test_all_types(
 	vchar VARCHAR(4000),
 	num NUMBER (38, 9),
 	small_int SMALLINT,
+  integ INTEGER,
 	double_precision DOUBLE PRECISION,
 	float_126 FLOAT(126),
 	real_num REAL,
