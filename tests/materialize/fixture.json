@@ -1,0 +1,71 @@
+[
+  [
+    ["tests/simple", { "id": 1, "canary": "amputation's"}],
+    ["tests/simple", { "id": 2, "canary": "armament's"}],
+    ["tests/simple", { "id": 3, "canary": "splatters"}],
+    ["tests/simple", { "id": 4, "canary": "strengthen"}],
+    ["tests/simple", { "id": 5, "canary": "Kringle's"}],
+    ["tests/simple", { "id": 6, "canary": "grosbeak's"}],
+
+    ["tests/duplicated-keys", { "id": 1, "int": 1, "str": "str 1"}],
+    ["tests/duplicated-keys", { "id": 2, "int": 2, "str": "str 2"}],
+    ["tests/duplicated-keys", { "id": 3, "int": 3, "str": "str 3"}],
+    ["tests/duplicated-keys", { "id": 4, "int": 4, "str": "str 4"}],
+    ["tests/duplicated-keys", { "id": 5, "int": 5, "str": "str 5"}],
+
+    ["tests/formatted-strings", { "id":3, "int_and_str":3, "num_and_str":3.1, "int_str": "30", "num_str":"30.1", "datetime":"1000-03-03T23:59:38.10Z", "date":"1000-03-03", "time":"23:59:38.10Z"}],
+    ["tests/formatted-strings", { "id":4, "int_and_str":"4", "num_and_str":"4.1", "int_str": "40", "num_str":"40.1", "datetime":"2023-08-29T23:59:38Z", "date":"2023-08-29", "time":"23:59:38Z"}],
+
+    ["tests/multiple-data-types", { "id": 1, "str_field": "str1", "float_field": 1.1, "bool_field": false, "nullable_int": null, "array_int":[11, 12], "nested": {"id": "i1"}, "multiple": 1}],
+    ["tests/multiple-data-types", { "id": 2, "str_field": "str2", "float_field": 2.2, "bool_field": true , "nullable_int": 2   , "array_int":[21, 22], "nested": {"id": "i2"}, "multiple": 2.2}],
+    ["tests/multiple-data-types", { "id": 3, "str_field": "str3", "float_field": 3.3, "bool_field": false, "nullable_int": null, "array_int":[31, 32], "nested": {"id": "i3"}, "multiple": true}],
+    ["tests/multiple-data-types", { "id": 4, "str_field": "str4", "float_field": 4.4, "bool_field": true , "nullable_int": 4   , "array_int":[41, 42], "nested": {"id": "i4"}, "multiple": false}],
+    ["tests/multiple-data-types", { "id": 5, "str_field": "str5", "float_field": 5.5, "bool_field": false, "nullable_int": null, "array_int":[51, 52], "nested": {"id": "i5"}, "multiple": "string five"}],
+    ["tests/multiple-data-types", { "id": 6, "str_field": "str6", "float_field": 6.6, "bool_field": true , "nullable_int": 6   , "array_int":[61, 62], "nested": {"id": "i6"}, "multiple": ["one", 2, true]}],
+    ["tests/multiple-data-types", { "id": 7, "str_field": "str7", "float_field": 7.7, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}, "multiple": {"object": "seven"}}],
+    ["tests/multiple-data-types", { "id": 8, "str_field": "str8", "float_field": 8.8, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}, "multiple": null}],
+    ["tests/multiple-data-types", { "id": 9, "str_field": "str9", "float_field": 9.9, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "binary_field": "aGVsbG8K", "nested": {"id": "i9"}}],
+    ["tests/multiple-data-types", { "id": 10, "str_field": "str10", "float_field": 10.1, "bool_field": true , "nullable_int": 10, "array_int":[1,   2],"binary_field": "Z29vZGJ5ZQo=", "nested": {"id": "i10"}}],
+
+    ["tests/compound-key", { "yin": "a", "yan": "b", "num": 0}],
+    ["tests/compound-key", { "yin": "b", "yan": "a", "num": 0}],
+    ["tests/compound-key", { "yin": "ab", "yan": "", "num": 0}],
+    ["tests/compound-key", { "yin": "", "yan": "ab", "num": 0}],
+
+    ["tests/symbols", { "id": "test", "testing (%s)": "test"}],
+
+    ["tests/unsigned-bigint", { "id": 1, "unsigned_bigint": 18446744073709551615}]
+  ],
+  [
+    ["tests/simple", { "id": 7, "canary": "pieced"}],
+    ["tests/simple", { "id": 8, "canary": "roaches"}],
+    ["tests/simple", { "id": 9, "canary": "devilish"}],
+    ["tests/simple", { "id": 10, "canary": "glucose's"}],
+
+    ["tests/duplicated-keys", { "id": 1, "int": 6, "str": "str 6"}],
+    ["tests/duplicated-keys", { "id": 2, "int": 7, "str": "str 7"}],
+    ["tests/duplicated-keys", { "id": 3, "int": 8, "str": "str 8"}],
+    ["tests/duplicated-keys", { "id": 4, "int": 9, "str": "str 9"}],
+    ["tests/duplicated-keys", { "id": 5, "int": 10, "str": "str 10"}],
+
+    ["tests/compound-key", { "yin": "a", "yan": "b", "num": 1}],
+    ["tests/compound-key", { "yin": "b", "yan": "a", "num": 2}],
+    ["tests/compound-key", { "yin": "ab", "yan": "", "num": 3}],
+    ["tests/compound-key", { "yin": "", "yan": "ab", "num": 4}],
+
+    ["tests/formatted-strings", { "id":1, "int_and_str":1, "num_and_str":1.1, "int_str": "10", "num_str":"10.1", "datetime":"0000-01-01T00:00:00Z", "date":"0000-01-01", "time":"00:00:00Z"}],
+    ["tests/formatted-strings", { "id":2, "int_and_str":2, "num_and_str":2.1, "int_str": "20", "num_str":"20.1", "datetime":"1999-02-02T14:20:12.33Z", "date":"1999-02-02", "time":"14:20:12.33Z"}],
+    ["tests/formatted-strings", { "id":5, "int_and_str":"5", "num_and_str":"5.1", "int_str": "50", "num_str":"50.1", "datetime":"9999-12-31T23:59:59Z", "date":"9999-12-31", "time":"23:59:59Z"}],
+    ["tests/formatted-strings", { "id":8, "num_str":"NaN"}],
+    ["tests/formatted-strings", { "id":9, "num_str":"Infinity"}],
+    ["tests/formatted-strings", { "id":10, "num_str":"-Infinity"}],
+
+    ["tests/multiple-data-types", { "id": 6, "str_field": "str6 v2", "float_field": 66.66, "bool_field": true , "nullable_int": 6   , "array_int":[61, 62], "nested": {"id": "i6"}, "multiple": ["one", 2, true]}],
+    ["tests/multiple-data-types", { "id": 7, "str_field": "str7 v2", "float_field": 77.77, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}, "multiple": {"object": "seven"}}],
+    ["tests/multiple-data-types", { "id": 8, "str_field": "str8 v2", "float_field": 88.88, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}, "multiple": null}],
+    ["tests/multiple-data-types", { "id": 9, "str_field": "str9 v2", "float_field": 99.99, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "binary_field": "YWxvaGEK", "nested": {"id": "i9"}}],
+    ["tests/multiple-data-types", { "id": 10, "str_field": "str10 v2", "float_field": 1010.101, "bool_field": true , "nullable_int": 10, "array_int":[1, 2],"binary_field": "c2F5xY1uYXJhCg==", "nested": {"id": "i10"}}],
+
+    ["tests/long-string", { "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.", "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."}]
+  ]
+]

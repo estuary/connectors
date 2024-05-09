@@ -1,276 +1,25 @@
-{
-  "applied": {
-    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tspec nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tbinary_field nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnested nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnullable_int BIGINT,\n\t\tstr_field nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'compound_key', 'U') IS NULL BEGIN\nCREATE TABLE compound_key (\n\t\tyin nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tyan nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tnum BIGINT NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (yin, yan)\n);\nEND;\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-sqlserver/materialize');"
+[
+  "applied.actionDescription",
+  "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tspec nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tbinary_field nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnested nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnullable_int BIGINT,\n\t\tstr_field nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'compound_key', 'U') IS NULL BEGIN\nCREATE TABLE compound_key (\n\t\tyin nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tyan nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tnum BIGINT NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (yin, yan)\n);\nEND;\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('localbuild', '(a-base64-encoded-value)', 'tests/materialize-sqlserver/materialize');"
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
-}
-{
-  "opened": {
-    "runtimeCheckpoint": {}
-  }
-}
-{
-  "acknowledged": {}
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 1,
-      "int": 1,
-      "str": "str 1"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 2,
-      "int": 2,
-      "str": "str 2"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 3,
-      "int": 3,
-      "str": "str 3"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 4,
-      "int": 4,
-      "str": "str 4"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 5,
-      "int": 5,
-      "str": "str 5"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        61,
-        62
-      ],
-      "bool_field": true,
-      "float_field": 6.6,
-      "id": 6,
-      "multiple": [
-        "one",
-        2,
-        true
-      ],
-      "nested": {
-        "id": "i6"
-      },
-      "nullable_int": 6,
-      "str_field": "str6"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        71,
-        72
-      ],
-      "bool_field": false,
-      "float_field": 7.7,
-      "id": 7,
-      "multiple": {
-        "object": "seven"
-      },
-      "nested": {
-        "id": "i7"
-      },
-      "nullable_int": null,
-      "str_field": "str7"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        81,
-        82
-      ],
-      "bool_field": true,
-      "float_field": 8.8,
-      "id": 8,
-      "multiple": null,
-      "nested": {
-        "id": "i8"
-      },
-      "nullable_int": 8,
-      "str_field": "str8"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        91,
-        92
-      ],
-      "binary_field": "aGVsbG8K",
-      "bool_field": false,
-      "float_field": 9.9,
-      "id": 9,
-      "nested": {
-        "id": "i9"
-      },
-      "nullable_int": null,
-      "str_field": "str9"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        1,
-        2
-      ],
-      "binary_field": "Z29vZGJ5ZQo=",
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 6,
-    "doc": {
-      "_meta": {
-        "uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "num": 0,
-      "yan": "b",
-      "yin": "a"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 6,
-    "doc": {
-      "_meta": {
-        "uuid": "1b953992-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "num": 0,
-      "yan": "a",
-      "yin": "b"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 6,
-    "doc": {
-      "_meta": {
-        "uuid": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "num": 0,
-      "yan": "",
-      "yin": "ab"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 6,
-    "doc": {
-      "_meta": {
-        "uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "num": 0,
-      "yan": "ab",
-      "yin": ""
-    }
-  }
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
+]
 {
   "row": {
     "canary": "amputation's",
-    "flow_published_at": "2023-07-12T18:18:11.537199Z",
+    "flow_published_at": "1970-01-01T00:00:00Z",
     "id": 1
   },
   "table": "Simple"
@@ -278,7 +27,7 @@
 {
   "row": {
     "canary": "armament's",
-    "flow_published_at": "2023-07-12T18:18:24.946758Z",
+    "flow_published_at": "1970-01-01T00:00:01Z",
     "id": 2
   },
   "table": "Simple"
@@ -286,7 +35,7 @@
 {
   "row": {
     "canary": "splatters",
-    "flow_published_at": "2023-07-12T18:18:48.441281Z",
+    "flow_published_at": "1970-01-01T00:00:02Z",
     "id": 3
   },
   "table": "Simple"
@@ -294,7 +43,7 @@
 {
   "row": {
     "canary": "strengthen",
-    "flow_published_at": "2023-07-12T18:19:15.034186Z",
+    "flow_published_at": "1970-01-01T00:00:03Z",
     "id": 4
   },
   "table": "Simple"
@@ -302,7 +51,7 @@
 {
   "row": {
     "canary": "Kringle's",
-    "flow_published_at": "2023-07-12T18:19:57.165604Z",
+    "flow_published_at": "1970-01-01T00:00:04Z",
     "id": 5
   },
   "table": "Simple"
@@ -310,7 +59,7 @@
 {
   "row": {
     "canary": "grosbeak's",
-    "flow_published_at": "2023-07-12T18:20:10.962631Z",
+    "flow_published_at": "1970-01-01T00:00:05Z",
     "id": 6
   },
   "table": "Simple"
@@ -318,7 +67,7 @@
 {
   "row": {
     "canary": "pieced",
-    "flow_published_at": "2023-07-12T18:22:35.841647Z",
+    "flow_published_at": "1970-01-01T01:00:00Z",
     "id": 7
   },
   "table": "Simple"
@@ -326,7 +75,7 @@
 {
   "row": {
     "canary": "roaches",
-    "flow_published_at": "2023-07-12T18:22:49.755893Z",
+    "flow_published_at": "1970-01-01T01:00:01Z",
     "id": 8
   },
   "table": "Simple"
@@ -334,7 +83,7 @@
 {
   "row": {
     "canary": "devilish",
-    "flow_published_at": "2023-07-12T18:25:35.173533Z",
+    "flow_published_at": "1970-01-01T01:00:02Z",
     "id": 9
   },
   "table": "Simple"
@@ -342,59 +91,59 @@
 {
   "row": {
     "canary": "glucose's",
-    "flow_published_at": "2023-07-12T18:25:45.520064Z",
+    "flow_published_at": "1970-01-01T01:00:03Z",
     "id": 10
   },
   "table": "Simple"
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:01.560712Z",
+    "flow_published_at": "1970-01-01T01:00:04Z",
     "id": 1,
-    "int": 6,
+    "int": 7,
     "str": "str 6"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:14.215494Z",
+    "flow_published_at": "1970-01-01T01:00:05Z",
     "id": 2,
-    "int": 7,
+    "int": 9,
     "str": "str 7"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:23.495167Z",
+    "flow_published_at": "1970-01-01T01:00:06Z",
     "id": 3,
-    "int": 8,
+    "int": 11,
     "str": "str 8"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:33.697752Z",
+    "flow_published_at": "1970-01-01T01:00:07Z",
     "id": 4,
-    "int": 9,
+    "int": 13,
     "str": "str 9"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:42.518724Z",
+    "flow_published_at": "1970-01-01T01:00:08Z",
     "id": 5,
-    "int": 10,
+    "int": 15,
     "str": "str 10"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:18:11.537199Z",
+    "flow_published_at": "1970-01-01T00:00:06Z",
     "id": 1,
     "int": 1,
     "str": "str 1"
@@ -403,7 +152,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:18:24.946758Z",
+    "flow_published_at": "1970-01-01T00:00:07Z",
     "id": 2,
     "int": 2,
     "str": "str 2"
@@ -412,7 +161,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:18:48.441281Z",
+    "flow_published_at": "1970-01-01T00:00:08Z",
     "id": 3,
     "int": 3,
     "str": "str 3"
@@ -421,7 +170,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:19:15.034186Z",
+    "flow_published_at": "1970-01-01T00:00:09Z",
     "id": 4,
     "int": 4,
     "str": "str 4"
@@ -430,7 +179,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:20:10.962631Z",
+    "flow_published_at": "1970-01-01T00:00:10Z",
     "id": 5,
     "int": 5,
     "str": "str 5"
@@ -439,7 +188,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:01.560712Z",
+    "flow_published_at": "1970-01-01T01:00:04Z",
     "id": 1,
     "int": 6,
     "str": "str 6"
@@ -448,7 +197,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:14.215494Z",
+    "flow_published_at": "1970-01-01T01:00:05Z",
     "id": 2,
     "int": 7,
     "str": "str 7"
@@ -457,7 +206,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:23.495167Z",
+    "flow_published_at": "1970-01-01T01:00:06Z",
     "id": 3,
     "int": 8,
     "str": "str 8"
@@ -466,7 +215,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:33.697752Z",
+    "flow_published_at": "1970-01-01T01:00:07Z",
     "id": 4,
     "int": 9,
     "str": "str 9"
@@ -475,7 +224,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:42.518724Z",
+    "flow_published_at": "1970-01-01T01:00:08Z",
     "id": 5,
     "int": 10,
     "str": "str 10"
@@ -484,7 +233,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:18:11.537199Z",
+    "flow_published_at": "1970-01-01T00:00:06Z",
     "id": 1,
     "int": 1,
     "str": "str 1"
@@ -493,7 +242,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:18:24.946758Z",
+    "flow_published_at": "1970-01-01T00:00:07Z",
     "id": 2,
     "int": 2,
     "str": "str 2"
@@ -502,7 +251,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:18:48.441281Z",
+    "flow_published_at": "1970-01-01T00:00:08Z",
     "id": 3,
     "int": 3,
     "str": "str 3"
@@ -511,7 +260,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:19:15.034186Z",
+    "flow_published_at": "1970-01-01T00:00:09Z",
     "id": 4,
     "int": 4,
     "str": "str 4"
@@ -520,7 +269,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:20:10.962631Z",
+    "flow_published_at": "1970-01-01T00:00:10Z",
     "id": 5,
     "int": 5,
     "str": "str 5"
@@ -529,7 +278,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:01.560712Z",
+    "flow_published_at": "1970-01-01T01:00:04Z",
     "id": 1,
     "int": 6,
     "str": "str 6"
@@ -538,7 +287,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:14.215494Z",
+    "flow_published_at": "1970-01-01T01:00:05Z",
     "id": 2,
     "int": 7,
     "str": "str 7"
@@ -547,7 +296,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:23.495167Z",
+    "flow_published_at": "1970-01-01T01:00:06Z",
     "id": 3,
     "int": 8,
     "str": "str 8"
@@ -556,7 +305,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:33.697752Z",
+    "flow_published_at": "1970-01-01T01:00:07Z",
     "id": 4,
     "int": 9,
     "str": "str 9"
@@ -565,7 +314,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:26:42.518724Z",
+    "flow_published_at": "1970-01-01T01:00:08Z",
     "id": 5,
     "int": 10,
     "str": "str 10"
@@ -578,7 +327,7 @@
     "binary_field": null,
     "bool_field": false,
     "float_field": 1.1,
-    "flow_published_at": "2023-07-12T18:23:50.55822Z",
+    "flow_published_at": "1970-01-01T00:00:13Z",
     "id": 1,
     "multiple": "1",
     "nested": "{\"id\":\"i1\"}",
@@ -593,7 +342,7 @@
     "binary_field": null,
     "bool_field": true,
     "float_field": 2.2,
-    "flow_published_at": "2023-07-12T18:24:09.67518Z",
+    "flow_published_at": "1970-01-01T00:00:14Z",
     "id": 2,
     "multiple": "2.2",
     "nested": "{\"id\":\"i2\"}",
@@ -608,7 +357,7 @@
     "binary_field": null,
     "bool_field": false,
     "float_field": 3.3,
-    "flow_published_at": "2023-07-12T18:24:19.384Z",
+    "flow_published_at": "1970-01-01T00:00:15Z",
     "id": 3,
     "multiple": "true",
     "nested": "{\"id\":\"i3\"}",
@@ -623,7 +372,7 @@
     "binary_field": null,
     "bool_field": true,
     "float_field": 4.4,
-    "flow_published_at": "2023-07-12T18:24:28.397025Z",
+    "flow_published_at": "1970-01-01T00:00:16Z",
     "id": 4,
     "multiple": "false",
     "nested": "{\"id\":\"i4\"}",
@@ -638,7 +387,7 @@
     "binary_field": null,
     "bool_field": false,
     "float_field": 5.5,
-    "flow_published_at": "2023-07-12T18:24:36.112031Z",
+    "flow_published_at": "1970-01-01T00:00:17Z",
     "id": 5,
     "multiple": "\"string five\"",
     "nested": "{\"id\":\"i5\"}",
@@ -653,7 +402,7 @@
     "binary_field": null,
     "bool_field": true,
     "float_field": 66.66,
-    "flow_published_at": "2023-07-12T18:28:27.194541Z",
+    "flow_published_at": "1970-01-01T01:00:19Z",
     "id": 6,
     "multiple": "[\"one\",2,true]",
     "nested": "{\"id\":\"i6\"}",
@@ -668,7 +417,7 @@
     "binary_field": null,
     "bool_field": false,
     "float_field": 77.77,
-    "flow_published_at": "2023-07-12T18:28:38.169062Z",
+    "flow_published_at": "1970-01-01T01:00:20Z",
     "id": 7,
     "multiple": "{\"object\":\"seven\"}",
     "nested": "{\"id\":\"i7\"}",
@@ -683,7 +432,7 @@
     "binary_field": null,
     "bool_field": true,
     "float_field": 88.88,
-    "flow_published_at": "2023-07-12T18:28:48.465279Z",
+    "flow_published_at": "1970-01-01T01:00:21Z",
     "id": 8,
     "multiple": null,
     "nested": "{\"id\":\"i8\"}",
@@ -698,7 +447,7 @@
     "binary_field": "YWxvaGEK",
     "bool_field": false,
     "float_field": 99.99,
-    "flow_published_at": "2023-07-12T18:28:55.677252Z",
+    "flow_published_at": "1970-01-01T01:00:22Z",
     "id": 9,
     "multiple": null,
     "nested": "{\"id\":\"i9\"}",
@@ -713,7 +462,7 @@
     "binary_field": "c2F5xY1uYXJhCg==",
     "bool_field": true,
     "float_field": 1010.101,
-    "flow_published_at": "2023-07-12T18:29:04.671352Z",
+    "flow_published_at": "1970-01-01T01:00:23Z",
     "id": 10,
     "multiple": null,
     "nested": "{\"id\":\"i10\"}",
@@ -726,7 +475,7 @@
   "row": {
     "date": "0001-01-01T00:00:00Z",
     "datetime": "0001-01-01T00:00:00Z",
-    "flow_published_at": "2023-07-12T18:27:01.912219Z",
+    "flow_published_at": "1970-01-01T01:00:13Z",
     "id": 1,
     "int_and_str": 1,
     "int_str": 10,
@@ -740,7 +489,7 @@
   "row": {
     "date": "1999-02-02T00:00:00Z",
     "datetime": "1999-02-02T14:20:12.33Z",
-    "flow_published_at": "2023-07-12T18:27:12.35461Z",
+    "flow_published_at": "1970-01-01T01:00:14Z",
     "id": 2,
     "int_and_str": 2,
     "int_str": 20,
@@ -754,7 +503,7 @@
   "row": {
     "date": "1000-03-03T00:00:00Z",
     "datetime": "1000-03-03T23:59:38.1Z",
-    "flow_published_at": "2023-07-12T18:18:11.537199Z",
+    "flow_published_at": "1970-01-01T00:00:11Z",
     "id": 3,
     "int_and_str": 3,
     "int_str": 30,
@@ -768,7 +517,7 @@
   "row": {
     "date": "2023-08-29T00:00:00Z",
     "datetime": "2023-08-29T23:59:38Z",
-    "flow_published_at": "2023-07-12T18:18:48.441281Z",
+    "flow_published_at": "1970-01-01T00:00:12Z",
     "id": 4,
     "int_and_str": 4,
     "int_str": 40,
@@ -782,7 +531,7 @@
   "row": {
     "date": "9999-12-31T00:00:00Z",
     "datetime": "9999-12-31T23:59:59Z",
-    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "flow_published_at": "1970-01-01T01:00:15Z",
     "id": 5,
     "int_and_str": 5,
     "int_str": 50,
@@ -796,7 +545,7 @@
   "row": {
     "date": null,
     "datetime": null,
-    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "flow_published_at": "1970-01-01T01:00:16Z",
     "id": 8,
     "int_and_str": null,
     "int_str": null,
@@ -810,7 +559,7 @@
   "row": {
     "date": null,
     "datetime": null,
-    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "flow_published_at": "1970-01-01T01:00:17Z",
     "id": 9,
     "int_and_str": null,
     "int_str": null,
@@ -824,7 +573,7 @@
   "row": {
     "date": null,
     "datetime": null,
-    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "flow_published_at": "1970-01-01T01:00:18Z",
     "id": 10,
     "int_and_str": null,
     "int_str": null,
@@ -836,7 +585,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:25:45.520064Z",
+    "flow_published_at": "1970-01-01T01:00:12Z",
     "num": 4,
     "yan": "ab",
     "yin": ""
@@ -845,7 +594,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:22:35.841647Z",
+    "flow_published_at": "1970-01-01T01:00:09Z",
     "num": 1,
     "yan": "b",
     "yin": "a"
@@ -854,7 +603,7 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:25:35.173533Z",
+    "flow_published_at": "1970-01-01T01:00:11Z",
     "num": 3,
     "yan": "",
     "yin": "ab"
@@ -863,29 +612,20 @@
 }
 {
   "row": {
-    "flow_published_at": "2023-07-12T18:22:49.755893Z",
+    "flow_published_at": "1970-01-01T01:00:10Z",
     "num": 2,
     "yan": "a",
     "yin": "b"
   },
   "table": "compound_key"
 }
-{
-  "applied": {
-    "actionDescription": "UPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-sqlserver/materialize';"
+[
+  "applied.actionDescription",
+  "UPDATE flow_materializations_v2 SET version = 'localbuild', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-sqlserver/materialize';"
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
-}
-{
-  "opened": {
-    "runtimeCheckpoint": {
-      "sources": {
-        "a/read/journal;suffix": {
-          "readThrough": "1"
-        }
-      }
-    }
-  }
-}
-{
-  "acknowledged": {}
-}
+]
