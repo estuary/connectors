@@ -1,0 +1,18 @@
+index: flow-index
+environment: us-central1-gcp
+pineconeApiKey_sops: ENC[AES256_GCM,data:qv41PZ2Kj/4jvM2Ock/DpUR8zfDJvpRqxsijq+sPGx1GMJ1T,iv:8L2s+tqoMlyBvOMe6Wg10zfvNHtLPeEWtaq8jdorfgE=,tag:55690uYVPpnKwKdAuSMIEQ==,type:str]
+openAiApiKey_sops: ENC[AES256_GCM,data:lgevd66PE6OYHueHN5YDCql2WfZXl6I0QNomXPYSvt/vJsStK+kKLVp24wrrmaNiBfqu,iv:ajDHjXd9ETEiTr45G754DosBKgbeMShF7KRsB6/rLXY=,tag:u0ZL9tb7VUC7hR3NtJ/88A==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-05-13T16:48:53Z"
+    mac: ENC[AES256_GCM,data:71hY02/irE7cK5jd567uH3hfvUhNykSyNYdoDWtCZX7t+6+jGjh09mwI7O3fikgnxOeh8hsgsGHyA4MMBtEnyoc5w4dMWxV5DC47RgFdImIDtZf+JMDxjUlmvqQp6n59gJSZxkfRD+LjEGvwr5dflV+tALpc03UiZNAfHmg88No=,iv:PhxkCXNzzlQFHU0jVy8QVKHaaE10odKnwUdQVAC7C7Q=,tag:srZfYgoKosqXUoQnAGcd2A==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1

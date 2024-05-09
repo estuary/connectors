@@ -1,0 +1,24 @@
+address: whb-test.ctlewyr8p8yg.us-east-2.redshift.amazonaws.com:5439
+database: dev
+password_sops: ENC[AES256_GCM,data:kcluRuHji9ckwA==,iv:SRE4ZtcVSFOPHikXJhXEFF5xXcMa7kTbPUCqmgBqbQ0=,tag:mjqomw4ihdngh9yzvIKTkg==,type:str]
+user: estuary
+bucket: whb-test-bucket
+awsAccessKeyId_sops: ENC[AES256_GCM,data:fpQsSRCDHvrxLrJLbgKIjVlrtkM=,iv:pYCjsTwvJLu7rpyg08Cwvlic67D71tDskdfMqTbiwIQ=,tag:Ya//jGdoRwwbNMFj6+ugNw==,type:str]
+awsSecretAccessKey_sops: ENC[AES256_GCM,data:YOLNeE2ORrCU0RUgH6paGfGVDraBtOntAleheKtNxgLXB7pKQ58guA==,iv:eRDh8flWsN0lTle5igWfDAC0d5xhc+ErZT95EkHa+AU=,tag:1jxYF2PW2IYzfJFzqeolew==,type:str]
+region: us-east-2
+advanced:
+    updateDelay: 0s
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-05-13T17:01:59Z"
+    mac: ENC[AES256_GCM,data:LgR/XuEabjjEXf+fmel52Yb+P5EsxATiri5D1MRr8xQtemRPdlo5FZHZp1fQLS4k9uxtOLw7IpNxWRDhu9IWOQeWq+m8eCgsmT5UJx5Dtle71St5eyhhpDZAbXJOcE3jzxJ1hrWAH1HJbnpzmr64Ksu9G7nCoforTRHAnn7bv+8=,iv:OsKjbfjespHZmfnr5GV0nLRxdskDQIxPqpUH5wnVNAY=,tag:OlySJEyfn+wmq5PnREv04g==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
