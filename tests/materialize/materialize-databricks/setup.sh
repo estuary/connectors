@@ -4,27 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export DATABRICKS_HOST_NAME="${DATABRICKS_HOST_NAME}"
-export DATABRICKS_HTTP_PATH="${DATABRICKS_HTTP_PATH}"
-export DATABRICKS_CATALOG="${DATABRICKS_CATALOG}"
-export DATABRICKS_ACCESS_TOKEN="${DATABRICKS_ACCESS_TOKEN}"
-
-export DBSQLCLI_HOST_NAME="${DATABRICKS_HOST_NAME}"
-export DBSQLCLI_HTTP_PATH="${DATABRICKS_HTTP_PATH}"
-export DBSQLCLI_ACCESS_TOKEN="${DATABRICKS_ACCESS_TOKEN}"
-
-config_json_template='{
-   "address": "$DATABRICKS_HOST_NAME",
-   "http_path": "$DATABRICKS_HTTP_PATH",
-   "catalog_name": "$DATABRICKS_CATALOG",
-	 "schema_name": "some-schema",
-	 "advanced": { "updateDelay": "0s" },
-   "credentials": {
-			"auth_type": "PAT",
-			"personal_access_token": "$DATABRICKS_ACCESS_TOKEN"
-		}
-}'
-
 resources_json_template='[
   {
     "resource": {
@@ -96,5 +75,14 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
+
+export DBSQLCLI_HOST_NAME="$(echo $CONNECTOR_CONFIG | jq -r .address)"
+export DBSQLCLI_HTTP_PATH="$(echo $CONNECTOR_CONFIG | jq -r .http_path)"
+export DBSQLCLI_ACCESS_TOKEN="$(echo $CONNECTOR_CONFIG | jq -r .credentials.personal_access_token)"
+export DATABRICKS_CATALOG="$(echo $CONNECTOR_CONFIG | jq -r .catalog_name)"
+export DATABRICKS_SCHEMA="$(echo $CONNECTOR_CONFIG | jq -r .schema)"
+export DATABRICKS_ACCESS_TOKEN="$DBSQLCLI_ACCESS_TOKEN"
+export DATABRICKS_HOST_NAME="$DBSQLCLI_HOST_NAME"
+export DATABRICKS_HTTP_PATH="$DBSQLCLI_HTTP_PATH"

@@ -1,230 +1,31 @@
-{
-  "applied": {
-    "actionDescription": "Created sheet \"Simple\".\nCreated sheet \"duplicate_keys\".\nCreated sheet \"Multiple Types\".\n"
-  }
-}
-{
-  "opened": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {
-    "state": {
-      "updated": {
-        "round": 1
-      }
+[
+  "applied.actionDescription",
+  "Created sheet \"Simple\".\nCreated sheet \"duplicate_keys\".\nCreated sheet \"Multiple Types\".\n"
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "round": 1
     }
   }
-}
-{
-  "acknowledged": {}
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 1,
-      "int": 1,
-      "str": "str 1"
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "round": 2
     }
   }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 2,
-      "int": 2,
-      "str": "str 2"
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "round": 2
     }
   }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 3,
-      "int": 3,
-      "str": "str 3"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 4,
-      "int": 4,
-      "str": "str 4"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 5,
-      "int": 5,
-      "str": "str 5"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        61,
-        62
-      ],
-      "bool_field": true,
-      "float_field": 6.6,
-      "id": 6,
-      "multiple": [
-        "one",
-        2,
-        true
-      ],
-      "nested": {
-        "id": "i6"
-      },
-      "nullable_int": 6,
-      "str_field": "str6"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        71,
-        72
-      ],
-      "bool_field": false,
-      "float_field": 7.7,
-      "id": 7,
-      "multiple": {
-        "object": "seven"
-      },
-      "nested": {
-        "id": "i7"
-      },
-      "nullable_int": null,
-      "str_field": "str7"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        81,
-        82
-      ],
-      "bool_field": true,
-      "float_field": 8.8,
-      "id": 8,
-      "multiple": null,
-      "nested": {
-        "id": "i8"
-      },
-      "nullable_int": 8,
-      "str_field": "str8"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        91,
-        92
-      ],
-      "binary_field": "aGVsbG8K",
-      "bool_field": false,
-      "float_field": 9.9,
-      "id": 9,
-      "nested": {
-        "id": "i9"
-      },
-      "nullable_int": null,
-      "str_field": "str9"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        1,
-        2
-      ],
-      "binary_field": "Z29vZGJ5ZQo=",
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {
-    "state": {
-      "updated": {
-        "round": 2
-      }
-    }
-  }
-}
-{
-  "acknowledged": {}
-}
+]
 {
   "values": [
     {
@@ -258,7 +59,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:18:11.537199Z"
+        "stringValue": "1970-01-01T00:00:00Z"
       }
     }
   ]
@@ -277,7 +78,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:18:24.946758Z"
+        "stringValue": "1970-01-01T00:00:01Z"
       }
     }
   ]
@@ -296,7 +97,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:18:48.441281Z"
+        "stringValue": "1970-01-01T00:00:02Z"
       }
     }
   ]
@@ -315,7 +116,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:19:15.034186Z"
+        "stringValue": "1970-01-01T00:00:03Z"
       }
     }
   ]
@@ -334,7 +135,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:19:57.165604Z"
+        "stringValue": "1970-01-01T00:00:04Z"
       }
     }
   ]
@@ -353,7 +154,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:20:10.962631Z"
+        "stringValue": "1970-01-01T00:00:05Z"
       }
     }
   ]
@@ -372,7 +173,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:22:35.841647Z"
+        "stringValue": "1970-01-01T01:00:00Z"
       }
     }
   ]
@@ -391,7 +192,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:22:49.755893Z"
+        "stringValue": "1970-01-01T01:00:01Z"
       }
     }
   ]
@@ -410,7 +211,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:25:35.173533Z"
+        "stringValue": "1970-01-01T01:00:02Z"
       }
     }
   ]
@@ -429,7 +230,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:25:45.520064Z"
+        "stringValue": "1970-01-01T01:00:03Z"
       }
     }
   ]
@@ -467,12 +268,12 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:26:01.560712Z"
+        "stringValue": "1970-01-01T01:00:04Z"
       }
     },
     {
       "userEnteredValue": {
-        "numberValue": 6
+        "numberValue": 7
       }
     },
     {
@@ -491,12 +292,12 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:26:14.215494Z"
+        "stringValue": "1970-01-01T01:00:05Z"
       }
     },
     {
       "userEnteredValue": {
-        "numberValue": 7
+        "numberValue": 9
       }
     },
     {
@@ -515,12 +316,12 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:26:23.495167Z"
+        "stringValue": "1970-01-01T01:00:06Z"
       }
     },
     {
       "userEnteredValue": {
-        "numberValue": 8
+        "numberValue": 11
       }
     },
     {
@@ -539,12 +340,12 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:26:33.697752Z"
+        "stringValue": "1970-01-01T01:00:07Z"
       }
     },
     {
       "userEnteredValue": {
-        "numberValue": 9
+        "numberValue": 13
       }
     },
     {
@@ -563,12 +364,12 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:26:42.518724Z"
+        "stringValue": "1970-01-01T01:00:08Z"
       }
     },
     {
       "userEnteredValue": {
-        "numberValue": 10
+        "numberValue": 15
       }
     },
     {
@@ -642,7 +443,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:23:50.55822Z"
+        "stringValue": "1970-01-01T00:00:13Z"
       }
     },
     {
@@ -678,7 +479,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:24:09.67518Z"
+        "stringValue": "1970-01-01T00:00:14Z"
       }
     },
     {
@@ -718,7 +519,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:24:19.384Z"
+        "stringValue": "1970-01-01T00:00:15Z"
       }
     },
     {
@@ -754,7 +555,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:24:28.397025Z"
+        "stringValue": "1970-01-01T00:00:16Z"
       }
     },
     {
@@ -794,7 +595,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:24:36.112031Z"
+        "stringValue": "1970-01-01T00:00:17Z"
       }
     },
     {
@@ -830,7 +631,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:28:27.194541Z"
+        "stringValue": "1970-01-01T01:00:19Z"
       }
     },
     {
@@ -870,7 +671,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:28:38.169062Z"
+        "stringValue": "1970-01-01T01:00:20Z"
       }
     },
     {
@@ -906,7 +707,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:28:48.465279Z"
+        "stringValue": "1970-01-01T01:00:21Z"
       }
     },
     {
@@ -950,7 +751,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:28:55.677252Z"
+        "stringValue": "1970-01-01T01:00:22Z"
       }
     },
     {
@@ -990,7 +791,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "2023-07-12T18:29:04.671352Z"
+        "stringValue": "1970-01-01T01:00:23Z"
       }
     },
     {
@@ -1010,12 +811,13 @@
     }
   ]
 }
-{
-  "applied": {}
-}
-{
-  "opened": {}
-}
-{
-  "acknowledged": {}
-}
+[
+  "applied.actionDescription",
+  ""
+]
+[
+  "connectorState",
+  {
+    "updated": {}
+  }
+]
