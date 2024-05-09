@@ -2,6 +2,7 @@ from datetime import datetime, UTC
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
+import time
 import tempfile
 import json
 import pytz
@@ -115,6 +116,23 @@ async def fetch_columns(
 
             return columns
 
+# Backfills operate on ROWID, which is a unique identifier for each row based on its
+# physical location. This identifier is consistent in a single transaction but can change between
+# transactions. We use the ROWID to order all rows of a table and capture all rows up until the last ROWID
+# we have identified for this table at the time of starting the backfill. It is possible that some of the rows from
+# the middle of the range move to a place after the last ROWID, or to a smaller value than the ROWIDs we have processed
+# thus being missed by the backfill process, however since the incremental changes are captured based on transaction IDs, and not ROWIDs
+# the incremental changes task will capture those updated rows, so we will eventually have all the documents
+
+# In order to avoid races between backfill and incremental tasks, we implement a ping-pong between the two,
+# meaning that they don't really run concurrently ever, but rather they run one after another. We start by running
+# a backfill task (sync_counter = 0), backfilling CHECKPOINT_EVERY documents, and then passing the ball to the
+# incremental task (sync_counter = 1), which will fetch updates since the last seen transaction ID up until the latest transaction
+# of the database. The ball is then passed back to backfill (sync_counter = 2). This ensures
+# that we do not capture incremental updates to documents and emit them while a backfill task may be reading and emitting an older
+# version of the same row afterwards. Incremental updates always come after a backfill operation.
+
+
 CHECKPOINT_EVERY = 1000
 
 
@@ -129,17 +147,15 @@ async def fetch_page(
     full_state: ConnectorState,
 ) -> AsyncGenerator[Document | str, None]:
     # fetch_page only runs on even sync counter numbers
-    if full_state.sync_counter % 2 == 0:
+    # this allows a ping-ponging between fetch_page and fetch_changes
+    if full_state.sync_counter % 2 != 0:
         return
-    full_state.sync_counter = full_state.sync_counter + 1
 
-    is_first_query = False
     if page is None:
-        is_first_query = True
         # ROWID is a base64 encoded string, so this string is the minimum value possible
         page = 'AAAAAAAAAAAAAAAAAA'
 
-    query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0], is_first_query=is_first_query)
+    query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0])
 
     log.debug("fetch_page", query, page)
 
@@ -175,6 +191,7 @@ async def fetch_page(
     if last_rowid is not None and (i % CHECKPOINT_EVERY != 0):
         yield last_rowid
 
+    full_state.sync_counter = full_state.sync_counter + 1
 
 op_mapping = {
     'I': 'c',
@@ -193,9 +210,9 @@ async def fetch_changes(
     full_state: ConnectorState,
 ) -> AsyncGenerator[Document | LogCursor, None]:
     # fetch_changes only runs on odd sync counter numbers
-    if full_state.sync_counter % 2 == 1:
+    # this allows a ping-ponging between fetch_page and fetch_changes
+    if full_state.sync_counter % 2 != 1 and full_state.backfill is not None:
         return
-    full_state.sync_counter = full_state.sync_counter + 1
 
     scn = log_cursor
     query = template_env.get_template("inc").render(table=table, cursor=scn)
@@ -252,6 +269,9 @@ async def fetch_changes(
     elif current_transaction is not None and current_transaction > scn:
         yield current_transaction + 1
 
+    if full_state.backfill is not None:
+        full_state.sync_counter = full_state.sync_counter + 1
+
 
 # datetime and some other data types must be cast to string
 # this helper function takes care of formatting datetimes as RFC3339 strings
@@ -292,7 +312,7 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
 {{ c | cast }}
 {%- endfor %} FROM {{ table.table_name }}
-    WHERE ROWID >{% if is_first_query %}={% endif %} '{{ rowid }}'
+    WHERE ROWID > '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
       AND ROWNUM > :rownum_start
       AND ROWNUM < :rownum_end
