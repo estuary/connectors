@@ -101,7 +101,7 @@ var databricksDialect = func() sql.Dialect {
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"long"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"long", "decimal"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
