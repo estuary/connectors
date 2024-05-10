@@ -13,7 +13,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 			FROM json.`file2`
 		)
 	) AS r
-	ON `a-schema`.target_table.key1 = r.key1 AND `a-schema`.target_table.key2 = r.key2
+	ON `a-schema`.target_table.key1 = r.key1 AND `a-schema`.target_table.key2 = unbase64(r.key2)
 --- End `a-schema`.target_table loadQuery ---
 
 --- Begin `a-schema`.target_table mergeInto ---
@@ -21,12 +21,12 @@ SELECT 0, `a-schema`.target_table.flow_document
 	USING (
 		(
 			SELECT
-			key1::BIGINT, key2::BOOLEAN, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+			key1::BIGINT, unbase64(key2)::BINARY as key2, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1::BIGINT, key2::BOOLEAN, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+			key1::BIGINT, unbase64(key2)::BINARY as key2, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
 			FROM json.`file2`
 		)
 	) AS r
@@ -43,7 +43,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 --- Begin `a-schema`.target_table copyIntoDirect ---
 	COPY INTO `a-schema`.target_table FROM (
     SELECT
-		key1::BIGINT, key2::BOOLEAN, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+		key1::BIGINT, unbase64(key2)::BINARY as key2, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
@@ -56,7 +56,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 --- Begin `a-schema`.target_table createTargetTable ---
 CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
   key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
-  key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
+  key2 BINARY NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [string]',
   binary BINARY COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
   boolean BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
   integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',

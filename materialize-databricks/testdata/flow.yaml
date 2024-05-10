@@ -4,7 +4,8 @@ collections:
       type: object
       properties:
         key1: { type: integer }
-        key2: { type: boolean }
+        key2: { type: binary }
+        binary: { type: string, contentEncoding: base64 }
         boolean: { type: boolean }
         integer: { type: integer }
         number: { type: number }
