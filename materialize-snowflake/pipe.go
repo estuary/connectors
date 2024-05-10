@@ -231,7 +231,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	return &response, nil
 }
 
-const insertReportRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/insertReport?requestId={{ $.RequestId }}&beginMark={{ $.BeginMark }}"
+const insertReportRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/insertReport?requestId={{ $.RequestId }}"
 
 type insertReportURLTemplate struct {
 	Base     string
@@ -262,15 +262,11 @@ type fileReport struct {
 }
 
 type InsertReportResponse struct {
-	// completeResult: false means there were events between the supplied beginMark
-	// and the first even that were missed.
-	// see https://docs.snowflake.com/user-guide/data-load-snowpipe-rest-apis
-	CompleteResult bool         `json:"completeResult"`
-	NextBeginMark  string       `json:"nextBeginMark"`
-	Files          []fileReport `json:"files"`
+	NextBeginMark string       `json:"nextBeginMark"`
+	Files         []fileReport `json:"files"`
 }
 
-func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertReportResponse, error) {
+func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error) {
 	if err := c.refreshJWT(); err != nil {
 		return nil, err
 	}
@@ -279,7 +275,6 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
 		RequestId: uuid.New().String(),
-		BeginMark: beginMark,
 	}
 
 	var w strings.Builder

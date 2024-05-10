@@ -130,9 +130,6 @@ type transactor struct {
 	db         *stdsql.DB
 	pipeClient *PipeClient
 
-	// map of pipe name to beginMarker cursors
-	pipeMarkers map[string]string
-
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -193,14 +190,13 @@ func newTransactor(
 	}
 
 	var d = &transactor{
-		cfg:         cfg,
-		ep:          ep,
-		templates:   renderTemplates(dialect),
-		db:          db,
-		pipeClient:  pipeClient,
-		pipeMarkers: make(map[string]string),
-		_range:      open.Range,
-		version:     open.Version,
+		cfg:        cfg,
+		ep:         ep,
+		templates:  renderTemplates(dialect),
+		db:         db,
+		pipeClient: pipeClient,
+		_range:     open.Range,
+		version:    open.Version,
 	}
 
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -678,18 +674,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is not the most ergonomic and sometimes does not yield
 			// results as expected
-			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
+			report, err := d.pipeClient.InsertReport(pipeName)
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
-			}
-
-			// completeResult=false means the latest report we received has a cursor
-			// which is ahead, and some results have not been seen by us and will not be
-			// seen with the given cursor. So we reset the cursor in this case and try again.
-			if !report.CompleteResult {
-				d.pipeMarkers[pipeName] = ""
-			} else {
-				d.pipeMarkers[pipeName] = report.NextBeginMark
 			}
 
 			// If the files have already been loaded, when we submit a request to
