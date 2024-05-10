@@ -69,11 +69,8 @@ var databricksDialect = func() sql.Dialect {
 
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY: jsonMapper,
-		sql.BINARY: sql.PrimaryKeyMapper{
-			PrimaryKey: sql.NewStaticMapper("STRING"),
-			Delegate:   sql.NewStaticMapper("BINARY"),
-		},
+		sql.ARRAY:    jsonMapper,
+		sql.BINARY:   sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.INTEGER:  customDDLMapper(sql.NewStaticMapper("BIGINT")),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
@@ -161,12 +158,12 @@ var databricksDialect = func() sql.Dialect {
 // stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
 // be materialized since they are all converted to strings.
 func stringCompatible(p pf.Projection) bool {
-	// TODO(whb): This is a hack for making sure that pre-existing non-collection key base64 encoded
-	// columns that were materialized as string columns in v1 fail validation in v2, which will
-	// materialize these columns as binary. This is needed because we currently validate a
-	// pre-existing "string" column positively with a string field having any format, content-type,
-	// or content-encoding, see https://github.com/estuary/connectors/issues/1501.
-	if !p.IsPrimaryKey && sql.TypesOrNull(p.Inference.Types, []string{"string"}) {
+	// TODO(whb): This is a hack for making sure that pre-existing base64 encoded columns that were
+	// materialized as string columns in v1 fail validation in v2, which will materialize these
+	// columns as binary. This is needed because we currently validate a pre-existing "string"
+	// column positively with a string field having any format, content-type, or content-encoding,
+	// see https://github.com/estuary/connectors/issues/1501.
+	if sql.TypesOrNull(p.Inference.Types, []string{"string"}) {
 		if p.Inference.String_.ContentEncoding == "base64" {
 			return false
 		}
@@ -222,7 +219,11 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ $.Table.Identifier }}.{{ $key.Identifier }} = {{ if eq (First (Split $key.DDL " ")) "BINARY" -}}
+		unbase64(r.{{ $key.Identifier }})
+	{{- else -}}
+		r.{{ $key.Identifier }}
+	{{- end -}}
 	{{- end }}
 {{ else -}}
 SELECT -1, ""

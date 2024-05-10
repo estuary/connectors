@@ -34,7 +34,8 @@
               "type": "integer"
             },
             "key2": {
-              "type": "boolean"
+              "type": "string",
+              "contentEncoding": "base64"
             },
             "number": {
               "type": "number"
@@ -114,8 +115,11 @@
             "is_primary_key": true,
             "inference": {
               "types": [
-                "boolean"
+                "string"
               ],
+              "string": {
+                "content_encoding": "base64"
+              },
               "exists": 1
             }
           },
