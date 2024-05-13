@@ -10,6 +10,7 @@ function dropTable() {
 }
 
 # Remove materialized tables.
+dbsqlcli -e "SELECT 1"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.simple"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_standard"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_delta"
