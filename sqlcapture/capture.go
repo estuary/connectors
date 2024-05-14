@@ -811,7 +811,9 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 	return nil
 }
 
+type StreamID = string
+
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
-func JoinStreamID(namespace, stream string) string {
+func JoinStreamID(namespace, stream string) StreamID {
 	return strings.ToLower(namespace + "." + stream)
 }
