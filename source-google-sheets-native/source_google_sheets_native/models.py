@@ -82,6 +82,7 @@ class Sheet(BaseModel, extra="allow"):
     class EffectiveValue(BaseModel, extra="forbid"):
         stringValue: str | None = None
         numberValue: Decimal | None = None
+        boolValue: bool | None = None
         errorValue: dict | None = None
 
     class EffectiveFormat(BaseModel, extra="forbid"):
