@@ -218,6 +218,7 @@ func (c *PineconeClient) DescribeIndexStats(ctx context.Context) (PineconeIndexS
 	req.Header.Set("accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Api-Key", c.apiKey)
+	req.Header.Set("User-Agent", "source_tag=estuary")
 
 	res, err := c.http.Do(req)
 	if err != nil {
