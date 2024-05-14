@@ -227,7 +227,7 @@ func quoteColumnName(name string) string {
 func (db *postgresDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {
-		db.explained = make(map[string]struct{})
+		db.explained = make(map[sqlcapture.StreamID]struct{})
 	}
 	if _, ok := db.explained[streamID]; ok {
 		return
