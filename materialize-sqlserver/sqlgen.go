@@ -331,7 +331,7 @@ SELECT TOP 0 -1, NULL
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Document }}
-	WHEN MATCHED AND r.{{ $.Document.Identifier }}=NULL THEN
+	WHEN MATCHED AND r.{{ $.Document.Identifier }}='null' THEN
 		DELETE
 	{{- end }}
 	WHEN MATCHED THEN
