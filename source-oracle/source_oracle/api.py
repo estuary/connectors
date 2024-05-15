@@ -163,7 +163,7 @@ async def fetch_page(
     i = 0
     async with pool.acquire() as conn:
         with conn.cursor() as c:
-            await c.execute(query, rownum_start=0, rownum_end=CHECKPOINT_EVERY)
+            await c.execute(query, rownum_end=CHECKPOINT_EVERY)
             async for values in c:
                 cols = [col[0] for col in c.description]
                 row = dict(zip(cols, values))
@@ -187,9 +187,6 @@ async def fetch_page(
 
             if last_rowid is not None:
                 yield last_rowid
-
-    if last_rowid is not None and (i % CHECKPOINT_EVERY != 0):
-        yield last_rowid
 
     full_state.sync_counter = full_state.sync_counter + 1
 
@@ -314,8 +311,7 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- endfor %} FROM {{ table.table_name }}
     WHERE ROWID > '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
-      AND ROWNUM > :rownum_start
-      AND ROWNUM < :rownum_end
+      AND ROWNUM <= :rownum_end
     ORDER BY ROWID ASC
 """,
     'inc': """
