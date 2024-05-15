@@ -38,6 +38,12 @@ type config struct {
 	Database string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled, items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false"`
 }
 
 // Validate the configuration.
@@ -196,6 +202,7 @@ func newSqlServerDriver() *sql.Driver {
 }
 
 type transactor struct {
+	cfg       *config
 	templates templates
 	// Variables exclusively used by Load.
 	load struct {
@@ -220,10 +227,10 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 	) (_ m.Transactor, err error) {
-		var d = &transactor{templates: templates}
+		var cfg = ep.Config.(*config)
+		var d = &transactor{templates: templates, cfg: cfg}
 		d.store.fence = fence
 
-		var cfg = ep.Config.(*config)
 		// Establish connections.
 		if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
 			return nil, fmt.Errorf("load sql.Open: %w", err)
@@ -458,7 +465,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var b = d.bindings[it.Binding]
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		var flowDocument = it.RawJSON
+		if d.cfg.Advanced.HardDelete && it.Delete {
+			flowDocument = json.RawMessage("null")
+		}
+		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
