@@ -40,6 +40,12 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
