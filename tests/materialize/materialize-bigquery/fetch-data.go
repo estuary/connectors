@@ -123,4 +123,8 @@ func main() {
 	for _, row := range rows {
 		enc.Encode(row)
 	}
+
+	if len(rows) == 0 {
+		enc.Encode([]any{})
+	}
 }
