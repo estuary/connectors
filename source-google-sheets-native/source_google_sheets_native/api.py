@@ -85,6 +85,9 @@ def convert_row(
         if isinstance((sv := ev.stringValue), str):
             d[headers[ind]] = sv
 
+        if isinstance((bv := ev.boolValue), bool):
+            d[headers[ind]] = bv
+
         if isinstance((nv := ev.numberValue), Decimal):
             nt = (
                 isinstance((ef := column.effectiveFormat), Sheet.EffectiveFormat)
