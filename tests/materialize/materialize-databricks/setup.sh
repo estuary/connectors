@@ -72,6 +72,12 @@ resources_json_template='[
         "unsigned_bigint": {"DDL": "DECIMAL(20)"}
       }
     }
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
