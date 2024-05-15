@@ -194,7 +194,7 @@ not emitted by the connector.
 
 FetchPageFn = Callable[
     [Logger, PageCursor, LogCursor],
-    AsyncGenerator[_BaseDocument | AssociatedDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
 ]
 """
 FetchPageFn fetches available checkpoints since the provided last PageCursor.
@@ -219,7 +219,7 @@ returning without yielding a final PageCursor.
 
 FetchChangesFn = Callable[
     [Logger, LogCursor],
-    AsyncGenerator[_BaseDocument | AssociatedDocument | LogCursor, None],
+    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
 ]
 """
 FetchChangesFn fetches available checkpoints since the provided last LogCursor.
@@ -570,7 +570,7 @@ async def _binding_backfill_task(
         done = True 
 
         async for item in fetch_page(task.log, state.next_page, state.cutoff):
-            if isinstance(item, BaseDocument):
+            if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 done = True
             elif isinstance(item, AssociatedDocument):
@@ -615,11 +615,10 @@ async def _binding_incremental_task(
         pending = False
 
         async for item in fetch_changes(task.log, state.cursor):
-            if isinstance(item, BaseDocument):
+            if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 pending = True
             elif isinstance(item, AssociatedDocument):
-                # TODO(jshearer): Assert that the binding index exists (and is enabled?)
                 task.captured(item.binding, item.doc)
                 pending = True
             else:
