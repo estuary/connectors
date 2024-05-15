@@ -97,7 +97,6 @@ class Document(BaseDocument, extra="allow"):
             )
             row_id: str = Field(
                 title='Row ID',
-                default=None,
                 description="Row ID of the Document",
             )
             scn: int | None = Field(
