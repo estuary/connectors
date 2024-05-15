@@ -31,7 +31,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 		)
 	) AS r
 	ON l.key1 = r.key1 AND l.key2 = r.key2
-	WHEN MATCHED AND r.flow_document <=> NULL THEN
+	WHEN MATCHED AND r.flow_document="null" THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.binary = r.binary, l.boolean = r.boolean, l.integer = r.integer, l.`unsigned-integer` = r.`unsigned-integer`, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
@@ -135,7 +135,7 @@ ALTER TABLE `a-schema`.target_table ADD COLUMN
 		)
 	) AS r
 	ON l.key1 = r.key1 AND l.key2 = r.key2
-	WHEN MATCHED AND r.flow_document <=> NULL THEN
+	WHEN MATCHED AND r.flow_document="null" THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.flow_document = r.flow_document
