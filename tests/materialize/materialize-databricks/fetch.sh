@@ -15,3 +15,4 @@ exportToJsonl "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_delta_excl
 exportToJsonl "\`$DATABRICKS_CATALOG\`.\`some-schema\`.multiple_types"
 exportToJsonl "\`$DATABRICKS_CATALOG\`.\`some-schema\`.formatted_strings"
 exportToJsonl "\`$DATABRICKS_CATALOG\`.\`some-schema\`.unsigned_bigint"
+exportToJsonl "\`$DATABRICKS_CATALOG\`.\`some-schema\`.deletions"

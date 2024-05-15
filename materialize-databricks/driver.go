@@ -354,9 +354,14 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
+		var flowDocument = it.RawJSON
+		if d.cfg.Advanced.HardDelete && it.Delete {
+			flowDocument = json.RawMessage("null")
+		}
+
 		if err := b.storeFile.start(ctx); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := b.storeFile.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
