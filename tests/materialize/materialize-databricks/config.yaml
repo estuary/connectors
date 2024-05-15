@@ -4,6 +4,7 @@ catalog_name: main
 schema_name: some-schema
 advanced:
     updateDelay: 0s
+    hardDelete: true
 credentials:
     auth_type: PAT
     personal_access_token_sops: ENC[AES256_GCM,data:LBaw6Ry6tXhZ4sWfENJ2It8PzERVVysVyqghFleppL1Fjcb/,iv:fx2I8YpHNZL/mqHvdP08cnGdfNtmm2oCA2QCmtxpgMU=,tag:5CIlCwbb2gv8BP/l+SuMWw==,type:str]
@@ -16,8 +17,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-05-13T15:58:53Z"
-    mac: ENC[AES256_GCM,data:UOVtQFTdd5GfOGQtjeLWY52DylnJizhw/CoqCFtV2bV82L3gb39zcQumGS7nMvKWGs5+176T7GZcHrfzOj7PnOdK0+dEboOYmlC6HnRkZImf3Qp3rsLHcSkr/PG3TB6D/+16ZFsGTgUHbX/YU8vkGQoK5dbZww425REW8f1gxEs=,iv:v/FE0maYmR3g13WFHUcNo/E9N3Uj6cnkvuKxaT92FWU=,tag:+2QhKtdxBTabeD7e7Xw7Jg==,type:str]
+    lastmodified: "2024-05-15T14:18:58Z"
+    mac: ENC[AES256_GCM,data:PskCaAn4jFTf8QLW3hSfT72kvGIdIiBJiost3QQcRb2muT0qfbBLrAQjF5ywvVoPhnMtJT92Bq0OzvuelUtJzHX1JhmCiM2TfwMNc/jgEbTaDJwJgdaR8ai+CKr4eLYPWlK1BS4GToeiuV4JfzOaazTJw9AHhI4C1MetM7UIsFc=,iv:ZSPt/5CsTKJwgCHSj4HX2OwG8iBS3ioFaqKxzu9/grE=,tag:42wrtmoGdudO/uh41S8Prw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
