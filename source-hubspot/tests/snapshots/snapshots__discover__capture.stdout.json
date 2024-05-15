@@ -14856,6 +14856,12 @@
                 "string"
               ]
             },
+            "hs_latest_message_visible_to_visitor": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_merged_object_ids": {
               "type": [
                 "null",
