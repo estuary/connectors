@@ -61,6 +61,18 @@ properties:
       - type: "null"
     default: ~
     title: Customer Balance Transaction
+  discount_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Discount Amount
+  effective_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Effective At
   discount_amounts:
     items:
       type: object

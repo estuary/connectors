@@ -41,16 +41,40 @@ properties:
     title: Amount
     type: integer
   balance_transactions:
-    items:
-      type: object
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
     title: Balance Transactions
-    type: array
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  payment_method_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Details
+  network_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Network Details
   charge:
     title: Charge
     type: string
   count:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
     title: Count
-    type: integer
   created:
     title: Created
     type: integer
@@ -94,9 +118,7 @@ required:
   - id
   - object
   - amount
-  - balance_transactions
   - charge
-  - count
   - created
   - evidence
   - evidence_details

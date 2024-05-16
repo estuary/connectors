@@ -53,8 +53,11 @@ properties:
     default: ~
     title: Charge
   count:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
     title: Count
-    type: integer
   created:
     title: Created
     type: integer
@@ -70,6 +73,18 @@ properties:
       - type: "null"
     default: ~
     title: Destination Details
+  failure_balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Balance Transaction
+  failure_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Reason
   metadata:
     anyOf:
       - type: object
@@ -116,7 +131,6 @@ required:
   - id
   - object
   - amount
-  - count
   - created
 title: Refunds
 type: object

@@ -172,3 +172,7 @@ collections:
     schema: Transfers.schema.yaml
     key:
       - /id
+  acmeCo/UsageRecords:
+    schema: UsageRecords.schema.yaml
+    key:
+      - /id

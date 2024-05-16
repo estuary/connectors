@@ -94,6 +94,12 @@ properties:
       - type: "null"
     default: ~
     title: Customer
+  refunds:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Refunds
   description:
     anyOf:
       - type: string
@@ -129,7 +135,7 @@ properties:
     title: Radar Options
   source:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
     title: Source

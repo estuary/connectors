@@ -60,10 +60,19 @@ properties:
     default: ~
     title: Description
   discount_amounts:
-    items:
-      type: object
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
     title: Discount Amounts
-    type: array
+  discount_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Discount Amount
   invoice_line_item:
     anyOf:
       - type: string
@@ -117,7 +126,6 @@ required:
   - id
   - object
   - amount
-  - discount_amounts
   - livemode
   - tax_amounts
   - tax_rates

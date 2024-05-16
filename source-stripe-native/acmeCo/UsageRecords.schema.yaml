@@ -20,7 +20,7 @@ $defs:
     title: Meta
     type: object
 additionalProperties: false
-description: "Child Stream\nParent Stream: Customers"
+description: "Child Stream\nParent Stream: SubscriptionItems"
 properties:
   _meta:
     allOf:
@@ -39,62 +39,52 @@ properties:
     default: ~
     title: Parent Id
   object:
-    const: payment_method
+    const: usage_record_summary
     enum:
-      - payment_method
+      - usage_record_summary
     title: Object
     type: string
-  billing_details:
-    title: Billing Details
-    type: object
-  card:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Card
-  created:
-    title: Created
-    type: integer
-  customer:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Customer
-  link:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Link
   livemode:
     title: Livemode
     type: boolean
-  allow_redisplay:
+  quantity:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Quantity
+  subscription_item:
+    title: Subscription Item
+    type: string
+  timestamp:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Timestamp
+  invoice:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Allow Redisplay
-  metadata:
+    title: Invoice
+  period:
     anyOf:
       - type: object
       - type: "null"
     default: ~
-    title: Metadata
-  type:
+    title: Period
+  total_usage:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
     default: ~
-    title: Type
+    title: Total Usage
 required:
   - id
   - object
-  - billing_details
-  - created
   - livemode
-title: PaymentMethods
+  - subscription_item
+title: UsageRecords
 type: object
 x-infer-schema: true

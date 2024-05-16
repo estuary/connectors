@@ -39,19 +39,28 @@ properties:
     default: ~
     title: Parent Id
   object:
-    const: balance_transaction
+    const: customer_balance_transaction
     enum:
-      - balance_transaction
+      - customer_balance_transaction
     title: Object
     type: string
   amount:
     title: Amount
     type: integer
   available_on:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
     title: Available On
-    type: integer
   created:
     title: Created
+    type: integer
+  customer:
+    title: Customer
+    type: string
+  ending_balance:
+    title: Ending Balance
     type: integer
   currency:
     anyOf:
@@ -72,19 +81,31 @@ properties:
     default: ~
     title: Exchange Rate
   fee:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
     title: Fee
-    type: integer
   fee_details:
-    items:
-      type: object
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
     title: Fee Details
-    type: array
   net:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
     title: Net
-    type: integer
   reporting_category:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
     title: Reporting Category
-    type: string
   source:
     anyOf:
       - type: string
@@ -92,8 +113,32 @@ properties:
     default: ~
     title: Source
   status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
     title: Status
-    type: string
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  credit_note:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Credit Note
   type:
     title: Type
     type: string
@@ -101,13 +146,10 @@ required:
   - id
   - object
   - amount
-  - available_on
   - created
-  - fee
-  - fee_details
-  - net
-  - reporting_category
-  - status
+  - customer
+  - ending_balance
+  - livemode
   - type
 title: CustomerBalanceTransaction
 type: object

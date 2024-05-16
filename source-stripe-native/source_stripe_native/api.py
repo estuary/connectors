@@ -71,14 +71,14 @@ async def fetch_backfill(
 )-> AsyncGenerator:
     """ Note: Stripe's data is always served in reverse-chronological order.
     fetch_backfill works by accessing the stream own data API
-    providade by stripe. These API's endpoints works by using pagination,
+    provided by stripe. These API's endpoints works by using pagination,
     with the response schema being the same on most cases (some edge-cases
     added extra fields, so BackfillResult model allows for extras).
     It works by calling each individual stream endpoint and parsing each result,
     created before the cutoff, with its model.
 
     If a document is equal-to or older-than the stop_date, this means we've reached the limit
-    set by the user, and the streams halts. 
+    set by the user, and the stream halts. 
 
     """
 
@@ -267,6 +267,8 @@ async def _capture_substreams(
         child_url = f"{API}/{cls_child.SEARCH_NAME}"
 
     while True:
+        if cls_child.NAME == "Persons" and parent_data.controller["requirement_collection"] == "stripe" :
+            break
         result_child = ListResult[cls_child].model_validate_json(
         await http.request(log, child_url, method="GET", params=parameters)
     )
@@ -307,14 +309,93 @@ async def fetch_incremental_no_events(
         await http.request(log, url, method="GET", params=parameters)
     )
         for results in result.data:
-            log.debug(f"{results}")
             if _s_to_dt(results["created"]) > log_cursor:
-                recent.append(_s_to_dt(results.created))
-                doc = _cls.model_validate(results.data.object)
+                recent.append(_s_to_dt(results["created"]))
+                doc = _cls.model_validate(results)
                 doc.meta_ = _cls.Meta(op="u")
                 yield doc
         
             elif _s_to_dt(results["created"]) < log_cursor:
+                stop = False
+                break
+        if result.has_more is True:
+            parameters["starting_after"] = result.data[-1]["id"]
+        else:
+            break
+    if recent:
+        recent.sort()
+        yield recent[-1]
+
+async def fetch_incremental_substreams2(
+    cls,
+    cls_child,
+    cls_child2,
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator:
+
+    """Note: Stripe's data is always served in reverse-chronological order.
+    fetch_incremental_substreams works very similar to
+    fetch_incremental method. The only variation is that 
+    the resulting data serves has the search object for the next
+    stream (child stream). With that, a new iteration happens inside
+    this method exclusively for the child stream.
+    """
+
+    stop = True
+
+    url = f"{API}/events"
+    parameters = {"type": cls.TYPES, "limit": 100}
+    recent = []
+
+
+    _cls: Any = cls  # Silence mypy false-positive
+
+    while stop:
+        result = EventResult.model_validate_json(
+        await http.request(log, url, method="GET", params=parameters)
+    )
+        for results in result.data:
+            if _s_to_dt(results.created) > log_cursor:
+                recent.append(_s_to_dt(results.created))
+
+                parent_data = _cls.model_validate(results.data.object)
+                search_name = _cls.SEARCH_NAME
+                id = parent_data.id
+                child_data = _capture_substreams(
+                                cls_child,
+                                search_name,
+                                id,
+                                parent_data,
+                                http,
+                                log
+                            )
+
+                if child_data is None:
+                    pass
+                async for doc in child_data:
+                        id2 = doc.id
+                        child_data = doc
+                        search_name2 = cls_child.SEARCH_NAME
+                        child_data_2 = _capture_substreams(
+                            cls_child2,
+                            search_name2,
+                            id2,
+                            child_data,
+                            http,
+                            log
+                        )
+                        if child_data_2 is None:
+                            log.debug(f"None")
+                            pass
+                        async for doc2 in child_data_2:
+                            doc2.parent_id = child_data.id
+                            doc2.meta_ = cls_child.Meta(op="u")
+                            yield doc2
+
+        
+            elif _s_to_dt(results.created) < log_cursor:
                 stop = False
                 break
         if result.has_more is True:
@@ -324,6 +405,111 @@ async def fetch_incremental_no_events(
     if recent:
         recent.sort()
         yield recent[-1]
+
+async def fetch_backfill_substreams2(
+    cls,
+    cls_child,
+    cls_child2,
+    stop_date,
+    http: HTTPSession,
+    log: Logger,
+    page: str | None,
+    cutoff: datetime,
+)-> AsyncGenerator:
+    """Note: Stripe's data is always served in reverse-chronological order.
+    fetch_backfill_substreams works similar to fetch_backfill. The only variation is that 
+    the resulting data serves has the search object for the next
+    stream (child stream). With that, a new iteration happens inside
+    this method exclusively for the child stream.
+    """
+
+    url = f"{API}/{cls.SEARCH_NAME}"
+    parameters = {"limit": 100}
+
+    if page:
+        parameters["starting_after"] = page
+
+    _cls: Any = cls  # Silence mypy false-positive
+    result = BackfillResult[_cls].model_validate_json(
+        await http.request(log, url, method="GET", params=parameters)
+    )
+
+    for doc in result.data:
+        if _s_to_dt(doc.created) <= stop_date:
+            parent_data = doc
+            search_name = _cls.SEARCH_NAME
+            id = parent_data.id
+            child_data = _capture_substreams(
+                            cls_child,
+                            search_name,
+                            id,
+                            parent_data,
+                            http,
+                            log
+                        )
+
+            if child_data is None:
+                return
+            async for doc in child_data:
+                    id2 = doc.id
+                    child_data = doc
+                    search_name2 = cls_child.SEARCH_NAME
+                    child_data_2 = _capture_substreams(
+                        cls_child2,
+                        search_name2,
+                        id2,
+                        child_data,
+                        http,
+                        log
+                    )
+                    if child_data_2 is None:
+                        log.debug(f"None")
+                        pass
+                    async for doc2 in child_data_2:
+                        doc2.parent_id = child_data.id
+                        doc2.meta_ = cls_child.Meta(op="u")
+                        yield doc2
+                    return
+
+        elif _s_to_dt(doc.created) < cutoff:
+            parent_data = doc
+            search_name = _cls.SEARCH_NAME
+            id = parent_data.id
+            child_data = _capture_substreams(
+                            cls_child,
+                            search_name,
+                            id,
+                            parent_data,
+                            http,
+                            log
+                        )
+
+            if child_data is None:
+                pass
+            async for doc in child_data:
+                    id2 = doc.id
+                    child_data = doc
+                    search_name2 = cls_child.SEARCH_NAME
+                    child_data_2 = _capture_substreams(
+                        cls_child2,
+                        search_name2,
+                        id2,
+                        child_data,
+                        http,
+                        log
+                    )
+                    if child_data_2 is None:
+                        log.debug(f"None")
+                        pass
+                    async for doc2 in child_data_2:
+                        doc2.parent_id = child_data.id
+                        doc2.meta_ = cls_child.Meta(op="u")
+                        yield doc2
+
+    if result.has_more:
+        yield result.data[-1].id
+    else:
+        return
 
 def _s_to_dt(s: int) -> datetime:
     return datetime.fromtimestamp(s,tz=UTC)
