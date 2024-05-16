@@ -2,7 +2,7 @@
 ### Capture from Key "FgeUAk5WAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_complexdataset_86827053": 11 Documents
+# Collection "acmeCo/test/test_complexdataset_86827053": 13 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"New York","population":13456000,"state":"NY","year":1940}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"Ohio","population":6929000,"state":"OH","year":1940}
@@ -15,10 +15,12 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"Tennessee","population":2935000,"state":"TN","year":1940}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"Texas","population":6425000,"state":"TX","year":1940}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"complexdataset_86827053","loc":[11111111,11111111,11111111],"txid":111111}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"complexdataset_86827053","loc":[11111111,11111111,11111111],"txid":111111}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"complexdataset_86827053","loc":[11111111,11111111,11111111],"txid":111111}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":140,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAlRYAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":140,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgeUAlRYAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -40,7 +42,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":150,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAkFSAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":150,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgeoAkFSAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -62,7 +64,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":160,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAklBAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":160,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgeoAklBAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -84,7 +86,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":170,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAk1JAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":170,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgeoAk1JAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -106,7 +108,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":180,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAk5NAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":180,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgeoAk5NAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -128,7 +130,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":190,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAlROAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":190,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgeoAlROAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -150,7 +152,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":200,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AkFLAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":200,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"Fge8AkFLAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -172,7 +174,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":210,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AkdBAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":210,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"Fge8AkdBAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -194,7 +196,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":220,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8Ak1EAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":220,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"Fge8Ak1EAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -216,7 +218,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":230,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8Ak5IAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":230,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"Fge8Ak5IAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -238,7 +240,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":240,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AlNDAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":240,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"Fge8AlNDAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -260,7 +262,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":250,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AldZAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":250,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"Fge8AldZAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -282,7 +284,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":260,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAkRFAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":260,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfQAkRFAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -304,7 +306,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":270,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAkxBAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":270,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfQAkxBAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -326,7 +328,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":280,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAk5EAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":280,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfQAk5EAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -348,7 +350,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":290,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAlBBAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":290,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfQAlBBAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -370,7 +372,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":300,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAldJAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":300,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfQAldJAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -392,7 +394,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":310,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAkRDAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":310,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfkAkRDAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -414,7 +416,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":320,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAktZAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":320,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfkAktZAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -436,7 +438,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":330,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAk5DAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":330,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfkAk5DAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -458,7 +460,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":340,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAk9SAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":340,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfkAk9SAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -480,7 +482,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":350,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAldBAA=="}},"cursor":"0/1111111"}
+{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":350,"key_columns":["year","state"],"mode":"UnfilteredBackfill","scanned":"FgfkAldBAA=="}},"cursor":"0/1111111"}
 
 
 ####################################
@@ -492,15 +494,6 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"West Virginia","population":1784787,"state":"WV","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"Wisconsin","population":5832655,"state":"WI","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"complexdataset_86827053","loc":[11111111,11111111,11111111]}},"fullname":"Wyoming","population":582328,"state":"WY","year":2020}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fcomplexdataset_86827053":{"backfilled":353,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAldZAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "FgfkAldZAA=="
-####################################
 # ================================
 # Final State Checkpoint
 # ================================
