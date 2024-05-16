@@ -15,8 +15,8 @@ captures:
           name: Accounts
         target: acmeCo/Accounts
       - resource:
-          name: Application_Fees
-        target: acmeCo/Application_Fees
+          name: ApplicationFees
+        target: acmeCo/ApplicationFees
       - resource:
           name: Customers
         target: acmeCo/Customers
@@ -36,8 +36,8 @@ captures:
           name: Disputes
         target: acmeCo/Disputes
       - resource:
-          name: Early_Fraud_Warning
-        target: acmeCo/Early_Fraud_Warning
+          name: EarlyFraudWarning
+        target: acmeCo/EarlyFraudWarning
       - resource:
           name: InvoiceItems
         target: acmeCo/InvoiceItems
@@ -66,14 +66,14 @@ captures:
           name: Reviews
         target: acmeCo/Reviews
       - resource:
-          name: Setup_Intents
-        target: acmeCo/Setup_Intents
+          name: SetupIntents
+        target: acmeCo/SetupIntents
       - resource:
           name: Subscriptions
         target: acmeCo/Subscriptions
       - resource:
-          name: Subscription_Schedule
-        target: acmeCo/Subscription_Schedule
+          name: SubscriptionSchedule
+        target: acmeCo/SubscriptionSchedule
       - resource:
           name: TopUps
         target: acmeCo/TopUps
@@ -93,26 +93,26 @@ captures:
           name: Persons
         target: acmeCo/Persons
       - resource:
-          name: External_Account_Cards
-        target: acmeCo/External_Account_Cards
+          name: ExternalAccountCards
+        target: acmeCo/ExternalAccountCards
       - resource:
-          name: External_Bank_Account
-        target: acmeCo/External_Bank_Account
+          name: ExternalBankAccount
+        target: acmeCo/ExternalBankAccount
       - resource:
-          name: Application_Fees_Refunds
-        target: acmeCo/Application_Fees_Refunds
+          name: ApplicationFeesRefunds
+        target: acmeCo/ApplicationFeesRefunds
       - resource:
           name: Cards
         target: acmeCo/Cards
       - resource:
-          name: Bank_Accounts
-        target: acmeCo/Bank_Accounts
+          name: BankAccounts
+        target: acmeCo/BankAccounts
       - resource:
-          name: Payment_Methods
-        target: acmeCo/Payment_Methods
+          name: PaymentMethods
+        target: acmeCo/PaymentMethods
       - resource:
-          name: Customer_Balance_Transaction
-        target: acmeCo/Customer_Balance_Transaction
+          name: CustomerBalanceTransaction
+        target: acmeCo/CustomerBalanceTransaction
       - resource:
           name: CheckoutSessionsLine
         target: acmeCo/CheckoutSessionsLine
@@ -129,10 +129,10 @@ captures:
           name: SubscriptionItems
         target: acmeCo/SubscriptionItems
       - resource:
+          name: SetupAttempts
+        target: acmeCo/SetupAttempts
+      - resource:
           name: UsageRecords
         target: acmeCo/UsageRecords
-      - resource:
-          name: Setup_Attempts
-        target: acmeCo/Setup_Attempts
     shards:
       logLevel: debug

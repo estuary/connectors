@@ -4,12 +4,12 @@ collections:
     schema: Accounts.schema.yaml
     key:
       - /id
-  acmeCo/Application_Fees:
-    schema: Application_Fees.schema.yaml
+  acmeCo/ApplicationFees:
+    schema: ApplicationFees.schema.yaml
     key:
       - /id
-  acmeCo/Application_Fees_Refunds:
-    schema: Application_Fees_Refunds.schema.yaml
+  acmeCo/ApplicationFeesRefunds:
+    schema: ApplicationFeesRefunds.schema.yaml
     key:
       - /id
   acmeCo/Authorizations:
@@ -20,8 +20,8 @@ collections:
     schema: BalanceTransactions.schema.yaml
     key:
       - /id
-  acmeCo/Bank_Accounts:
-    schema: Bank_Accounts.schema.yaml
+  acmeCo/BankAccounts:
+    schema: BankAccounts.schema.yaml
     key:
       - /id
   acmeCo/CardHolders:
@@ -56,8 +56,8 @@ collections:
     schema: CreditNotesLines.schema.yaml
     key:
       - /id
-  acmeCo/Customer_Balance_Transaction:
-    schema: Customer_Balance_Transaction.schema.yaml
+  acmeCo/CustomerBalanceTransaction:
+    schema: CustomerBalanceTransaction.schema.yaml
     key:
       - /id
   acmeCo/Customers:
@@ -68,16 +68,16 @@ collections:
     schema: Disputes.schema.yaml
     key:
       - /id
-  acmeCo/Early_Fraud_Warning:
-    schema: Early_Fraud_Warning.schema.yaml
+  acmeCo/EarlyFraudWarning:
+    schema: EarlyFraudWarning.schema.yaml
     key:
       - /id
-  acmeCo/External_Account_Cards:
-    schema: External_Account_Cards.schema.yaml
+  acmeCo/ExternalAccountCards:
+    schema: ExternalAccountCards.schema.yaml
     key:
       - /id
-  acmeCo/External_Bank_Account:
-    schema: External_Bank_Account.schema.yaml
+  acmeCo/ExternalBankAccount:
+    schema: ExternalBankAccount.schema.yaml
     key:
       - /id
   acmeCo/Files:
@@ -104,8 +104,8 @@ collections:
     schema: PaymentIntents.schema.yaml
     key:
       - /id
-  acmeCo/Payment_Methods:
-    schema: Payment_Methods.schema.yaml
+  acmeCo/PaymentMethods:
+    schema: PaymentMethods.schema.yaml
     key:
       - /id
   acmeCo/Payouts:
@@ -136,20 +136,20 @@ collections:
     schema: Reviews.schema.yaml
     key:
       - /id
-  acmeCo/Setup_Attempts:
-    schema: Setup_Attempts.schema.yaml
+  acmeCo/SetupAttempts:
+    schema: SetupAttempts.schema.yaml
     key:
       - /id
-  acmeCo/Setup_Intents:
-    schema: Setup_Intents.schema.yaml
+  acmeCo/SetupIntents:
+    schema: SetupIntents.schema.yaml
     key:
       - /id
   acmeCo/SubscriptionItems:
     schema: SubscriptionItems.schema.yaml
     key:
       - /id
-  acmeCo/Subscription_Schedule:
-    schema: Subscription_Schedule.schema.yaml
+  acmeCo/SubscriptionSchedule:
+    schema: SubscriptionSchedule.schema.yaml
     key:
       - /id
   acmeCo/Subscriptions:
