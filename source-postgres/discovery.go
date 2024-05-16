@@ -277,6 +277,22 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		dataType = column.DataType
 	}
 
+	switch dataType {
+	case "timetz":
+		if x, ok := val.(string); ok {
+			var formats = []string{
+				"15:04:05.999999999Z07:00",
+				"15:04:05.999999999Z07",
+				"15:04:05Z07:00",
+				"15:04:05Z07",
+			}
+			for _, format := range formats {
+				if t, err := time.Parse(format, x); err == nil {
+					return t.Format(RFC3339TimeFormat), nil
+				}
+			}
+		}
+	}
 	switch x := val.(type) {
 	case *net.IPNet:
 		return x.String(), nil
@@ -362,22 +378,6 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		return formatRFC3339(x.Time)
 	case time.Time:
 		return formatRFC3339(x)
-	}
-	switch dataType {
-	case "timetz":
-		if x, ok := val.(string); ok {
-			var formats = []string{
-				"15:04:05.999999999Z07:00",
-				"15:04:05.999999999Z07",
-				"15:04:05Z07:00",
-				"15:04:05Z07",
-			}
-			for _, format := range formats {
-				if t, err := time.Parse(format, x); err == nil {
-					return t.Format(RFC3339TimeFormat), nil
-				}
-			}
-		}
 	}
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
