@@ -135,7 +135,7 @@ async def all_resources(
 
         keys = [f"/{c.column_name}" for c in t.primary_key]
         if len(keys) < 1:
-            keys = ["/_meta/row_id"]
+            keys = ["/_meta/source/row_id"]
 
         resources_list.append(common.Resource(
             name=f"{t.owner}_{t.table_name}",
