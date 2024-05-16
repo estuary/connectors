@@ -94,10 +94,12 @@ async def fetch_backfill(
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) <= stop_date:
-            # Yield final document
+        if _s_to_dt(doc.created) == stop_date:
+            # Yield final document for reference
             doc.meta_ = _cls.Meta(op="u")
             yield doc
+            return
+        elif _s_to_dt(doc.created) < stop_date:
             return
         elif _s_to_dt(doc.created) < cutoff:
             doc.meta_ = _cls.Meta(op="u")
@@ -199,7 +201,7 @@ async def fetch_backfill_substreams(
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) <= stop_date:
+        if _s_to_dt(doc.created) == stop_date:
             parent_data = doc
             search_name = _cls.SEARCH_NAME
             id = parent_data.id
@@ -218,6 +220,9 @@ async def fetch_backfill_substreams(
                 doc.parent_id = parent_data.id
                 doc.meta_ = cls_child.Meta(op="u")
                 yield doc 
+            return
+
+        elif _s_to_dt(doc.created) < stop_date:
             return
 
         elif _s_to_dt(doc.created) < cutoff:
@@ -326,7 +331,7 @@ async def fetch_incremental_no_events(
         recent.sort()
         yield recent[-1]
 
-async def fetch_incremental_substreams2(
+async def fetch_incremental_usage_records(
     cls,
     cls_child,
     cls_child2,
@@ -336,11 +341,10 @@ async def fetch_incremental_substreams2(
 ) -> AsyncGenerator:
 
     """Note: Stripe's data is always served in reverse-chronological order.
-    fetch_incremental_substreams works very similar to
-    fetch_incremental method. The only variation is that 
-    the resulting data serves has the search object for the next
-    stream (child stream). With that, a new iteration happens inside
-    this method exclusively for the child stream.
+    fetch_incremental_usage_records works similar to fetch_incremental_substreams. 
+    The only variation is that the resulting data from the child stream
+    serves has the search object for the next child stream
+    As of now, the only supported stream is UsageRecords
     """
 
     stop = True
@@ -387,7 +391,6 @@ async def fetch_incremental_substreams2(
                             log
                         )
                         if child_data_2 is None:
-                            log.debug(f"None")
                             pass
                         async for doc2 in child_data_2:
                             doc2.parent_id = child_data.id
@@ -406,7 +409,7 @@ async def fetch_incremental_substreams2(
         recent.sort()
         yield recent[-1]
 
-async def fetch_backfill_substreams2(
+async def fetch_backfill_usage_records(
     cls,
     cls_child,
     cls_child2,
@@ -417,10 +420,10 @@ async def fetch_backfill_substreams2(
     cutoff: datetime,
 )-> AsyncGenerator:
     """Note: Stripe's data is always served in reverse-chronological order.
-    fetch_backfill_substreams works similar to fetch_backfill. The only variation is that 
-    the resulting data serves has the search object for the next
-    stream (child stream). With that, a new iteration happens inside
-    this method exclusively for the child stream.
+    fetch_backfill_usage_records works similar to fetch_backfill_substreams. 
+    The only variation is that the resulting data from the child stream
+    serves has the search object for the next child stream
+    As of now, the only supported stream is UsageRecords
     """
 
     url = f"{API}/{cls.SEARCH_NAME}"
@@ -435,7 +438,8 @@ async def fetch_backfill_substreams2(
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) <= stop_date:
+        if _s_to_dt(doc.created) == stop_date:
+            # Yield final document for reference
             parent_data = doc
             search_name = _cls.SEARCH_NAME
             id = parent_data.id
@@ -463,13 +467,14 @@ async def fetch_backfill_substreams2(
                         log
                     )
                     if child_data_2 is None:
-                        log.debug(f"None")
                         pass
                     async for doc2 in child_data_2:
                         doc2.parent_id = child_data.id
                         doc2.meta_ = cls_child.Meta(op="u")
                         yield doc2
                     return
+        elif _s_to_dt(doc.created) < stop_date:
+            return
 
         elif _s_to_dt(doc.created) < cutoff:
             parent_data = doc
@@ -499,7 +504,6 @@ async def fetch_backfill_substreams2(
                         log
                     )
                     if child_data_2 is None:
-                        log.debug(f"None")
                         pass
                     async for doc2 in child_data_2:
                         doc2.parent_id = child_data.id

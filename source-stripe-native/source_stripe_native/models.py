@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, AwareDatetime, model_validator, AliasChoi
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Dict, List
 import urllib.parse
 
-from estuary_cdk.flow import BasicAuth
+from estuary_cdk.flow import AccessToken
 
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
@@ -16,7 +16,13 @@ from estuary_cdk.capture.common import (
 
 
 class EndpointConfig(BaseModel):
-    credentials: BasicAuth
+    credentials: AccessToken = Field(
+        title="API Key"        )
+    stop_date: AwareDatetime = Field(
+        description="Replication Stop Date. Records will only be considered for backfilling "\
+                    "before the stop_date, similar to a start date",
+        default=datetime.fromisoformat("2010-01-01T00:00:00Z".replace('Z', '+00:00'))
+    )
 
 
 # We use ResourceState directly, without extending it.
@@ -170,7 +176,7 @@ class ExternalAccountCards(BaseDocument, extra="allow"):
     Child Stream
     Parent Stream: Accounts
     """
-    NAME: ClassVar[str] = "External_Account_Cards"
+    NAME: ClassVar[str] = "ExternalAccountCards"
     SEARCH_NAME: ClassVar[str] = "external_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"card"}   
 
@@ -205,7 +211,7 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     Child Stream
     Parent Stream: Accounts
     """
-    NAME: ClassVar[str] = "External_Bank_Account"
+    NAME: ClassVar[str] = "ExternalBankAccount"
     SEARCH_NAME: ClassVar[str] = "external_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"bank_account"} 
 
@@ -228,7 +234,7 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     status: str
 
 class ApplicationFees(BaseDocument, extra="forbid"):
-    NAME: ClassVar[str] = "Application_Fees"
+    NAME: ClassVar[str] = "ApplicationFees"
     TYPES: ClassVar[str] =  "application_fee.refunded"
     SEARCH_NAME: ClassVar[str] = "application_fees"
 
@@ -252,7 +258,7 @@ class ApplicationFeesRefunds(BaseDocument, extra="forbid"):
     Child Stream
     Parent Stream: ApplicationFees
     """
-    NAME: ClassVar[str] = "Application_Fees_Refunds"
+    NAME: ClassVar[str] = "ApplicationFeesRefunds"
     SEARCH_NAME: ClassVar[str] = "refunds"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
@@ -366,7 +372,7 @@ class Bank_Accounts(BaseDocument, extra="forbid"):
     Child Stream
     Parent Stream: Customers
     """
-    NAME: ClassVar[str] = "Bank_Accounts"
+    NAME: ClassVar[str] = "BankAccounts"
     SEARCH_NAME: ClassVar[str] = "bank_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
@@ -392,7 +398,7 @@ class CustomerBalanceTransaction(BaseDocument, extra="forbid"):
     Child Stream
     Parent Stream: Customers
     """
-    NAME: ClassVar[str] = "Customer_Balance_Transaction"
+    NAME: ClassVar[str] = "CustomerBalanceTransaction"
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
@@ -425,7 +431,7 @@ class PaymentMethods(BaseDocument, extra="forbid"):
     Child Stream
     Parent Stream: Customers
     """
-    NAME: ClassVar[str] = "Payment_Methods"
+    NAME: ClassVar[str] = "PaymentMethods"
     SEARCH_NAME: ClassVar[str] = "payment_methods"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
     
@@ -713,7 +719,7 @@ class Disputes(BaseDocument, extra="forbid"):
     status: str
 
 class EarlyFraudWarning(BaseDocument, extra="forbid"):
-    NAME: ClassVar[str] = "Early_Fraud_Warning"
+    NAME: ClassVar[str] = "EarlyFraudWarning"
     TYPES: ClassVar[str] =  "radar.early_fraud_warning.*"
     SEARCH_NAME: ClassVar[str] = "radar/early_fraud_warnings"
 
@@ -1076,7 +1082,7 @@ class Reviews(BaseDocument, extra="forbid"):
     session: Dict | None = None
 
 class SetupIntents(BaseDocument, extra="forbid"):
-    NAME: ClassVar[str] = "Setup_Intents"
+    NAME: ClassVar[str] = "SetupIntents"
     TYPES: ClassVar[str] =  "setup_intent.*"
     SEARCH_NAME: ClassVar[str] = "setup_intents"
 
@@ -1110,7 +1116,7 @@ class SetupAttempts(BaseDocument, extra="forbid"):
     Child Stream
     Parent Stream: SetupIntents
     """
-    NAME: ClassVar[str] = "Setup_Attempts"
+    NAME: ClassVar[str] = "SetupAttempts"
     SEARCH_NAME: ClassVar[str] = "setup_attempts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "setup_intent": None} 
 
@@ -1228,7 +1234,7 @@ class UsageRecords(BaseDocument, extra="forbid"):
     total_usage: int | None = None
 
 class SubscriptionsSchedule(BaseDocument, extra="forbid"):
-    NAME: ClassVar[str] = "Subscription_Schedule"
+    NAME: ClassVar[str] = "SubscriptionSchedule"
     TYPES: ClassVar[str] =  "subscription_schedule.updated"
     SEARCH_NAME: ClassVar[str] = "subscription_schedules"
 

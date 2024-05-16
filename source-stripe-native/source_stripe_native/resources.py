@@ -13,8 +13,8 @@ from .api import (fetch_incremental,
                   fetch_incremental_substreams,
                   fetch_backfill_substreams,
                   fetch_incremental_no_events,
-                  fetch_backfill_substreams2,
-                  fetch_incremental_substreams2
+                  fetch_backfill_usage_records,
+                  fetch_incremental_usage_records,
                   )
 
 from .models import (
@@ -64,67 +64,87 @@ from .models import (
     Files,
     FilesLink,
     EndpointConfig,
+    EventResult,
     )
-#TODO add config.stop_date after validating tests
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
-    return [
-        base_object(Accounts, http),
-        base_object(ApplicationFees, http),
-        base_object(Customers, http),
-        base_object(Charges, http),
-        base_object(CheckoutSessions, http),
-        base_object(Coupons, http),
-        base_object(CreditNotes, http),
-        base_object(Disputes, http),
-        base_object(EarlyFraudWarning, http),
-        base_object(InvoiceItems, http),
-        base_object(Invoices, http),
-        base_object(PaymentIntent, http),
-        base_object(Payouts, http),
-        base_object(Plans, http),
-        base_object(Products, http),
-        base_object(PromotionCode, http),
-        base_object(Refunds, http),
-        base_object(Reviews, http),
-        base_object(SetupIntents, http),
-        base_object(Subscriptions, http),
-        base_object(SubscriptionsSchedule, http),
-        base_object(TopUps, http),
-        base_object(Transfers, http),
-        no_events_object(Files, http),
-        no_events_object(FilesLink, http),
-        no_events_object(BalanceTransactions, http),
-        # issuing_object(Authorizations, http),
-        # issuing_object(CardHolders, http),
-        # issuing_object(Transactions, http),
-        child_object(Accounts, Persons, http),
-        child_object(Accounts, ExternalAccountCards, http),
-        child_object(Accounts, ExternalBankAccount, http),
-        child_object(ApplicationFees, ApplicationFeesRefunds, http),
-        child_object(Customers, Cards, http),
-        child_object(Customers, Bank_Accounts, http),
-        child_object(Customers, PaymentMethods, http),
-        child_object(Customers, CustomerBalanceTransaction, http),
-        child_object(CheckoutSessions, CheckoutSessionsLine, http),
-        child_object(CreditNotes, CreditNotesLines, http),
-        child_object(Invoices, InvoiceLineItems, http),
-        child_object(Transfers, TransferReversals, http),
-        child_object(Subscriptions, SubscriptionItems, http),
-        child_object2(Subscriptions, SubscriptionItems,UsageRecords, http),
-        child_object(SetupIntents, SetupAttempts, http),
 
+
+    all_streams = [
+        base_object(Accounts, http, config.stop_date),
+        base_object(ApplicationFees, http, config.stop_date),
+        base_object(Customers, http, config.stop_date),
+        base_object(Charges, http, config.stop_date),
+        base_object(CheckoutSessions, http, config.stop_date),
+        base_object(Coupons, http, config.stop_date),
+        base_object(CreditNotes, http, config.stop_date),
+        base_object(Disputes, http, config.stop_date),
+        base_object(EarlyFraudWarning, http, config.stop_date),
+        base_object(InvoiceItems, http, config.stop_date),
+        base_object(Invoices, http, config.stop_date),
+        base_object(PaymentIntent, http, config.stop_date),
+        base_object(Payouts, http, config.stop_date),
+        base_object(Plans, http, config.stop_date),
+        base_object(Products, http, config.stop_date),
+        base_object(PromotionCode, http, config.stop_date),
+        base_object(Refunds, http, config.stop_date),
+        base_object(Reviews, http, config.stop_date),
+        base_object(SetupIntents, http, config.stop_date),
+        base_object(Subscriptions, http, config.stop_date),
+        base_object(SubscriptionsSchedule, http, config.stop_date),
+        base_object(TopUps, http, config.stop_date),
+        base_object(Transfers, http, config.stop_date),
+        no_events_object(Files, http, config.stop_date),
+        no_events_object(FilesLink, http, config.stop_date),
+        no_events_object(BalanceTransactions, http, config.stop_date),
+        child_object(Accounts, Persons, http, config.stop_date),
+        child_object(Accounts, ExternalAccountCards, http, config.stop_date),
+        child_object(Accounts, ExternalBankAccount, http, config.stop_date),
+        child_object(ApplicationFees, ApplicationFeesRefunds, http, config.stop_date),
+        child_object(Customers, Cards, http, config.stop_date),
+        child_object(Customers, Bank_Accounts, http, config.stop_date),
+        child_object(Customers, PaymentMethods, http, config.stop_date),
+        child_object(Customers, CustomerBalanceTransaction, http, config.stop_date),
+        child_object(CheckoutSessions, CheckoutSessionsLine, http, config.stop_date),
+        child_object(CreditNotes, CreditNotesLines, http, config.stop_date),
+        child_object(Invoices, InvoiceLineItems, http, config.stop_date),
+        child_object(Transfers, TransferReversals, http, config.stop_date),
+        child_object(Subscriptions, SubscriptionItems, http, config.stop_date),
+        child_object(SetupIntents, SetupAttempts, http, config.stop_date),
+        usage_records(Subscriptions, SubscriptionItems,UsageRecords, http, config.stop_date),
 
 
     ]
+
+    # Checking if user has "Issuing" permissions
+    try:
+        #Using Authorizations stream for testing
+        url = f"https://api.stripe.com/v1/{Authorizations.SEARCH_NAME}"
+        result = EventResult.model_validate_json(
+                await http.request(log, url, method="GET")
+            )
+        issuing_list = [
+            issuing_object(Authorizations, http, config.stop_date),
+            issuing_object(CardHolders, http, config.stop_date),
+            issuing_object(Transactions, http, config.stop_date),
+        ]
+        all_streams += issuing_list
+    except:
+        # User does not have permission
+        log.info("Permission Denied for Issuing Endpoints. "
+                 "Removing 'Issuing' streams")
+
+    return all_streams
+
+
 
 
 
 
 def base_object(
-    cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
+    cls, http: HTTPSession, stop_date: datetime
 ) -> Resource:
     """Base Object handles the default case from source-stripe-native
     It requires a single, parent stream with a valid Event API Type
@@ -162,7 +182,7 @@ def base_object(
     )
 
 def child_object(
-    cls, child_cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
+    cls, child_cls, http: HTTPSession, stop_date: datetime
 ) -> Resource:
     """Child Object handles the default child case from source-stripe-native
     It requires both the parent and child stream, with the parent stream having
@@ -200,12 +220,12 @@ def child_object(
         schema_inference=True,
     )
 
-def child_object2(
-    cls, child_cls, child_cls2, http: HTTPSession, stop_date =datetime.fromisoformat("2024-01-01T00:00:00Z".replace('Z', '+00:00'))
+def usage_records(
+    cls, child_cls, child_cls2, http: HTTPSession, stop_date: datetime
 ) -> Resource:
-    """Child Object handles the default child case from source-stripe-native
-    It requires both the parent and child stream, with the parent stream having
-    a valid Event API Type
+    """ Usage Records handles a specific stream (UsageRecords).
+    This is required since Usage Records is a child stream from a child stream.
+    It requires the parent stream, child stream and second child stream.
     """
 
     def open(
@@ -220,8 +240,8 @@ def child_object2(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental_substreams2, cls, child_cls, child_cls2, http),
-            fetch_page=functools.partial(fetch_backfill_substreams2, cls, child_cls, child_cls2, stop_date, http),
+            fetch_changes=functools.partial(fetch_incremental_usage_records, cls, child_cls, child_cls2, http),
+            fetch_page=functools.partial(fetch_backfill_usage_records, cls, child_cls, child_cls2, stop_date, http),
         )
 
     started_at = datetime.now(tz=UTC)
@@ -240,7 +260,7 @@ def child_object2(
     )
 
 def no_events_object(
-    cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
+    cls, http: HTTPSession, stop_date: datetime
 ) -> Resource:
     """No Events Object handles a edge-case from source-stripe-native,
     where the given parent stream does not contain a valid Events API type.
@@ -280,9 +300,8 @@ def no_events_object(
     )
 
 def issuing_object(
-        cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
+        cls, http: HTTPSession, stop_date: datetime
 ) -> Resource:
-    #TODO add validation check to issuing streams
 
     """ Issuing Object works similar to Base Objects, but only handles "issuing" endpoint
     streams.
