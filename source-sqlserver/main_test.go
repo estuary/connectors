@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -40,13 +39,6 @@ func TestMain(m *testing.M) {
 		}
 		log.SetLevel(level)
 	}
-
-	// SQL Server captures aren't just tailing the WAL directly, instead they're
-	// polling change tables which are updated by an asynchronous worker which in
-	// turn is reading the WAL, which has a higher latency than in other DBs. This
-	// means that our capture shutdown delay has to be substantially longer if we
-	// want to avoid having tests flake out sometimes.
-	tests.CaptureShutdownDelay = 15 * time.Second
 
 	os.Exit(m.Run())
 }
