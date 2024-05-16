@@ -26,10 +26,6 @@ type DatatypeTestCase struct {
 // TestDatatypes runs a series of tests creating tables with specific column types
 // and performing discovery/capture to verify that each type is supported properly.
 func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []DatatypeTestCase) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
 	for idx, tc := range cases {
 		var testName = sanitizeName(tc.ColumnType)
 		if len(testName) > 8 {
