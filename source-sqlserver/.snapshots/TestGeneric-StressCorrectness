@@ -6,5 +6,5 @@ no invariant violations observed
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"dbo.test_generic_stresscorrectness_51314288":{"backfilled":999,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+{"bindingStateV1":{"dbo%2Ftest_generic_stresscorrectness_51314288":{"backfilled":999,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 
