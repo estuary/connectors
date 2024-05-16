@@ -19,6 +19,9 @@ type DatatypeTestCase struct {
 	ExpectType  string
 	InputValue  interface{}
 	ExpectValue string
+
+	PrimaryKeyValue    interface{}
+	PrimaryExpectValue string
 }
 
 // TestDatatypes runs a series of tests creating tables with specific column types
@@ -35,7 +38,12 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 		}
 		t.Run(fmt.Sprintf("%d_%s", idx, testName), func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("1%07d", idx)
-			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			var tableName string
+			if tc.PrimaryKeyValue != nil {
+				tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(b %s PRIMARY KEY)", tc.ColumnType))
+			} else {
+				tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			}
 			var stream *capture.Response_Discovered_Binding
 
 			// Perform discovery and verify that the generated JSON schema looks correct
@@ -67,15 +75,30 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 				cs.Sanitizers = make(map[string]*regexp.Regexp)
 
 				t.Run("scan", func(t *testing.T) {
-					tb.Insert(ctx, t, tableName, [][]interface{}{{1, tc.InputValue}})
+					var v [][]any
+					if tc.PrimaryKeyValue != nil {
+						v = [][]any{{tc.InputValue}}
+					} else {
+						v = [][]any{{1, tc.InputValue}}
+					}
+					tb.Insert(ctx, t, tableName, v)
 					var output = RunCapture(ctx, t, cs)
-					verifyRoundTrip(t, tc, output)
+					verifyRoundTrip(t, tc, tc.ExpectValue, output)
 				})
 
 				t.Run("replication", func(t *testing.T) {
-					tb.Insert(ctx, t, tableName, [][]interface{}{{2, tc.InputValue}})
+					var v [][]any
+					var expected string = tc.ExpectValue
+					if tc.PrimaryKeyValue != nil {
+						v = [][]any{{tc.PrimaryKeyValue}}
+						expected = tc.PrimaryExpectValue
+					} else {
+						v = [][]any{{2, tc.InputValue}}
+					}
+					tb.Insert(ctx, t, tableName, v)
 					var output = RunCapture(ctx, t, cs)
-					verifyRoundTrip(t, tc, output)
+
+					verifyRoundTrip(t, tc, expected, output)
 				})
 			})
 		})
@@ -86,7 +109,7 @@ type datatypeTestRecord struct {
 	Value json.RawMessage `json:"b"`
 }
 
-func verifyRoundTrip(t *testing.T, tc DatatypeTestCase, actual string) {
+func verifyRoundTrip(t *testing.T, tc DatatypeTestCase, expected, actual string) {
 	t.Helper()
 
 	// Extract the document of interest from the full capture summary
@@ -107,7 +130,7 @@ func verifyRoundTrip(t *testing.T, tc DatatypeTestCase, actual string) {
 		return
 	}
 
-	if string(record.Value) != tc.ExpectValue {
+	if string(record.Value) != expected {
 		t.Errorf("result mismatch for type %q: input %q, got %q, expected %q",
 			tc.ColumnType, tc.InputValue, string(record.Value), tc.ExpectValue)
 	}
