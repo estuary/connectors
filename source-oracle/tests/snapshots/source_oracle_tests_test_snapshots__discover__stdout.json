@@ -553,7 +553,7 @@
       "type": "object"
     },
     "key": [
-      "/_meta/row_id"
+      "/_meta/source/row_id"
     ]
   }
 ]
