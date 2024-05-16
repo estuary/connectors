@@ -18,15 +18,19 @@ from estuary_cdk.capture.common import (
 
 class Wallet(BaseModel):
     credentials_title: Literal["Wallet"]
-    username: str
+    username: str = Field(
+        title="User",
+        description="Database user to connect to",
+    )
     password: str = Field(
         title="Password",
+        description="Password for the database user",
         json_schema_extra={"secret": True},
     )
     tnsnames: str = Field(
         title="tnsnames.ora file",
         description="tnsnames.ora file from the wallet zip file",
-        json_schema_extra={"multiline": True},
+        json_schema_extra={"secret": True, "multiline": True},
     )
     ewallet: str = Field(
         title="ewallet.pem file",
@@ -34,14 +38,17 @@ class Wallet(BaseModel):
         json_schema_extra={"secret": True, "multiline": True},
     )
     wallet_password: str = Field(
-        title="Password",
+        title="Wallet Password",
         description="Wallet's password",
         json_schema_extra={"secret": True},
     )
 
 
 class EndpointConfig(BaseModel):
-    address: str = Field(description="Address")
+    address: str = Field(
+        title="Address",
+        description="The connection string for connecting to the database",
+    )
     credentials: BasicAuth | Wallet = Field(
         discriminator="credentials_title",
         title="Authentication",

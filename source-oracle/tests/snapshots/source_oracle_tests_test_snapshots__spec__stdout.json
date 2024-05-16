@@ -61,10 +61,12 @@
               "type": "string"
             },
             "username": {
-              "title": "Username",
+              "description": "Database user to connect to",
+              "title": "User",
               "type": "string"
             },
             "password": {
+              "description": "Password for the database user",
               "secret": true,
               "title": "Password",
               "type": "string"
@@ -72,6 +74,7 @@
             "tnsnames": {
               "description": "tnsnames.ora file from the wallet zip file",
               "multiline": true,
+              "secret": true,
               "title": "tnsnames.ora file",
               "type": "string"
             },
@@ -85,7 +88,7 @@
             "wallet_password": {
               "description": "Wallet's password",
               "secret": true,
-              "title": "Password",
+              "title": "Wallet Password",
               "type": "string"
             }
           },
@@ -103,7 +106,7 @@
       },
       "properties": {
         "address": {
-          "description": "Address",
+          "description": "The connection string for connecting to the database",
           "title": "Address",
           "type": "string"
         },
