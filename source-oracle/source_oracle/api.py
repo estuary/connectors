@@ -163,6 +163,8 @@ async def fetch_page(
     i = 0
     async with pool.acquire() as conn:
         with conn.cursor() as c:
+            c.arraysize = CHECKPOINT_EVERY
+            c.prefetchrows = CHECKPOINT_EVERY + 1
             await c.execute(query, rownum_end=CHECKPOINT_EVERY)
             async for values in c:
                 cols = [col[0] for col in c.description]
@@ -231,6 +233,8 @@ async def fetch_changes(
                 end = (query_page + 1) * CHECKPOINT_EVERY
                 query_page = query_page + 1
 
+                c.arraysize = CHECKPOINT_EVERY
+                c.prefetchrows = CHECKPOINT_EVERY + 1
                 await c.execute(query, rownum_start=start, rownum_end=end)
                 has_more = c.rowcount >= CHECKPOINT_EVERY
 
