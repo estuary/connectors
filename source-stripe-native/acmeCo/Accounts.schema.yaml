@@ -67,6 +67,12 @@ properties:
   country:
     title: Country
     type: string
+  company:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Company
   created:
     title: Created
     type: integer
@@ -115,6 +121,12 @@ properties:
   tos_acceptance:
     title: Tos Acceptance
     type: object
+  login_links:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Login Links
   type:
     title: Type
     type: string

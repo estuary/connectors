@@ -55,12 +55,6 @@ properties:
       - type: "null"
     default: ~
     title: Cancellation Reason
-  client_secret:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Client Secret
   created:
     title: Created
     type: integer

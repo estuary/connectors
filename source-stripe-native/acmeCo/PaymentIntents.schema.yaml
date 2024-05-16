@@ -88,12 +88,12 @@ properties:
   capture_method:
     title: Capture Method
     type: string
-  client_secret:
+  charges:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
-    title: Client Secret
+    title: Charges
   confirmation_method:
     anyOf:
       - type: string

@@ -203,14 +203,14 @@ properties:
     title: Description
   discount:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
     title: Discount
   discounts:
     anyOf:
       - items:
-          type: object
+          type: string
         type: array
       - type: "null"
     default: ~

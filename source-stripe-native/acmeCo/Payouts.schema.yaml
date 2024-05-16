@@ -40,6 +40,18 @@ properties:
   amount:
     title: Amount
     type: integer
+  application_fee:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application Fee
+  application_fee_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Application Fee Amount
   arrival_date:
     title: Arrival Date
     type: integer

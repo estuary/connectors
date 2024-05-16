@@ -90,18 +90,6 @@ captures:
           name: BalanceTransactions
         target: acmeCo/BalanceTransactions
       - resource:
-          name: Authorizations
-        target: acmeCo/Authorizations
-        disable: true
-      - resource:
-          name: CardHolders
-        target: acmeCo/CardHolders
-        disable: true
-      - resource:
-          name: Transactions
-        target: acmeCo/Transactions
-        disable: true
-      - resource:
           name: Persons
         target: acmeCo/Persons
       - resource:
@@ -140,6 +128,9 @@ captures:
       - resource:
           name: SubscriptionItems
         target: acmeCo/SubscriptionItems
+      - resource:
+          name: UsageRecords
+        target: acmeCo/UsageRecords
       - resource:
           name: Setup_Attempts
         target: acmeCo/Setup_Attempts

@@ -139,8 +139,35 @@ properties:
     default: ~
     title: Invoice
   invoice_creation:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
     title: Invoice Creation
-    type: object
+  currency_conversion:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Currency Conversion
+  payment_method_configuration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Configuration Details
+  saved_payment_method_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Saved Payment Method Options
+  ui_mode:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Ui Mode
   livemode:
     title: Livemode
     type: boolean
@@ -212,6 +239,18 @@ properties:
       - type: "null"
     default: ~
     title: Setup Intent
+  shipping:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Shipping
+  shipping_rate:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Shipping Rate
   shipping_address_collection:
     anyOf:
       - type: object
@@ -281,7 +320,6 @@ required:
   - custom_fields
   - custom_text
   - expires_at
-  - invoice_creation
   - livemode
   - payment_method_types
   - payment_status

@@ -13,6 +13,8 @@ from .api import (fetch_incremental,
                   fetch_incremental_substreams,
                   fetch_backfill_substreams,
                   fetch_incremental_no_events,
+                  fetch_backfill_substreams2,
+                  fetch_incremental_substreams2
                   )
 
 from .models import (
@@ -58,6 +60,7 @@ from .models import (
     Transactions,
     Transfers,
     TransferReversals,
+    UsageRecords,
     Files,
     FilesLink,
     EndpointConfig,
@@ -94,9 +97,9 @@ async def all_resources(
         no_events_object(Files, http),
         no_events_object(FilesLink, http),
         no_events_object(BalanceTransactions, http),
-        issuing_object(Authorizations, http),
-        issuing_object(CardHolders, http),
-        issuing_object(Transactions, http),
+        # issuing_object(Authorizations, http),
+        # issuing_object(CardHolders, http),
+        # issuing_object(Transactions, http),
         child_object(Accounts, Persons, http),
         child_object(Accounts, ExternalAccountCards, http),
         child_object(Accounts, ExternalBankAccount, http),
@@ -110,7 +113,9 @@ async def all_resources(
         child_object(Invoices, InvoiceLineItems, http),
         child_object(Transfers, TransferReversals, http),
         child_object(Subscriptions, SubscriptionItems, http),
+        child_object2(Subscriptions, SubscriptionItems,UsageRecords, http),
         child_object(SetupIntents, SetupAttempts, http),
+
 
 
     ]
@@ -119,7 +124,7 @@ async def all_resources(
 
 
 def base_object(
-    cls, http: HTTPSession, stop_date = datetime.now(tz=UTC)
+    cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
 ) -> Resource:
     """Base Object handles the default case from source-stripe-native
     It requires a single, parent stream with a valid Event API Type
@@ -157,7 +162,7 @@ def base_object(
     )
 
 def child_object(
-    cls, child_cls, http: HTTPSession, stop_date = datetime.now(tz=UTC)
+    cls, child_cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
 ) -> Resource:
     """Child Object handles the default child case from source-stripe-native
     It requires both the parent and child stream, with the parent stream having
@@ -195,8 +200,47 @@ def child_object(
         schema_inference=True,
     )
 
+def child_object2(
+    cls, child_cls, child_cls2, http: HTTPSession, stop_date =datetime.fromisoformat("2024-01-01T00:00:00Z".replace('Z', '+00:00'))
+) -> Resource:
+    """Child Object handles the default child case from source-stripe-native
+    It requires both the parent and child stream, with the parent stream having
+    a valid Event API Type
+    """
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_incremental_substreams2, cls, child_cls, child_cls2, http),
+            fetch_page=functools.partial(fetch_backfill_substreams2, cls, child_cls, child_cls2, stop_date, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=child_cls2.NAME,
+        key=["/id"],
+        model=child_cls2,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+        ),
+        initial_config=ResourceConfig(name=child_cls2.NAME),
+        schema_inference=True,
+    )
+
 def no_events_object(
-    cls, http: HTTPSession, stop_date = datetime.now(tz=UTC)
+    cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
 ) -> Resource:
     """No Events Object handles a edge-case from source-stripe-native,
     where the given parent stream does not contain a valid Events API type.
@@ -220,7 +264,7 @@ def no_events_object(
             fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    started_at = datetime.now(tz=UTC) - timedelta(days=1)
 
     return Resource(
         name=cls.NAME,
@@ -236,7 +280,7 @@ def no_events_object(
     )
 
 def issuing_object(
-        cls, http: HTTPSession, stop_date = datetime.now(tz=UTC)
+        cls, http: HTTPSession, stop_date =datetime.fromisoformat("2024-04-10T00:00:00Z".replace('Z', '+00:00'))
 ) -> Resource:
     #TODO add validation check to issuing streams
 

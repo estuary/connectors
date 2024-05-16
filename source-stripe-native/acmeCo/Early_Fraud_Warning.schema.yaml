@@ -49,6 +49,12 @@ properties:
   fraud_type:
     title: Fraud Type
     type: string
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
   livemode:
     title: Livemode
     type: boolean

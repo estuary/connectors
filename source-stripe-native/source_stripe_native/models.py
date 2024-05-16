@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, AliasChoices
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Dict, List
 import urllib.parse
 
@@ -125,6 +125,7 @@ class Accounts(BaseDocument, extra="forbid"):
     charges_enabled: bool
     controller: Dict | None = None
     country: str
+    company: Dict | None = None
     created: int
     default_currency: str
     details_submitted: bool
@@ -136,6 +137,7 @@ class Accounts(BaseDocument, extra="forbid"):
     requirements: Dict | None = None
     settings: Dict | None = None
     tos_acceptance: Dict
+    login_links: Dict | None = None
     type: str
 
 class Persons(BaseDocument, extra="allow"):
@@ -169,7 +171,7 @@ class ExternalAccountCards(BaseDocument, extra="allow"):
     Parent Stream: Accounts
     """
     NAME: ClassVar[str] = "External_Account_Cards"
-    SEARCH_NAME: ClassVar[str] = "external_account"
+    SEARCH_NAME: ClassVar[str] = "external_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"card"}   
 
     id: str
@@ -185,7 +187,7 @@ class ExternalAccountCards(BaseDocument, extra="allow"):
     address_zip_check: str | None = None
     brand: str | None = None
     country: str | None = None
-    customer: str | None = None
+    customer: Dict | None = None
     cvc_check: str | None = None
     dynamic_last4: str | None = None
     exp_month: int
@@ -204,7 +206,7 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     Parent Stream: Accounts
     """
     NAME: ClassVar[str] = "External_Bank_Account"
-    SEARCH_NAME: ClassVar[str] = "external_account"
+    SEARCH_NAME: ClassVar[str] = "external_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"bank_account"} 
 
     
@@ -218,7 +220,7 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     bank_name: str | None = None
     country: str 
     currency: str
-    customer: str
+    customer: Dict | None = None
     fingerprint: str | None = None
     last4: str
     metadata: Dict | None = None
@@ -306,6 +308,7 @@ class Customers(BaseDocument, extra="forbid"):
     created: int
     currency: str | None = None 
     default_source: str | None = None
+    default_currency: str | None = None
     delinquent: bool | None = None
     description: str | None = None
     discount: Dict | None = None
@@ -396,19 +399,25 @@ class CustomerBalanceTransaction(BaseDocument, extra="forbid"):
 
     id: str
     parent_id: str | None = None # Custom Added Field
-    object: Literal["balance_transaction"]
+    object: Literal["customer_balance_transaction"]
     amount: int
-    available_on: int
+    available_on: int | None = None
     created: int
+    customer: str
+    ending_balance: int
     currency: str | None = None
     description: str | None = None
     exchange_rate: float | None = None
-    fee: int
-    fee_details: list[Dict]
-    net: int
-    reporting_category: str
+    fee: int | None = None
+    fee_details: list[Dict] | None = None
+    net: int | None = None
+    reporting_category: str | None = None
     source: str | None = None
-    status: str
+    status: str | None = None
+    invoice: str | None = None
+    livemode: bool
+    metadata: Dict | None = None
+    credit_note: str | None = None
     type: str
 
 class PaymentMethods(BaseDocument, extra="forbid"):
@@ -427,6 +436,7 @@ class PaymentMethods(BaseDocument, extra="forbid"):
     card: Dict | None = None
     created: int
     customer: str | None = None
+    link: Dict | None = None
     livemode: bool
     allow_redisplay: str | None = None
     metadata: Dict | None = None
@@ -474,13 +484,14 @@ class Charges(BaseDocument, extra="forbid"):
     created: int
     currency: str
     customer: str | None = None
+    refunds: Dict | None = None
     description: str | None = None
     disputed: bool
     destination: str | None = None
     dispute: str | None = None
     order: str | None = None
     radar_options: Dict | None = None
-    source: str | None = None
+    source: Dict | None = None
     failure_balance_transaction: str | None = None
     failure_code: str | None = None
     failure_message: str | None = None
@@ -535,7 +546,12 @@ class CheckoutSessions(BaseDocument, extra="forbid"):
     customer_email: str | None = None
     expires_at: int
     invoice: str | None = None
-    invoice_creation: Dict
+    invoice_creation: Dict | None = None
+    client_secret: str | None = Field(exclude=True) # Sensible Field
+    currency_conversion: Dict | None = None
+    payment_method_configuration_details: Dict | None = None
+    saved_payment_method_options: Dict | None = None
+    ui_mode: str | None = None
     livemode: bool
     locale: str | None = None
     metadata: Dict | None = None
@@ -549,6 +565,8 @@ class CheckoutSessions(BaseDocument, extra="forbid"):
     phone_number_collection: Dict | None = None
     recovered_from: str | None = None
     setup_intent: str | None = None
+    shipping: str | None = None
+    shipping_rate: int | None = None
     shipping_address_collection: Dict | None = None
     shipping_cost: Dict | None = None
     shipping_details: Dict | None = None
@@ -617,7 +635,8 @@ class CreditNotes(BaseDocument, extra="forbid"):
     currency: str | None = None
     customer: str
     customer_balance_transaction: str | None = None
-    #"discount_amount": 0,   Docs claim that this field is Deprecated
+    discount_amount: int | None = None
+    effective_at: int | None = None
     discount_amounts: list[Dict]
     invoice: str
     lines: Dict = Field(exclude=True)
@@ -655,7 +674,8 @@ class CreditNotesLines(BaseDocument, extra="forbid"):
     amount: int
     amount_excluding_tax: int | None = None
     description: str | None = None
-    discount_amounts: list[Dict]
+    discount_amounts: list[Dict] | None = None
+    discount_amount: int | None = None
     invoice_line_item: str | None = None
     livemode: bool
     quantity: int | None = None
@@ -668,16 +688,19 @@ class CreditNotesLines(BaseDocument, extra="forbid"):
 
 class Disputes(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Disputes"
-    TYPES: ClassVar[str] =  "dispute.updated"
+    TYPES: ClassVar[str] =  "charge.dispute.updated"
     SEARCH_NAME: ClassVar[str] = "disputes"
 
 
     id: str
     object: Literal["dispute"]
     amount: int
-    balance_transactions: list[Dict]
+    balance_transactions: list[Dict] | None = None
+    balance_transaction: str | None = None
+    payment_method_details: Dict | None = None
+    network_details: Dict | None = None
     charge: str
-    count: int
+    count: int | None = None
     created: int
     currency: str | None = None
     evidence: Dict
@@ -691,7 +714,7 @@ class Disputes(BaseDocument, extra="forbid"):
 
 class EarlyFraudWarning(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Early_Fraud_Warning"
-    TYPES: ClassVar[str] =  "radar.early_fraud_warning.updated"
+    TYPES: ClassVar[str] =  "radar.early_fraud_warning.*"
     SEARCH_NAME: ClassVar[str] = "radar/early_fraud_warnings"
 
 
@@ -701,6 +724,7 @@ class EarlyFraudWarning(BaseDocument, extra="forbid"):
     charge: str
     created: int
     fraud_type: str
+    payment_intent: str | None = None
     livemode: bool
 
 class InvoiceItems(BaseDocument, extra="forbid"):
@@ -713,7 +737,7 @@ class InvoiceItems(BaseDocument, extra="forbid"):
     amount: int
     currency: str | None = None
     customer: str
-    date: int
+    created: int = Field(validation_alias=AliasChoices('date'))
     description: str | None = None
     discountable: bool
     discounts: list[Dict] | None = None
@@ -721,14 +745,16 @@ class InvoiceItems(BaseDocument, extra="forbid"):
     livemode: bool
     metadata: Dict | None = None
     period: Dict
-    plan: str | None = None
+    plan: Dict | None = None
     price: Dict
     proration: bool
     quantity: int
     subscription: str | None = None
+    subscription_item: str | None = None
     tax_rates: list[Dict] | None = None
     test_clock: str | None = None
     unit_amount: int | None = None
+    unit_amount_decimal: str | None = None
 
 class Invoices(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Invoices"
@@ -768,8 +794,8 @@ class Invoices(BaseDocument, extra="forbid"):
     default_source: str | None = None
     default_tax_rates: list[Dict]
     description: str | None = None
-    discount: str | None = None
-    discounts: list[Dict] | None = None
+    discount: Dict | None = None
+    discounts: list[str] | None = None
     due_date: int | None = None
     ending_balance: int | None = None
     effective_at: int | None = None
@@ -870,7 +896,8 @@ class PaymentIntent(BaseDocument, extra="forbid"):
     canceled_at: int | None = None
     cancellation_reason: str | None = None
     capture_method: str
-    client_secret: str | None = None
+    client_secret: str | None = Field(exclude=True) # Sensible Field
+    charges: Dict | None = None
     confirmation_method: str | None = None
     created: int
     currency: str
@@ -907,6 +934,8 @@ class Payouts(BaseDocument, extra="forbid"):
     id: str
     object: Literal["payout"]
     amount: int
+    application_fee: str | None = None 
+    application_fee_amount: int | None = None
     arrival_date: int
     automatic: bool
     balance_transaction: str | None = None
@@ -1012,10 +1041,12 @@ class Refunds(BaseDocument, extra="forbid"):
     amount: int
     balance_transaction: str | None = None
     charge: str | None = None
-    count: int
+    count: int | None = None
     created: int
     currency: str | None = None
     destination_details: Dict | None = None
+    failure_balance_transaction: str | None = None
+    failure_reason: str | None = None
     metadata: Dict | None = None
     payment_intent: str | None = None
     reason: str | None = None
@@ -1054,7 +1085,7 @@ class SetupIntents(BaseDocument, extra="forbid"):
     application: str | None = None
     automatic_payment_methods: Dict | None = None
     cancellation_reason: str | None = None
-    client_secret: str | None = None
+    client_secret: str | None = Field(exclude=True) # Sensible Field
     created: int
     customer: str | None = None
     description: str | None = None
@@ -1128,7 +1159,7 @@ class Subscriptions(BaseDocument, extra="forbid"):
     default_source: str | None = None
     default_tax_rates: list[Dict] | None = None
     description: str | None = None
-    discounts: list[Dict] | None = None
+    discounts: list[str] | None = None
     discount: Dict | None = None
     ended_at: int | None = None
     invoice_settings: Dict
@@ -1176,21 +1207,25 @@ class SubscriptionItems(BaseDocument, extra="forbid"):
     subscription: str
     tax_rates: list[Dict] | None = None
 
-# class UsageRecords(BaseDocument, extra="forbid"):
-#     """
-#     Child Stream
-#     Parent Stream: SubscriptionItems
-#     """
-#     NAME: ClassVar[str] = "UsageRecords"
-#     #TODO child stream of a No Event stream (Subscription)
+class UsageRecords(BaseDocument, extra="forbid"):
+    """
+    Child Stream
+    Parent Stream: SubscriptionItems
+    """
+    NAME: ClassVar[str] = "UsageRecords"
+    SEARCH_NAME: ClassVar[str] = "usage_record_summaries"
+    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
-#     id: str
-#     parent_id: str | None = None # Custom Added Field
-#     object: Literal["usage_record"]
-#     livemode: bool
-#     quantity: int
-#     subscription_item: str
-#     timestamp: int
+    id: str
+    parent_id: str | None = None # Custom Added Field
+    object: Literal["usage_record_summary"]
+    livemode: bool
+    quantity: int | None = None
+    subscription_item: str
+    timestamp: int | None = None
+    invoice: str | None = None
+    period: Dict | None = None
+    total_usage: int | None = None
 
 class SubscriptionsSchedule(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Subscription_Schedule"
@@ -1284,6 +1319,7 @@ class Transfers(BaseDocument, extra="forbid"):
     source_transaction: str | None = None
     source_type: str | None = None
     transfer_group: str | None = None
+    metadata: Dict | None = None
 
 class TransferReversals(BaseDocument, extra="forbid"):
     """

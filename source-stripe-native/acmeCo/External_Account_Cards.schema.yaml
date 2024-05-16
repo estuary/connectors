@@ -106,7 +106,7 @@ properties:
     title: Country
   customer:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
     title: Customer

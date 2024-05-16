@@ -81,7 +81,7 @@ properties:
     type: boolean
   metadata:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
     title: Metadata

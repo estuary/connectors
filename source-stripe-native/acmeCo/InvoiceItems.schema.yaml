@@ -49,8 +49,8 @@ properties:
   customer:
     title: Customer
     type: string
-  date:
-    title: Date
+  created:
+    title: Created
     type: integer
   description:
     anyOf:
@@ -89,7 +89,7 @@ properties:
     type: object
   plan:
     anyOf:
-      - type: string
+      - type: object
       - type: "null"
     default: ~
     title: Plan
@@ -108,6 +108,12 @@ properties:
       - type: "null"
     default: ~
     title: Subscription
+  subscription_item:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Subscription Item
   tax_rates:
     anyOf:
       - items:
@@ -128,12 +134,18 @@ properties:
       - type: "null"
     default: ~
     title: Unit Amount
+  unit_amount_decimal:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Unit Amount Decimal
 required:
   - id
   - object
   - amount
   - customer
-  - date
+  - created
   - discountable
   - livemode
   - period

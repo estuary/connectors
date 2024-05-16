@@ -61,6 +61,12 @@ properties:
       - type: "null"
     default: ~
     title: Default Source
+  default_currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Currency
   delinquent:
     anyOf:
       - type: boolean
