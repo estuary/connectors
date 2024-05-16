@@ -497,15 +497,6 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":353,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAVdZAA=="}},"cursor":"binlog.000123:56789"}
-
-
-####################################
-### Capture from Key "FgfkAVdZAA=="
-####################################
-# ================================
-# Final State Checkpoint
-# ================================
 {"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":353,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
 
