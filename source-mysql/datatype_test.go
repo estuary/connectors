@@ -31,10 +31,10 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "text", ExpectType: `{"type":["string","null"]}`, InputValue: "hello", ExpectValue: `"hello"`},
 
 		// Integer Types
-		{ColumnType: "tinyint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, PrimaryKeyValue: 124, PrimaryExpectValue: `124`},
-		{ColumnType: "smallint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, PrimaryKeyValue: 124, PrimaryExpectValue: `124`},
-		{ColumnType: "mediumint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, PrimaryKeyValue: 124, PrimaryExpectValue: `124`},
-		{ColumnType: "int", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, PrimaryKeyValue: 124, PrimaryExpectValue: `124`},
+		{ColumnType: "tinyint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
+		{ColumnType: "smallint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
+		{ColumnType: "mediumint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
+		{ColumnType: "int", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
 		{ColumnType: "bigint", ExpectType: `{"type":["integer","null"]}`, InputValue: -1234567890123456789, ExpectValue: `-1234567890123456789`},
 
 		// MySQL "boolean" type is a synonym for tinyint(1)
