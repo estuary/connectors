@@ -41,10 +41,14 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 		// Values not natively supported by the FoundationDB tuple encoding code
 		// must be converted into ones that are.
 		switch x := x.(type) {
+		case uint8:
+			t = append(t, uint(x))
 		case uint16:
 			t = append(t, uint(x))
 		case uint32:
 			t = append(t, uint(x))
+		case int8:
+			t = append(t, int(x))
 		case int16:
 			t = append(t, int(x))
 		case int32:
