@@ -131,7 +131,7 @@ async def all_resources(
                 binding_index,
                 state,
                 task,
-                fetch_page=functools.partial(fetch_page, table, pool, task),
+                fetch_page=functools.partial(fetch_page, table, pool, task, config.advanced.backfill_chunk_size),
                 fetch_changes=functools.partial(fetch_changes, table, pool),
             )
 
