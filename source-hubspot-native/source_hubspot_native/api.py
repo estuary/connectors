@@ -315,6 +315,9 @@ async def fetch_recent_deals(
     result = OldRecentDeals.model_validate_json(
         await http.request(log, url, params=params)
     )
+
+    log.debug("fetched recent deals", {"params": params, "result_count": len(result.results), "hasMore": result.hasMore, "offset": result.offset})
+
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
         for r in result.results
