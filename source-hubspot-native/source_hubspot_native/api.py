@@ -312,11 +312,13 @@ async def fetch_recent_deals(
     url = f"{HUB}/deals/v1/deal/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
 
+    log.debug("fetching recent deals", {"params": params})
+
     result = OldRecentDeals.model_validate_json(
         await http.request(log, url, params=params)
     )
 
-    log.debug("fetched recent deals", {"params": params, "result_count": len(result.results), "hasMore": result.hasMore, "offset": result.offset})
+    log.debug("fetched recent deals", {"result_count": len(result.results), "hasMore": result.hasMore, "offset": result.offset})
 
     return (
         (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
