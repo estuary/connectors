@@ -255,14 +255,14 @@ class BaseCaptureConnector(
 
             stopping = Task.Stopping(asyncio.Event())
 
-            async def stop_on_elapsed_interval(interval: int) -> None:
-                await asyncio.sleep(interval)
+            async def periodic_stop() -> None:
+                await asyncio.sleep(24 * 60 * 60) # 24 hours
                 stopping.event.set()
 
-            # Gracefully exit after the capture interval has elapsed.
+            # Gracefully exit after a moderate period of time.
             # We don't do this within the TaskGroup because we don't
             # want to block on it.
-            asyncio.create_task(stop_on_elapsed_interval(open.capture.intervalSeconds))
+            asyncio.create_task(periodic_stop())
 
             async with asyncio.TaskGroup() as tg:
 
