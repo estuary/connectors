@@ -562,6 +562,10 @@ async def _binding_backfill_task(
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
+        if task.stopping.event.is_set():
+            task.log.debug(f"backfill is yielding to stop")
+            return
+
         # Track if fetch_page returns without having yielded a PageCursor.
         done = True 
 
