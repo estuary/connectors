@@ -149,6 +149,7 @@ async def fetch_page(
     # fetch_page only runs on even sync counter numbers
     # this allows a ping-ponging between fetch_page and fetch_changes
     if full_state.sync_counter % 2 != 0:
+        yield page
         return
 
     if page is None:
@@ -205,7 +206,7 @@ async def fetch_changes(
     pool: oracledb.AsyncConnectionPool,
     # Remainder is common.FetchPageFn:
     log: Logger,
-    log_cursor: LogCursor,
+    scn: LogCursor,
     full_state: ConnectorState,
 ) -> AsyncGenerator[Document | LogCursor, None]:
     # fetch_changes only runs on odd sync counter numbers
@@ -213,10 +214,8 @@ async def fetch_changes(
     if full_state.sync_counter % 2 != 1 and full_state.backfill is not None:
         return
 
-    scn = log_cursor
-
     query = template_env.get_template("inc").render(table=table, cursor=scn)
-    log.debug("fetch_changes", query, log_cursor)
+    log.debug("fetch_changes", query, scn)
 
     # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
     # for a transaction at the end, when all documents of that transaction have been emitted
@@ -225,10 +224,9 @@ async def fetch_changes(
     first_transaction = None
     current_transaction = None
     query_page = 0
-    has_more = True
     async with pool.acquire() as conn:
         with conn.cursor() as c:
-            while has_more:
+            while True:
                 start = query_page * CHECKPOINT_EVERY
                 end = (query_page + 1) * CHECKPOINT_EVERY
                 query_page = query_page + 1
@@ -274,10 +272,25 @@ async def fetch_changes(
                         yield current_transaction + 1
                         current_transaction = scn
 
+                if not has_more:
+                    break
+
     if first_transaction is not None and current_transaction is None:
         yield first_transaction + 1
     elif current_transaction is not None and current_transaction > scn:
         yield current_transaction + 1
+    elif first_transaction is None and current_transaction is None:
+        # if the task has found no events, we update the cursor
+        # to the latest current_scn value to avoid falling behind. The SCN has a timestamp
+        # component which can progress even if no transactions have happened
+        # over a long enough time with no events, the scn we hold will expire and be no longer
+        # valid, hence this logic to catch up if there are no events
+        async with pool.acquire() as conn:
+            with conn.cursor() as c:
+                await c.execute("SELECT current_scn FROM V$DATABASE")
+                current_scn = (await c.fetchone())[0]
+                if current_scn > scn:
+                    yield current_scn
 
     if full_state.backfill is not None:
         full_state.sync_counter = full_state.sync_counter + 1
