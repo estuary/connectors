@@ -591,8 +591,10 @@ async def _binding_backfill_task(
                     f"Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
                 )
             else:
-                state.next_page = item
-                task.checkpoint(connector_state)
+                # Avoid unnecessary checkpointing if the page_cursor has not changed
+                if item != state.next_page:
+                    state.next_page = item
+                    task.checkpoint(connector_state)
                 done = False
 
         if done:
