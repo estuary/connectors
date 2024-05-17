@@ -135,9 +135,6 @@ async def fetch_columns(
 
 
 CHECKPOINT_EVERY = 1000
-# How many query pages (each containing CHECKPOINT_EVERY) documents
-# should each backfill iteration fetch
-BACKFILL_PAGES = 10
 
 
 async def fetch_page(
@@ -145,6 +142,7 @@ async def fetch_page(
     table: Table,
     pool: oracledb.AsyncConnectionPool,
     task: Task,
+    backfill_chunk_size: int,
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
@@ -170,39 +168,38 @@ async def fetch_page(
     log.debug("fetch_page", query, page)
 
     last_rowid = None
-    query_page = 0
+    i = 0
     async with pool.acquire() as conn:
         with conn.cursor() as c:
-            while query_page < BACKFILL_PAGES:
-                start = query_page * CHECKPOINT_EVERY
-                end = (query_page + 1) * CHECKPOINT_EVERY
-                query_page = query_page + 1
+            c.arraysize = backfill_chunk_size
+            c.prefetchrows = backfill_chunk_size + 1
+            await c.execute(query, rownum_end=backfill_chunk_size)
 
-                c.arraysize = CHECKPOINT_EVERY
-                c.prefetchrows = CHECKPOINT_EVERY + 1
-                await c.execute(query, rownum_start=start, rownum_end=end)
+            async for values in c:
+                cols = [col[0] for col in c.description]
+                row = dict(zip(cols, values))
+                row = {k: v for (k, v) in row.items() if v is not None}
+                last_rowid = row[rowid_column_name]
 
-                async for values in c:
-                    cols = [col[0] for col in c.description]
-                    row = dict(zip(cols, values))
-                    row = {k: v for (k, v) in row.items() if v is not None}
-                    last_rowid = row[rowid_column_name]
+                doc = Document()
+                source = Document.Meta.Source(
+                    table=table.table_name,
+                    row_id=row[rowid_column_name]
+                )
+                doc.meta_ = Document.Meta(op='c', source=source)
+                for (k, v) in row.items():
+                    if k in (rowid_column_name,):
+                        continue
+                    setattr(doc, k, v)
 
-                    doc = Document()
-                    source = Document.Meta.Source(
-                        table=table.table_name,
-                        row_id=row[rowid_column_name]
-                    )
-                    doc.meta_ = Document.Meta(op='c', source=source)
-                    for (k, v) in row.items():
-                        if k in (rowid_column_name,):
-                            continue
-                        setattr(doc, k, v)
+                yield doc
 
-                    yield doc
-
-                if last_rowid is not None:
+                i = i + 1
+                if i % CHECKPOINT_EVERY == 0:
                     yield last_rowid
+
+    if last_rowid is not None and (i % CHECKPOINT_EVERY) != 0:
+        yield last_rowid
 
     full_state.sync_counter = full_state.sync_counter + 1
 
@@ -350,7 +347,6 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- endfor %} FROM {{ table.owner }}.{{ table.table_name }}
     WHERE ROWID > '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
-      AND ROWNUM > :rownum_start
       AND ROWNUM <= :rownum_end
     ORDER BY ROWID ASC
 """,

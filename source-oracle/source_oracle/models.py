@@ -65,6 +65,11 @@ class EndpointConfig(BaseModel):
             default=timedelta(minutes=1), description="Default interval between updates for all resources. Can be overwritten by each resource."
         )
 
+        backfill_chunk_size: int = Field(
+            default=50000,
+            description="How many rows should be fetched in a single query during backfill. Defaults to 50,000."
+        )
+
     advanced: Advanced = Field(
         default_factory=Advanced,
         title="Advanced Config",
