@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pydantic import Field
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
+import orjson
 from logging import Logger
 import abc
 import asyncio
@@ -108,11 +109,19 @@ class Task:
         Documents are not actually captured until checkpoint() is called.
         Or, reset() will discard any queued documents."""
 
-        b = Response(
-            captured=response.Captured(binding=binding, doc=document)
-        ).model_dump_json(by_alias=True, exclude_unset=True)
+        if isinstance(document, dict):
+            b = orjson.dumps({
+                "captured": {
+                    "binding": binding,
+                    "doc": document,
+                }
+            })
+        else:
+            b = Response(
+                captured=response.Captured(binding=binding, doc=document)
+            ).model_dump_json(by_alias=True, exclude_unset=True).encode()
 
-        self._buffer.write(b.encode())
+        self._buffer.write(b)
         self._buffer.write(b"\n")
         self._hasher.update(b)
 
