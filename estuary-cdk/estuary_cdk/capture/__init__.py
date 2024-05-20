@@ -10,6 +10,7 @@ import sys
 import tempfile
 import traceback
 import xxhash
+import orjson
 
 from . import request, response
 from .. import BaseConnector, Stopped
@@ -109,11 +110,13 @@ class Task:
         Documents are not actually captured until checkpoint() is called.
         Or, reset() will discard any queued documents."""
 
+        # When using python dictionaries, we don't need
+        # validation, so we use orjson for faster encoding
         if isinstance(document, dict):
             b = orjson.dumps({
-                "captured": {
-                    "binding": binding,
-                    "doc": document,
+                'captured': {
+                    'binding': binding,
+                    'doc': document,
                 }
             })
         else:
@@ -265,7 +268,7 @@ class BaseCaptureConnector(
             stopping = Task.Stopping(asyncio.Event())
 
             async def periodic_stop() -> None:
-                await asyncio.sleep(24 * 60 * 60) # 24 hours
+                await asyncio.sleep(24 * 60 * 60)  # 24 hours
                 stopping.event.set()
 
             # Gracefully exit after a moderate period of time.
