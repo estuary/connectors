@@ -66,8 +66,8 @@ class EndpointConfig(BaseModel):
         )
 
         backfill_chunk_size: int = Field(
-            default=50000,
-            description="How many rows should be fetched in a single query during backfill. Defaults to 50,000."
+            default=1000000,
+            description="How many rows should be fetched in a single query during backfill. Defaults to 1,000,000."
         )
 
     advanced: Advanced = Field(

@@ -157,7 +157,7 @@ async def fetch_page(
 
         query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0])
 
-        log.debug("fetch_page", query, page)
+        log.info("fetch_page", query, page)
 
         last_rowid = None
         i = 0
@@ -173,16 +173,19 @@ async def fetch_page(
                     row = {k: v for (k, v) in row.items() if v is not None}
                     last_rowid = row[rowid_column_name]
 
-                    doc = Document()
-                    source = Document.Meta.Source(
-                        table=table.table_name,
-                        row_id=row[rowid_column_name]
-                    )
-                    doc.meta_ = Document.Meta(op='c', source=source)
+                    doc = {
+                        '_meta': {
+                            'op': 'c',
+                            'source': {
+                                'table': table.table_name,
+                                'row_id': last_rowid,
+                            }
+                        }
+                    }
                     for (k, v) in row.items():
                         if k in (rowid_column_name,):
                             continue
-                        setattr(doc, k, v)
+                        doc[k] = v
 
                     yield doc
 
@@ -211,7 +214,7 @@ async def fetch_changes(
 ) -> AsyncGenerator[Document | LogCursor, None]:
     async with lock:
         query = template_env.get_template("inc").render(table=table, cursor=scn)
-        log.debug("fetch_changes", query, scn)
+        log.info("fetch_changes", query, scn)
 
         # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
         # for a transaction at the end, when all documents of that transaction have been emitted
@@ -219,57 +222,50 @@ async def fetch_changes(
         # of the current SCN before moving on to the next one.
         first_transaction = None
         current_transaction = None
-        query_page = 0
         async with pool.acquire() as conn:
             with conn.cursor() as c:
-                while True:
-                    start = query_page * CHECKPOINT_EVERY
-                    end = (query_page + 1) * CHECKPOINT_EVERY
-                    query_page = query_page + 1
+                c.arraysize = CHECKPOINT_EVERY
+                c.prefetchrows = CHECKPOINT_EVERY + 1
+                await c.execute(query)
 
-                    c.arraysize = CHECKPOINT_EVERY
-                    c.prefetchrows = CHECKPOINT_EVERY + 1
-                    await c.execute(query, rownum_start=start, rownum_end=end)
-                    has_more = c.rowcount >= CHECKPOINT_EVERY
+                async for values in c:
+                    cols = [col[0] for col in c.description]
+                    row = dict(zip(cols, values))
+                    row = {k: v for (k, v) in row.items() if v is not None}
 
-                    async for values in c:
-                        cols = [col[0] for col in c.description]
-                        row = dict(zip(cols, values))
-                        row = {k: v for (k, v) in row.items() if v is not None}
+                    scn = row[scn_column_name]
+                    op = row[op_column_name]
+                    row_id = row[rowid_column_name]
 
-                        scn = row[scn_column_name]
-                        op = row[op_column_name]
-                        row_id = row[rowid_column_name]
+                    doc = {
+                        '_meta': {
+                            'op': op_mapping[op],
+                            'source': {
+                                'scn': scn,
+                                'row_id': row_id,
+                                'table': table.table_name,
+                            }
+                        }
+                    }
+                    for (k, v) in row.items():
+                        if k in (scn_column_name, op_column_name, rowid_column_name):
+                            continue
+                        doc[k] = v
 
-                        doc = Document()
-                        source = Document.Meta.Source(
-                            table=table.table_name,
-                            row_id=row_id,
-                            scn=scn,
-                        )
-                        doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
-                        for (k, v) in row.items():
-                            if k in (scn_column_name, op_column_name, rowid_column_name):
-                                continue
-                            setattr(doc, k, v)
+                    yield doc
 
-                        yield doc
-
-                        # The query to fetch incremental changes uses "VERSIONS BETWEEN X and Y" where
-                        # BETWEEN is an inclusive operator. So once we have processed all items of one SCN,
-                        # in order to move on to the next SCN we need to increment the SCN by one. Since the query
-                        # is always inclusive, this does not risk losing any subsequent events.
-                        if first_transaction is None:
-                            first_transaction = scn
-                        elif current_transaction is None and scn > first_transaction:
-                            current_transaction = scn
-                            yield scn + 1
-                        elif current_transaction is not None and scn > current_transaction:
-                            yield current_transaction + 1
-                            current_transaction = scn
-
-                    if not has_more:
-                        break
+                    # The query to fetch incremental changes uses "VERSIONS BETWEEN X and Y" where
+                    # BETWEEN is an inclusive operator. So once we have processed all items of one SCN,
+                    # in order to move on to the next SCN we need to increment the SCN by one. Since the query
+                    # is always inclusive, this does not risk losing any subsequent events.
+                    if first_transaction is None:
+                        first_transaction = scn
+                    elif current_transaction is None and scn > first_transaction:
+                        current_transaction = scn
+                        yield scn + 1
+                    elif current_transaction is not None and scn > current_transaction:
+                        yield current_transaction + 1
+                        current_transaction = scn
 
         if first_transaction is not None and current_transaction is None:
             yield first_transaction + 1
@@ -334,14 +330,12 @@ SELECT ROWID, {% for c in table.columns -%}
     ORDER BY ROWID ASC
 """,
     'inc': """
-SELECT VERSIONS_STARTSCN, VERSIONS_OPERATION, ROWID, {% for c in table.columns -%}
+SELECT /*+parallel */ VERSIONS_STARTSCN, VERSIONS_OPERATION, ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
 {{ c | cast }}
 {%- endfor %} FROM {{ table.owner }}.{{ table.table_name }}
     VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
     WHERE VERSIONS_STARTSCN IS NOT NULL
-      AND ROWNUM > :rownum_start
-      AND ROWNUM <= :rownum_end
     ORDER BY VERSIONS_STARTSCN ASC
 """
 }))
