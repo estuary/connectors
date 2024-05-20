@@ -13,6 +13,7 @@ from copy import deepcopy
 import oracledb
 import inspect
 from jinja2 import Template, Environment, DictLoader
+import orjson
 
 from estuary_cdk.capture.common import (
     PageCursor,
@@ -143,65 +144,54 @@ async def fetch_page(
     pool: oracledb.AsyncConnectionPool,
     task: Task,
     backfill_chunk_size: int,
+    lock: asyncio.Lock,
     # Remainder is common.FetchPageFn:
     log: Logger,
     page: str | None,
     cutoff: Tuple[str],
-    full_state: ConnectorState,
 ) -> AsyncGenerator[Document | str, None]:
-    # fetch_page only runs on even sync counter numbers
-    # this allows a ping-ponging between fetch_page and fetch_changes
-    # if task.stopping is set, that means the incremental task will no longer run
-    # so there is no more ping-ponging and we will run backfill
-    if full_state.sync_counter % 2 != 0 and not task.stopping.event.is_set():
-        yield page
-        # Yield to the event loop to prevent starvation.
-        await asyncio.sleep(1)
-        return
+    async with lock:
+        if page is None:
+            # ROWID is a base64 encoded string, so this string is the minimum value possible
+            page = 'AAAAAAAAAAAAAAAAAA'
 
-    if page is None:
-        # ROWID is a base64 encoded string, so this string is the minimum value possible
-        page = 'AAAAAAAAAAAAAAAAAA'
+        query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0])
 
-    query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0])
+        log.debug("fetch_page", query, page)
 
-    log.debug("fetch_page", query, page)
+        last_rowid = None
+        i = 0
+        async with pool.acquire() as conn:
+            with conn.cursor() as c:
+                c.arraysize = backfill_chunk_size
+                c.prefetchrows = backfill_chunk_size + 1
+                await c.execute(query, rownum_end=backfill_chunk_size)
 
-    last_rowid = None
-    i = 0
-    async with pool.acquire() as conn:
-        with conn.cursor() as c:
-            c.arraysize = backfill_chunk_size
-            c.prefetchrows = backfill_chunk_size + 1
-            await c.execute(query, rownum_end=backfill_chunk_size)
+                async for values in c:
+                    cols = [col[0] for col in c.description]
+                    row = dict(zip(cols, values))
+                    row = {k: v for (k, v) in row.items() if v is not None}
+                    last_rowid = row[rowid_column_name]
 
-            async for values in c:
-                cols = [col[0] for col in c.description]
-                row = dict(zip(cols, values))
-                row = {k: v for (k, v) in row.items() if v is not None}
-                last_rowid = row[rowid_column_name]
+                    doc = Document()
+                    source = Document.Meta.Source(
+                        table=table.table_name,
+                        row_id=row[rowid_column_name]
+                    )
+                    doc.meta_ = Document.Meta(op='c', source=source)
+                    for (k, v) in row.items():
+                        if k in (rowid_column_name,):
+                            continue
+                        setattr(doc, k, v)
 
-                doc = Document()
-                source = Document.Meta.Source(
-                    table=table.table_name,
-                    row_id=row[rowid_column_name]
-                )
-                doc.meta_ = Document.Meta(op='c', source=source)
-                for (k, v) in row.items():
-                    if k in (rowid_column_name,):
-                        continue
-                    setattr(doc, k, v)
+                    yield doc
 
-                yield doc
+                    i = i + 1
+                    if i % CHECKPOINT_EVERY == 0:
+                        yield last_rowid
 
-                i = i + 1
-                if i % CHECKPOINT_EVERY == 0:
-                    yield last_rowid
-
-    if last_rowid is not None and (i % CHECKPOINT_EVERY) != 0:
-        yield last_rowid
-
-    full_state.sync_counter = full_state.sync_counter + 1
+        if last_rowid is not None and (i % CHECKPOINT_EVERY) != 0:
+            yield last_rowid
 
 op_mapping = {
     'I': 'c',
@@ -214,96 +204,89 @@ async def fetch_changes(
     # Closed over via functools.partial:
     table: Table,
     pool: oracledb.AsyncConnectionPool,
+    lock: asyncio.Lock,
     # Remainder is common.FetchPageFn:
     log: Logger,
     scn: LogCursor,
-    full_state: ConnectorState,
 ) -> AsyncGenerator[Document | LogCursor, None]:
-    # fetch_changes only runs on odd sync counter numbers
-    # this allows a ping-ponging between fetch_page and fetch_changes
-    if full_state.sync_counter % 2 != 1 and full_state.backfill is not None:
-        return
+    async with lock:
+        query = template_env.get_template("inc").render(table=table, cursor=scn)
+        log.debug("fetch_changes", query, scn)
 
-    query = template_env.get_template("inc").render(table=table, cursor=scn)
-    log.debug("fetch_changes", query, scn)
-
-    # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
-    # for a transaction at the end, when all documents of that transaction have been emitted
-    # so we have to keep track of the first two transaction SCNs we have to check whether we have all the documents
-    # of the current SCN before moving on to the next one.
-    first_transaction = None
-    current_transaction = None
-    query_page = 0
-    async with pool.acquire() as conn:
-        with conn.cursor() as c:
-            while True:
-                start = query_page * CHECKPOINT_EVERY
-                end = (query_page + 1) * CHECKPOINT_EVERY
-                query_page = query_page + 1
-
-                c.arraysize = CHECKPOINT_EVERY
-                c.prefetchrows = CHECKPOINT_EVERY + 1
-                await c.execute(query, rownum_start=start, rownum_end=end)
-                has_more = c.rowcount >= CHECKPOINT_EVERY
-
-                async for values in c:
-                    cols = [col[0] for col in c.description]
-                    row = dict(zip(cols, values))
-                    row = {k: v for (k, v) in row.items() if v is not None}
-
-                    scn = row[scn_column_name]
-                    op = row[op_column_name]
-                    row_id = row[rowid_column_name]
-
-                    doc = Document()
-                    source = Document.Meta.Source(
-                        table=table.table_name,
-                        row_id=row_id,
-                        scn=scn,
-                    )
-                    doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
-                    for (k, v) in row.items():
-                        if k in (scn_column_name, op_column_name, rowid_column_name):
-                            continue
-                        setattr(doc, k, v)
-
-                    yield doc
-
-                    # The query to fetch incremental changes uses "VERSIONS BETWEEN X and Y" where
-                    # BETWEEN is an inclusive operator. So once we have processed all items of one SCN,
-                    # in order to move on to the next SCN we need to increment the SCN by one. Since the query
-                    # is always inclusive, this does not risk losing any subsequent events.
-                    if first_transaction is None:
-                        first_transaction = scn
-                    elif current_transaction is None and scn > first_transaction:
-                        current_transaction = scn
-                        yield scn + 1
-                    elif current_transaction is not None and scn > current_transaction:
-                        yield current_transaction + 1
-                        current_transaction = scn
-
-                if not has_more:
-                    break
-
-    if first_transaction is not None and current_transaction is None:
-        yield first_transaction + 1
-    elif current_transaction is not None and current_transaction > scn:
-        yield current_transaction + 1
-    elif first_transaction is None and current_transaction is None:
-        # if the task has found no events, we update the cursor
-        # to the latest current_scn value to avoid falling behind. The SCN has a timestamp
-        # component which can progress even if no transactions have happened
-        # over a long enough time with no events, the scn we hold will expire and be no longer
-        # valid, hence this logic to catch up if there are no events
+        # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
+        # for a transaction at the end, when all documents of that transaction have been emitted
+        # so we have to keep track of the first two transaction SCNs we have to check whether we have all the documents
+        # of the current SCN before moving on to the next one.
+        first_transaction = None
+        current_transaction = None
+        query_page = 0
         async with pool.acquire() as conn:
             with conn.cursor() as c:
-                await c.execute("SELECT current_scn FROM V$DATABASE")
-                current_scn = (await c.fetchone())[0]
-                if current_scn > scn:
-                    yield current_scn
+                while True:
+                    start = query_page * CHECKPOINT_EVERY
+                    end = (query_page + 1) * CHECKPOINT_EVERY
+                    query_page = query_page + 1
 
-    if full_state.backfill is not None:
-        full_state.sync_counter = full_state.sync_counter + 1
+                    c.arraysize = CHECKPOINT_EVERY
+                    c.prefetchrows = CHECKPOINT_EVERY + 1
+                    await c.execute(query, rownum_start=start, rownum_end=end)
+                    has_more = c.rowcount >= CHECKPOINT_EVERY
+
+                    async for values in c:
+                        cols = [col[0] for col in c.description]
+                        row = dict(zip(cols, values))
+                        row = {k: v for (k, v) in row.items() if v is not None}
+
+                        scn = row[scn_column_name]
+                        op = row[op_column_name]
+                        row_id = row[rowid_column_name]
+
+                        doc = Document()
+                        source = Document.Meta.Source(
+                            table=table.table_name,
+                            row_id=row_id,
+                            scn=scn,
+                        )
+                        doc.meta_ = Document.Meta(op=op_mapping[op], source=source)
+                        for (k, v) in row.items():
+                            if k in (scn_column_name, op_column_name, rowid_column_name):
+                                continue
+                            setattr(doc, k, v)
+
+                        yield doc
+
+                        # The query to fetch incremental changes uses "VERSIONS BETWEEN X and Y" where
+                        # BETWEEN is an inclusive operator. So once we have processed all items of one SCN,
+                        # in order to move on to the next SCN we need to increment the SCN by one. Since the query
+                        # is always inclusive, this does not risk losing any subsequent events.
+                        if first_transaction is None:
+                            first_transaction = scn
+                        elif current_transaction is None and scn > first_transaction:
+                            current_transaction = scn
+                            yield scn + 1
+                        elif current_transaction is not None and scn > current_transaction:
+                            yield current_transaction + 1
+                            current_transaction = scn
+
+                    if not has_more:
+                        break
+
+        if first_transaction is not None and current_transaction is None:
+            yield first_transaction + 1
+        elif current_transaction is not None and current_transaction > scn:
+            yield current_transaction + 1
+        elif first_transaction is None and current_transaction is None:
+            # if the task has found no events, we update the cursor
+            # to the latest current_scn value to avoid falling behind. The SCN has a timestamp
+            # component which can progress even if no transactions have happened
+            # over a long enough time with no events, the scn we hold will expire and be no longer
+            # valid, hence this logic to catch up if there are no events
+            async with pool.acquire() as conn:
+                with conn.cursor() as c:
+                    await c.execute("SELECT current_scn FROM V$DATABASE")
+                    current_scn = (await c.fetchone())[0]
+                    if current_scn > scn:
+                        yield current_scn
 
 
 # datetime and some other data types must be cast to string
