@@ -91,7 +91,7 @@ class ResourceConfig(GenericResourceConfig):
 
 
 class ResourceState(GenericResourceState):
-    sync_counter: int
+    pass
 
 
 ConnectorState = GenericConnectorState[ResourceState]

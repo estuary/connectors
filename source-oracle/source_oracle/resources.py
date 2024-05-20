@@ -3,6 +3,7 @@ from typing import AsyncGenerator, Awaitable, Iterable, Dict
 from logging import Logger
 import functools
 import oracledb
+import asyncio
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
@@ -118,6 +119,8 @@ async def all_resources(
         # skip backfill
         backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
 
+        sync_lock = asyncio.Lock()
+
         def open(
             table: Table,
             binding: CaptureBinding[ResourceConfig],
@@ -131,8 +134,8 @@ async def all_resources(
                 binding_index,
                 state,
                 task,
-                fetch_page=functools.partial(fetch_page, table, pool, task, config.advanced.backfill_chunk_size),
-                fetch_changes=functools.partial(fetch_changes, table, pool),
+                fetch_page=functools.partial(fetch_page, table, pool, task, config.advanced.backfill_chunk_size, sync_lock),
+                fetch_changes=functools.partial(fetch_changes, table, pool, sync_lock),
             )
 
         keys = [f"/{c.column_name}" for c in t.primary_key]
@@ -147,7 +150,6 @@ async def all_resources(
             initial_state=ResourceState(
                 backfill=backfill,
                 inc=ResourceState.Incremental(cursor=current_scn),
-                sync_counter=0,
             ),
             initial_config=ResourceConfig(
                 schema=t.owner,
