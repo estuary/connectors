@@ -246,6 +246,7 @@ func (c *PineconeClient) DescribeIndex(ctx context.Context) (PineconeIndexDescri
 	req.Header.Set("accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Api-Key", c.apiKey)
+	req.Header.Set("User-Agent", "source_tag=estuary")
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -279,6 +280,7 @@ func (c *PineconeClient) Upsert(ctx context.Context, req PineconeUpsertRequest) 
 		req.Header.Set("accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Api-Key", c.apiKey)
+		req.Header.Set("User-Agent", "source_tag=estuary")
 
 		return c.http.Do(req)
 	})
@@ -319,6 +321,7 @@ func (c *PineconeClient) whoami(ctx context.Context) (whoamiResponse, error) {
 	}
 	req.Header.Set("Api-Key", c.apiKey)
 	req.Header.Set("accept", "application/json")
+	req.Header.Set("User-Agent", "source_tag=estuary")
 
 	res, err := c.http.Do(req)
 	if err != nil {
