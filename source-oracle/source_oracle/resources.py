@@ -119,8 +119,6 @@ async def all_resources(
         # skip backfill
         backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
 
-        sync_lock = asyncio.Lock()
-
         def open(
             table: Table,
             binding: CaptureBinding[ResourceConfig],
@@ -129,6 +127,7 @@ async def all_resources(
             task: Task,
             _all_bindings,
         ):
+            sync_lock = asyncio.Lock()
             common.open_binding(
                 binding,
                 binding_index,

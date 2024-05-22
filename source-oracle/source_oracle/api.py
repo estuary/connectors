@@ -55,8 +55,8 @@ def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
         password=config.credentials.password,
         dsn=config.address,
         min=4,
-        max=4,
-        increment=0,
+        max=12,
+        increment=1,
         cclass="ESTUARY",
         purity=oracledb.ATTR_PURITY_SELF,
         **credentials,
@@ -126,13 +126,13 @@ async def fetch_columns(
 # thus being missed by the backfill process, however since the incremental changes are captured based on transaction IDs, and not ROWIDs
 # the incremental changes task will capture those updated rows, so we will eventually have all the documents
 
-# In order to avoid races between backfill and incremental tasks, we implement a ping-pong between the two,
+# In order to avoid races between backfill and incremental tasks, we implement a ping-pong between the two using a lock,
 # meaning that they don't really run concurrently ever, but rather they run one after another. We start by running
-# a backfill task (sync_counter = 0), backfilling CHECKPOINT_EVERY documents, and then passing the ball to the
-# incremental task (sync_counter = 1), which will fetch updates since the last seen transaction ID up until the latest transaction
-# of the database. The ball is then passed back to backfill (sync_counter = 2). This ensures
+# a backfill task, backfilling CHECKPOINT_EVERY documents, and then passing the ball to the
+# incremental task, which will fetch updates since the last seen transaction ID up until the latest transaction
+# of the database. The ball is then passed back to backfill. This ensures
 # that we do not capture incremental updates to documents and emit them while a backfill task may be reading and emitting an older
-# version of the same row afterwards. Incremental updates always come after a backfill operation.
+# version of the same row afterwards.
 
 
 CHECKPOINT_EVERY = 1000
@@ -167,37 +167,38 @@ async def fetch_page(
         i = 0
         async with pool.acquire() as conn:
             with conn.cursor() as c:
-                c.arraysize = backfill_chunk_size
-                c.prefetchrows = backfill_chunk_size + 1
-                await c.execute(query)
+                while datetime.now() < (start_time + BACKFILL_MAX_TIME):
+                    c.arraysize = backfill_chunk_size
+                    c.prefetchrows = backfill_chunk_size + 1
+                    await c.execute(query, rownum_end=backfill_chunk_size)
 
-                async for values in c:
-                    cols = [col[0] for col in c.description]
-                    row = dict(zip(cols, values))
-                    row = {k: v for (k, v) in row.items() if v is not None}
-                    last_rowid = row[rowid_column_name]
+                    async for values in c:
+                        cols = [col[0] for col in c.description]
+                        row = dict(zip(cols, values))
+                        row = {k: v for (k, v) in row.items() if v is not None}
+                        last_rowid = row[rowid_column_name]
 
-                    doc = {
-                        '_meta': {
-                            'op': 'c',
-                            'source': {
-                                'table': table.table_name,
-                                'row_id': last_rowid,
+                        doc = {
+                            '_meta': {
+                                'op': 'c',
+                                'source': {
+                                    'table': table.table_name,
+                                    'row_id': last_rowid,
+                                }
                             }
                         }
-                    }
-                    for (k, v) in row.items():
-                        if k in (rowid_column_name,):
-                            continue
-                        doc[k] = v
+                        for (k, v) in row.items():
+                            if k in (rowid_column_name,):
+                                continue
+                            doc[k] = v
 
-                    yield doc
+                        yield doc
 
-                    i = i + 1
-                    if i % CHECKPOINT_EVERY == 0:
-                        yield last_rowid
+                        i = i + 1
+                        if i % CHECKPOINT_EVERY == 0:
+                            yield last_rowid
 
-                    if datetime.now() > (start_time + BACKFILL_MAX_TIME):
+                    if c.rowcount < backfill_chunk_size:
                         break
 
         if last_rowid is not None and (i % CHECKPOINT_EVERY) != 0:
@@ -333,6 +334,7 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- endfor %} FROM {{ table.owner }}.{{ table.table_name }}
     WHERE ROWID > '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
+      AND ROWNUM <= :rownum_end
     ORDER BY ROWID ASC
 """,
     'inc': """
