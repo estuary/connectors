@@ -144,7 +144,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, nil
+	return backfillComplete, rows.Err()
 }
 
 func (db *sqlserverDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {

@@ -153,7 +153,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	}
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, nil
+	return backfillComplete, rows.Err()
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
