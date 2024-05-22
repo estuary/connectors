@@ -250,8 +250,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		b.storeFile.start()
 
 		var flowDocument = it.RawJSON
-		if t.cfg.Advanced.HardDelete && it.Delete {
-			flowDocument = json.RawMessage("null")
+		if t.cfg.HardDelete && it.Delete {
+			flowDocument = json.RawMessage(`"delete"`)
 		}
 		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
