@@ -268,7 +268,7 @@ ON {{ range $ind, $key := $.Table.Keys }}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{- if $.Table.Document }}
-WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
+WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='delete' THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN

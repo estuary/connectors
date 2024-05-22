@@ -404,8 +404,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var flowDocument = it.RawJSON
-		if d.cfg.Advanced.HardDelete && it.Delete {
-			flowDocument = json.RawMessage("null")
+		if d.cfg.HardDelete && it.Delete {
+			flowDocument = json.RawMessage(`"delete"`)
 		}
 
 		if err := b.store.stage.start(ctx, d.db); err != nil {

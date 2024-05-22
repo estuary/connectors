@@ -17,6 +17,8 @@ type config struct {
 	CatalogName string `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog."`
 	SchemaName  string `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
 
+	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false"`
+
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
@@ -24,8 +26,6 @@ type config struct {
 
 type advancedConfig struct {
 	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
-
-	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false"`
 }
 
 const (
