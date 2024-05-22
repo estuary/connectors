@@ -1,4 +1,4 @@
-package sql
+package stream_encode
 
 import (
 	"bytes"
@@ -7,14 +7,32 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/bradleyjkemp/cupaloy"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCountingEncoder(t *testing.T) {
+func TestJsonEncoder(t *testing.T) {
+	dir := t.TempDir()
+	sink, err := os.CreateTemp(dir, "*.json.gz")
+	require.NoError(t, err)
+
+	enc := NewJsonEncoder(sink, makeTestFields())
+
+	for i := 0; i < 10; i++ {
+		require.NoError(t, enc.Encode(makeTestRow(t, i)))
+	}
+
+	require.NoError(t, enc.Close())
+
+	cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "JSON"))
+}
+
+func TestJsonEncoderInputs(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		fields    []string
@@ -60,7 +78,7 @@ func TestCountingEncoder(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var wantGzipBytes bytes.Buffer
-			gzw, err := gzip.NewWriterLevel(&wantGzipBytes, compressionLevel)
+			gzw, err := gzip.NewWriterLevel(&wantGzipBytes, jsonCompressionlevel)
 			require.NoError(t, err)
 
 			_, err = gzw.Write(tt.wantBytes)
@@ -73,7 +91,10 @@ func TestCountingEncoder(t *testing.T) {
 					w: &buf,
 				}
 
-				enc := NewCountingEncoder(tw, compress, tt.fields)
+				enc := NewJsonEncoder(tw, tt.fields)
+				if !compress {
+					enc = NewJsonEncoder(tw, tt.fields, WithJsonDisableCompression())
+				}
 				require.NoError(t, enc.Encode(tt.input))
 				require.NoError(t, enc.Close())
 
@@ -118,7 +139,7 @@ func BenchmarkEncodingObjects(b *testing.B) {
 		var names, values = benchmarkDataset(b, benchmarkDatasetSize)
 		b.StartTimer()
 
-		enc := NewCountingEncoder(&nopWriteCloser{w: io.Discard}, true, names)
+		enc := NewJsonEncoder(&nopWriteCloser{w: io.Discard}, names)
 		for _, row := range values {
 			require.NoError(b, enc.Encode(row))
 		}
@@ -133,7 +154,7 @@ func BenchmarkEncodingArrays(b *testing.B) {
 		var _, values = benchmarkDataset(b, benchmarkDatasetSize)
 		b.StartTimer()
 
-		enc := NewCountingEncoder(&nopWriteCloser{w: io.Discard}, true, nil)
+		enc := NewJsonEncoder(&nopWriteCloser{w: io.Discard}, nil)
 		for _, row := range values {
 			require.NoError(b, enc.Encode(row))
 		}
