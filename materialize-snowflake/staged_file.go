@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -88,7 +88,7 @@ type stagedFile struct {
 
 	// References to the current file being written.
 	buf     *fileBuffer
-	encoder *sql.CountingEncoder
+	encoder *enc.JsonEncoder
 
 	// list of uploaded files
 	uploaded []fileRecord
@@ -170,7 +170,7 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 
 	// Concurrently start the PUT process for this file if the current file has reached
 	// fileSizeLimit.
-	if f.encoder.Written() >= sql.DefaultFileSizeLimit {
+	if f.encoder.Written() >= enc.DefaultJsonFileSizeLimit {
 		if err := f.putFile(); err != nil {
 			return fmt.Errorf("encodeRow putFile: %w", err)
 		}
@@ -255,7 +255,7 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.encoder = sql.NewCountingEncoder(f.buf, true, nil)
+	f.encoder = enc.NewJsonEncoder(f.buf, nil)
 
 	return nil
 }

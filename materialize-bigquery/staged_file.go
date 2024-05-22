@@ -7,7 +7,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
-	sql "github.com/estuary/connectors/materialize-sql"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
@@ -24,7 +24,7 @@ type stagedFile struct {
 	// configured, and the randomly generated UUID of this stagedFile for this connector invocation.
 	prefix string
 
-	encoder *sql.CountingEncoder
+	encoder *enc.JsonEncoder
 
 	// List of file names uploaded during the current transaction. The data file names are randomly
 	// generated UUIDs.
@@ -63,7 +63,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	fName := uuid.NewString()
 	writer := f.client.Bucket(f.bucket).Object(path.Join(f.prefix, fName)).NewWriter(ctx)
-	f.encoder = sql.NewCountingEncoder(writer, true, f.fields)
+	f.encoder = enc.NewJsonEncoder(writer, f.fields)
 	f.uploaded = append(f.uploaded, fName)
 }
 
@@ -89,7 +89,7 @@ func (f *stagedFile) encodeRow(ctx context.Context, row []interface{}) error {
 		return fmt.Errorf("encoding row: %w", err)
 	}
 
-	if f.encoder.Written() >= sql.DefaultFileSizeLimit {
+	if f.encoder.Written() >= enc.DefaultJsonFileSizeLimit {
 		if err := f.flushFile(); err != nil {
 			return err
 		}
