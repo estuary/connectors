@@ -1,4 +1,4 @@
-package sql
+package stream_encode
 
 import (
 	"compress/flate"
@@ -13,7 +13,7 @@ import (
 const (
 	// JSON generally compresses well at minimum compression levels. Higher levels of compression
 	// will usually take a lot more CPU while not providing much space savings.
-	compressionLevel = flate.BestSpeed
+	jsonCompressionlevel = flate.BestSpeed
 
 	// Snowflake docs (https://docs.snowflake.com/en/sql-reference/sql/put#usage-notes) recommend
 	// data file sizes be in the range of 100-250MB for compressed data. Redshift docs
@@ -21,12 +21,22 @@ const (
 	// for compressed data be in the range of 1MB to 1GB, and all be about the same size. Bigquery
 	// docs don't mention anything other than the files must be less than 4GB. So, a 250MB file size
 	// seems reasonable to use across the board given the current materializations that use this.
-	DefaultFileSizeLimit = 250 * 1024 * 1024
+	DefaultJsonFileSizeLimit = 250 * 1024 * 1024
 )
 
-// CountingEncoder provides access to a count of optionally gzip'd bytes that have been written by a
-// json.Encoder to an io.WriterCloser.
-type CountingEncoder struct {
+type jsonConfig struct {
+	disableCompression bool
+}
+
+type JsonOption func(*jsonConfig)
+
+func WithJsonDisableCompression() JsonOption {
+	return func(cfg *jsonConfig) {
+		cfg.disableCompression = true
+	}
+}
+
+type JsonEncoder struct {
 	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
 	cwc   *countingWriteCloser
 	gz    *gzip.Writer
@@ -34,15 +44,20 @@ type CountingEncoder struct {
 	buf   []byte
 }
 
-// NewCountingEncoder creates a CountingEncoder from w. w is closed when CountingEncoder is closed.
-// If `fields` is nil, values will be encoded as a JSON array rather than as an object.
-func NewCountingEncoder(w io.WriteCloser, gzipCompression bool, fields []string) *CountingEncoder {
-	enc := &CountingEncoder{
-		cwc: &countingWriteCloser{w: w},
+// NewJsonEncoder creates a JsonEncoder from w. w is closed when JsonEncoder is closed. If `fields`
+// is nil, values will be encoded as a JSON array rather than as an object.
+func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonEncoder {
+	var cfg jsonConfig
+	for _, o := range opts {
+		o(&cfg)
 	}
 
-	if gzipCompression {
-		gz, err := gzip.NewWriterLevel(enc.cwc, compressionLevel)
+	enc := &JsonEncoder{
+		cwc: &countingWriteCloser{W: w},
+	}
+
+	if !cfg.disableCompression {
+		gz, err := gzip.NewWriterLevel(enc.cwc, jsonCompressionlevel)
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
@@ -67,7 +82,7 @@ func NewCountingEncoder(w io.WriteCloser, gzipCompression bool, fields []string)
 	return enc
 }
 
-func (e *CountingEncoder) Encode(vals []any) (err error) {
+func (e *JsonEncoder) Encode(vals []any) (err error) {
 	if e.shape == nil {
 		// Serialize as a JSON array of values.
 		e.buf = e.buf[:0]
@@ -97,14 +112,14 @@ func (e *CountingEncoder) Encode(vals []any) (err error) {
 	return nil
 }
 
-func (e *CountingEncoder) Written() int {
-	return e.cwc.written
+func (e *JsonEncoder) Written() int {
+	return e.cwc.Written
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
 // the GZIP footer. It also closes the underlying io.WriteCloser that was used to initialize the
 // counting encoder.
-func (e *CountingEncoder) Close() error {
+func (e *JsonEncoder) Close() error {
 	if e.gz != nil {
 		if err := e.gz.Close(); err != nil {
 			return fmt.Errorf("closing gzip writer: %w", err)
@@ -113,30 +128,6 @@ func (e *CountingEncoder) Close() error {
 
 	if err := e.cwc.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
-	}
-	return nil
-}
-
-// countingWriteCloser is used internally by CountingEncoder to access the count of compressed bytes
-// written to the writer.
-type countingWriteCloser struct {
-	written int
-	w       io.WriteCloser
-}
-
-func (c *countingWriteCloser) Write(p []byte) (int, error) {
-	n, err := c.w.Write(p)
-	if err != nil {
-		return 0, fmt.Errorf("countingWriteCloser writing to w: %w", err)
-	}
-	c.written += n
-
-	return n, nil
-}
-
-func (c *countingWriteCloser) Close() error {
-	if err := c.w.Close(); err != nil {
-		return fmt.Errorf("countingWriteCloser closing w: %w", err)
 	}
 	return nil
 }
