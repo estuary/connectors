@@ -17,6 +17,12 @@
               "format": "duration",
               "title": "Default Interval",
               "type": "string"
+            },
+            "backfill_chunk_size": {
+              "default": 50000,
+              "description": "How many rows should be fetched in a single query during backfill. Defaults to 1,000,000.",
+              "title": "Backfill Chunk Size",
+              "type": "integer"
             }
           },
           "title": "Advanced",

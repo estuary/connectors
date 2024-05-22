@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
@@ -137,6 +137,8 @@ async def fetch_columns(
 
 CHECKPOINT_EVERY = 1000
 
+BACKFILL_MAX_TIME = timedelta(hours=1)
+
 
 async def fetch_page(
     # Closed over via functools.partial:
@@ -151,13 +153,15 @@ async def fetch_page(
     cutoff: Tuple[str],
 ) -> AsyncGenerator[Document | str, None]:
     async with lock:
+        start_time = datetime.now()
+
         if page is None:
             # ROWID is a base64 encoded string, so this string is the minimum value possible
             page = 'AAAAAAAAAAAAAAAAAA'
 
         query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0])
 
-        log.info("fetch_page", query, page)
+        log.debug("fetch_page", query, page)
 
         last_rowid = None
         i = 0
@@ -165,7 +169,7 @@ async def fetch_page(
             with conn.cursor() as c:
                 c.arraysize = backfill_chunk_size
                 c.prefetchrows = backfill_chunk_size + 1
-                await c.execute(query, rownum_end=backfill_chunk_size)
+                await c.execute(query)
 
                 async for values in c:
                     cols = [col[0] for col in c.description]
@@ -193,6 +197,9 @@ async def fetch_page(
                     if i % CHECKPOINT_EVERY == 0:
                         yield last_rowid
 
+                    if datetime.now() > (start_time + BACKFILL_MAX_TIME):
+                        break
+
         if last_rowid is not None and (i % CHECKPOINT_EVERY) != 0:
             yield last_rowid
 
@@ -214,7 +221,7 @@ async def fetch_changes(
 ) -> AsyncGenerator[Document | LogCursor, None]:
     async with lock:
         query = template_env.get_template("inc").render(table=table, cursor=scn)
-        log.info("fetch_changes", query, scn)
+        log.debug("fetch_changes", query, scn)
 
         # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
         # for a transaction at the end, when all documents of that transaction have been emitted
@@ -326,7 +333,6 @@ SELECT ROWID, {% for c in table.columns -%}
 {%- endfor %} FROM {{ table.owner }}.{{ table.table_name }}
     WHERE ROWID > '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
-      AND ROWNUM <= :rownum_end
     ORDER BY ROWID ASC
 """,
     'inc': """
