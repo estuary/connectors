@@ -51,8 +51,8 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
-        pool = create_pool(discover.config)
-        resources = await all_resources(log, self, discover.config, pool)
+        self.pool = create_pool(discover.config)
+        resources = await all_resources(log, self, discover.config, self.pool)
         return common.discovered(resources)
 
     async def validate(
@@ -60,9 +60,9 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
-        pool = create_pool(validate.config)
-        await validate_flashback(log, validate.config, pool)
-        resources = await all_resources(log, self, validate.config, pool)
+        self.pool = create_pool(validate.config)
+        await validate_flashback(log, validate.config, self.pool)
+        resources = await all_resources(log, self, validate.config, self.pool)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
@@ -71,8 +71,12 @@ class Connector(
         log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-        pool = create_pool(open.capture.config)
-        await validate_flashback(log, open.capture.config, pool)
-        resources = await all_resources(log, self, open.capture.config, pool)
+        self.pool = create_pool(open.capture.config)
+        await validate_flashback(log, open.capture.config, self.pool)
+        resources = await all_resources(log, self, open.capture.config, self.pool)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
+
+    async def exit(self, _: Logger):
+        if pool := getattr(self, "pool", None):
+            await pool.close()
