@@ -129,7 +129,7 @@ END;
 		FROM #flow_temp_store_0
 	) AS r
 	ON target_table.key1 = r.key1 AND target_table."key!2" = r."key!2"
-	WHEN MATCHED AND r.flow_document='null' THEN
+	WHEN MATCHED AND r.flow_document='"delete"' THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET target_table."Camel_Case" = r."Camel_Case", target_table."a Time" = r."a Time", target_table."array" = r."array", target_table.lower_case = r.lower_case, target_table."value" = r."value", target_table.flow_document = r.flow_document

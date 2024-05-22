@@ -279,7 +279,7 @@ SELECT -1, ""
 		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Table.Document }}
-	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}="null" THEN
+	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='"delete"' THEN
 		DELETE
 	{{- end }}
 	WHEN MATCHED THEN

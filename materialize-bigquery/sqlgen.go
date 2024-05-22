@@ -239,7 +239,7 @@ ON {{ range $ind, $key := $.Keys }}
 	l.{{$key.Identifier}} = r.c{{$ind}}
 {{- end}}
 {{- if $.Document }}
-WHEN MATCHED AND JSON_TYPE(PARSE_JSON(r.c{{ Add (len $.Columns) -1 }}))='null' THEN
+WHEN MATCHED AND r.c{{ Add (len $.Columns) -1 }}='"delete"' THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
