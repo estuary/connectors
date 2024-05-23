@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -277,7 +278,60 @@ func TestNestedCollections(t *testing.T) {
 	client.Upsert(ctx, t, "nested_users/R4/docs/7", `{"foo": "baz", "asdf": 789}`)
 	client.Upsert(ctx, t, "nested_users/R4/docs/8", `{"foo": "baz", "asdf": 1000}`)
 	t.Run("repl", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+}
 
+func TestRestartCursorUpdates(t *testing.T) {
+	var ctx = testContext(t, 120*time.Second)
+	var capture = simpleCapture(t, "users/*/docs")
+	var client = testFirestoreClient(ctx, t)
+
+	var res resource
+	require.NoError(t, json.Unmarshal(capture.Bindings[0].ResourceConfigJson, &res))
+	res.RestartCursorPath = "/monotonic_id"
+	var resJSON, err = json.Marshal(res)
+	require.NoError(t, err)
+	capture.Bindings[0].ResourceConfigJson = resJSON
+
+	restartCursorPendingInterval = 1 * time.Millisecond
+
+	var timestampBase = time.Date(2024, 05, 28, 00, 00, 00, 00, time.UTC)
+	var root = client.Conn.Collection("flow_source_tests").Doc(strings.ReplaceAll(t.Name(), "/", "_"))
+	for user := 1; user < 3; user++ {
+		for doc := 0; doc < 10; doc++ {
+			root.Collection("users").Doc(strconv.Itoa(user)).Collection("docs").Doc(strconv.Itoa(doc)).Create(ctx, map[string]any{
+				"monotonic_id": timestampBase.Add(time.Duration(user*10+doc) * time.Minute),
+				"user":         user,
+				"doc":          doc,
+			})
+		}
+	}
+	time.Sleep(3 * time.Second)
+	t.Run("init", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 3; user < 10; user++ {
+		for doc := 0; doc < 10; doc++ {
+			root.Collection("users").Doc(strconv.Itoa(user)).Collection("docs").Doc(strconv.Itoa(doc)).Create(ctx, map[string]any{
+				"monotonic_id": timestampBase.Add(time.Duration(user*10+doc) * time.Minute),
+				"user":         user,
+				"doc":          doc,
+			})
+		}
+	}
+	time.Sleep(3 * time.Second)
+	t.Run("repl", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	var checkpoint captureState
+	require.NoError(t, json.Unmarshal(capture.Checkpoint, &checkpoint))
+	for _, resourceState := range checkpoint.Resources {
+		resourceState.Inconsistent = true
+		resourceState.RestartCursorValue = "2024-05-28T00:49:00Z"
+		resourceState.Backfill.StartAfter = time.Now().Add(100 * time.Millisecond)
+	}
+	checkpointJSON, err := json.Marshal(&checkpoint)
+	require.NoError(t, err)
+	capture.Checkpoint = checkpointJSON
+
+	t.Run("restart", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
 func testContext(t testing.TB, duration time.Duration) context.Context {
@@ -351,8 +405,8 @@ func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 }
 
 type firestoreClient struct {
-	inner  *firestore.Client
-	prefix string
+	Conn   *firestore.Client
+	Prefix string
 }
 
 func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
@@ -370,14 +424,14 @@ func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 
 	var prefix = fmt.Sprintf("flow_source_tests/%s", strings.ReplaceAll(t.Name(), "/", "_"))
 	var tfc = &firestoreClient{
-		inner:  client,
-		prefix: prefix + "/",
+		Conn:   client,
+		Prefix: prefix + "/",
 	}
 	t.Cleanup(func() {
-		tfc.deleteCollectionRecursive(context.Background(), t, tfc.inner.Collection("flow_source_tests"))
-		tfc.inner.Close()
+		tfc.deleteCollectionRecursive(context.Background(), t, tfc.Conn.Collection("flow_source_tests"))
+		tfc.Conn.Close()
 	})
-	tfc.deleteCollectionRecursive(ctx, t, tfc.inner.Collection("flow_source_tests"))
+	tfc.deleteCollectionRecursive(ctx, t, tfc.Conn.Collection("flow_source_tests"))
 
 	_, err = client.Batch().Set(client.Doc(prefix), map[string]interface{}{"testName": t.Name()}).Commit(ctx)
 	require.NoError(t, err)
@@ -387,7 +441,7 @@ func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 
 func (c *firestoreClient) DeleteCollection(ctx context.Context, t testing.TB, collection string) {
 	t.Helper()
-	c.deleteCollectionRecursive(ctx, t, c.inner.Collection(c.prefix+collection))
+	c.deleteCollectionRecursive(ctx, t, c.Conn.Collection(c.Prefix+collection))
 }
 
 func (c *firestoreClient) deleteCollectionRecursive(ctx context.Context, t testing.TB, ref *firestore.CollectionRef) {
@@ -422,12 +476,12 @@ func (c *firestoreClient) Upsert(ctx context.Context, t testing.TB, docKVs ...st
 	}
 	log.WithField("count", len(names)).Trace("upserting test documents")
 
-	var wb = c.inner.Batch()
+	var wb = c.Conn.Batch()
 	for idx := range values {
 		var fields = make(map[string]interface{})
 		var err = json.Unmarshal(json.RawMessage(values[idx]), &fields)
 		require.NoError(t, err)
-		wb = wb.Set(c.inner.Doc(c.prefix+names[idx]), fields, firestore.MergeAll)
+		wb = wb.Set(c.Conn.Doc(c.Prefix+names[idx]), fields, firestore.MergeAll)
 	}
 	var _, err = wb.Commit(ctx)
 	require.NoError(t, err)
@@ -437,9 +491,9 @@ func (c *firestoreClient) Delete(ctx context.Context, t testing.TB, names ...str
 	t.Helper()
 	log.WithField("count", len(names)).Debug("deleting test documents")
 
-	var wb = c.inner.Batch()
+	var wb = c.Conn.Batch()
 	for _, docName := range names {
-		wb = wb.Delete(c.inner.Doc(c.prefix + docName))
+		wb = wb.Delete(c.Conn.Doc(c.Prefix + docName))
 	}
 	var _, err = wb.Commit(ctx)
 	require.NoError(t, err)

@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -46,12 +47,24 @@ const progressLogInterval = 10000
 // elapsed since the previous backfill was started.
 //
 // TODO(wgd): Consider making this user-configurable?
-const backfillRestartDelay = 6 * time.Hour
+const (
+	backfillRestartDelayNoRestartCursor   = 6 * time.Hour
+	backfillRestartDelayWithRestartCursor = 5 * time.Minute
+)
 
 const (
 	backfillChunkSize   = 256
 	concurrentBackfills = 2
 )
+
+// The minimum length of time for which a new restart cursor value will be buffered in
+// memory before being committed to the state checkpoint. This ensures that in the event
+// of a re-backfill there will be some minimum amount of overlap between the most recent
+// change events and the restart point of the backfill.
+//
+// This is a constant in typical usage, but is made a variable so that tests can override
+// the value to something smaller.
+var restartCursorPendingInterval = 5 * time.Minute
 
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
@@ -119,6 +132,15 @@ type resourceState struct {
 	// to be performed to re-establish consistency.
 	Inconsistent bool `json:"Inconsistent,omitempty"`
 
+	// The `RestartCursorValue` property is updated periodically during change streaming
+	// (if the binding has a `RestartCursorPath` setting) so it holds an arbitrarily selected
+	// restart-cursor value which was recently observed in the dataset.
+	RestartCursorValue any `json:"RestartCursorValue,omitempty"`
+
+	restartCursorPath           []string  // The parsed path to the restart-cursor property. Not serialized as part of the state, it's just copied from the resource spec for convenience.
+	pendingRestartCursorTimeout time.Time // The timestamp after which the pending restart-cursor value may be promoted to active. Zero if there is no pending value.
+	pendingRestartCursorValue   any       // A new restart-cursor value which has been buffered temporarily and may eventually be promoted to active.
+
 	bindingIndex int
 	path         string
 }
@@ -165,7 +187,11 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 			bindingIndex: idx,
 			path:         res.Path,
 		}
+		if res.RestartCursorPath != "" {
+			state.restartCursorPath = parseJSONPointer(res.RestartCursorPath)
+		}
 		if prevState, ok := prevStates[stateKey]; ok && !prevState.Inconsistent {
+			state.RestartCursorValue = prevState.RestartCursorValue
 			state.ReadTime = prevState.ReadTime
 			state.Backfill = prevState.Backfill
 		} else if ok && prevState.Inconsistent {
@@ -179,12 +205,17 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 			}
 			// Add a restart delay unless the current StartAfter time is already in the future.
 			if startTime.Before(time.Now()) {
+				var backfillRestartDelay = backfillRestartDelayNoRestartCursor
+				if len(state.restartCursorPath) != 0 {
+					backfillRestartDelay = backfillRestartDelayWithRestartCursor
+				}
 				startTime = startTime.Add(backfillRestartDelay)
 			}
 			// If the adjusted start time is still in the past, we ought to start immediately.
 			if startTime.Before(time.Now()) {
 				startTime = time.Now()
 			}
+			state.RestartCursorValue = prevState.RestartCursorValue
 			state.ReadTime = now
 			if res.BackfillMode == backfillModeNone {
 				state.Backfill = nil
@@ -292,22 +323,27 @@ func (s *captureState) UpdateBackfillState(resourcePaths []resourcePath, state *
 	return checkpointJSON, nil
 }
 
-func (s *captureState) MarkInconsistent(collectionID string) (json.RawMessage, error) {
+func (s *captureState) MarkInconsistent(collectionID string) (json.RawMessage, bool, error) {
+	var allStreamsHaveRestartCursors = true
+
 	s.Lock()
 	var updated = make(map[boilerplate.StateKey]*resourceState)
 	for stateKey, resourceState := range s.Resources {
 		if getLastCollectionGroupID(resourceState.path) == collectionID {
 			resourceState.Inconsistent = true
 			updated[stateKey] = resourceState
+			if len(resourceState.restartCursorPath) == 0 {
+				allStreamsHaveRestartCursors = false
+			}
 		}
 	}
 	s.Unlock()
 
 	var checkpointJSON, err = json.Marshal(&captureState{Resources: updated})
 	if err != nil {
-		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
+		return nil, false, fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-	return checkpointJSON, nil
+	return checkpointJSON, allStreamsHaveRestartCursors, nil
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -340,7 +376,7 @@ func (c *capture) Run(ctx context.Context) error {
 		// Otherwise add another backfill to the list.
 		var compatibleBackfill *backfillDescription
 		for _, backfill := range backfills {
-			if backfill.CollectionID == collectionID && backfill.ResumeState.Equal(resourceState.Backfill) {
+			if backfill.CollectionID == collectionID && backfill.ResumeState.Equal(resourceState.Backfill) && slices.Equal(backfill.RestartCursorPath, resourceState.restartCursorPath) && backfill.RestartCursorValue == resourceState.RestartCursorValue {
 				compatibleBackfill = backfill
 				break
 			}
@@ -349,9 +385,11 @@ func (c *capture) Run(ctx context.Context) error {
 			compatibleBackfill.ResourcePaths = append(compatibleBackfill.ResourcePaths, resourceState.path)
 		} else {
 			backfills = append(backfills, &backfillDescription{
-				CollectionID:  collectionID,
-				ResourcePaths: []string{resourceState.path},
-				ResumeState:   resourceState.Backfill,
+				CollectionID:       collectionID,
+				ResourcePaths:      []string{resourceState.path},
+				ResumeState:        resourceState.Backfill,
+				RestartCursorPath:  resourceState.restartCursorPath,
+				RestartCursorValue: resourceState.RestartCursorValue,
 			})
 		}
 	}
@@ -445,6 +483,9 @@ type backfillDescription struct {
 	CollectionID  collectionGroupID // The collection group ID this backfill will query
 	ResourcePaths []resourcePath    // All resource paths which will be captured by this backfill
 	ResumeState   *backfillState    // The backfill state from which to resume
+
+	RestartCursorPath  []string // The parsed path to the restart cursor property, or nil if there is no such property.
+	RestartCursorValue any      // The most recent restart cursor value from this resource, or nil if there is no such value.
 }
 
 func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, backfill *backfillDescription) error {
@@ -532,8 +573,21 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, b
 		c.streamsInCatchup.Wait()
 
 		var query firestore.Query = client.CollectionGroup(backfill.CollectionID).Query
+		if backfill.RestartCursorPath != nil {
+			query = query.OrderByPath(firestore.FieldPath(backfill.RestartCursorPath), firestore.Asc)
+		}
 		if cursor != nil {
 			query = query.StartAfter(cursor)
+		} else if backfill.RestartCursorPath != nil && backfill.RestartCursorValue != nil {
+			var startAfter = backfill.RestartCursorValue
+			if restartString, ok := backfill.RestartCursorValue.(string); ok {
+				// If the RestartCursorValue is a string holding a valid RFC3339 timestamp then
+				// assume that it's actually a typed timestamp in the source dataset.
+				if ts, err := time.Parse(time.RFC3339Nano, restartString); err == nil {
+					startAfter = ts
+				}
+			}
+			query = query.StartAfter(startAfter)
 		}
 		query = query.Limit(backfillChunkSize)
 
@@ -769,10 +823,22 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 				listenClient = nil
 				if catchupStreaming {
 					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up, skipping to latest changes (go.estuary.dev/YRDsKd)")
-					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
+					var checkpointJSON, allStreamsHaveRestartCursors, err = c.State.MarkInconsistent(collectionID)
+					if err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 						return err
+					}
+					// If all impacted bindings have a restart cursor, we don't need to wait nearly as long
+					// before triggering a connector restart.
+					//
+					// TODO(wgd): This is suboptimal. If another collection ID stream breaks shortly after
+					// this one and it _doesn't_ have a restart cursor available, we will still restart
+					// after the shorter delay here. The proper fix might be to eliminate restarting
+					// entirely.
+					var backfillRestartDelay = backfillRestartDelayNoRestartCursor
+					if allStreamsHaveRestartCursors {
+						backfillRestartDelay = backfillRestartDelayWithRestartCursor
 					}
 					time.AfterFunc(backfillRestartDelay+time.Hour, func() {
 						logEntry.Fatal("forcing connector restart to establish consistency")
@@ -904,10 +970,68 @@ func (c *capture) HandleDocument(ctx context.Context, resourcePath string, doc *
 		return fmt.Errorf("error serializing document %q: %w", doc.Name, err)
 	} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
 		return err
-	} else if err := c.Output.Checkpoint(json.RawMessage(emptyCheckpoint), true); err != nil {
+	}
+
+	var checkpointUpdate = json.RawMessage(emptyCheckpoint)
+
+	// Update restart-cursor state by promoting a pending value to current if necessary
+	// and by buffering a new value if a cursor path is specified.
+	//
+	// TODO(wgd): Consider factoring this out as a helper function like other state accesses?
+	c.State.Lock()
+	if sk, ok := c.State.stateKeys[resourcePath]; ok {
+		if state := c.State.Resources[sk]; state != nil {
+			if !state.pendingRestartCursorTimeout.IsZero() && time.Now().Before(state.pendingRestartCursorTimeout) {
+				state.RestartCursorValue = state.pendingRestartCursorValue
+				state.pendingRestartCursorTimeout = time.Time{}
+				state.pendingRestartCursorValue = nil
+
+				var updated = map[boilerplate.StateKey]*resourceState{sk: state}
+				var updateJSON, err = json.Marshal(&captureState{Resources: updated})
+				if err != nil {
+					return fmt.Errorf("error serializing state checkpoint: %w", err)
+				}
+				checkpointUpdate = updateJSON
+			}
+			if len(state.restartCursorPath) > 0 && state.pendingRestartCursorTimeout.IsZero() {
+				if restartCursorValue, ok := indexDocumentByPath(fields, state.restartCursorPath); ok {
+					state.pendingRestartCursorTimeout = time.Now().Add(restartCursorPendingInterval)
+					state.pendingRestartCursorValue = restartCursorValue
+				}
+			}
+		}
+	}
+	c.State.Unlock()
+
+	if err := c.Output.Checkpoint(checkpointUpdate, true); err != nil {
 		return err
 	}
 	return nil
+}
+
+// indexDocumentByPath implements JSON pointer indexing rules given a parsed
+// list of individual path elements.
+func indexDocumentByPath(x any, path []string) (any, bool) {
+	for _, p := range path {
+		if obj, ok := x.(map[string]any); ok {
+			var fval, ok = obj[p]
+			if !ok {
+				return nil, false
+			}
+			x = fval
+		} else if arr, ok := x.([]any); ok {
+			if idx, err := strconv.Atoi(p); err != nil {
+				return nil, false
+			} else if idx < 0 || idx >= len(arr) {
+				return nil, false
+			} else {
+				x = arr[idx]
+			}
+		} else {
+			return nil, false
+		}
+	}
+	return x, true
 }
 
 func (c *capture) HandleDelete(ctx context.Context, resourcePath string, docName string, readTime time.Time) error {
