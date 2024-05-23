@@ -255,6 +255,12 @@ jobs:
         if: matrix.connector == 'materialize-databricks'
         run: python -m pip install databricks-sql-cli
 
+      - name: Install duckdb
+        if: matrix.connector == 'materialize-motherduck'
+        uses: opt-nc/setup-duckdb-action@v1.0.7
+        with:
+          version: v0.10.3
+
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
@@ -267,6 +273,7 @@ jobs:
               "materialize-s3-parquet",
               "materialize-sqlserver",
               "materialize-mongodb",
+              "materialize-motherduck",
               "materialize-snowflake",
               "materialize-databricks",
               "materialize-bigquery",
