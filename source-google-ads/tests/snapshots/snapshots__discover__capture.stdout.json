@@ -1113,7 +1113,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -2930,7 +2929,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -3456,7 +3454,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -3931,7 +3928,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -4323,7 +4319,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -5218,7 +5213,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -5271,7 +5265,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
