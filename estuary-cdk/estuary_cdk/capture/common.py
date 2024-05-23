@@ -31,7 +31,7 @@ LogCursor = AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.
- b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal). 
+ b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal).
 
 Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
 """
@@ -182,7 +182,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     doc: _BaseDocument
     binding: int
 
-FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument, None]]
+FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 
@@ -511,9 +511,15 @@ async def _binding_snapshot_task(
 
         count = 0
         async for doc in fetch_snapshot(task.log):
-            doc.meta_ = BaseDocument.Meta(
-                op="u" if count < state.last_count else "c", row_id=count
-            )
+            if isinstance(doc, dict):
+                doc["meta_"] = {
+                    "op": "u" if count < state.last_count else "c",
+                    "row_id": count
+                }
+            else:
+                doc.meta_ = BaseDocument.Meta(
+                    op="u" if count < state.last_count else "c", row_id=count
+                )
             task.captured(binding_index, doc)
             count += 1
 
@@ -567,7 +573,7 @@ async def _binding_backfill_task(
             return
 
         # Track if fetch_page returns without having yielded a PageCursor.
-        done = True 
+        done = True
 
         async for item in fetch_page(task.log, state.next_page, state.cutoff):
             if isinstance(item, BaseDocument) or isinstance(item, dict):
@@ -652,7 +658,7 @@ async def _binding_incremental_task(
 
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.
-            sleep_for = binding.resourceConfig.interval 
+            sleep_for = binding.resourceConfig.interval
 
         elif isinstance(state.cursor, datetime):
             lag = (datetime.now(tz=UTC) - state.cursor)
