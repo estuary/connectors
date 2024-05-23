@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgtype"
 	"github.com/sirupsen/logrus"
 )
+
+var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
@@ -152,8 +156,19 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		rowOffset++
 	}
 
+	if err := rows.Err(); err != nil {
+		// As a special case, consider statement timeouts to be not an error so long as we got
+		// at least one row back. This allows us to make partial progress on slow databases with
+		// statement timeouts set, without having to fine-tune the backfill chunk size.
+		if err, ok := err.(*pgconn.PgError); ok && statementTimeoutRegexp.MatchString(err.Message) && resultRows > 0 {
+			logrus.WithField("rows", resultRows).Warn("backfill query interrupted by statement timeout")
+			return false, nil
+		}
+		return false, err
+	}
+
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, rows.Err()
+	return backfillComplete, nil
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
