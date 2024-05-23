@@ -48,7 +48,7 @@
       "type": ["null", "string"]
     },
     "ad_group.id": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     },
     "ad_group.labels": {
       "type": ["null", "array"],
