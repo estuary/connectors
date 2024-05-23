@@ -65,6 +65,11 @@
       "initTimestamp": {
         "type": "string",
         "description": "Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."
+      },
+      "restartCursorPath": {
+        "type": "string",
+        "pattern": "^(/([^/~]|~[01])+)*$",
+        "description": "Optionally specifies a JSON pointer to some document property which increases monotonically and can be used as a restart cursor to optimize backfill behavior when streaming consistency is lost. Generally this only matters for collections with very high write volumes."
       }
     },
     "type": "object",
