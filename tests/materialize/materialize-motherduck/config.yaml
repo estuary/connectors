@@ -1,0 +1,21 @@
+awsAccessKeyId: AKIA3PYBORRDH4TGOSGZ
+awsSecretAccessKey_sops: ENC[AES256_GCM,data:QDU+90NPyMy9PfDOxp2HiA9nwzOPMAVkPtAGyUFR/ZbSqk6uHm07Yg==,iv:8V3mdCzzssKnS709VKKydcrm1yGo/LYJb4VvMyReMek=,tag:tm+1ufUKrwda/MVI7vCrsA==,type:str]
+bucket: whb-test-bucket
+database: test_db
+region: us-east-2
+schema: main
+token_sops: ENC[AES256_GCM,data:jzZeBqb9vCjlmLfcys35Zxf1gLZiqI7Jv/EvX1yQL5RoDsdzDg3v/TX5osvBv1kbtljbaFkXqEBt4mHnwuIJnf5pkXwz+6TgcVHEs0cuACPrbb+9SVSVcjTvuG6sx4zgPjrVHqvnFh2L1brgIg1IBNGKdxTaNFcE2l65W1GuIYIJFlpN1xo6uYszj3BDG5CPLN0ZiIB80H73x46U/d4eXMEyKmx0fmxl8AbM0vgt935DKra4X01s7PVTUugvwlkz5ROHLuiTStSdCjjXxzLCQqY0effZC5xATem83VNugHSRrBFX7J46OhGIiBlZNn4fq2nY9GYjJf3QUU55f0q5gezaCiz16lHtvW/pJ3pvDhw=,iv:fZptEdanrofwZFWgtzKxDyV5fdnC2VdtctMdzLrqcUQ=,tag:uuFtIGz0EOZYtGdxIC6euQ==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-05-23T21:25:19Z"
+          enc: CiQAdmEdwuYd5dgBmZKmE/v2/ebAF9rqZVtWs48HNDf1NOr11gQSSQCSobQjWx53iByTq/afJbpWDsWW4U67+LzfXRO15Ui1vpC2UaJKz58rMXUjoTy/umt1ftuZxKhaa9BzrLWfwLUvKCuBivYAwwA=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-05-23T21:25:19Z"
+    mac: ENC[AES256_GCM,data:2ZvxPE0SZECcjx0KMWvNM8nZ3UO6gbjhhNUX7/70Kj2aqeytaZiBdlzy4/QhV5yE73femDZznwfgY9s9bWAaf00RK9Uxfrsxcu9omykX2hq74oYT8Ba5968yquFaIB4JGrcCEdEXVxLuVa4Dun/0QDGkKWHd0QqknBQUCiarAGg=,iv:4o26enko/FLr8U0N13qPG0bi5tNBCX6Uy9iKQLCWIS0=,tag:je0Dy3vPyS9hZEJPhUnjOg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
