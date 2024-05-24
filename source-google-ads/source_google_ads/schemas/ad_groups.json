@@ -96,7 +96,7 @@
       }
     },
     "segments.date": {
-      "type": ["null", "string"],
+      "type": ["string"],
       "format": "date"
     }
   }

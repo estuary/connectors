@@ -33,7 +33,7 @@
       "type": ["null", "number"]
     },
     "segments.ad_network_type": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "metrics.all_conversions_from_interactions_rate": {
       "type": ["null", "number"]
@@ -99,14 +99,14 @@
       "type": ["null", "number"]
     },
     "segments.date": {
-      "type": ["null", "string"],
+      "type": ["string"],
       "format": "date"
     },
     "segments.day_of_week": {
       "type": ["null", "string"]
     },
     "segments.device": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "metrics.engagement_rate": {
       "type": ["null", "number"]
@@ -115,7 +115,7 @@
       "type": ["null", "integer"]
     },
     "customer.id": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     },
     "metrics.impressions": {
       "type": ["null", "integer"]
