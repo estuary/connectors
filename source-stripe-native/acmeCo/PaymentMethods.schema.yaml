@@ -19,7 +19,7 @@ $defs:
       - op
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 description: "Child Stream\nParent Stream: Customers"
 properties:
   _meta:

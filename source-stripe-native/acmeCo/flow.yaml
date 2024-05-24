@@ -12,20 +12,12 @@ collections:
     schema: ApplicationFeesRefunds.schema.yaml
     key:
       - /id
-  acmeCo/Authorizations:
-    schema: Authorizations.schema.yaml
-    key:
-      - /id
   acmeCo/BalanceTransactions:
     schema: BalanceTransactions.schema.yaml
     key:
       - /id
   acmeCo/BankAccounts:
     schema: BankAccounts.schema.yaml
-    key:
-      - /id
-  acmeCo/CardHolders:
-    schema: CardHolders.schema.yaml
     key:
       - /id
   acmeCo/Cards:
@@ -160,10 +152,6 @@ collections:
     schema: TopUps.schema.yaml
     key:
       - /id
-  acmeCo/Transactions:
-    schema: Transactions.schema.yaml
-    key:
-      - /id
   acmeCo/TransferReversals:
     schema: TransferReversals.schema.yaml
     key:
@@ -175,4 +163,4 @@ collections:
   acmeCo/UsageRecords:
     schema: UsageRecords.schema.yaml
     key:
-      - /id
+      - /subscription_item

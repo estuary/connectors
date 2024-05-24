@@ -426,7 +426,7 @@ class CustomerBalanceTransaction(BaseDocument, extra="forbid"):
     credit_note: str | None = None
     type: str
 
-class PaymentMethods(BaseDocument, extra="forbid"):
+class PaymentMethods(BaseDocument, extra="allow"):
     """
     Child Stream
     Parent Stream: Customers
@@ -506,7 +506,7 @@ class Charges(BaseDocument, extra="forbid"):
     livemode: bool
     metadata: Dict | None = None
     on_behalf_of: str | None = None
-    outcome: Dict
+    outcome: Dict | None
     paid: bool
     payment_intent: str | None = None
     payment_method: str | None = None
@@ -1139,7 +1139,7 @@ class SetupAttempts(BaseDocument, extra="forbid"):
 
 class Subscriptions(BaseDocument, extra="forbid"):
     NAME: ClassVar[str] = "Subscriptions"
-    TYPES: ClassVar[str] =  "customer.subscription.updated"
+    TYPES: ClassVar[str] =  "customer.subscription.*"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
 
     id: str
@@ -1192,26 +1192,79 @@ class Subscriptions(BaseDocument, extra="forbid"):
     quantity: int
 
 class SubscriptionItems(BaseDocument, extra="forbid"):
-    """
-    Child Stream
-    Parent Stream: Subscriptions
-    """
     NAME: ClassVar[str] = "SubscriptionItems"
-    SEARCH_NAME: ClassVar[str] = "subscription_items"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100, "subscription": None} 
+    TYPES: ClassVar[str] =  "customer.subscription.*"
+    SEARCH_NAME: ClassVar[str] = "subscriptions"
+    class Items(BaseModel, extra="forbid"):
+        class Values(BaseModel, extra="forbid"):
+            id: str
+            parent_id: str | None = None
+            object: Literal["subscription_item"]
+            billing_thresholds: Dict | None = None
+            created: int
+            metadata: Dict | None = None
+            discounts: list[Dict] | None = None
+            plan: Dict | None = None
+            price: Dict
+            quantity: int | None = None
+            subscription: str
+            tax_rates: list[Dict] | None = None
+
+        object: Literal["list"]
+        data: list[Values]
+        has_more: bool = Field(exclude=True)
+        total_count: int = Field(exclude=True)
+        url: str = Field(exclude=True)
 
     id: str
-    parent_id: str | None = None
-    object: Literal["subscription_item"]
-    billing_thresholds: Dict | None = None
+    object: Literal["subscription"]
+    application: str | None = None
+    application_fee_percent: float | None = None
+    automatic_tax: Dict
+    billing_cycle_anchor: int  = Field(exclude=True)
+    billing_cycle_anchor_config: Dict | None = Field(exclude=True)
+    billing_thresholds: Dict | None  = Field(exclude=True)
+    cancel_at: int | None  = Field(exclude=True)
+    cancel_at_period_end: bool  = Field(exclude=True)
+    canceled_at: int | None = None
+    cancellation_details: Dict
+    collection_method: str | None = None
     created: int
+    currency: str | None = None
+    current_period_end: int | None = None
+    current_period_start: int | None = None
+    customer: str
+    days_until_due: int | None  = Field(exclude=True)
+    default_payment_method: str | None = None
+    default_source: str | None = None
+    default_tax_rates: list[Dict] | None = None
+    description: str | None = None
+    discounts: list[str] | None = Field(exclude=True)
+    discount: Dict | None = Field(exclude=True)
+    ended_at: int | None = None
+    invoice_settings: Dict
+    items: Items
+    latest_invoice: str | None = None
+    livemode: bool
     metadata: Dict | None = None
-    discounts: list[Dict] | None = None
-    plan: Dict | None = None
-    price: Dict
-    quantity: int | None = None
-    subscription: str
-    tax_rates: list[Dict] | None = None
+    next_pending_invoice_item_invoice: int | None = None
+    on_behalf_of: str | None = None
+    pause_collection: Dict | None = None
+    payment_settings: Dict | None = None
+    pending_invoice_item_interval: Dict | None = None
+    pending_setup_intent: str | None = None
+    pending_update: Dict | None = None
+    schedule: str | None = None
+    start_date: int
+    status: str
+    test_clock: str | None = None
+    transfer_data: Dict | None = None
+    trial_end: int | None = None
+    trial_settings: Dict
+    trial_start: int | None = None
+    plan: Dict
+    quantity: int
+
 
 class UsageRecords(BaseDocument, extra="forbid"):
     """
