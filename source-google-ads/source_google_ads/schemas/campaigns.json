@@ -87,7 +87,7 @@
       "type": ["null", "integer"]
     },
     "campaign.id": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     },
     "campaign.labels": {
       "type": ["null", "array"],
@@ -267,11 +267,11 @@
       "type": ["null", "number"]
     },
     "segments.date": {
-      "type": ["null", "string"],
+      "type": ["string"],
       "format": "date"
     },
     "segments.hour": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     }
   }
 }
