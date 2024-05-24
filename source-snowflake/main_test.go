@@ -26,15 +26,12 @@ var (
 	dbAccount   = flag.String("db_account", "bn92689", "The Snowflake account ID to use for tests")
 	dbName      = flag.String("db_name", "CONNECTOR_TESTING", "The database to use for tests")
 	dbWarehouse = flag.String("db_warehouse", "COMPUTE_WH", "The warehouse to execute test queries in")
+	dbSchema    = flag.String("db_schema", "PUBLIC", "The schema to execute test queries in")
 
 	dbCaptureUser = flag.String("db_capture_user", "USERNAME", "The user to perform captures as")
 	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 	dbControlUser = flag.String("db_control_user", "", "The user for test setup/control operations, if different from the capture user")
 	dbControlPass = flag.String("db_control_pass", "", "The password the the test setup/control user, if different from the capture password")
-)
-
-const (
-	snowflakeDefaultSchema = "PUBLIC"
 )
 
 func TestMain(m *testing.M) {
@@ -181,7 +178,7 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
-	var fullTableName = snowflakeObject{snowflakeDefaultSchema, tableName}.QuotedName()
+	var fullTableName = snowflakeObject{*dbSchema, tableName}.QuotedName()
 
 	log.WithFields(log.Fields{"table": fullTableName, "cols": tableDef}).Debug("creating test table")
 
