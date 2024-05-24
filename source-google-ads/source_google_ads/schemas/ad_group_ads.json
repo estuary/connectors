@@ -168,7 +168,7 @@
       "type": ["null", "string"]
     },
     "ad_group_ad.ad.id": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     },
     "ad_group_ad.ad.image_ad.image_url": {
       "type": ["null", "string"]
@@ -522,7 +522,7 @@
       "type": ["null", "string"]
     },
     "segments.date": {
-      "type": ["null", "string"],
+      "type": ["string"],
       "format": "date"
     }
   }

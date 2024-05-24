@@ -6,7 +6,7 @@
       "type": ["null", "string"]
     },
     "campaign_label.resource_name": {
-      "type": ["null", "string"]
+      "type": ["string"]
     },
     "label.name": {
       "type": ["null", "string"]
