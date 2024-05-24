@@ -126,13 +126,13 @@ captures:
           name: TransferReversals
         target: acmeCo/TransferReversals
       - resource:
-          name: SubscriptionItems
-        target: acmeCo/SubscriptionItems
-      - resource:
           name: SetupAttempts
         target: acmeCo/SetupAttempts
       - resource:
           name: UsageRecords
         target: acmeCo/UsageRecords
+      - resource:
+          name: SubscriptionItems
+        target: acmeCo/SubscriptionItems
     shards:
       logLevel: debug

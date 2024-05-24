@@ -185,8 +185,10 @@ properties:
     default: ~
     title: On Behalf Of
   outcome:
+    anyOf:
+      - type: object
+      - type: "null"
     title: Outcome
-    type: object
   paid:
     title: Paid
     type: boolean

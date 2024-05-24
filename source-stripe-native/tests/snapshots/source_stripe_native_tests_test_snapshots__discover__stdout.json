@@ -1010,8 +1010,15 @@
           "title": "On Behalf Of"
         },
         "outcome": {
-          "title": "Outcome",
-          "type": "object"
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outcome"
         },
         "paid": {
           "title": "Paid",
@@ -9003,7 +9010,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "description": "Child Stream\nParent Stream: Customers",
       "properties": {
         "_meta": {
@@ -10274,184 +10281,6 @@
     ]
   },
   {
-    "recommendedName": "SubscriptionItems",
-    "resourceConfig": {
-      "name": "SubscriptionItems"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "required": [
-            "op"
-          ],
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": false,
-      "description": "Child Stream\nParent Stream: Subscriptions",
-      "properties": {
-        "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "parent_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Parent Id"
-        },
-        "object": {
-          "const": "subscription_item",
-          "enum": [
-            "subscription_item"
-          ],
-          "title": "Object",
-          "type": "string"
-        },
-        "billing_thresholds": {
-          "anyOf": [
-            {
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Billing Thresholds"
-        },
-        "created": {
-          "title": "Created",
-          "type": "integer"
-        },
-        "metadata": {
-          "anyOf": [
-            {
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Metadata"
-        },
-        "discounts": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "object"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Discounts"
-        },
-        "plan": {
-          "anyOf": [
-            {
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Plan"
-        },
-        "price": {
-          "title": "Price",
-          "type": "object"
-        },
-        "quantity": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Quantity"
-        },
-        "subscription": {
-          "title": "Subscription",
-          "type": "string"
-        },
-        "tax_rates": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "object"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Tax Rates"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "created",
-        "price",
-        "subscription"
-      ],
-      "title": "SubscriptionItems",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
     "recommendedName": "SetupAttempts",
     "resourceConfig": {
       "name": "SetupAttempts"
@@ -10782,6 +10611,606 @@
         "subscription_item"
       ],
       "title": "UsageRecords",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/subscription_item"
+    ]
+  },
+  {
+    "recommendedName": "SubscriptionItems",
+    "resourceConfig": {
+      "name": "SubscriptionItems"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Items": {
+          "additionalProperties": false,
+          "properties": {
+            "object": {
+              "const": "list",
+              "enum": [
+                "list"
+              ],
+              "title": "Object",
+              "type": "string"
+            },
+            "data": {
+              "items": {
+                "$ref": "#/$defs/Values"
+              },
+              "title": "Data",
+              "type": "array"
+            }
+          },
+          "required": [
+            "object",
+            "data"
+          ],
+          "title": "Items",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "title": "Meta",
+          "type": "object"
+        },
+        "Values": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            },
+            "object": {
+              "const": "subscription_item",
+              "enum": [
+                "subscription_item"
+              ],
+              "title": "Object",
+              "type": "string"
+            },
+            "billing_thresholds": {
+              "anyOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Billing Thresholds"
+            },
+            "created": {
+              "title": "Created",
+              "type": "integer"
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Metadata"
+            },
+            "discounts": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Discounts"
+            },
+            "plan": {
+              "anyOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Plan"
+            },
+            "price": {
+              "title": "Price",
+              "type": "object"
+            },
+            "quantity": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Quantity"
+            },
+            "subscription": {
+              "title": "Subscription",
+              "type": "string"
+            },
+            "tax_rates": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Tax Rates"
+            }
+          },
+          "required": [
+            "id",
+            "object",
+            "created",
+            "price",
+            "subscription"
+          ],
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "const": "subscription",
+          "enum": [
+            "subscription"
+          ],
+          "title": "Object",
+          "type": "string"
+        },
+        "application": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Application"
+        },
+        "application_fee_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Application Fee Percent"
+        },
+        "automatic_tax": {
+          "title": "Automatic Tax",
+          "type": "object"
+        },
+        "canceled_at": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canceled At"
+        },
+        "cancellation_details": {
+          "title": "Cancellation Details",
+          "type": "object"
+        },
+        "collection_method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Collection Method"
+        },
+        "created": {
+          "title": "Created",
+          "type": "integer"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "current_period_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Period End"
+        },
+        "current_period_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Period Start"
+        },
+        "customer": {
+          "title": "Customer",
+          "type": "string"
+        },
+        "default_payment_method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Payment Method"
+        },
+        "default_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Source"
+        },
+        "default_tax_rates": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Tax Rates"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "invoice_settings": {
+          "title": "Invoice Settings",
+          "type": "object"
+        },
+        "items": {
+          "$ref": "#/$defs/Items"
+        },
+        "latest_invoice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latest Invoice"
+        },
+        "livemode": {
+          "title": "Livemode",
+          "type": "boolean"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata"
+        },
+        "next_pending_invoice_item_invoice": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Pending Invoice Item Invoice"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "On Behalf Of"
+        },
+        "pause_collection": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pause Collection"
+        },
+        "payment_settings": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Payment Settings"
+        },
+        "pending_invoice_item_interval": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pending Invoice Item Interval"
+        },
+        "pending_setup_intent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pending Setup Intent"
+        },
+        "pending_update": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pending Update"
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schedule"
+        },
+        "start_date": {
+          "title": "Start Date",
+          "type": "integer"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "test_clock": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Test Clock"
+        },
+        "transfer_data": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transfer Data"
+        },
+        "trial_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trial End"
+        },
+        "trial_settings": {
+          "title": "Trial Settings",
+          "type": "object"
+        },
+        "trial_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trial Start"
+        },
+        "plan": {
+          "title": "Plan",
+          "type": "object"
+        },
+        "quantity": {
+          "title": "Quantity",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "automatic_tax",
+        "cancellation_details",
+        "created",
+        "customer",
+        "invoice_settings",
+        "items",
+        "livemode",
+        "start_date",
+        "status",
+        "trial_settings",
+        "plan",
+        "quantity"
+      ],
+      "title": "SubscriptionItems",
       "type": "object",
       "x-infer-schema": true
     },

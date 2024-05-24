@@ -65,6 +65,7 @@ from .models import (
     FilesLink,
     EndpointConfig,
     EventResult,
+    SubscriptionItems,
     )
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
@@ -96,6 +97,7 @@ async def all_resources(
         base_object(SubscriptionsSchedule, http, config.stop_date),
         base_object(TopUps, http, config.stop_date),
         base_object(Transfers, http, config.stop_date),
+        base_object(SubscriptionItems, http, config.stop_date),
         no_events_object(Files, http, config.stop_date),
         no_events_object(FilesLink, http, config.stop_date),
         no_events_object(BalanceTransactions, http, config.stop_date),
@@ -111,9 +113,8 @@ async def all_resources(
         child_object(CreditNotes, CreditNotesLines, http, config.stop_date),
         child_object(Invoices, InvoiceLineItems, http, config.stop_date),
         child_object(Transfers, TransferReversals, http, config.stop_date),
-        child_object(Subscriptions, SubscriptionItems, http, config.stop_date),
         child_object(SetupIntents, SetupAttempts, http, config.stop_date),
-        usage_records(Subscriptions, SubscriptionItems,UsageRecords, http, config.stop_date),
+        usage_records(SubscriptionItems, UsageRecords, http, config.stop_date),
 
 
     ]
@@ -221,7 +222,7 @@ def child_object(
     )
 
 def usage_records(
-    cls, child_cls, child_cls2, http: HTTPSession, stop_date: datetime
+    cls, child_cls, http: HTTPSession, stop_date: datetime
 ) -> Resource:
     """ Usage Records handles a specific stream (UsageRecords).
     This is required since Usage Records is a child stream from a child stream.
@@ -240,22 +241,22 @@ def usage_records(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental_usage_records, cls, child_cls, child_cls2, http),
-            fetch_page=functools.partial(fetch_backfill_usage_records, cls, child_cls, child_cls2, stop_date, http),
+            fetch_changes=functools.partial(fetch_incremental_usage_records, cls, child_cls, http),
+            fetch_page=functools.partial(fetch_backfill_usage_records, cls, child_cls, stop_date, http),
         )
 
     started_at = datetime.now(tz=UTC)
 
     return Resource(
-        name=child_cls2.NAME,
-        key=["/id"],
-        model=child_cls2,
+        name=child_cls.NAME,
+        key=["/subscription_item"],
+        model=child_cls,
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=child_cls2.NAME),
+        initial_config=ResourceConfig(name=child_cls.NAME),
         schema_inference=True,
     )
 

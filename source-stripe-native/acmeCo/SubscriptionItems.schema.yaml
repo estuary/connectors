@@ -1,5 +1,24 @@
 ---
 $defs:
+  Items:
+    additionalProperties: false
+    properties:
+      object:
+        const: list
+        enum:
+          - list
+        title: Object
+        type: string
+      data:
+        items:
+          $ref: "#/$defs/Values"
+        title: Data
+        type: array
+    required:
+      - object
+      - data
+    title: Items
+    type: object
   Meta:
     properties:
       op:
@@ -19,8 +38,82 @@ $defs:
       - op
     title: Meta
     type: object
+  Values:
+    additionalProperties: false
+    properties:
+      id:
+        title: Id
+        type: string
+      parent_id:
+        anyOf:
+          - type: string
+          - type: "null"
+        default: ~
+        title: Parent Id
+      object:
+        const: subscription_item
+        enum:
+          - subscription_item
+        title: Object
+        type: string
+      billing_thresholds:
+        anyOf:
+          - type: object
+          - type: "null"
+        default: ~
+        title: Billing Thresholds
+      created:
+        title: Created
+        type: integer
+      metadata:
+        anyOf:
+          - type: object
+          - type: "null"
+        default: ~
+        title: Metadata
+      discounts:
+        anyOf:
+          - items:
+              type: object
+            type: array
+          - type: "null"
+        default: ~
+        title: Discounts
+      plan:
+        anyOf:
+          - type: object
+          - type: "null"
+        default: ~
+        title: Plan
+      price:
+        title: Price
+        type: object
+      quantity:
+        anyOf:
+          - type: integer
+          - type: "null"
+        default: ~
+        title: Quantity
+      subscription:
+        title: Subscription
+        type: string
+      tax_rates:
+        anyOf:
+          - items:
+              type: object
+            type: array
+          - type: "null"
+        default: ~
+        title: Tax Rates
+    required:
+      - id
+      - object
+      - created
+      - price
+      - subscription
+    title: Values
+    type: object
 additionalProperties: false
-description: "Child Stream\nParent Stream: Subscriptions"
 properties:
   _meta:
     allOf:
@@ -32,73 +125,220 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
+  object:
+    const: subscription
+    enum:
+      - subscription
+    title: Object
+    type: string
+  application:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Parent Id
-  object:
-    const: subscription_item
-    enum:
-      - subscription_item
-    title: Object
-    type: string
-  billing_thresholds:
+    title: Application
+  application_fee_percent:
     anyOf:
-      - type: object
+      - type: number
       - type: "null"
     default: ~
-    title: Billing Thresholds
+    title: Application Fee Percent
+  automatic_tax:
+    title: Automatic Tax
+    type: object
+  canceled_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Canceled At
+  cancellation_details:
+    title: Cancellation Details
+    type: object
+  collection_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Collection Method
   created:
     title: Created
     type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  current_period_end:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Current Period End
+  current_period_start:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Current Period Start
+  customer:
+    title: Customer
+    type: string
+  default_payment_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Payment Method
+  default_source:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Source
+  default_tax_rates:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Default Tax Rates
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  ended_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Ended At
+  invoice_settings:
+    title: Invoice Settings
+    type: object
+  items:
+    $ref: "#/$defs/Items"
+  latest_invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Latest Invoice
+  livemode:
+    title: Livemode
+    type: boolean
   metadata:
     anyOf:
       - type: object
       - type: "null"
     default: ~
     title: Metadata
-  discounts:
-    anyOf:
-      - items:
-          type: object
-        type: array
-      - type: "null"
-    default: ~
-    title: Discounts
-  plan:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Plan
-  price:
-    title: Price
-    type: object
-  quantity:
+  next_pending_invoice_item_invoice:
     anyOf:
       - type: integer
       - type: "null"
     default: ~
-    title: Quantity
-  subscription:
-    title: Subscription
-    type: string
-  tax_rates:
+    title: Next Pending Invoice Item Invoice
+  on_behalf_of:
     anyOf:
-      - items:
-          type: object
-        type: array
+      - type: string
       - type: "null"
     default: ~
-    title: Tax Rates
+    title: On Behalf Of
+  pause_collection:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Pause Collection
+  payment_settings:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Settings
+  pending_invoice_item_interval:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Pending Invoice Item Interval
+  pending_setup_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Pending Setup Intent
+  pending_update:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Pending Update
+  schedule:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Schedule
+  start_date:
+    title: Start Date
+    type: integer
+  status:
+    title: Status
+    type: string
+  test_clock:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Test Clock
+  transfer_data:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Transfer Data
+  trial_end:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Trial End
+  trial_settings:
+    title: Trial Settings
+    type: object
+  trial_start:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Trial Start
+  plan:
+    title: Plan
+    type: object
+  quantity:
+    title: Quantity
+    type: integer
 required:
   - id
   - object
+  - automatic_tax
+  - cancellation_details
   - created
-  - price
-  - subscription
+  - customer
+  - invoice_settings
+  - items
+  - livemode
+  - start_date
+  - status
+  - trial_settings
+  - plan
+  - quantity
 title: SubscriptionItems
 type: object
 x-infer-schema: true
