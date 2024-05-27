@@ -180,7 +180,7 @@
       "title": "ResourceConfig",
       "type": "object"
     },
-    "documentationUrl": "https://go.estuary.dev/source-oracle-batch",
+    "documentationUrl": "https://go.estuary.dev/source-oracle",
     "resourcePathPointers": [
       "/name"
     ]
