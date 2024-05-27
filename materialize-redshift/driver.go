@@ -62,11 +62,12 @@ type tunnelConfig struct {
 }
 
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
-	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
-	Schema   string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
+	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
+	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=8"`
 
 	Bucket             string `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
@@ -357,12 +358,16 @@ type binding struct {
 	varcharColumnMetas      []varcharColumnMeta
 	loadFile                *stagedFile
 	storeFile               *stagedFile
+	deleteFile              *stagedFile
 	createLoadTableTemplate *template.Template
 	createStoreTableSQL     string
+	createDeleteTableSQL    string
 	mergeIntoSQL            string
+	deleteQuerySQL          string
 	loadQuerySQL            string
 	copyIntoLoadTableSQL    string
 	copyIntoMergeTableSQL   string
+	copyIntoDeleteTableSQL  string
 	copyIntoTargetTableSQL  string
 }
 
@@ -382,9 +387,10 @@ func (t *transactor) addBinding(
 	caseSensitiveIdentifierEnabled bool,
 ) error {
 	var b = &binding{
-		target:    target,
-		loadFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
-		storeFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.ColumnNames()),
+		target:     target,
+		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
+		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.ColumnNames()),
+		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
 	}
 
 	// Render templates that require specific S3 "COPY INTO" parameters.
@@ -397,6 +403,7 @@ func (t *transactor) addBinding(
 	}{
 		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
 		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
+		{&b.copyIntoDeleteTableSQL, fmt.Sprintf("flow_temp_table_%d_deleted", bindingIdx), target.KeyPtrs(), false, b.deleteFile},
 		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
 	} {
 		var sql strings.Builder
@@ -419,7 +426,9 @@ func (t *transactor) addBinding(
 		tpl *template.Template
 	}{
 		{&b.createStoreTableSQL, t.templates.createStoreTable},
+		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.mergeIntoSQL, t.templates.mergeInto},
+		{&b.deleteQuerySQL, t.templates.deleteQuery},
 		{&b.loadQuerySQL, t.templates.loadQuery},
 	} {
 		var err error
@@ -620,17 +629,36 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
+		var b = d.bindings[it.Binding]
+		var file *stagedFile
+
 		if it.Exists {
 			hasUpdates[it.Binding] = true
 		}
 
-		var b = d.bindings[it.Binding]
-		b.storeFile.start()
+		var err error
+		var converted []any
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-		if err != nil {
-			return nil, fmt.Errorf("converting store parameters: %w", err)
+		// Unfortunately Redshift does not support MERGE INTO statements with multiple clauses
+		// so we can't use it to both update and delete rows. So instead we use a separate
+		// temporary table and run a `DELETE USING` query to delete rows
+		if d.cfg.HardDelete && it.Delete {
+			file = b.deleteFile
+
+			converted, err = b.target.ConvertKey(it.Key)
+			if err != nil {
+				return nil, fmt.Errorf("converting delete parameters: %w", err)
+			}
+		} else {
+			file = b.storeFile
+
+			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+			if err != nil {
+				return nil, fmt.Errorf("converting store parameters: %w", err)
+			}
 		}
+
+		file.start()
 
 		// See if we need to increase any VARCHAR column lengths.
 		for idx, c := range converted {
@@ -662,7 +690,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if err := b.storeFile.encodeRow(ctx, converted); err != nil {
+		if err := file.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 	}
@@ -751,16 +779,39 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 
 	log.Info("store: starting copying of files into tables")
 	for idx, b := range d.bindings {
+		if b.deleteFile.started {
+			deleteDeleted, err := b.deleteFile.flush(ctx)
+			if err != nil {
+				return fmt.Errorf("flushing delete file for binding[%d]: %w", idx, err)
+			}
+			defer deleteDeleted(ctx)
+
+			// Create the temporary table for staging values to delete from the target table.
+			// Redshift actually supports transactional DDL for creating tables, so this can be
+			// executed within the transaction.
+			if _, err := txn.Exec(ctx, b.createDeleteTableSQL); err != nil {
+				return fmt.Errorf("creating delete table: %w", err)
+			}
+
+			log.WithField("table", b.target.Identifier).Info("store: starting deleting from table")
+
+			if _, err := txn.Exec(ctx, b.copyIntoDeleteTableSQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.deleteFile.prefix, b.target.Identifier, err)
+			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
+				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
+			}
+			log.WithField("table", b.target.Identifier).Info("store: finished deleting from table")
+		}
+
 		if !b.storeFile.started {
-			// No stores for this binding.
 			continue
 		}
 
-		delete, err := b.storeFile.flush(ctx)
+		deleteStored, err := b.storeFile.flush(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
-		defer delete(ctx)
+		defer deleteStored(ctx)
 
 		if hasUpdates[idx] {
 			// Create the temporary table for staging values to merge into the target table.
