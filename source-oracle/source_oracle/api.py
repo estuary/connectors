@@ -1,4 +1,5 @@
 from datetime import datetime, UTC, timedelta
+import functools
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
@@ -139,6 +140,21 @@ CHECKPOINT_EVERY = 1000
 BACKFILL_MAX_TIME = timedelta(hours=1)
 
 
+# the first two arguments are provided by functools.partial, the rest are row values
+# the first value is taken as rowid
+def backfill_rowfactory(table_name, cols, rowid, *args):
+    obj = dict(zip(cols[1:], args))
+    obj['_meta'] = {
+        'op': 'c',
+        'source': {
+            'table': table_name,
+            'row_id': rowid,
+        }
+    }
+
+    return obj
+
+
 async def fetch_page(
     # Closed over via functools.partial:
     table: Table,
@@ -153,6 +169,7 @@ async def fetch_page(
 ) -> AsyncGenerator[Document | str, None]:
     async with lock:
         start_time = datetime.now()
+        end_time = start_time + BACKFILL_MAX_TIME
 
         if page is None:
             # ROWID is a base64 encoded string, so this string is the minimum value possible
@@ -166,31 +183,16 @@ async def fetch_page(
         i = 0
         async with pool.acquire() as conn:
             with conn.cursor() as c:
-                while datetime.now() < (start_time + BACKFILL_MAX_TIME):
+                while datetime.now() < end_time:
                     c.arraysize = backfill_chunk_size
                     c.prefetchrows = backfill_chunk_size + 1
                     await c.execute(query, rownum_end=backfill_chunk_size)
                     cols = [col[0] for col in c.description]
-                    c.rowfactory = lambda *args: dict(zip(cols, args))
+                    c.rowfactory = functools.partial(backfill_rowfactory, table.table_name, cols)
 
                     async for row in c:
-                        last_rowid = row[rowid_column_name]
-
-                        doc = {
-                            '_meta': {
-                                'op': 'c',
-                                'source': {
-                                    'table': table.table_name,
-                                    'row_id': last_rowid,
-                                }
-                            }
-                        }
-                        for (k, v) in row.items():
-                            if k in (rowid_column_name,):
-                                continue
-                            doc[k] = v
-
-                        yield doc
+                        last_rowid = row['_meta']['source']['row_id']
+                        yield row
 
                         i = i + 1
                         if i % CHECKPOINT_EVERY == 0:
@@ -207,6 +209,23 @@ op_mapping = {
     'D': 'd',
     'U': 'u',
 }
+
+# the first two arguments are provided by functools.partial, the rest are row values
+# the first three values are taken as scn, op and rowid, in order
+
+
+def changes_rowfactory(table_name, cols, scn, op, rowid, *args):
+    obj = dict(zip(cols[3:], args))
+    obj['_meta'] = {
+        'op': op_mapping[op],
+        'source': {
+            'table': table_name,
+            'scn': scn,
+            'row_id': rowid,
+        }
+    }
+
+    return obj
 
 
 async def fetch_changes(
@@ -243,29 +262,11 @@ async def fetch_changes(
                 c.prefetchrows = CHECKPOINT_EVERY + 1
                 await c.execute(query)
                 cols = [col[0] for col in c.description]
-                c.rowfactory = lambda *args: dict(zip(cols, args))
+                c.rowfactory = functools.partial(changes_rowfactory, table.table_name, cols)
 
                 async for row in c:
-                    scn = row[scn_column_name]
-                    op = row[op_column_name]
-                    row_id = row[rowid_column_name]
-
-                    doc = {
-                        '_meta': {
-                            'op': op_mapping[op],
-                            'source': {
-                                'scn': scn,
-                                'row_id': row_id,
-                                'table': table.table_name,
-                            }
-                        }
-                    }
-                    for (k, v) in row.items():
-                        if k in (scn_column_name, op_column_name, rowid_column_name):
-                            continue
-                        doc[k] = v
-
-                    yield doc
+                    scn = row['_meta']['source']['scn']
+                    yield row
 
                     # The query to fetch incremental changes uses "VERSIONS BETWEEN X and Y" where
                     # BETWEEN is an inclusive operator. So once we have processed all items of one SCN,
