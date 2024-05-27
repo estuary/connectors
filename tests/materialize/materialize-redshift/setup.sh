@@ -66,14 +66,20 @@ resources_json_template='[
       "table": "long_string"
     },
     "source": "${TEST_COLLECTION_LONG_STRING}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
 export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
 export REDSHIFT_ADDRESS="$(echo $CONNECTOR_CONFIG | jq -r .address)"
 export REDSHIFT_USER="$(echo $CONNECTOR_CONFIG | jq -r .user)"
-export REDSHIFT_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .user)"
-export REDSHIFT_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .password)"
+export REDSHIFT_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .password)"
+export REDSHIFT_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
 export REDSHIFT_BUCKET="$(echo $CONNECTOR_CONFIG | jq -r .bucket)"
 export AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | jq -r .awsAccessKeyId)"
 export AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | jq -r .awsSecretAccessKey)"

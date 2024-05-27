@@ -166,7 +166,9 @@ type templates struct {
 	createTargetTable *template.Template
 	createLoadTable   *template.Template
 	createStoreTable  *template.Template
+	createDeleteTable *template.Template
 	mergeInto         *template.Template
+	deleteQuery       *template.Template
 	loadQuery         *template.Template
 	updateFence       *template.Template
 	copyFromS3        *template.Template
@@ -176,6 +178,10 @@ func renderTemplates(dialect sql.Dialect) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_name" -}}
 flow_temp_table_{{ $.Binding }}
+{{- end }}
+
+{{ define "temp_name_deleted" -}}
+{{ template "temp_name" $ }}_deleted
 {{- end }}
 
 -- Templated creation of a materialized table definition and comments.
@@ -219,6 +225,15 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 );
 {{ end }}
 
+{{ define "createDeleteTable" }}
+CREATE TEMPORARY TABLE {{ template "temp_name_deleted" . }} (
+{{- range $ind, $key := $.Keys }}
+	{{- if $ind }},{{ end }}
+  {{ $key.Identifier }} {{ $key.DDL }}
+{{- end }}
+);
+{{ end }}
+
 -- Templated query which updates an existing row in the target table. Redshift does not support
 -- "WHEN MATCHED AND", so if/when deletion is implemented using a NULL document, a separate delete
 -- statement will be needed in addition to this merge statement.
@@ -251,6 +266,17 @@ WHEN NOT MATCHED THEN
 		r.{{$col.Identifier}}
 	{{- end -}}
 	);
+{{ end }}
+
+{{ define "deleteQuery" }}
+{{ if $.Document -}}
+DELETE FROM {{ $.Identifier }}
+USING {{ template "temp_name_deleted" . }} AS r
+WHERE {{ range $ind, $key := $.Keys }}
+{{- if $ind }} AND {{end -}}
+	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
+{{- end }}
+{{- end }}
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -309,7 +335,9 @@ TRUNCATECOLUMNS;
 		createTargetTable: tplAll.Lookup("createTargetTable"),
 		createLoadTable:   tplAll.Lookup("createLoadTable"),
 		createStoreTable:  tplAll.Lookup("createStoreTable"),
+		createDeleteTable: tplAll.Lookup("createDeleteTable"),
 		mergeInto:         tplAll.Lookup("mergeInto"),
+		deleteQuery:       tplAll.Lookup("deleteQuery"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		updateFence:       tplAll.Lookup("updateFence"),
 		copyFromS3:        tplAll.Lookup("copyFromS3"),
