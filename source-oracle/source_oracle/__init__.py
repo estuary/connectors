@@ -41,7 +41,7 @@ class Connector(
 
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
-            documentationUrl="https://go.estuary.dev/source-oracle-batch",
+            documentationUrl="https://go.estuary.dev/source-oracle",
             configSchema=EndpointConfig.model_json_schema(),
             oauth2=None,
             resourceConfigSchema=ResourceConfig.model_json_schema(),
