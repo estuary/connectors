@@ -6,6 +6,7 @@ bucket: whb-test-bucket
 awsAccessKeyId_sops: ENC[AES256_GCM,data:fpQsSRCDHvrxLrJLbgKIjVlrtkM=,iv:pYCjsTwvJLu7rpyg08Cwvlic67D71tDskdfMqTbiwIQ=,tag:Ya//jGdoRwwbNMFj6+ugNw==,type:str]
 awsSecretAccessKey_sops: ENC[AES256_GCM,data:YOLNeE2ORrCU0RUgH6paGfGVDraBtOntAleheKtNxgLXB7pKQ58guA==,iv:eRDh8flWsN0lTle5igWfDAC0d5xhc+ErZT95EkHa+AU=,tag:1jxYF2PW2IYzfJFzqeolew==,type:str]
 region: us-east-2
+hardDelete: true
 advanced:
     updateDelay: 0s
 sops:
@@ -17,8 +18,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-05-13T17:01:59Z"
-    mac: ENC[AES256_GCM,data:LgR/XuEabjjEXf+fmel52Yb+P5EsxATiri5D1MRr8xQtemRPdlo5FZHZp1fQLS4k9uxtOLw7IpNxWRDhu9IWOQeWq+m8eCgsmT5UJx5Dtle71St5eyhhpDZAbXJOcE3jzxJ1hrWAH1HJbnpzmr64Ksu9G7nCoforTRHAnn7bv+8=,iv:OsKjbfjespHZmfnr5GV0nLRxdskDQIxPqpUH5wnVNAY=,tag:OlySJEyfn+wmq5PnREv04g==,type:str]
+    lastmodified: "2024-05-27T16:49:17Z"
+    mac: ENC[AES256_GCM,data:7XRtasMrJBPaWEAv0PiK1KbTQYSSzimGMQh1NztlQXOqoIuwTbkkiuvNzZe61/K6lsIradKOYEjXwxcHZ8ZC5EXYcuzLPUYQaqOyp6wj4ERv2kZj2pTonhR0iwzu+46JSUMj0CeiWsFaiPRehWcEyvlnJq9GdQrH/qDx8dKebTI=,iv:CA7fSQ65ofxoyv1hDoKYClHLDqNbdSlK2xtWR8vmxd0=,tag:XhGXllK/0Rj23hFkWBQoUw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

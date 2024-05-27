@@ -82,6 +82,29 @@ SELECT 0, r.flow_document
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 --- End "Delta Updates" loadQuery ---
 
+--- Begin "a-schema".target_table createDeleteTable ---
+CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
+  key1 BIGINT,
+  "key!2" BOOLEAN
+);
+--- End "a-schema".target_table createDeleteTable ---
+
+--- Begin "Delta Updates" createDeleteTable ---
+CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
+  "theKey" TEXT
+);
+--- End "Delta Updates" createDeleteTable ---
+
+--- Begin "a-schema".target_table deleteQuery ---
+DELETE FROM "a-schema".target_table
+USING flow_temp_table_0_deleted AS r
+WHERE "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table."key!2" = r."key!2"
+--- End "a-schema".target_table deleteQuery ---
+
+--- Begin "Delta Updates" deleteQuery ---
+
+--- End "Delta Updates" deleteQuery ---
+
 --- Begin "a-schema".target_table createLoadTable (no varchar length) ---
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
