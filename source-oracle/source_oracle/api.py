@@ -13,7 +13,6 @@ from copy import deepcopy
 import oracledb
 import inspect
 from jinja2 import Template, Environment, DictLoader
-import orjson
 
 from estuary_cdk.capture.common import (
     PageCursor,
@@ -75,9 +74,9 @@ async def fetch_tables(
             query = f"SELECT {sql_columns} FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')"  # noqa
             tables = []
             await c.execute(query)
-            async for values in c:
-                cols = [col[0] for col in c.description]
-                row = dict(zip(cols, values))
+            cols = [col[0] for col in c.description]
+            c.rowfactory = lambda *args: dict(zip(cols, args))
+            async for row in c:
                 tables.append(
                     OracleTable(**row)
                 )
@@ -110,9 +109,9 @@ async def fetch_columns(
 
             columns = []
             await c.execute(query)
-            async for values in c:
-                cols = [col[0] for col in c.description]
-                row = dict(zip(cols, values))
+            cols = [col[0] for col in c.description]
+            c.rowfactory = lambda *args: dict(zip(cols, args))
+            async for row in c:
                 row = {k: v for (k, v) in row.items() if v is not None}
                 columns.append(OracleColumn(**row))
 
@@ -171,11 +170,10 @@ async def fetch_page(
                     c.arraysize = backfill_chunk_size
                     c.prefetchrows = backfill_chunk_size + 1
                     await c.execute(query, rownum_end=backfill_chunk_size)
+                    cols = [col[0] for col in c.description]
+                    c.rowfactory = lambda *args: dict(zip(cols, args))
 
-                    async for values in c:
-                        cols = [col[0] for col in c.description]
-                        row = dict(zip(cols, values))
-                        row = {k: v for (k, v) in row.items() if v is not None}
+                    async for row in c:
                         last_rowid = row[rowid_column_name]
 
                         doc = {
@@ -235,12 +233,10 @@ async def fetch_changes(
                 c.arraysize = CHECKPOINT_EVERY
                 c.prefetchrows = CHECKPOINT_EVERY + 1
                 await c.execute(query)
+                cols = [col[0] for col in c.description]
+                c.rowfactory = lambda *args: dict(zip(cols, args))
 
-                async for values in c:
-                    cols = [col[0] for col in c.description]
-                    row = dict(zip(cols, values))
-                    row = {k: v for (k, v) in row.items() if v is not None}
-
+                async for row in c:
                     scn = row[scn_column_name]
                     op = row[op_column_name]
                     row_id = row[rowid_column_name]
