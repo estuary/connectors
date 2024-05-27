@@ -62,7 +62,7 @@ class EndpointConfig(BaseModel):
         )
 
         default_interval: timedelta = Field(
-            default=timedelta(minutes=1), description="Default interval between updates for all resources. Can be overwritten by each resource."
+            default=timedelta(minutes=5), description="Default interval between updates for all resources. Can be overwritten by each resource."
         )
 
         backfill_chunk_size: int = Field(
