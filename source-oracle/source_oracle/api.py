@@ -222,6 +222,15 @@ async def fetch_changes(
         query = template_env.get_template("inc").render(table=table, cursor=scn)
         log.debug("fetch_changes", query, scn)
 
+        current_scn = None
+        # if the task has found no events, we update the cursor
+        # to the latest current_scn value to avoid falling behind. The SCN has a timestamp
+        # component which can progress even if no transactions have happened
+        async with pool.acquire() as conn:
+            with conn.cursor() as c:
+                await c.execute("SELECT current_scn FROM V$DATABASE")
+                current_scn = (await c.fetchone())[0]
+
         # We may receive many documents from the same transaction, as such we need to only emit the checkpoint
         # for a transaction at the end, when all documents of that transaction have been emitted
         # so we have to keep track of the first two transaction SCNs we have to check whether we have all the documents
@@ -276,17 +285,10 @@ async def fetch_changes(
         elif current_transaction is not None and current_transaction > scn:
             yield current_transaction + 1
         elif first_transaction is None and current_transaction is None:
-            # if the task has found no events, we update the cursor
-            # to the latest current_scn value to avoid falling behind. The SCN has a timestamp
-            # component which can progress even if no transactions have happened
             # over a long enough time with no events, the scn we hold will expire and be no longer
             # valid, hence this logic to catch up if there are no events
-            async with pool.acquire() as conn:
-                with conn.cursor() as c:
-                    await c.execute("SELECT current_scn FROM V$DATABASE")
-                    current_scn = (await c.fetchone())[0]
-                    if current_scn > scn:
-                        yield current_scn
+            if current_scn > scn:
+                yield current_scn
 
 
 # datetime and some other data types must be cast to string
