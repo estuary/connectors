@@ -24,8 +24,8 @@ const (
 type resource struct {
 	Path              string       `json:"path" jsonschema:"title=Path to Collection,description=Supports parent/*/nested to capture all nested collections of parent's children"`
 	BackfillMode      backfillMode `json:"backfillMode" jsonschema:"title=Backfill Mode,description=Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async'. Has no effect if changed after a binding is added.,enum=async,enum=none,enum=sync"`
-	InitTimestamp     string       `json:"initTimestamp,omitempty" jsonschema:"Initial Replication Timestamp,description=Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."`
-	RestartCursorPath string       `json:"restartCursorPath,omitempty" jsonschema:"Restart Cursor Property,description=Optionally specifies a JSON pointer to some document property which increases monotonically and can be used as a restart cursor to optimize backfill behavior when streaming consistency is lost. Generally this only matters for collections with very high write volumes.,pattern=^(/([^/~]|~[01])+)*$"`
+	InitTimestamp     string       `json:"initTimestamp,omitempty" jsonschema:"title=Initial Replication Timestamp,description=Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."`
+	RestartCursorPath string       `json:"restartCursorPath,omitempty" jsonschema:"title=Restart Cursor Path,description=Optionally specifies a JSON pointer to some document property which increases monotonically and can be used as a restart cursor to optimize backfill behavior when streaming consistency is lost. Generally this only matters for collections with very high write volumes.,pattern=^(/([^/~]|~[01])+)*$"`
 }
 
 var jsonPointerRegexp = regexp.MustCompile(`^(/([^/~]|~[01])+)*$`)
