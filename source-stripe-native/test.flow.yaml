@@ -81,6 +81,9 @@ captures:
           name: Transfers
         target: acmeCo/Transfers
       - resource:
+          name: SubscriptionItems
+        target: acmeCo/SubscriptionItems
+      - resource:
           name: Files
         target: acmeCo/Files
       - resource:
@@ -131,8 +134,5 @@ captures:
       - resource:
           name: UsageRecords
         target: acmeCo/UsageRecords
-      - resource:
-          name: SubscriptionItems
-        target: acmeCo/SubscriptionItems
     shards:
       logLevel: debug

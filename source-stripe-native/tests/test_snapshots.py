@@ -9,12 +9,28 @@ def test_capture(request, snapshot):
             "preview",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
+            "--sessions",
+            "1",
+            "--delay",
+            "120s",
         ],
         stdout=subprocess.PIPE,
         text=True,
     )
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
+
+    for l in lines:
+        typ, rec = l[0], l[1]
+
+        if typ == "acmeCo/Charges":
+            rec["receipt_url"] = "redacted"
+        elif typ == "acmeCo/Invoices":
+            rec["hosted_invoice_url"] = "redacted"
+            rec["invoice_pdf"] = "redacted"
+        elif typ == "acmeCo/CreditNotes":
+            rec["pdf"] = "redacted"
+            
 
     assert snapshot("stdout.json") == lines
 
