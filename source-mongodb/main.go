@@ -110,7 +110,13 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// a more helpful error message in the event that someone tries to use the
 	// online-archive url instead of the regular mongodb url.
 	if strings.Contains(cfg.Address, "atlas-online-archive") {
-		return nil, fmt.Errorf("The provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
+	// Similarly, MongoDB "Atlas SQL" does not support change streams, so our
+	// connector doesn't work with that either.
+	if strings.HasPrefix(cfg.Address, "mongodb://atlas-sql") {
+		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas SQL Interface', which is not supported by this connector. Please use the regular cluster URL instead")
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
