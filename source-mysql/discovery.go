@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -86,21 +87,38 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 		if !ok || info.PrimaryKey != nil {
 			continue
 		}
+
+		// Make a list of all usable indexes.
 		logrus.WithFields(logrus.Fields{
 			"table":   streamID,
 			"indices": len(indexColumns),
-		}).Debug("checking for suitable secondary index")
+		}).Debug("checking for suitable secondary indexes")
+		var suitableIndexes []string
 		for indexName, columns := range indexColumns {
-			// Test that all columns of the index are non-nullable.
 			if columnsNonNullable(info.Columns, columns) {
 				logrus.WithFields(logrus.Fields{
 					"table":   streamID,
 					"index":   indexName,
 					"columns": columns,
-				}).Debug("selected unique secondary index as table key")
-				info.PrimaryKey = columns
-				break
+				}).Debug("secondary index could be used as primary key")
+				suitableIndexes = append(suitableIndexes, indexName)
 			}
+		}
+
+		// Sort the list by index name and pick the first one, if there are multiple.
+		// This helps ensure stable selection, although it could still change due to
+		// the creation of a new secondary index.
+		sort.Strings(suitableIndexes)
+		if len(suitableIndexes) > 0 {
+			var selectedIndex = suitableIndexes[0]
+			logrus.WithFields(logrus.Fields{
+				"table":   streamID,
+				"index":   selectedIndex,
+				"columns": columns,
+			}).Debug("selected secondary index as table key")
+			info.PrimaryKey = indexColumns[selectedIndex]
+		} else {
+			logrus.WithField("table", streamID).Debug("no secondary index is suitable")
 		}
 	}
 
