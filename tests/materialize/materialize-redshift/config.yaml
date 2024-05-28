@@ -1,4 +1,4 @@
-address: whb-test.ctlewyr8p8yg.us-east-2.redshift.amazonaws.com:5439
+address: integration-test.789740162118.us-east-2.redshift-serverless.amazonaws.com:5439
 database: dev
 password_sops: ENC[AES256_GCM,data:kcluRuHji9ckwA==,iv:SRE4ZtcVSFOPHikXJhXEFF5xXcMa7kTbPUCqmgBqbQ0=,tag:mjqomw4ihdngh9yzvIKTkg==,type:str]
 user: estuary
@@ -18,8 +18,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-05-27T16:49:17Z"
-    mac: ENC[AES256_GCM,data:7XRtasMrJBPaWEAv0PiK1KbTQYSSzimGMQh1NztlQXOqoIuwTbkkiuvNzZe61/K6lsIradKOYEjXwxcHZ8ZC5EXYcuzLPUYQaqOyp6wj4ERv2kZj2pTonhR0iwzu+46JSUMj0CeiWsFaiPRehWcEyvlnJq9GdQrH/qDx8dKebTI=,iv:CA7fSQ65ofxoyv1hDoKYClHLDqNbdSlK2xtWR8vmxd0=,tag:XhGXllK/0Rj23hFkWBQoUw==,type:str]
+    lastmodified: "2024-05-28T18:17:44Z"
+    mac: ENC[AES256_GCM,data:ho7jlfNt2CgxZumG8ruMpz/sMVwQxVMYGpAm9qOzygUUJmNUJwMDZNCTR1AmCkwUcaHDtLYvSyxjtFvZsArIJgGkNLhgUHV0A4XwwrTeB4nI6gXcZTzol6xleIxQ5xBNJuIxFHCVs15XV66ykHsFAAbpnM59MqWkzeL/StndYGg=,iv:HbXH/hGcKZ5eKjh+WbJ7Bc0Ro+VShyD+IJw35am1/yo=,tag:NDeyqqCsVDZJI987OY09GQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
