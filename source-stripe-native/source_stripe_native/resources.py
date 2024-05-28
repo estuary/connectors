@@ -225,8 +225,8 @@ def usage_records(
     cls, child_cls, http: HTTPSession, stop_date: datetime
 ) -> Resource:
     """ Usage Records handles a specific stream (UsageRecords).
-    This is required since Usage Records is a child stream from a child stream.
-    It requires the parent stream, child stream and second child stream.
+    This is required since Usage Records is a child stream from SubscriptionItem
+    and requires special processing.
     """
 
     def open(
