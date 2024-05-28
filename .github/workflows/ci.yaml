@@ -269,7 +269,8 @@ jobs:
               "materialize-mongodb",
               "materialize-snowflake",
               "materialize-databricks",
-              "materialize-bigquery"
+              "materialize-bigquery",
+              "materialize-redshift"
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
