@@ -106,9 +106,8 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sq
 		if len(suitableIndexes) > 0 {
 			var selectedIndex = suitableIndexes[0]
 			log.WithFields(log.Fields{
-				"table":   streamID,
-				"index":   selectedIndex,
-				"columns": columns,
+				"table": streamID,
+				"index": selectedIndex,
 			}).Debug("selected secondary index as table key")
 			info.PrimaryKey = indexColumns[selectedIndex]
 		} else {

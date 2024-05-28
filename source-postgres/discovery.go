@@ -138,9 +138,8 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 		if len(suitableIndexes) > 0 {
 			var selectedIndex = suitableIndexes[0]
 			logrus.WithFields(logrus.Fields{
-				"table":   streamID,
-				"index":   selectedIndex,
-				"columns": columns,
+				"table": streamID,
+				"index": selectedIndex,
 			}).Debug("selected secondary index as table key")
 			info.PrimaryKey = indexColumns[selectedIndex]
 		} else {
