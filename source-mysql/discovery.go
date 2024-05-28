@@ -86,20 +86,20 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 		if !ok || info.PrimaryKey != nil {
 			continue
 		}
-		for _, columns := range indexColumns {
-			// Test that for each column the value is non-nullable
+		logrus.WithFields(logrus.Fields{
+			"table":   streamID,
+			"indices": len(indexColumns),
+		}).Debug("checking for suitable secondary index")
+		for indexName, columns := range indexColumns {
+			// Test that all columns of the index are non-nullable.
 			if columnsNonNullable(info.Columns, columns) {
 				logrus.WithFields(logrus.Fields{
-					"table": streamID,
-					"index": columns,
-				}).Trace("using unique secondary index as primary key")
+					"table":   streamID,
+					"index":   indexName,
+					"columns": columns,
+				}).Debug("selected unique secondary index as table key")
 				info.PrimaryKey = columns
 				break
-			} else {
-				logrus.WithFields(logrus.Fields{
-					"table": streamID,
-					"index": columns,
-				}).Trace("cannot use secondary index because some of its columns are nullable")
 			}
 		}
 	}
