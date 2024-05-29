@@ -25,7 +25,8 @@ config_json_template='{
    "address":  "$MYSQL_HOST:$MYSQL_PORT",
    "database": "$MYSQL_DATABASE",
    "password": "$MYSQL_PASSWORD",
-   "user":     "$MYSQL_USER"
+   "user":     "$MYSQL_USER",
+   "hardDelete": true
 }'
 
 resources_json_template='[
@@ -95,6 +96,12 @@ resources_json_template='[
       "table": "unsigned_bigint"
     },
     "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
