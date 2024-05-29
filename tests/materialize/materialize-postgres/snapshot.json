@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE IF NOT EXISTS \"public\".flow_materializations_v2 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tversion TEXT NOT NULL,\n\t\tspec TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\n\nCOMMENT ON TABLE \"public\".flow_materializations_v2 IS 'This table is the source of truth for all materializations into this system.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.version IS 'Version of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.spec IS 'Specification of the materialization, encoded as base64 protobuf.';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".flow_checkpoints_v1 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\tcheckpoint TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\nCOMMENT ON TABLE \"public\".flow_checkpoints_v1 IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".\"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary TEXT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".\"Simple\" IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/simple';\nCOMMENT ON COLUMN \"public\".\"Simple\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".\"Simple\".canary IS 'auto-generated projection of JSON at: /canary with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Simple\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Simple\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr TEXT NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".duplicate_keys_standard IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.\"int\" IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr TEXT NOT NULL,\n\t\tflow_document JSON NOT NULL\n);\n\nCOMMENT ON TABLE \"public\".duplicate_keys_delta IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.\"int\" IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr TEXT NOT NULL\n);\n\nCOMMENT ON TABLE \"public\".duplicate_keys_delta_exclude_flow_doc IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.\"int\" IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".\"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field TEXT,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int BIGINT,\n\t\tstr_field TEXT NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".\"Multiple Types\" IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/multiple-data-types';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".array_int IS 'auto-generated projection of JSON at: /array_int with inferred types: [array]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".binary_field IS 'auto-generated projection of JSON at: /binary_field with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".bool_field IS 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".float_field IS 'auto-generated projection of JSON at: /float_field with inferred types: [number]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".nested IS 'auto-generated projection of JSON at: /nested with inferred types: [object]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".nullable_int IS 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".\"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime TIMESTAMPTZ,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tint_and_str NUMERIC,\n\t\tint_str NUMERIC,\n\t\tnum_and_str DECIMAL,\n\t\tnum_str DECIMAL,\n\t\t\"time\" TIME,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".\"Formatted Strings\" IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/formatted-strings';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".\"date\" IS 'auto-generated projection of JSON at: /date with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".datetime IS 'auto-generated projection of JSON at: /datetime with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".int_and_str IS 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".int_str IS 'auto-generated projection of JSON at: /int_str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".num_and_str IS 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".num_str IS 'auto-generated projection of JSON at: /num_str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".\"time\" IS 'auto-generated projection of JSON at: /time with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\nINSERT INTO \"public\".flow_materializations_v2 (version, spec, materialization) VALUES ('localbuild', '(a-base64-encoded-value)', 'tests/materialize-postgres/materialize');"
+  "\nCREATE TABLE IF NOT EXISTS \"public\".flow_materializations_v2 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tversion TEXT NOT NULL,\n\t\tspec TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\n\nCOMMENT ON TABLE \"public\".flow_materializations_v2 IS 'This table is the source of truth for all materializations into this system.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.version IS 'Version of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.spec IS 'Specification of the materialization, encoded as base64 protobuf.';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".flow_checkpoints_v1 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\tcheckpoint TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\nCOMMENT ON TABLE \"public\".flow_checkpoints_v1 IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".\"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary TEXT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".\"Simple\" IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/simple';\nCOMMENT ON COLUMN \"public\".\"Simple\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".\"Simple\".canary IS 'auto-generated projection of JSON at: /canary with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Simple\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Simple\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr TEXT NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".duplicate_keys_standard IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.\"int\" IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_standard.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr TEXT NOT NULL,\n\t\tflow_document JSON NOT NULL\n);\n\nCOMMENT ON TABLE \"public\".duplicate_keys_delta IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.\"int\" IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr TEXT NOT NULL\n);\n\nCOMMENT ON TABLE \"public\".duplicate_keys_delta_exclude_flow_doc IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.\"int\" IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".duplicate_keys_delta_exclude_flow_doc.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".\"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field TEXT,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int BIGINT,\n\t\tstr_field TEXT NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".\"Multiple Types\" IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/multiple-data-types';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".array_int IS 'auto-generated projection of JSON at: /array_int with inferred types: [array]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".binary_field IS 'auto-generated projection of JSON at: /binary_field with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".bool_field IS 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".float_field IS 'auto-generated projection of JSON at: /float_field with inferred types: [number]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".nested IS 'auto-generated projection of JSON at: /nested with inferred types: [object]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".nullable_int IS 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Multiple Types\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".\"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime TIMESTAMPTZ,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tint_and_str NUMERIC,\n\t\tint_str NUMERIC,\n\t\tnum_and_str DECIMAL,\n\t\tnum_str DECIMAL,\n\t\t\"time\" TIME,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".\"Formatted Strings\" IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/formatted-strings';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".\"date\" IS 'auto-generated projection of JSON at: /date with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".datetime IS 'auto-generated projection of JSON at: /datetime with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".int_and_str IS 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".int_str IS 'auto-generated projection of JSON at: /int_str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".num_and_str IS 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".num_str IS 'auto-generated projection of JSON at: /num_str with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".\"time\" IS 'auto-generated projection of JSON at: /time with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".\"Formatted Strings\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".deletions (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at TIMESTAMPTZ NOT NULL,\n\t\tflow_document JSON NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\n\nCOMMENT ON TABLE \"public\".deletions IS 'Generated for materialization tests/materialize-postgres/materialize of collection tests/deletions';\nCOMMENT ON COLUMN \"public\".deletions.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN \"public\".deletions.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN \"public\".deletions.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\nINSERT INTO \"public\".flow_materializations_v2 (version, spec, materialization) VALUES ('localbuild', '(a-base64-encoded-value)', 'tests/materialize-postgres/materialize');"
 ]
 [
   "connectorState",
@@ -17,627 +17,502 @@
   }
 ]
 {
-  "row": {
-    "canary": "amputation's",
-    "flow_published_at": "1970-01-01T00:00:00+00:00",
-    "id": 1
-  },
+  "rows": [
+    {
+      "canary": "amputation's",
+      "flow_published_at": "1970-01-01T00:00:00+00:00",
+      "id": 1
+    },
+    {
+      "canary": "armament's",
+      "flow_published_at": "1970-01-01T00:00:01+00:00",
+      "id": 2
+    },
+    {
+      "canary": "splatters",
+      "flow_published_at": "1970-01-01T00:00:02+00:00",
+      "id": 3
+    },
+    {
+      "canary": "strengthen",
+      "flow_published_at": "1970-01-01T00:00:03+00:00",
+      "id": 4
+    },
+    {
+      "canary": "Kringle's",
+      "flow_published_at": "1970-01-01T00:00:04+00:00",
+      "id": 5
+    },
+    {
+      "canary": "grosbeak's",
+      "flow_published_at": "1970-01-01T00:00:05+00:00",
+      "id": 6
+    },
+    {
+      "canary": "pieced",
+      "flow_published_at": "1970-01-01T01:00:00+00:00",
+      "id": 7
+    },
+    {
+      "canary": "roaches",
+      "flow_published_at": "1970-01-01T01:00:01+00:00",
+      "id": 8
+    },
+    {
+      "canary": "devilish",
+      "flow_published_at": "1970-01-01T01:00:02+00:00",
+      "id": 9
+    },
+    {
+      "canary": "glucose's",
+      "flow_published_at": "1970-01-01T01:00:03+00:00",
+      "id": 10
+    }
+  ],
   "table": "Simple"
 }
 {
-  "row": {
-    "canary": "armament's",
-    "flow_published_at": "1970-01-01T00:00:01+00:00",
-    "id": 2
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "splatters",
-    "flow_published_at": "1970-01-01T00:00:02+00:00",
-    "id": 3
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "strengthen",
-    "flow_published_at": "1970-01-01T00:00:03+00:00",
-    "id": 4
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "Kringle's",
-    "flow_published_at": "1970-01-01T00:00:04+00:00",
-    "id": 5
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "grosbeak's",
-    "flow_published_at": "1970-01-01T00:00:05+00:00",
-    "id": 6
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "pieced",
-    "flow_published_at": "1970-01-01T01:00:00+00:00",
-    "id": 7
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "roaches",
-    "flow_published_at": "1970-01-01T01:00:01+00:00",
-    "id": 8
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "devilish",
-    "flow_published_at": "1970-01-01T01:00:02+00:00",
-    "id": 9
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "canary": "glucose's",
-    "flow_published_at": "1970-01-01T01:00:03+00:00",
-    "id": 10
-  },
-  "table": "Simple"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:04+00:00",
-    "id": 1,
-    "int": 7,
-    "str": "str 6"
-  },
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01T01:00:04+00:00",
+      "id": 1,
+      "int": 7,
+      "str": "str 6"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:05+00:00",
+      "id": 2,
+      "int": 9,
+      "str": "str 7"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:06+00:00",
+      "id": 3,
+      "int": 11,
+      "str": "str 8"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:07+00:00",
+      "id": 4,
+      "int": 13,
+      "str": "str 9"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:08+00:00",
+      "id": 5,
+      "int": 15,
+      "str": "str 10"
+    }
+  ],
   "table": "duplicate_keys_standard"
 }
 {
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:05+00:00",
-    "id": 2,
-    "int": 9,
-    "str": "str 7"
-  },
-  "table": "duplicate_keys_standard"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:06+00:00",
-    "id": 3,
-    "int": 11,
-    "str": "str 8"
-  },
-  "table": "duplicate_keys_standard"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:07+00:00",
-    "id": 4,
-    "int": 13,
-    "str": "str 9"
-  },
-  "table": "duplicate_keys_standard"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:08+00:00",
-    "id": 5,
-    "int": 15,
-    "str": "str 10"
-  },
-  "table": "duplicate_keys_standard"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:06+00:00",
-    "id": 1,
-    "int": 1,
-    "str": "str 1"
-  },
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01T00:00:06+00:00",
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:07+00:00",
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:08+00:00",
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:09+00:00",
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:10+00:00",
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:04+00:00",
+      "id": 1,
+      "int": 6,
+      "str": "str 6"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:05+00:00",
+      "id": 2,
+      "int": 7,
+      "str": "str 7"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:06+00:00",
+      "id": 3,
+      "int": 8,
+      "str": "str 8"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:07+00:00",
+      "id": 4,
+      "int": 9,
+      "str": "str 9"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:08+00:00",
+      "id": 5,
+      "int": 10,
+      "str": "str 10"
+    }
+  ],
   "table": "duplicate_keys_delta"
 }
 {
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:07+00:00",
-    "id": 2,
-    "int": 2,
-    "str": "str 2"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:08+00:00",
-    "id": 3,
-    "int": 3,
-    "str": "str 3"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:09+00:00",
-    "id": 4,
-    "int": 4,
-    "str": "str 4"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:10+00:00",
-    "id": 5,
-    "int": 5,
-    "str": "str 5"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:04+00:00",
-    "id": 1,
-    "int": 6,
-    "str": "str 6"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:05+00:00",
-    "id": 2,
-    "int": 7,
-    "str": "str 7"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:06+00:00",
-    "id": 3,
-    "int": 8,
-    "str": "str 8"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:07+00:00",
-    "id": 4,
-    "int": 9,
-    "str": "str 9"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:08+00:00",
-    "id": 5,
-    "int": 10,
-    "str": "str 10"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:06+00:00",
-    "id": 1,
-    "int": 1,
-    "str": "str 1"
-  },
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01T00:00:06+00:00",
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:07+00:00",
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:08+00:00",
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:09+00:00",
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    },
+    {
+      "flow_published_at": "1970-01-01T00:00:10+00:00",
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:04+00:00",
+      "id": 1,
+      "int": 6,
+      "str": "str 6"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:05+00:00",
+      "id": 2,
+      "int": 7,
+      "str": "str 7"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:06+00:00",
+      "id": 3,
+      "int": 8,
+      "str": "str 8"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:07+00:00",
+      "id": 4,
+      "int": 9,
+      "str": "str 9"
+    },
+    {
+      "flow_published_at": "1970-01-01T01:00:08+00:00",
+      "id": 5,
+      "int": 10,
+      "str": "str 10"
+    }
+  ],
   "table": "duplicate_keys_delta_exclude_flow_doc"
 }
 {
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:07+00:00",
-    "id": 2,
-    "int": 2,
-    "str": "str 2"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:08+00:00",
-    "id": 3,
-    "int": 3,
-    "str": "str 3"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:09+00:00",
-    "id": 4,
-    "int": 4,
-    "str": "str 4"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T00:00:10+00:00",
-    "id": 5,
-    "int": 5,
-    "str": "str 5"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:04+00:00",
-    "id": 1,
-    "int": 6,
-    "str": "str 6"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:05+00:00",
-    "id": 2,
-    "int": 7,
-    "str": "str 7"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:06+00:00",
-    "id": 3,
-    "int": 8,
-    "str": "str 8"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:07+00:00",
-    "id": 4,
-    "int": 9,
-    "str": "str 9"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "flow_published_at": "1970-01-01T01:00:08+00:00",
-    "id": 5,
-    "int": 10,
-    "str": "str 10"
-  },
-  "table": "duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "array_int": [
-      11,
-      12
-    ],
-    "binary_field": null,
-    "bool_field": false,
-    "float_field": 1.1,
-    "flow_published_at": "1970-01-01T00:00:13+00:00",
-    "id": 1,
-    "multiple": 1,
-    "nested": {
-      "id": "i1"
+  "rows": [
+    {
+      "array_int": [
+        11,
+        12
+      ],
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 1.1,
+      "flow_published_at": "1970-01-01T00:00:13+00:00",
+      "id": 1,
+      "multiple": 1,
+      "nested": {
+        "id": "i1"
+      },
+      "nullable_int": null,
+      "str_field": "str1"
     },
-    "nullable_int": null,
-    "str_field": "str1"
-  },
+    {
+      "array_int": [
+        21,
+        22
+      ],
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 2.2,
+      "flow_published_at": "1970-01-01T00:00:14+00:00",
+      "id": 2,
+      "multiple": 2.2,
+      "nested": {
+        "id": "i2"
+      },
+      "nullable_int": 2,
+      "str_field": "str2"
+    },
+    {
+      "array_int": [
+        31,
+        32
+      ],
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 3.3,
+      "flow_published_at": "1970-01-01T00:00:15+00:00",
+      "id": 3,
+      "multiple": true,
+      "nested": {
+        "id": "i3"
+      },
+      "nullable_int": null,
+      "str_field": "str3"
+    },
+    {
+      "array_int": [
+        41,
+        42
+      ],
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 4.4,
+      "flow_published_at": "1970-01-01T00:00:16+00:00",
+      "id": 4,
+      "multiple": false,
+      "nested": {
+        "id": "i4"
+      },
+      "nullable_int": 4,
+      "str_field": "str4"
+    },
+    {
+      "array_int": [
+        51,
+        52
+      ],
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 5.5,
+      "flow_published_at": "1970-01-01T00:00:17+00:00",
+      "id": 5,
+      "multiple": "string five",
+      "nested": {
+        "id": "i5"
+      },
+      "nullable_int": null,
+      "str_field": "str5"
+    },
+    {
+      "array_int": [
+        61,
+        62
+      ],
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 66.66,
+      "flow_published_at": "1970-01-01T01:00:19+00:00",
+      "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
+      "nested": {
+        "id": "i6"
+      },
+      "nullable_int": 6,
+      "str_field": "str6 v2"
+    },
+    {
+      "array_int": [
+        71,
+        72
+      ],
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 77.77,
+      "flow_published_at": "1970-01-01T01:00:20+00:00",
+      "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
+      "nested": {
+        "id": "i7"
+      },
+      "nullable_int": null,
+      "str_field": "str7 v2"
+    },
+    {
+      "array_int": [
+        81,
+        82
+      ],
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 88.88,
+      "flow_published_at": "1970-01-01T01:00:21+00:00",
+      "id": 8,
+      "multiple": null,
+      "nested": {
+        "id": "i8"
+      },
+      "nullable_int": 8,
+      "str_field": "str8 v2"
+    },
+    {
+      "array_int": [
+        91,
+        92
+      ],
+      "binary_field": "YWxvaGEK",
+      "bool_field": false,
+      "float_field": 99.99,
+      "flow_published_at": "1970-01-01T01:00:22+00:00",
+      "id": 9,
+      "multiple": null,
+      "nested": {
+        "id": "i9"
+      },
+      "nullable_int": null,
+      "str_field": "str9 v2"
+    },
+    {
+      "array_int": [
+        1,
+        2
+      ],
+      "binary_field": "c2F5xY1uYXJhCg==",
+      "bool_field": true,
+      "float_field": 1010.101,
+      "flow_published_at": "1970-01-01T01:00:23+00:00",
+      "id": 10,
+      "multiple": null,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10 v2"
+    }
+  ],
   "table": "Multiple Types"
 }
 {
-  "row": {
-    "array_int": [
-      21,
-      22
-    ],
-    "binary_field": null,
-    "bool_field": true,
-    "float_field": 2.2,
-    "flow_published_at": "1970-01-01T00:00:14+00:00",
-    "id": 2,
-    "multiple": 2.2,
-    "nested": {
-      "id": "i2"
+  "rows": [
+    {
+      "date": "1000-03-03",
+      "datetime": "1000-03-03T23:59:38.1+00:00",
+      "flow_published_at": "1970-01-01T00:00:11+00:00",
+      "id": 3,
+      "int_and_str": 3,
+      "int_str": 30,
+      "num_and_str": 3.1,
+      "num_str": 30.1,
+      "time": "23:59:38.1"
     },
-    "nullable_int": 2,
-    "str_field": "str2"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      31,
-      32
-    ],
-    "binary_field": null,
-    "bool_field": false,
-    "float_field": 3.3,
-    "flow_published_at": "1970-01-01T00:00:15+00:00",
-    "id": 3,
-    "multiple": true,
-    "nested": {
-      "id": "i3"
+    {
+      "date": "2023-08-29",
+      "datetime": "2023-08-29T23:59:38+00:00",
+      "flow_published_at": "1970-01-01T00:00:12+00:00",
+      "id": 4,
+      "int_and_str": 4,
+      "int_str": 40,
+      "num_and_str": 4.1,
+      "num_str": 40.1,
+      "time": "23:59:38"
     },
-    "nullable_int": null,
-    "str_field": "str3"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      41,
-      42
-    ],
-    "binary_field": null,
-    "bool_field": true,
-    "float_field": 4.4,
-    "flow_published_at": "1970-01-01T00:00:16+00:00",
-    "id": 4,
-    "multiple": false,
-    "nested": {
-      "id": "i4"
+    {
+      "date": "0001-01-01",
+      "datetime": "0001-01-01T00:00:00+00:00",
+      "flow_published_at": "1970-01-01T01:00:13+00:00",
+      "id": 1,
+      "int_and_str": 1,
+      "int_str": 10,
+      "num_and_str": 1.1,
+      "num_str": 10.1,
+      "time": "00:00:00"
     },
-    "nullable_int": 4,
-    "str_field": "str4"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      51,
-      52
-    ],
-    "binary_field": null,
-    "bool_field": false,
-    "float_field": 5.5,
-    "flow_published_at": "1970-01-01T00:00:17+00:00",
-    "id": 5,
-    "multiple": "string five",
-    "nested": {
-      "id": "i5"
+    {
+      "date": "1999-02-02",
+      "datetime": "1999-02-02T14:20:12.33+00:00",
+      "flow_published_at": "1970-01-01T01:00:14+00:00",
+      "id": 2,
+      "int_and_str": 2,
+      "int_str": 20,
+      "num_and_str": 2.1,
+      "num_str": 20.1,
+      "time": "14:20:12.33"
     },
-    "nullable_int": null,
-    "str_field": "str5"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      61,
-      62
-    ],
-    "binary_field": null,
-    "bool_field": true,
-    "float_field": 66.66,
-    "flow_published_at": "1970-01-01T01:00:19+00:00",
-    "id": 6,
-    "multiple": [
-      "one",
-      2,
-      true
-    ],
-    "nested": {
-      "id": "i6"
+    {
+      "date": "9999-12-31",
+      "datetime": "9999-12-31T23:59:59+00:00",
+      "flow_published_at": "1970-01-01T01:00:15+00:00",
+      "id": 5,
+      "int_and_str": 5,
+      "int_str": 50,
+      "num_and_str": 5.1,
+      "num_str": 50.1,
+      "time": "23:59:59"
     },
-    "nullable_int": 6,
-    "str_field": "str6 v2"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      71,
-      72
-    ],
-    "binary_field": null,
-    "bool_field": false,
-    "float_field": 77.77,
-    "flow_published_at": "1970-01-01T01:00:20+00:00",
-    "id": 7,
-    "multiple": {
-      "object": "seven"
+    {
+      "date": null,
+      "datetime": null,
+      "flow_published_at": "1970-01-01T01:00:16+00:00",
+      "id": 8,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": "NaN",
+      "time": null
     },
-    "nested": {
-      "id": "i7"
+    {
+      "date": null,
+      "datetime": null,
+      "flow_published_at": "1970-01-01T01:00:17+00:00",
+      "id": 9,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": "Infinity",
+      "time": null
     },
-    "nullable_int": null,
-    "str_field": "str7 v2"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      81,
-      82
-    ],
-    "binary_field": null,
-    "bool_field": true,
-    "float_field": 88.88,
-    "flow_published_at": "1970-01-01T01:00:21+00:00",
-    "id": 8,
-    "multiple": null,
-    "nested": {
-      "id": "i8"
-    },
-    "nullable_int": 8,
-    "str_field": "str8 v2"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      91,
-      92
-    ],
-    "binary_field": "YWxvaGEK",
-    "bool_field": false,
-    "float_field": 99.99,
-    "flow_published_at": "1970-01-01T01:00:22+00:00",
-    "id": 9,
-    "multiple": null,
-    "nested": {
-      "id": "i9"
-    },
-    "nullable_int": null,
-    "str_field": "str9 v2"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "array_int": [
-      1,
-      2
-    ],
-    "binary_field": "c2F5xY1uYXJhCg==",
-    "bool_field": true,
-    "float_field": 1010.101,
-    "flow_published_at": "1970-01-01T01:00:23+00:00",
-    "id": 10,
-    "multiple": null,
-    "nested": {
-      "id": "i10"
-    },
-    "nullable_int": 10,
-    "str_field": "str10 v2"
-  },
-  "table": "Multiple Types"
-}
-{
-  "row": {
-    "date": "1000-03-03",
-    "datetime": "1000-03-03T23:59:38.1+00:00",
-    "flow_published_at": "1970-01-01T00:00:11+00:00",
-    "id": 3,
-    "int_and_str": 3,
-    "int_str": 30,
-    "num_and_str": 3.1,
-    "num_str": 30.1,
-    "time": "23:59:38.1"
-  },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_published_at": "1970-01-01T01:00:18+00:00",
+      "id": 10,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": "-Infinity",
+      "time": null
+    }
+  ],
   "table": "Formatted Strings"
 }
 {
-  "row": {
-    "date": "2023-08-29",
-    "datetime": "2023-08-29T23:59:38+00:00",
-    "flow_published_at": "1970-01-01T00:00:12+00:00",
-    "id": 4,
-    "int_and_str": 4,
-    "int_str": 40,
-    "num_and_str": 4.1,
-    "num_str": 40.1,
-    "time": "23:59:38"
-  },
-  "table": "Formatted Strings"
-}
-{
-  "row": {
-    "date": "0001-01-01",
-    "datetime": "0001-01-01T00:00:00+00:00",
-    "flow_published_at": "1970-01-01T01:00:13+00:00",
-    "id": 1,
-    "int_and_str": 1,
-    "int_str": 10,
-    "num_and_str": 1.1,
-    "num_str": 10.1,
-    "time": "00:00:00"
-  },
-  "table": "Formatted Strings"
-}
-{
-  "row": {
-    "date": "1999-02-02",
-    "datetime": "1999-02-02T14:20:12.33+00:00",
-    "flow_published_at": "1970-01-01T01:00:14+00:00",
-    "id": 2,
-    "int_and_str": 2,
-    "int_str": 20,
-    "num_and_str": 2.1,
-    "num_str": 20.1,
-    "time": "14:20:12.33"
-  },
-  "table": "Formatted Strings"
-}
-{
-  "row": {
-    "date": "9999-12-31",
-    "datetime": "9999-12-31T23:59:59+00:00",
-    "flow_published_at": "1970-01-01T01:00:15+00:00",
-    "id": 5,
-    "int_and_str": 5,
-    "int_str": 50,
-    "num_and_str": 5.1,
-    "num_str": 50.1,
-    "time": "23:59:59"
-  },
-  "table": "Formatted Strings"
-}
-{
-  "row": {
-    "date": null,
-    "datetime": null,
-    "flow_published_at": "1970-01-01T01:00:16+00:00",
-    "id": 8,
-    "int_and_str": null,
-    "int_str": null,
-    "num_and_str": null,
-    "num_str": "NaN",
-    "time": null
-  },
-  "table": "Formatted Strings"
-}
-{
-  "row": {
-    "date": null,
-    "datetime": null,
-    "flow_published_at": "1970-01-01T01:00:17+00:00",
-    "id": 9,
-    "int_and_str": null,
-    "int_str": null,
-    "num_and_str": null,
-    "num_str": "Infinity",
-    "time": null
-  },
-  "table": "Formatted Strings"
-}
-{
-  "row": {
-    "date": null,
-    "datetime": null,
-    "flow_published_at": "1970-01-01T01:00:18+00:00",
-    "id": 10,
-    "int_and_str": null,
-    "int_str": null,
-    "num_and_str": null,
-    "num_str": "-Infinity",
-    "time": null
-  },
-  "table": "Formatted Strings"
+  "rows": [],
+  "table": "deletions"
 }
 [
   "applied.actionDescription",

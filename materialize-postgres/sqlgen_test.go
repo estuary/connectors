@@ -46,6 +46,7 @@ func TestSQLGeneration(t *testing.T) {
 		tplLoadQuery,
 		tplStoreInsert,
 		tplStoreUpdate,
+		tplDeleteQuery,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()

@@ -42,11 +42,13 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for postgres.
 type config struct {
-	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema   string         `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -216,6 +218,8 @@ func newPostgresDriver() *sql.Driver {
 }
 
 type transactor struct {
+	cfg *config
+
 	// Variables exclusively used by Load.
 	load struct {
 		conn     *pgx.Conn
@@ -236,10 +240,11 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 ) (_ m.Transactor, err error) {
-	var d = &transactor{}
+	var cfg = ep.Config.(*config)
+
+	var d = &transactor{cfg: cfg}
 	d.store.fence = fence
 
-	var cfg = ep.Config.(*config)
 	// Establish connections.
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
@@ -270,6 +275,7 @@ type binding struct {
 	loadInsertSQL      string
 	storeUpdateSQL     string
 	storeInsertSQL     string
+	deleteQuerySQL     string
 	loadQuerySQL       string
 }
 
@@ -284,6 +290,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		{&b.loadInsertSQL, tplLoadInsert},
 		{&b.storeInsertSQL, tplStoreInsert},
 		{&b.storeUpdateSQL, tplStoreUpdate},
+		{&b.deleteQuerySQL, tplDeleteQuery},
 		{&b.loadQuerySQL, tplLoadQuery},
 	} {
 		var err error
@@ -391,17 +398,28 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	var batch pgx.Batch
 	batchBytes := 0
 	for it.Next() {
-		// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
-		// tuples & the document JSON are proportional to the size of the item in the batch.
-		batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
-			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if it.Exists {
-			batch.Queue(b.storeUpdateSQL, converted...)
+		if it.Delete && d.cfg.HardDelete {
+			if converted, err := b.target.ConvertKey(it.Key); err != nil {
+				return nil, fmt.Errorf("converting delete keys: %w", err)
+			} else if it.Exists {
+				batch.Queue(b.deleteQuerySQL, converted...)
+			}
+
+			batchBytes += len(it.PackedKey)
 		} else {
-			batch.Queue(b.storeInsertSQL, converted...)
+			// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
+			// tuples & the document JSON are proportional to the size of the item in the batch.
+			batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
+
+			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+				return nil, fmt.Errorf("converting store parameters: %w", err)
+			} else if it.Exists {
+				batch.Queue(b.storeUpdateSQL, converted...)
+			} else {
+				batch.Queue(b.storeInsertSQL, converted...)
+			}
 		}
 
 		if batchBytes >= batchBytesLimit {
