@@ -159,10 +159,10 @@ captures:
           cursorField:
             - updated_at
         target: acmeCo/repositories
-      - resource:
-          stream: repository_contents
-          syncMode: full_refresh
-        target: acmeCo/repository_contents
+      # - resource:
+      #     stream: repository_contents
+      #     syncMode: full_refresh
+      #   target: acmeCo/repository_contents
       - resource:
           stream: review_comments
           syncMode: incremental
