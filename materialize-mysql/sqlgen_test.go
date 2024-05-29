@@ -52,6 +52,9 @@ func TestSQLGeneration(t *testing.T) {
 		templates.updateLoad,
 		templates.updateReplace,
 		templates.updateTruncate,
+		templates.deleteQuery,
+		templates.deleteLoad,
+		templates.deleteTruncate,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
