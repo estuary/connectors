@@ -34,6 +34,13 @@
         "description": "Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set.",
         "order": 4
       },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 5
+      },
       "advanced": {
         "properties": {
           "sslmode": {
