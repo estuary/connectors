@@ -70,6 +70,10 @@ class Sheet(BaseModel, extra="allow"):
             rowCount: int
             columnCount: int
             frozenRowCount: int = 0
+            frozenColumnCount: int = 0
+            hideGridlines: bool = False
+            rowGroupControlAfter: bool = False
+            columnGroupControlAfter: bool = False
 
         sheetId: int
         title: str
