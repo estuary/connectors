@@ -272,7 +272,7 @@ func (d *transactor) addBinding(target sql.Table) error {
 	return nil
 }
 
-const MaxConcurrentLoads = 5
+const MaxConcurrentQueries = 5
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -315,7 +315,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(MaxConcurrentLoads)
+	group.SetLimit(MaxConcurrentQueries)
 	// Used to ensure we have no data-interleaving when calling |loaded|
 	var mutex sync.Mutex
 
@@ -585,28 +585,12 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	// Use a freshly initialized connection for running queries with Snowflake's async mode, as a
-	// possible workaround for https://github.com/estuary/connectors/issues/1526.
-	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.ep.Tenant))
-	if err != nil {
-		return nil, fmt.Errorf("acknowledge stdsql.Open: %w", err)
-	}
-	defer db.Close()
+	// Run store queries concurrently, as each independently operates on a separate table.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(MaxConcurrentQueries)
 
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("acknowledge db.Conn: %w", err)
-	}
-	defer conn.Close()
-
-	// Run the queries using AsyncMode, which means that `ExecContext` will not block
-	// until the query is successful, rather we will store the results of these queries
-	// in a map so that we can then call `RowsAffected` on them, blocking until
-	// the queries are actually executed and done
-	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
-	var results = make(map[string]stdsql.Result)
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
@@ -616,12 +600,18 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		if len(item.Query) > 0 {
-			log.WithField("table", item.Table).Info("store: starting query")
-			if result, err := conn.ExecContext(asyncCtx, item.Query); err != nil {
-				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-			} else {
-				results[stateKey] = result
-			}
+			item := item
+			group.Go(func() error {
+				log.WithField("table", item.Table).Info("store: starting query")
+				if _, err := d.db.ExecContext(groupCtx, item.Query); err != nil {
+					return fmt.Errorf("query %q failed: %w", item.Query, err)
+				}
+
+				log.WithField("table", item.Table).Info("store: finished query")
+				d.deleteFiles(ctx, []string{item.StagedDir})
+
+				return nil
+			})
 		} else if len(item.PipeFiles) > 0 {
 			log.WithField("table", item.Table).Info("store: starting pipe requests")
 			var fileRequests = make([]FileRequest, len(item.PipeFiles))
@@ -650,14 +640,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
-	for stateKey, r := range results {
-		var item = d.cp[stateKey]
-		if _, err := r.RowsAffected(); err != nil {
-			return nil, fmt.Errorf("query failed: %w", err)
-		}
-		log.WithField("table", item.Table).Info("store: finished query")
-
-		d.deleteFiles(ctx, []string{item.StagedDir})
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("executing concurrent store query: %w", err)
 	}
 
 	// Keep asking for a report on the files that have been submitted for processing
