@@ -108,6 +108,14 @@
       "schema": {
         "properties": {
            "id": { "type": "integer" },
+           "_meta": {
+             "type": "object",
+             "properties": {
+                "op": {
+                  "type": "string"
+                }
+             }
+           }
         },
         "required": ["id"],
         "type": "object",

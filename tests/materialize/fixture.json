@@ -36,7 +36,8 @@
 
     ["tests/unsigned-bigint", { "id": 1, "unsigned_bigint": 18446744073709551615}],
 
-    ["tests/deletions", { "id": 1 }]
+    ["tests/deletions", { "id": 1, "_meta": {"op": "c"} }],
+    ["tests/deletions", { "id": 2, "_meta": {"op": "c"} }]
   ],
   [
     ["tests/simple", { "id": 7, "canary": "pieced"}],
@@ -70,6 +71,8 @@
 
     ["tests/long-string", { "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.", "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."}],
 
-    ["tests/deletions", { "id": 1, "_meta": {"op": "d"} }]
+    ["tests/deletions", { "id": 1, "_meta": {"op": "d"} }],
+    ["tests/deletions", { "id": 2, "_meta": {"op": "u"} }],
+    ["tests/deletions", { "id": 3, "_meta": {"op": "c"} }]
   ]
 ]
