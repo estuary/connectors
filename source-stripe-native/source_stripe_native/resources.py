@@ -119,7 +119,8 @@ async def all_resources(
 
     ]
 
-    # Checking if user has "Issuing" permissions
+    # Stripe 'Issuing' is only available in certain countries and 
+    # accounts. Checking to see if user has permission to access 'Issuing' endpoints.
     try:
         #Using Authorizations stream for testing
         url = f"https://api.stripe.com/v1/{Authorizations.SEARCH_NAME}"
@@ -138,11 +139,6 @@ async def all_resources(
                  "Removing 'Issuing' streams")
 
     return all_streams
-
-
-
-
-
 
 def base_object(
     cls, http: HTTPSession, stop_date: datetime
@@ -285,7 +281,7 @@ def no_events_object(
             fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
         )
 
-    started_at = datetime.now(tz=UTC) - timedelta(days=1)
+    started_at = datetime.now(tz=UTC)
 
     return Resource(
         name=cls.NAME,

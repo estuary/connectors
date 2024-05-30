@@ -1118,7 +1118,7 @@ class SetupAttempts(BaseDocument, extra="forbid"):
     """
     NAME: ClassVar[str] = "SetupAttempts"
     SEARCH_NAME: ClassVar[str] = "setup_attempts"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100, "setup_intent": None} 
+    PARAMETERS: ClassVar[Dict] = {"limit": 100, "setup_intent": None}
 
     id: str
     parent_id: str | None = None
