@@ -10,12 +10,15 @@ function dropTable() {
 }
 
 # Remove materialized tables.
+dbsqlcli -e "SELECT 1"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.simple"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_standard"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_delta"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_delta_exclude_flow_doc"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.multiple_types"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.formatted_strings"
+dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.unsigned_bigint"
+dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.deletions"
 
 yes | dbsqlcli -e "delete from \`$DATABRICKS_CATALOG\`.\`some-schema\`.flow_materializations_v2 where MATERIALIZATION='tests/materialize-databricks/materialize';"
 

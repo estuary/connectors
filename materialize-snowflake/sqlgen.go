@@ -42,7 +42,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    variantMapper,
-		sql.BINARY:   sql.NewStaticMapper("BINARY"),
+		sql.BINARY:   sql.NewStaticMapper("STRING"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.INTEGER:  sql.NewStaticMapper("INTEGER"),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
@@ -268,7 +268,7 @@ ON {{ range $ind, $key := $.Table.Keys }}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{- if $.Table.Document }}
-WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
+WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='delete' THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN

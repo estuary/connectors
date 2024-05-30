@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = rsDialect(false)
+
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
@@ -31,18 +33,22 @@ func TestSQLGeneration(t *testing.T) {
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
-	table1, err := sqlDriver.ResolveTable(shape1, rsDialect)
+	table1, err := sqlDriver.ResolveTable(shape1, testDialect)
 	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, rsDialect)
+	table2, err := sqlDriver.ResolveTable(shape2, testDialect)
 	require.NoError(t, err)
+
+	templates := renderTemplates(testDialect)
 
 	var snap strings.Builder
 
 	for _, tpl := range []*template.Template{
-		tplCreateTargetTable,
-		tplCreateStoreTable,
-		tplMergeInto,
-		tplLoadQuery,
+		templates.createTargetTable,
+		templates.createStoreTable,
+		templates.mergeInto,
+		templates.loadQuery,
+		templates.createDeleteTable,
+		templates.deleteQuery,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -54,7 +60,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
-		tpl := tplCreateLoadTable
+		tpl := templates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
 		data := loadTableParams{
@@ -67,7 +73,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
-		tpl := tplCreateLoadTable
+		tpl := templates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
 		data := loadTableParams{
@@ -90,7 +96,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin Fence Update ---")
-	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
+	require.NoError(t, templates.updateFence.Execute(&snap, fence))
 	snap.WriteString("--- End Fence Update ---\n\n")
 
 	var copyParams = copyFromS3Params{
@@ -109,18 +115,19 @@ func TestSQLGeneration(t *testing.T) {
 			AWSSecretAccessKey: "secretKey",
 			Region:             "us-somewhere-1",
 		},
-		TruncateColumns: true,
+		CaseSensitiveIdentifierEnabled: false,
 	}
 
-	snap.WriteString("--- Begin Copy From S3 With Truncation---")
-	require.NoError(t, tplCopyFromS3.Execute(&snap, copyParams))
-	snap.WriteString("--- End Copy From S3 With Truncation ---\n\n")
+	snap.WriteString("--- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---")
+	require.NoError(t, templates.copyFromS3.Execute(&snap, copyParams))
+	snap.WriteString("--- End Copy From S3 Without Case Sensitive Identifier or Truncation ---\n\n")
 
-	copyParams.TruncateColumns = false
+	copyParams.CaseSensitiveIdentifierEnabled = true
+	copyParams.TruncateColumns = true
 
-	snap.WriteString("--- Begin Copy From S3 Without Truncation---")
-	require.NoError(t, tplCopyFromS3.Execute(&snap, copyParams))
-	snap.WriteString("--- End Copy From S3 Without Truncation ---")
+	snap.WriteString("--- Begin Copy From S3 With Case Sensitive Identifiers and Truncation ---")
+	require.NoError(t, templates.copyFromS3.Execute(&snap, copyParams))
+	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---")
 
 	cupaloy.SnapshotT(t, snap.String())
 }

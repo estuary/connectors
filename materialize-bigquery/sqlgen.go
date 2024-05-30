@@ -58,7 +58,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 var bqDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("BYTES"),
+		sql.BINARY:   sql.NewStaticMapper("STRING"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
 		sql.INTEGER:  sql.NewStaticMapper("INT64"),
 		sql.NUMBER:   sql.NewStaticMapper("FLOAT64"),
@@ -239,7 +239,7 @@ ON {{ range $ind, $key := $.Keys }}
 	l.{{$key.Identifier}} = r.c{{$ind}}
 {{- end}}
 {{- if $.Document }}
-WHEN MATCHED AND r.c{{ Add (len $.Columns) -1 }} IS NULL THEN
+WHEN MATCHED AND r.c{{ Add (len $.Columns) -1 }}='"delete"' THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN

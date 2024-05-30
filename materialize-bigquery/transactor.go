@@ -22,6 +22,7 @@ var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
 	fence *sql.Fence
+	cfg   *config
 
 	client     *client
 	bucketPath string
@@ -46,6 +47,7 @@ func newTransactor(
 	}
 
 	t := &transactor{
+		cfg:        cfg,
 		fence:      &fence,
 		client:     client,
 		bucketPath: cfg.BucketPath,
@@ -247,7 +249,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var b = t.bindings[it.Binding]
 		b.storeFile.start()
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		var flowDocument = it.RawJSON
+		if t.cfg.HardDelete && it.Delete {
+			flowDocument = json.RawMessage(`"delete"`)
+		}
+		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}

@@ -4,18 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export PINECONE_ENVIRONMENT="${PINECONE_ENVIRONMENT}"
-export PINECONE_API_KEY="${PINECONE_API_KEY}"
-export OPENAI_API_KEY="${OPENAI_API_KEY}"
-export PINECONE_PROJECT_ID="${PINECONE_PROJECT_ID}"
-
-config_json_template='{
-   "index":           "$PINECONE_INDEX",
-   "environment":     "$PINECONE_ENVIRONMENT",
-   "pineconeApiKey":  "$PINECONE_API_KEY",
-   "openAiApiKey":    "$OPENAI_API_KEY"
-}'
-
 resources_json_template='[
   {
     "resource": {
@@ -45,5 +33,11 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export PINECONE_INDEX="$(echo $CONNECTOR_CONFIG | jq -r .index)"
+export PINECONE_ENVIRONMENT="$(echo $CONNECTOR_CONFIG | jq -r .environment)"
+export PINECONE_API_KEY="$(echo $CONNECTOR_CONFIG | jq -r .pineconeApiKey)"
+CONFIG_EXTRA="$(cat ${TEST_DIR}/${CONNECTOR}/config-extra.json)"
+export PINECONE_PROJECT_ID="$(echo $CONFIG_EXTRA | jq -r .projectId)"
+
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"

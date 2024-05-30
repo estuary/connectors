@@ -140,7 +140,7 @@ func TestAddedBindingSameGroup(t *testing.T) {
 		)
 		verifyCapture(ctx, t, capture)
 	})
-	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
+	capture.Bindings = append(capture.Bindings, simpleBindings("groups/*/docs")...)
 	t.Run("two", func(t *testing.T) {
 		client.Upsert(ctx, t,
 			"users/1/docs/3", `{"data": 3}`,
@@ -157,21 +157,26 @@ func TestManySmallWrites(t *testing.T) {
 	var capture = simpleCapture(t, "users/*/docs")
 	var client = testFirestoreClient(ctx, t)
 
-	go func(ctx context.Context) {
-		for user := 0; user < 10; user++ {
-			for doc := 0; doc < 5; doc++ {
-				var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
-				var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
-				client.Upsert(ctx, t, docName, docData)
-				time.Sleep(100 * time.Millisecond)
-			}
-			if user == 4 {
-				time.Sleep(1500 * time.Millisecond)
-			}
+	for user := 0; user < 5; user++ {
+		for doc := 0; doc < 5; doc++ {
+			var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
+			var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
+			client.Upsert(ctx, t, docName, docData)
+			time.Sleep(100 * time.Millisecond)
 		}
-	}(ctx)
-
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 5; user < 10; user++ {
+		for doc := 0; doc < 5; doc++ {
+			var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
+			var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
+			client.Upsert(ctx, t, docName, docData)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -180,20 +185,24 @@ func TestMultipleWatches(t *testing.T) {
 	var capture = simpleCapture(t, "users/*/docs", "users/*/notes", "users/*/tasks")
 	var client = testFirestoreClient(ctx, t)
 
-	go func(ctx context.Context) {
-		for user := 0; user < 10; user++ {
-			for item := 0; item < 5; item++ {
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
-			}
-			if user == 4 {
-				time.Sleep(1500 * time.Millisecond)
-			}
+	for user := 0; user < 5; user++ {
+		for item := 0; item < 5; item++ {
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
 		}
-	}(ctx)
-
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 5; user < 10; user++ {
+		for item := 0; item < 5; item++ {
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
+		}
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -203,13 +212,13 @@ func TestBindingDeletion(t *testing.T) {
 	for idx := 0; idx < 20; idx++ {
 		client.Upsert(ctx, t, fmt.Sprintf("docs/%d", idx), `{"data": "placeholder"}`)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	var capture = simpleCapture(t, "docs")
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
-	capture.Bindings = simpleBindings(t, "other")
+	capture.Bindings = simpleBindings("other")
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
-	capture.Bindings = simpleBindings(t, "docs")
+	capture.Bindings = simpleBindings("docs")
 	t.Run("three", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -223,7 +232,32 @@ func TestDiscovery(t *testing.T) {
 	client.Upsert(ctx, t, "users/2/docs/3", `{"foo": "baz", "asdf": 789}`)
 	client.Upsert(ctx, t, "users/2/docs/4", `{"foo": "baz", "asdf": 1000}`)
 	time.Sleep(1 * time.Second)
-	simpleCapture(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
+	var cs = simpleCapture(t)
+	cs.EndpointSpec.(*config).Advanced.ExtraCollections = []string{"flow_source_tests/*/nonexistent/*/extra/*/collection"}
+	cs.VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
+}
+
+func TestNestedCollections(t *testing.T) {
+	var ctx = testContext(t, 300*time.Second)
+	var client = testFirestoreClient(ctx, t)
+	var capture = simpleCapture(t, "nested_users", "nested_users/*/docs")
+
+	client.Upsert(ctx, t, "nested_users/B1", `{"name": "Alice"}`)
+	client.Upsert(ctx, t, "nested_users/B2", `{"name": "Bob"}`)
+	client.Upsert(ctx, t, "nested_users/B1/docs/1", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "nested_users/B1/docs/2", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "nested_users/B2/docs/3", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "nested_users/B2/docs/4", `{"foo": "baz", "asdf": 1000}`)
+	t.Run("init", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	client.Upsert(ctx, t, "nested_users/R3", `{"name": "Carol"}`)
+	client.Upsert(ctx, t, "nested_users/R4", `{"name": "Dave"}`)
+	client.Upsert(ctx, t, "nested_users/R3/docs/5", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "nested_users/R3/docs/6", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "nested_users/R4/docs/7", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "nested_users/R4/docs/8", `{"foo": "baz", "asdf": 1000}`)
+	t.Run("repl", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
 }
 
 func testContext(t testing.TB, duration time.Duration) context.Context {
@@ -255,13 +289,13 @@ func simpleCapture(t testing.TB, names ...string) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
-		Bindings:     simpleBindings(t, names...),
+		Bindings:     simpleBindings(names...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   DefaultSanitizers,
 	}
 }
 
-func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
+func simpleBindings(names ...string) []*flow.CaptureSpec_Binding {
 	var bindings []*flow.CaptureSpec_Binding
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
@@ -281,7 +315,7 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 1000 * time.Millisecond
+	const shutdownDelay = 2000 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {

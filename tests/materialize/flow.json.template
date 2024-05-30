@@ -34,7 +34,8 @@
            "nullable_int": {"type": ["null", "integer"]},
            "array_int": {"type": "array", "items": {"type": "integer"}},
            "nested": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}},
-           "multiple": {"type": ["array", "object", "string", "integer", "number", "boolean", "null"]}
+           "multiple": {"type": ["array", "object", "string", "integer", "number", "boolean", "null"]},
+           "binary_field": {"type": "string", "contentEncoding": "base64"}
           },
           "required": ["id", "str_field"],
           "type": "object"
@@ -91,6 +92,53 @@
         "type": "object"
       },
       "key": ["/testing (%s)"]
+    },
+    "tests/unsigned-bigint": {
+       "schema": {
+       "properties": {
+           "id": { "type": "integer" },
+           "unsigned_bigint": { "type": "integer" },
+          },
+          "required": ["id"],
+          "type": "object"
+       },
+       "key": ["/id"]
+    },
+    "tests/deletions": {
+      "schema": {
+        "properties": {
+           "id": { "type": "integer" },
+           "_meta": {
+             "type": "object",
+             "properties": {
+                "op": {
+                  "type": "string"
+                }
+             }
+           }
+        },
+        "required": ["id"],
+        "type": "object",
+
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "lastWriteWins"
+          }
+        }
+      },
+      "key": ["/id"]
     }
   },
 

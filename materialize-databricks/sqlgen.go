@@ -50,12 +50,29 @@ var databricksDialect = func() sql.Dialect {
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
 	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter))
 
+	type customDDLFieldConfig struct {
+		DDL string `json:"DDL,omitempty"`
+	}
+
+	var customDDLMapper = func(mapper sql.TypeMapper) sql.FieldConfigMapper[customDDLFieldConfig] {
+		return sql.FieldConfigMapper[customDDLFieldConfig]{
+			Delegate: mapper,
+			Map: func(m *sql.MappedType, config customDDLFieldConfig) error {
+				if config.DDL != "" {
+					m.DDL = config.DDL
+				}
+
+				return nil
+			},
+		}
+	}
+
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    jsonMapper,
 		sql.BINARY:   sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
+		sql.INTEGER:  customDDLMapper(sql.NewStaticMapper("BIGINT")),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
 		sql.OBJECT:   jsonMapper,
 		sql.MULTIPLE: jsonMapper,
@@ -84,10 +101,11 @@ var databricksDialect = func() sql.Dialect {
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"long"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"long", "decimal"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"binary"}, Validate: sql.BinaryCompatible},
 	)
 
 	return sql.Dialect{
@@ -140,10 +158,20 @@ var databricksDialect = func() sql.Dialect {
 // stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
 // be materialized since they are all converted to strings.
 func stringCompatible(p pf.Projection) bool {
+	// TODO(whb): This is a hack for making sure that pre-existing base64 encoded columns that were
+	// materialized as string columns in v1 fail validation in v2, which will materialize these
+	// columns as binary. This is needed because we currently validate a pre-existing "string"
+	// column positively with a string field having any format, content-type, or content-encoding,
+	// see https://github.com/estuary/connectors/issues/1501.
+	if sql.TypesOrNull(p.Inference.Types, []string{"string"}) {
+		if p.Inference.String_.ContentEncoding == "base64" {
+			return false
+		}
+	}
+
 	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
-// TODO: use create table USING location instead of copying data into temporary table
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 -- Templated creation of a materialized table definition and comments:
@@ -191,30 +219,28 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ $.Table.Identifier }}.{{ $key.Identifier }} = {{ if eq (First (Split $key.DDL " ")) "BINARY" -}}
+		unbase64(r.{{ $key.Identifier }})
+	{{- else -}}
+		r.{{ $key.Identifier }}
+	{{- end -}}
 	{{- end }}
 {{ else -}}
 SELECT -1, ""
 {{ end -}}
 {{ end }}
 
-{{ define "cast" }}
-{{- if Contains $ "DATE" -}}
-	::DATE
-{{- else if Contains $ "TIMESTAMP" -}}
-	::TIMESTAMP
-{{- else if Contains $ "DOUBLE" -}}
-	::DOUBLE
-{{- else if Contains $ "BIGINT" -}}
-	::BIGINT
-{{- else if Contains $ "BOOLEAN" -}}
-	::BOOLEAN
-{{- else if Contains $ "BINARY" -}}
-	::BINARY
-{{- else if Contains $ "STRING" -}}
-	::STRING
+-- TODO: this will not work with custom type definitions that require more than a single word
+-- namely: ARRAY, MAP and INTERVAL. We don't have these types ourselves, but users may be able
+-- to specify them as a custom DDL
+{{ define "cast" -}}
+{{ $DDL := First (Split $.DDL " ") }}
+{{- if eq $DDL "BINARY" -}}
+	unbase64({{ $.Identifier }})::BINARY as {{ $.Identifier }}
+{{- else -}}
+	{{ $.Identifier }}::{{- $DDL -}}
 {{- end -}}
-{{ end }}
+{{- end }}
 
 -- Directly copy into the target table
 {{ define "copyIntoDirect" }}
@@ -222,7 +248,7 @@ SELECT -1, ""
     SELECT
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}{{ template "cast" $key.DDL -}}
+			{{ template "cast" $key -}}
 		{{- end }}
   FROM {{ Literal $.StagingPath }}
 	)
@@ -242,7 +268,7 @@ SELECT -1, ""
 			SELECT
 			{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
+			{{ template "cast" $key -}}
 			{{- end }}
 			FROM json.`+"`{{ $file }}`"+`
 		)
@@ -250,16 +276,16 @@ SELECT -1, ""
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Table.Document }}
-	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }} <=> NULL THEN
+	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='"delete"' THEN
 		DELETE
 	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end -}}
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
@@ -274,7 +300,7 @@ SELECT -1, ""
 		VALUES (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
+			r.{{ $key.Identifier }}
 		{{- end -}}
 	);
 {{ end }}

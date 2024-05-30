@@ -18,7 +18,7 @@
       ]
     },
     "ad_group.id": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     },
     "segments.date": {
       "type": ["null", "string"],

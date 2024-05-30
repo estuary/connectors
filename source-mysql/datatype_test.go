@@ -31,10 +31,10 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "text", ExpectType: `{"type":["string","null"]}`, InputValue: "hello", ExpectValue: `"hello"`},
 
 		// Integer Types
-		{ColumnType: "tinyint", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
-		{ColumnType: "smallint", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
-		{ColumnType: "mediumint", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
-		{ColumnType: "int", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
+		{ColumnType: "tinyint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
+		{ColumnType: "smallint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
+		{ColumnType: "mediumint", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
+		{ColumnType: "int", ExpectType: `{"type":"integer"}`, InputValue: 123, ExpectValue: `123`, AsPrimaryKey: true},
 		{ColumnType: "bigint", ExpectType: `{"type":["integer","null"]}`, InputValue: -1234567890123456789, ExpectValue: `-1234567890123456789`},
 
 		// MySQL "boolean" type is a synonym for tinyint(1)
@@ -204,6 +204,7 @@ func TestScanKeyTypes(t *testing.T) {
 		{"Bool", "BOOLEAN", []interface{}{"1", "0"}},
 		{"Integer", "INTEGER", []interface{}{0, -3, 2, 1723}},
 		{"SmallInt", "SMALLINT", []interface{}{0, -3, 2, 1723}},
+		{"TinyInt", "TINYINT", []interface{}{0, -3, 2, 255}},
 		{"BigInt", "BIGINT", []interface{}{0, -3, 2, 1723}},
 		{"Real", "REAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
 		{"Double", "DOUBLE PRECISION", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},

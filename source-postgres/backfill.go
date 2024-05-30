@@ -3,15 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
+var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
+
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) error {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -42,10 +46,10 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			logEntry.WithFields(logrus.Fields{
 				"keyColumns": keyColumns,
@@ -58,7 +62,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// Keyless backfill queries need to return results in CTID order, but we can't ask
@@ -85,12 +89,13 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.Query(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("unable to execute query %q: %w", query, err)
+		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
+	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
 	var prevTID pgtype.TID // Used when processing keyless backfill results to sanity-check ordering
 	logEntry.Debug("translating query rows to change events")
@@ -98,7 +103,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
 		if err != nil {
-			return fmt.Errorf("unable to get row values: %w", err)
+			return false, fmt.Errorf("unable to get row values: %w", err)
 		}
 		var fields = make(map[string]interface{})
 		for idx := range cols {
@@ -111,22 +116,22 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 
 			rowKey, err = ctid.EncodeText(db.conn.ConnInfo(), nil)
 			if err != nil {
-				return fmt.Errorf("internal error: failed to encode ctid %#v: %w", ctid, err)
+				return false, fmt.Errorf("internal error: failed to encode ctid %#v: %w", ctid, err)
 			}
 
 			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
 			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
-				return fmt.Errorf("internal error: ctid ordering sanity check failed: %v <= %v", ctid, prevTID)
+				return false, fmt.Errorf("internal error: ctid ordering sanity check failed: %v <= %v", ctid, prevTID)
 			}
 			prevTID = ctid
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
-				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
 		if err := translateRecordFields(info, fields); err != nil {
-			return fmt.Errorf("error backfilling table %q: %w", table, err)
+			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		var event = &sqlcapture.ChangeEvent{
@@ -145,11 +150,25 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			After:  fields,
 		}
 		if err := callback(event); err != nil {
-			return fmt.Errorf("error processing change event: %w", err)
+			return false, fmt.Errorf("error processing change event: %w", err)
 		}
+		resultRows++
 		rowOffset++
 	}
-	return nil
+
+	if err := rows.Err(); err != nil {
+		// As a special case, consider statement timeouts to be not an error so long as we got
+		// at least one row back. This allows us to make partial progress on slow databases with
+		// statement timeouts set, without having to fine-tune the backfill chunk size.
+		if err, ok := err.(*pgconn.PgError); ok && statementTimeoutRegexp.MatchString(err.Message) && resultRows > 0 {
+			logrus.WithField("rows", resultRows).Warn("backfill query interrupted by statement timeout")
+			return false, nil
+		}
+		return false, err
+	}
+
+	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	return backfillComplete, nil
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
@@ -223,7 +242,7 @@ func quoteColumnName(name string) string {
 func (db *postgresDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {
-		db.explained = make(map[string]struct{})
+		db.explained = make(map[sqlcapture.StreamID]struct{})
 	}
 	if _, ok := db.explained[streamID]; ok {
 		return

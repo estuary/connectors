@@ -82,12 +82,12 @@ func TestValidateAndApply(t *testing.T) {
 		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
 
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", rsDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
 				"delete from %s where materialization = %s",
-				rsDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				rsDialect.Literal(materialization.String()),
+				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				testDialect.Literal(materialization.String()),
 			))
 		},
 	)
@@ -100,6 +100,7 @@ func TestFencingCases(t *testing.T) {
 	cfg := mustGetCfg(t)
 
 	ctx := context.Background()
+	templates := renderTemplates(testDialect)
 
 	c, err := newClient(ctx, &sql.Endpoint{Config: &cfg})
 	require.NoError(t, err)
@@ -108,11 +109,11 @@ func TestFencingCases(t *testing.T) {
 	sql.RunFenceTestCases(t,
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
-		rsDialect,
-		tplCreateTargetTable,
+		testDialect,
+		templates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 			return c.ExecStatements(ctx, []string{fenceUpdate.String()})

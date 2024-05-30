@@ -1,92 +1,21 @@
-{
-  "applied": {
-    "actionDescription": "update persisted spec"
+[
+  "applied.actionDescription",
+  "update persisted spec"
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
-}
-{
-  "opened": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 1,
-      "int": 1,
-      "str": "str 1"
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 2,
-      "int": 2,
-      "str": "str 2"
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 3,
-      "int": 3,
-      "str": "str 3"
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 4,
-      "int": 4,
-      "str": "str 4"
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 5,
-      "int": 5,
-      "str": "str 5"
-    }
-  }
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
+]
 {
   "index": "Simple",
   "rows": [
@@ -171,7 +100,7 @@
         "$numberInt": "1"
       },
       "int": {
-        "$numberInt": "6"
+        "$numberInt": "7"
       },
       "str": "str 6"
     },
@@ -181,7 +110,7 @@
         "$numberInt": "2"
       },
       "int": {
-        "$numberInt": "7"
+        "$numberInt": "9"
       },
       "str": "str 7"
     },
@@ -191,7 +120,7 @@
         "$numberInt": "3"
       },
       "int": {
-        "$numberInt": "8"
+        "$numberInt": "11"
       },
       "str": "str 8"
     },
@@ -201,7 +130,7 @@
         "$numberInt": "4"
       },
       "int": {
-        "$numberInt": "9"
+        "$numberInt": "13"
       },
       "str": "str 9"
     },
@@ -211,7 +140,7 @@
         "$numberInt": "5"
       },
       "int": {
-        "$numberInt": "10"
+        "$numberInt": "15"
       },
       "str": "str 10"
     }
@@ -312,14 +241,13 @@
     }
   ]
 }
-{
-  "applied": {
-    "actionDescription": "update persisted spec"
+[
+  "applied.actionDescription",
+  "update persisted spec"
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
-}
-{
-  "opened": {}
-}
-{
-  "acknowledged": {}
-}
+]

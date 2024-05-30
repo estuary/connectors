@@ -141,7 +141,6 @@ jobs:
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Set up Cloud SDK
-        if: matrix.connector == 'source-gcs' || matrix.python
         uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
@@ -252,6 +251,10 @@ jobs:
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
+      - name: Install databricks-sql-cli
+        if: matrix.connector == 'materialize-databricks'
+        run: python -m pip install databricks-sql-cli
+
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
@@ -263,15 +266,14 @@ jobs:
               "materialize-mysql",
               "materialize-s3-parquet",
               "materialize-sqlserver",
-              "materialize-mongodb"
+              "materialize-mongodb",
+              "materialize-snowflake",
+              "materialize-databricks",
+              "materialize-bigquery",
+              "materialize-redshift"
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PINECONE_INDEX: ${{ vars.PINECONE_INDEX }}
-          PINECONE_PROJECT_ID: ${{ vars.PINECONE_PROJECT_ID }}
-          PINECONE_ENVIRONMENT: ${{ vars.PINECONE_ENVIRONMENT }}
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 

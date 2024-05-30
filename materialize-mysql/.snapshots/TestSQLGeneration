@@ -220,6 +220,60 @@ TRUNCATE flow_temp_update_table_0;
 TRUNCATE flow_temp_update_table_1;
 --- End `Delta Updates` truncateUpdateTable ---
 
+--- Begin target_table deleteQuery ---
+
+DELETE original FROM target_table original, flow_temp_delete_table_0 temp
+WHERE
+		original.key1 = temp.key1 AND 
+		original.`key!2` = temp.`key!2`;
+--- End target_table deleteQuery ---
+
+--- Begin `Delta Updates` deleteQuery ---
+
+DELETE original FROM `Delta Updates` original, flow_temp_delete_table_1 temp
+WHERE
+		original.`theKey` = temp.`theKey`;
+--- End `Delta Updates` deleteQuery ---
+
+--- Begin target_table deleteLoad ---
+
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_0
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+		key1,
+		`key!2`
+);
+--- End target_table deleteLoad ---
+
+--- Begin `Delta Updates` deleteLoad ---
+
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_1
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+		`theKey`
+);
+--- End `Delta Updates` deleteLoad ---
+
+--- Begin target_table truncateDeleteTable ---
+
+TRUNCATE flow_temp_delete_table_0;
+--- End target_table truncateDeleteTable ---
+
+--- Begin `Delta Updates` truncateDeleteTable ---
+
+TRUNCATE flow_temp_delete_table_1;
+--- End `Delta Updates` truncateDeleteTable ---
+
 --- Begin alter table add columns and drop not nulls ---
 
 ALTER TABLE target_table

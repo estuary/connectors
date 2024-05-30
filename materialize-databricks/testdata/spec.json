@@ -17,17 +17,25 @@
         "write_schema_json": {
           "$id": "file:///builder/materialize-snowflake/testdata/flow.yaml?ptr=/collections/key~1value/schema",
           "properties": {
+            "binary": {
+              "type": "string",
+              "contentEncoding": "base64"
+            },
             "boolean": {
               "type": "boolean"
             },
             "integer": {
               "type": "integer"
             },
+            "unsigned-integer": {
+              "type": "integer"
+            },
             "key1": {
               "type": "integer"
             },
             "key2": {
-              "type": "boolean"
+              "type": "string",
+              "contentEncoding": "base64"
             },
             "number": {
               "type": "number"
@@ -48,6 +56,19 @@
         ],
         "uuid_ptr": "/_meta/uuid",
         "projections": [
+          {
+            "ptr": "/binary",
+            "field": "binary",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "content_encoding": "base64"
+              },
+              "exists": 2
+            }
+          },
           {
             "ptr": "/boolean",
             "field": "boolean",
@@ -94,8 +115,11 @@
             "is_primary_key": true,
             "inference": {
               "types": [
-                "boolean"
+                "string"
               ],
+              "string": {
+                "content_encoding": "base64"
+              },
               "exists": 1
             }
           },
@@ -117,6 +141,16 @@
                 "string"
               ],
               "string": {},
+              "exists": 2
+            }
+          },
+          {
+            "ptr": "/unsigned-integer",
+            "field": "unsigned-integer",
+            "inference": {
+              "types": [
+                "integer"
+              ],
               "exists": 2
             }
           }
@@ -184,12 +218,17 @@
           "key2"
         ],
         "values": [
+          "binary",
           "boolean",
           "integer",
+          "unsigned-integer",
           "number",
           "string"
         ],
-        "document": "flow_document"
+        "document": "flow_document",
+        "field_config_json_map": {
+          "unsigned-integer": {"DDL": "DECIMAL(20)"}
+        }
       },
       "journal_read_suffix": "materialize/test/sqlite/key_value"
     },

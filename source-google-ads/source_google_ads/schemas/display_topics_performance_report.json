@@ -33,7 +33,7 @@
       "type": ["null", "number"]
     },
     "ad_group.id": {
-      "type": ["null", "integer"]
+      "type": ["integer"]
     },
     "ad_group.name": {
       "type": ["null", "string"]

@@ -11,6 +11,7 @@ dropTable "simple"
 dropTable "duplicate_keys"
 dropTable "multiple_types"
 dropTable "formatted_strings"
+dropTable "deletions"
 
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.

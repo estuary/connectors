@@ -39,7 +39,7 @@ SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 FROM flow_temp_table_0;
 MERGE INTO projectID.dataset.target_table AS l
 USING flow_temp_table_0 AS r
 ON l.key1 = r.c0 AND l.key2 = r.c1 AND l.boolean = r.c2 AND l.integer = r.c3 AND l.string = r.c4
-WHEN MATCHED AND r.c10 IS NULL THEN
+WHEN MATCHED AND r.c10='"delete"' THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET l.`defAULT` = r.c5, l.number = r.c6, l.person_place_ = r.c7, l.source_name = r.c8, l.`with-dash` = r.c9, l.flow_document = r.c10
@@ -74,7 +74,7 @@ ALTER TABLE projectID.dataset.target_table
 MERGE INTO projectID.dataset.target_table_no_values_materialized AS l
 USING flow_temp_table_1 AS r
 ON l.key1 = r.c0 AND l.key2 = r.c1
-WHEN MATCHED AND r.c2 IS NULL THEN
+WHEN MATCHED AND r.c2='"delete"' THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET l.flow_document = r.c2
