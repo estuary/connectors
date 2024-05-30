@@ -5,7 +5,7 @@ set -o pipefail
 set -o nounset
 
 function exportToJsonl() {
-  go run ${TEST_DIR}/materialize-databricks/fetch-data.go "$1" | jq "{ \"table\": \"$1\", rows: . }"
+  go run ${TEST_DIR}/materialize-databricks/fetch-data.go "$1" | jq "{ \"table\": \"$1\", rows: map(del(.flow_document)) }"
 }
 
 exportToJsonl "\`$DATABRICKS_CATALOG\`.\`some-schema\`.simple"
