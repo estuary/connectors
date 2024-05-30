@@ -30,36 +30,33 @@ async def fetch_incremental(
     If the document was created after the last log_cursor, 
     yield this document and later yield the newest log_cursor.
     """
-    stop = True
+    iterating = True
 
     url = f"{API}/events"
     parameters = {"type": cls.TYPES, "limit": 100}
-    recent = []
-
+    max_ts = log_cursor
 
     _cls: Any = cls  # Silence mypy false-positive
 
-    while stop:
+    while iterating:
         result = EventResult.model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
         for results in result.data:
             if _s_to_dt(results.created) > log_cursor:
-                recent.append(_s_to_dt(results.created))
+                max_ts = _s_to_dt(results.created)
                 doc = _cls.model_validate(results.data.object)
-                doc.meta_ = _cls.Meta(op="u")
                 yield doc
         
             elif _s_to_dt(results.created) < log_cursor:
-                stop = False
+                iterating = False
                 break
         if result.has_more is True:
             parameters["starting_after"] = result.data[-1].id
         else:
             break
-    if recent:
-        recent.sort()
-        yield recent[-1]
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_backfill(
     cls,
@@ -99,13 +96,11 @@ async def fetch_backfill(
     for doc in result.data:
         if _s_to_dt(doc.created) == stop_date:
             # Yield final document for reference
-            doc.meta_ = _cls.Meta(op="u")
             yield doc
             return
         elif _s_to_dt(doc.created) < stop_date:
             return
         elif _s_to_dt(doc.created) < cutoff:
-            doc.meta_ = _cls.Meta(op="u")
             yield doc
 
     if result.has_more:
@@ -129,22 +124,22 @@ async def fetch_incremental_substreams(
     this method exclusively for the child stream.
     """
 
-    stop = True
+    iterating = True
 
     url = f"{API}/events"
     parameters = {"type": cls.TYPES, "limit": 100}
-    recent = []
+    max_ts = log_cursor
 
 
     _cls: Any = cls  # Silence mypy false-positive
 
-    while stop:
+    while iterating:
         result = EventResult.model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
         for results in result.data:
             if _s_to_dt(results.created) > log_cursor:
-                recent.append(_s_to_dt(results.created))
+                max_ts = _s_to_dt(results.created)
 
                 parent_data = _cls.model_validate(results.data.object)
                 search_name = _cls.SEARCH_NAME
@@ -166,15 +161,14 @@ async def fetch_incremental_substreams(
                     yield doc 
         
             elif _s_to_dt(results.created) < log_cursor:
-                stop = False
+                iterating = False
                 break
         if result.has_more is True:
             parameters["starting_after"] = result.data[-1].id
         else:
             break
-    if recent:
-        recent.sort()
-        yield recent[-1]
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_backfill_substreams(
     cls,
@@ -213,7 +207,6 @@ async def fetch_backfill_substreams(
     )
 
     for doc in result.data:
-        log.debug(f"{_s_to_dt(doc.created)}")
         if _s_to_dt(doc.created) == stop_date:
             parent_data = doc
             id = parent_data.id
@@ -275,12 +268,10 @@ async def _capture_substreams(
 
     child_url = f"{API}/{search_name}/{id}/{cls_child.SEARCH_NAME}"
     parameters = cls_child.PARAMETERS
-    if "subscription" in parameters.keys():
-        parameters["subscription"] = id
-        child_url = f"{API}/{cls_child.SEARCH_NAME}"
-    elif "setup_intent" in parameters.keys():
+    if cls_child.NAME == "SetupAttempts":
         parameters["setup_intent"] = id
         child_url = f"{API}/{cls_child.SEARCH_NAME}"
+
     elif cls_child.NAME == "UsageRecords":
         child_url = f"{API}/subscription_items/{id}/{cls_child.SEARCH_NAME}"
 
@@ -313,36 +304,34 @@ async def fetch_incremental_no_events(
     created after the last log_cursor, with its model.
     """
 
-    stop = True
+    iterating = True
 
     url = f"{API}/{cls.SEARCH_NAME}"
     parameters = {"limit": 100}
-    recent = []
+    max_ts = log_cursor
 
 
     _cls: Any = cls  # Silence mypy false-positive
 
-    while stop:
-        result = ListResult.model_validate_json(
+    while iterating:
+        result = ListResult[_cls].model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
         for results in result.data:
-            if _s_to_dt(results["created"]) > log_cursor:
-                recent.append(_s_to_dt(results["created"]))
+            if _s_to_dt(results.created) > log_cursor:
+                max_ts = _s_to_dt(results.created)
                 doc = _cls.model_validate(results)
-                doc.meta_ = _cls.Meta(op="u")
                 yield doc
         
-            elif _s_to_dt(results["created"]) < log_cursor:
-                stop = False
+            elif _s_to_dt(results.created) < log_cursor:
+                iterating = False
                 break
         if result.has_more is True:
             parameters["starting_after"] = result.data[-1]["id"]
         else:
             break
-    if recent:
-        recent.sort()
-        yield recent[-1]
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_incremental_usage_records(
     cls,
@@ -358,22 +347,22 @@ async def fetch_incremental_usage_records(
     needs aditional processing
     """
 
-    stop = True
+    iterating = True
 
     url = f"{API}/events"
     parameters = {"type": cls.TYPES, "limit": 100}
-    recent = []
+    max_ts = log_cursor
 
 
     _cls: Any = cls  # Silence mypy false-positive
 
-    while stop:
+    while iterating:
         result = EventResult.model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
         for results in result.data:
             if _s_to_dt(results.created) > log_cursor:
-                recent.append(_s_to_dt(results.created))
+                max_ts = _s_to_dt(results.created)
 
                 parent_data = _cls.model_validate(results.data.object)
                 search_name = _cls.SEARCH_NAME
@@ -397,15 +386,14 @@ async def fetch_incremental_usage_records(
 
         
             elif _s_to_dt(results.created) < log_cursor:
-                stop = False
+                iterating = False
                 break
         if result.has_more is True:
             parameters["starting_after"] = result.data[-1].id
         else:
             break
-    if recent:
-        recent.sort()
-        yield recent[-1]
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_backfill_usage_records(
     cls,

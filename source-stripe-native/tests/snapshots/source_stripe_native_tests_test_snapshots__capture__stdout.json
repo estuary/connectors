@@ -2,9 +2,6 @@
   [
     "acmeCo/Accounts",
     {
-      "_meta": {
-        "op": "u"
-      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -168,9 +165,6 @@
   [
     "acmeCo/Accounts",
     {
-      "_meta": {
-        "op": "u"
-      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -567,9 +561,6 @@
   [
     "acmeCo/Accounts",
     {
-      "_meta": {
-        "op": "u"
-      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -704,9 +695,6 @@
   [
     "acmeCo/Customers",
     {
-      "_meta": {
-        "op": "u"
-      },
       "address": {
         "city": "",
         "country": "BR",
@@ -748,9 +736,6 @@
   [
     "acmeCo/Customers",
     {
-      "_meta": {
-        "op": "u"
-      },
       "address": null,
       "balance": 0,
       "created": 1715026232,
@@ -773,7 +758,7 @@
         "some-interesting": "piece-of-information"
       },
       "name": "My Cool Customer",
-      "next_invoice_sequence": 23,
+      "next_invoice_sequence": 25,
       "object": "customer",
       "phone": null,
       "preferred_locales": [],
@@ -785,9 +770,6 @@
   [
     "acmeCo/Customers",
     {
-      "_meta": {
-        "op": "u"
-      },
       "address": {
         "city": "Maringa",
         "country": "BR",
@@ -840,9 +822,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -952,9 +931,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 1000,
@@ -1064,9 +1040,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 23000,
       "amount_captured": 23000,
       "amount_refunded": 0,
@@ -1176,9 +1149,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 4500,
       "amount_captured": 4500,
       "amount_refunded": 0,
@@ -1288,9 +1258,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1400,9 +1367,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1512,9 +1476,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1624,9 +1585,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1737,9 +1695,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1850,9 +1805,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 300,
@@ -1963,9 +1915,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1200,
       "amount_captured": 1200,
       "amount_refunded": 0,
@@ -2075,9 +2024,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1200,
       "amount_captured": 1200,
       "amount_refunded": 0,
@@ -2187,9 +2133,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 3400,
       "amount_captured": 3400,
       "amount_refunded": 3400,
@@ -2299,9 +2242,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2411,9 +2351,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2523,9 +2460,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2635,9 +2569,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2747,9 +2678,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2859,9 +2787,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2971,9 +2896,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3083,9 +3005,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3195,9 +3114,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3307,9 +3223,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3419,9 +3332,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3531,9 +3441,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3643,9 +3550,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3755,9 +3659,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3867,9 +3768,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3979,9 +3877,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4091,9 +3986,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4203,9 +4095,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4315,9 +4204,6 @@
   [
     "acmeCo/Charges",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4425,11 +4311,226 @@
     }
   ],
   [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PLXIlLzZ0uyKPmd1C3u1mtT",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716930684,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PLXIlLzZ0uyKPmd1ovAWeiZ",
+      "invoice": "in_1PLWMALzZ0uyKPmdpuDVZIqM",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 6,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PLXIlLzZ0uyKPmd1PzA6kOv",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PLtmYLzZ0uyKPmd1Sp2TVpS",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1717017099,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PLtmYLzZ0uyKPmd1ZNMMgm1",
+      "invoice": "in_1PLspWLzZ0uyKPmdC9tCYNdm",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 56,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PLtmYLzZ0uyKPmd1HR1xtxp",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
     "acmeCo/CheckoutSessions",
     {
-      "_meta": {
-        "op": "u"
-      },
       "after_expiration": null,
       "allow_promotion_codes": null,
       "amount_subtotal": 144000,
@@ -4512,9 +4613,6 @@
   [
     "acmeCo/Coupons",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount_off": null,
       "created": 1715177451,
       "currency": null,
@@ -4535,9 +4633,6 @@
   [
     "acmeCo/CreditNotes",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 1000,
       "amount_shipping": 0,
       "created": 1715194504,
@@ -4572,9 +4667,6 @@
   [
     "acmeCo/Disputes",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 2250,
       "balance_transaction": "txn_1PEANFLzZ0uyKPmdJ294AFtR",
       "balance_transactions": [
@@ -4662,9 +4754,6 @@
   [
     "acmeCo/Disputes",
     {
-      "_meta": {
-        "op": "u"
-      },
       "amount": 2250,
       "balance_transaction": "txn_1PEANGLzZ0uyKPmdio38Pgeo",
       "balance_transactions": [
@@ -4752,9 +4841,6 @@
   [
     "acmeCo/Invoices",
     {
-      "_meta": {
-        "op": "u"
-      },
       "account_country": "BR",
       "account_name": null,
       "account_tax_ids": null,
@@ -4857,9 +4943,6 @@
   [
     "acmeCo/Invoices",
     {
-      "_meta": {
-        "op": "u"
-      },
       "account_country": "BR",
       "account_name": null,
       "account_tax_ids": null,
@@ -4962,9 +5045,6 @@
   [
     "acmeCo/Invoices",
     {
-      "_meta": {
-        "op": "u"
-      },
       "account_country": "BR",
       "account_name": null,
       "account_tax_ids": null,
@@ -5085,9 +5165,6 @@
   [
     "acmeCo/Invoices",
     {
-      "_meta": {
-        "op": "u"
-      },
       "account_country": "BR",
       "account_name": null,
       "account_tax_ids": null,
@@ -5190,9 +5267,6 @@
   [
     "acmeCo/Invoices",
     {
-      "_meta": {
-        "op": "u"
-      },
       "account_country": "BR",
       "account_name": null,
       "account_tax_ids": null,
@@ -5290,216 +5364,6 @@
       "total_tax_amounts": [],
       "transfer_data": null,
       "webhooks_delivered_at": 1715285543
-    }
-  ],
-  [
-    "acmeCo/Invoices",
-    {
-      "_meta": {
-        "op": "u"
-      },
-      "account_country": "BR",
-      "account_name": null,
-      "account_tax_ids": null,
-      "amount_due": 1000,
-      "amount_paid": 1000,
-      "amount_remaining": 0,
-      "amount_shipping": 0,
-      "application": null,
-      "application_fee_amount": null,
-      "attempt_count": 1,
-      "attempted": true,
-      "auto_advance": false,
-      "automatic_tax": {
-        "enabled": false,
-        "liability": null,
-        "status": null
-      },
-      "billing_reason": "subscription_cycle",
-      "charge": "ch_3PF0mTLzZ0uyKPmd0mqJ2BBR",
-      "collection_method": "charge_automatically",
-      "created": 1715371864,
-      "currency": "usd",
-      "custom_fields": null,
-      "customer": "cus_Q3fCJO6pdqbdAr",
-      "customer_address": null,
-      "customer_email": "my_cool_customer@example.com",
-      "customer_name": "My Cool Customer",
-      "customer_phone": null,
-      "customer_shipping": null,
-      "customer_tax_exempt": "none",
-      "customer_tax_ids": [],
-      "default_payment_method": null,
-      "default_source": null,
-      "default_tax_rates": [],
-      "description": null,
-      "discount": null,
-      "discounts": [],
-      "due_date": null,
-      "effective_at": 1715375704,
-      "ending_balance": 0,
-      "footer": null,
-      "from_invoice": null,
-      "hosted_invoice_url": "redacted",
-      "id": "in_1PEzmWLzZ0uyKPmdbw1iDMnP",
-      "invoice_pdf": "redacted",
-      "issuer": {
-        "type": "self"
-      },
-      "last_finalization_error": null,
-      "latest_revision": null,
-      "livemode": false,
-      "metadata": {},
-      "next_payment_attempt": null,
-      "number": "A2BF5CFE-0005",
-      "object": "invoice",
-      "on_behalf_of": null,
-      "paid": true,
-      "paid_out_of_band": false,
-      "payment_intent": "pi_3PF0mTLzZ0uyKPmd0YsT8kLG",
-      "payment_settings": {
-        "default_mandate": null,
-        "payment_method_options": null,
-        "payment_method_types": null
-      },
-      "period_end": 1715371834,
-      "period_start": 1715285434,
-      "post_payment_credit_notes_amount": 0,
-      "pre_payment_credit_notes_amount": 0,
-      "quote": null,
-      "receipt_number": null,
-      "rendering": null,
-      "rendering_options": null,
-      "shipping_cost": null,
-      "shipping_details": null,
-      "starting_balance": 0,
-      "statement_descriptor": null,
-      "status": "paid",
-      "status_transitions": {
-        "finalized_at": 1715375704,
-        "marked_uncollectible_at": null,
-        "paid_at": 1715375704,
-        "voided_at": null
-      },
-      "subscription": "sub_1PDXrqLzZ0uyKPmdnoxWai8f",
-      "subscription_details": {
-        "metadata": {}
-      },
-      "subtotal": 1000,
-      "subtotal_excluding_tax": 1000,
-      "tax": null,
-      "test_clock": null,
-      "total": 1000,
-      "total_discount_amounts": [],
-      "total_excluding_tax": 1000,
-      "total_tax_amounts": [],
-      "transfer_data": null,
-      "webhooks_delivered_at": 1715371864
-    }
-  ],
-  [
-    "acmeCo/Invoices",
-    {
-      "_meta": {
-        "op": "u"
-      },
-      "account_country": "BR",
-      "account_name": null,
-      "account_tax_ids": null,
-      "amount_due": 1000,
-      "amount_paid": 1000,
-      "amount_remaining": 0,
-      "amount_shipping": 0,
-      "application": null,
-      "application_fee_amount": null,
-      "attempt_count": 1,
-      "attempted": true,
-      "auto_advance": false,
-      "automatic_tax": {
-        "enabled": false,
-        "liability": null,
-        "status": null
-      },
-      "billing_reason": "subscription_cycle",
-      "charge": "ch_3PFNGYLzZ0uyKPmd1iCQNi4O",
-      "collection_method": "charge_automatically",
-      "created": 1715458273,
-      "currency": "usd",
-      "custom_fields": null,
-      "customer": "cus_Q3fCJO6pdqbdAr",
-      "customer_address": null,
-      "customer_email": "my_cool_customer@example.com",
-      "customer_name": "My Cool Customer",
-      "customer_phone": null,
-      "customer_shipping": null,
-      "customer_tax_exempt": "none",
-      "customer_tax_ids": [],
-      "default_payment_method": null,
-      "default_source": null,
-      "default_tax_rates": [],
-      "description": null,
-      "discount": null,
-      "discounts": [],
-      "due_date": null,
-      "effective_at": 1715462137,
-      "ending_balance": 0,
-      "footer": null,
-      "from_invoice": null,
-      "hosted_invoice_url": "redacted",
-      "id": "in_1PFMGDLzZ0uyKPmdTzJYjFnv",
-      "invoice_pdf": "redacted",
-      "issuer": {
-        "type": "self"
-      },
-      "last_finalization_error": null,
-      "latest_revision": null,
-      "livemode": false,
-      "metadata": {},
-      "next_payment_attempt": null,
-      "number": "A2BF5CFE-0006",
-      "object": "invoice",
-      "on_behalf_of": null,
-      "paid": true,
-      "paid_out_of_band": false,
-      "payment_intent": "pi_3PFNGYLzZ0uyKPmd1C9L15CS",
-      "payment_settings": {
-        "default_mandate": null,
-        "payment_method_options": null,
-        "payment_method_types": null
-      },
-      "period_end": 1715458234,
-      "period_start": 1715371834,
-      "post_payment_credit_notes_amount": 0,
-      "pre_payment_credit_notes_amount": 0,
-      "quote": null,
-      "receipt_number": null,
-      "rendering": null,
-      "rendering_options": null,
-      "shipping_cost": null,
-      "shipping_details": null,
-      "starting_balance": 0,
-      "statement_descriptor": null,
-      "status": "paid",
-      "status_transitions": {
-        "finalized_at": 1715462137,
-        "marked_uncollectible_at": null,
-        "paid_at": 1715462137,
-        "voided_at": null
-      },
-      "subscription": "sub_1PDXrqLzZ0uyKPmdnoxWai8f",
-      "subscription_details": {
-        "metadata": {}
-      },
-      "subtotal": 1000,
-      "subtotal_excluding_tax": 1000,
-      "tax": null,
-      "test_clock": null,
-      "total": 1000,
-      "total_discount_amounts": [],
-      "total_excluding_tax": 1000,
-      "total_tax_amounts": [],
-      "transfer_data": null,
-      "webhooks_delivered_at": 1715458273
     }
   ]
 ]

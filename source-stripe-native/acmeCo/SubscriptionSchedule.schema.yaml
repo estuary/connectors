@@ -3,6 +3,7 @@ $defs:
   Meta:
     properties:
       op:
+        default: u
         description: "Operation type (c: Create, u: Update, d: Delete)"
         enum:
           - c
@@ -15,8 +16,6 @@ $defs:
         description: "Row ID of the Document, counting up from zero, or -1 if not known"
         title: Row Id
         type: integer
-    required:
-      - op
     title: Meta
     type: object
 additionalProperties: false
