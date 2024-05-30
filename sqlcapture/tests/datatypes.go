@@ -19,15 +19,13 @@ type DatatypeTestCase struct {
 	ExpectType  string
 	InputValue  interface{}
 	ExpectValue string
+
+	AsPrimaryKey bool
 }
 
 // TestDatatypes runs a series of tests creating tables with specific column types
 // and performing discovery/capture to verify that each type is supported properly.
 func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []DatatypeTestCase) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
 	for idx, tc := range cases {
 		var testName = sanitizeName(tc.ColumnType)
 		if len(testName) > 8 {
@@ -35,7 +33,12 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 		}
 		t.Run(fmt.Sprintf("%d_%s", idx, testName), func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("1%07d", idx)
-			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			var tableName string
+			if tc.AsPrimaryKey {
+				tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(a INTEGER, b %s, PRIMARY KEY (a,b))", tc.ColumnType))
+			} else {
+				tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			}
 			var stream *capture.Response_Discovered_Binding
 
 			// Perform discovery and verify that the generated JSON schema looks correct

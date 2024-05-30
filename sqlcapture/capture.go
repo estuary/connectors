@@ -18,6 +18,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	// TestShutdownAfterBackfill is a test behavior flag which causes the capture
+	// to shut down after backfilling one chunk from one table. It is always false
+	// in normal operation.
+	TestShutdownAfterBackfill = false
+
+	// TestShutdownAfterCaughtUp is a test behavior flag which causes the capture
+	// to shut down after replication is all caught up and all tables are fully
+	// backfilled. It is always false in normal operation.
+	TestShutdownAfterCaughtUp = false
+)
+
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
@@ -271,31 +283,36 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}
 
-	// Backfill any tables which require it
+	// Backfill any tables which require it.
 	for c.BindingsCurrentlyBackfilling() != nil {
 		var watermark = uuid.New().String()
-		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
+		if err := c.backfillStreams(ctx); err != nil {
+			return fmt.Errorf("error performing backfill: %w", err)
+		} else if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
 		} else if err := c.streamToWatermark(ctx, replStream, watermark); err != nil {
 			return fmt.Errorf("error streaming until watermark: %w", err)
 		} else if err := c.emitState(); err != nil {
 			return err
-		} else if err := c.backfillStreams(ctx); err != nil {
-			return fmt.Errorf("error performing backfill: %w", err)
+		}
+
+		if TestShutdownAfterBackfill {
+			return nil // In tests we sometimes want to shut down here
 		}
 	}
 
 	// Once all backfills are complete, make sure an up-to-date state checkpoint
 	// gets emitted. This ensures that streams reliably transition into the Active
-	// state on the first connector run even if there are no replication events
-	// occurring.
+	// state during tests even if there is no backfill work to do.
 	logrus.Info("no tables currently require backfilling")
 	if err := c.emitState(); err != nil {
 		return err
 	}
+	if TestShutdownAfterCaughtUp {
+		return nil // In tests we typically want to shut down at this point
+	}
 
-	// Once there is no more backfilling to do, just stream changes forever and emit
-	// state updates on every transaction commit.
+	// Finally, we can just stream changes indefinitely, emitting state updates on every transaction commit.
 	if err := c.streamForever(ctx, replStream); err != nil {
 		return err
 	}
@@ -649,7 +666,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	// Process backfill query results as a callback-driven stream.
 	var lastRowKey = streamState.Scanned
 	var eventCount int
-	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
+	var backfillComplete, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
 		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
@@ -685,13 +702,13 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 		"rows":   eventCount,
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
-	if eventCount == 0 {
+	state.BackfilledCount += eventCount
+	if backfillComplete {
 		logrus.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableModeActive
 		state.Scanned = nil
 	} else {
 		state.Scanned = lastRowKey
-		state.BackfilledCount += eventCount
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
@@ -811,7 +828,9 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 	return nil
 }
 
+type StreamID = string
+
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
-func JoinStreamID(namespace, stream string) string {
+func JoinStreamID(namespace, stream string) StreamID {
 	return strings.ToLower(namespace + "." + stream)
 }

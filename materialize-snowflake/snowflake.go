@@ -130,9 +130,6 @@ type transactor struct {
 	db         *stdsql.DB
 	pipeClient *PipeClient
 
-	// map of pipe name to beginMarker cursors
-	pipeMarkers map[string]string
-
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -193,14 +190,13 @@ func newTransactor(
 	}
 
 	var d = &transactor{
-		cfg:         cfg,
-		ep:          ep,
-		templates:   renderTemplates(dialect),
-		db:          db,
-		pipeClient:  pipeClient,
-		pipeMarkers: make(map[string]string),
-		_range:      open.Range,
-		version:     open.Version,
+		cfg:        cfg,
+		ep:         ep,
+		templates:  renderTemplates(dialect),
+		db:         db,
+		pipeClient: pipeClient,
+		_range:     open.Range,
+		version:    open.Version,
 	}
 
 	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -276,7 +272,7 @@ func (d *transactor) addBinding(target sql.Table) error {
 	return nil
 }
 
-const MaxConcurrentLoads = 5
+const MaxConcurrentQueries = 5
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -298,7 +294,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	var subqueries = make(map[int]string)
-	var toDelete []string
+	var filesToCleanup []string
 	for i, b := range d.bindings {
 		if !b.load.stage.started {
 			// Pass.
@@ -307,10 +303,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if subqueries[i], err = RenderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			toDelete = append(toDelete, dir)
+			filesToCleanup = append(filesToCleanup, dir)
 		}
 	}
-	defer d.deleteFiles(ctx, toDelete)
+	defer d.deleteFiles(ctx, filesToCleanup)
 
 	log.Info("load: finished encoding and uploading of files")
 
@@ -319,7 +315,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(MaxConcurrentLoads)
+	group.SetLimit(MaxConcurrentQueries)
 	// Used to ensure we have no data-interleaving when calling |loaded|
 	var mutex sync.Mutex
 
@@ -407,9 +403,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
+		var flowDocument = it.RawJSON
+		if d.cfg.HardDelete && it.Delete {
+			flowDocument = json.RawMessage(`"delete"`)
+		}
+
 		if err := b.store.stage.start(ctx, d.db); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
@@ -584,28 +585,12 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	// Use a freshly initialized connection for running queries with Snowflake's async mode, as a
-	// possible workaround for https://github.com/estuary/connectors/issues/1526.
-	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.ep.Tenant))
-	if err != nil {
-		return nil, fmt.Errorf("acknowledge stdsql.Open: %w", err)
-	}
-	defer db.Close()
+	// Run store queries concurrently, as each independently operates on a separate table.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(MaxConcurrentQueries)
 
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("acknowledge db.Conn: %w", err)
-	}
-	defer conn.Close()
-
-	// Run the queries using AsyncMode, which means that `ExecContext` will not block
-	// until the query is successful, rather we will store the results of these queries
-	// in a map so that we can then call `RowsAffected` on them, blocking until
-	// the queries are actually executed and done
-	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
-	var results = make(map[string]stdsql.Result)
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
@@ -615,12 +600,18 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		if len(item.Query) > 0 {
-			log.WithField("table", item.Table).Info("store: starting query")
-			if result, err := conn.ExecContext(asyncCtx, item.Query); err != nil {
-				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-			} else {
-				results[stateKey] = result
-			}
+			item := item
+			group.Go(func() error {
+				log.WithField("table", item.Table).Info("store: starting query")
+				if _, err := d.db.ExecContext(groupCtx, item.Query); err != nil {
+					return fmt.Errorf("query %q failed: %w", item.Query, err)
+				}
+
+				log.WithField("table", item.Table).Info("store: finished query")
+				d.deleteFiles(ctx, []string{item.StagedDir})
+
+				return nil
+			})
 		} else if len(item.PipeFiles) > 0 {
 			log.WithField("table", item.Table).Info("store: starting pipe requests")
 			var fileRequests = make([]FileRequest, len(item.PipeFiles))
@@ -649,14 +640,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
-	for stateKey, r := range results {
-		var item = d.cp[stateKey]
-		if _, err := r.RowsAffected(); err != nil {
-			return nil, fmt.Errorf("query failed: %w", err)
-		}
-		log.WithField("table", item.Table).Info("store: finished query")
-
-		d.deleteFiles(ctx, []string{item.StagedDir})
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("executing concurrent store query: %w", err)
 	}
 
 	// Keep asking for a report on the files that have been submitted for processing
@@ -678,18 +663,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is not the most ergonomic and sometimes does not yield
 			// results as expected
-			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
+			report, err := d.pipeClient.InsertReport(pipeName)
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
-			}
-
-			// completeResult=false means the latest report we received has a cursor
-			// which is ahead, and some results have not been seen by us and will not be
-			// seen with the given cursor. So we reset the cursor in this case and try again.
-			if !report.CompleteResult {
-				d.pipeMarkers[pipeName] = ""
-			} else {
-				d.pipeMarkers[pipeName] = report.NextBeginMark
 			}
 
 			// If the files have already been loaded, when we submit a request to

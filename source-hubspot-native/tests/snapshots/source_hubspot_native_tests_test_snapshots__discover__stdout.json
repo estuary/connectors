@@ -46,6 +46,18 @@
               "default": null,
               "title": "Sourceid"
             },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
             "updatedByUserId": {
               "anyOf": [
                 {
@@ -70,6 +82,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -86,9 +99,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -235,6 +245,18 @@
               "default": null,
               "title": "Sourceid"
             },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
             "updatedByUserId": {
               "anyOf": [
                 {
@@ -259,6 +281,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -275,9 +298,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -416,6 +436,18 @@
               "default": null,
               "title": "Sourceid"
             },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
             "updatedByUserId": {
               "anyOf": [
                 {
@@ -440,6 +472,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -456,9 +489,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -613,6 +643,18 @@
               "default": null,
               "title": "Sourceid"
             },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
             "updatedByUserId": {
               "anyOf": [
                 {
@@ -637,6 +679,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -653,9 +696,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -794,6 +834,18 @@
               "default": null,
               "title": "Sourceid"
             },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
             "updatedByUserId": {
               "anyOf": [
                 {
@@ -818,6 +870,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -834,9 +887,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -955,6 +1005,7 @@
         "Meta": {
           "properties": {
             "op": {
+              "default": "u",
               "description": "Operation type (c: Create, u: Update, d: Delete)",
               "enum": [
                 "c",
@@ -971,9 +1022,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "op"
-          ],
           "title": "Meta",
           "type": "object"
         }
@@ -1014,6 +1062,91 @@
     },
     "key": [
       "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "email_events",
+    "resourceConfig": {
+      "name": "email_events"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "created": {
+          "format": "date-time",
+          "title": "Created",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "SENT",
+            "DROPPED",
+            "PROCESSED",
+            "DELIVERED",
+            "DEFERRED",
+            "BOUNCE",
+            "OPEN",
+            "CLICK",
+            "STATUSCHANGE",
+            "SPAMREPORT",
+            "SUPPRESSED",
+            "UNBOUNCE"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created"
+      ],
+      "title": "EmailEvent",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
     ]
   }
 ]

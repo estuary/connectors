@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -80,21 +81,37 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sq
 		if !ok || info.PrimaryKey != nil {
 			continue
 		}
-		for _, columns := range indexColumns {
-			// Test that for each column the value is non-nullable
+
+		// Make a list of all usable indexes.
+		log.WithFields(log.Fields{
+			"table":   streamID,
+			"indices": len(indexColumns),
+		}).Debug("checking for suitable secondary indexes")
+		var suitableIndexes []string
+		for indexName, columns := range indexColumns {
 			if columnsNonNullable(info.Columns, columns) {
 				log.WithFields(log.Fields{
-					"table": streamID,
-					"index": columns,
-				}).Trace("using unique secondary index as primary key")
-				info.PrimaryKey = columns
-				break
-			} else {
-				log.WithFields(log.Fields{
-					"table": streamID,
-					"index": columns,
-				}).Trace("cannot use secondary index because some of its columns are nullable")
+					"table":   streamID,
+					"index":   indexName,
+					"columns": columns,
+				}).Debug("secondary index could be used as primary key")
+				suitableIndexes = append(suitableIndexes, indexName)
 			}
+		}
+
+		// Sort the list by index name and pick the first one, if there are multiple.
+		// This helps ensure stable selection, although it could still change due to
+		// the creation of a new secondary index.
+		sort.Strings(suitableIndexes)
+		if len(suitableIndexes) > 0 {
+			var selectedIndex = suitableIndexes[0]
+			log.WithFields(log.Fields{
+				"table": streamID,
+				"index": selectedIndex,
+			}).Debug("selected secondary index as table key")
+			info.PrimaryKey = indexColumns[selectedIndex]
+		} else {
+			log.WithField("table", streamID).Debug("no secondary index is suitable")
 		}
 	}
 

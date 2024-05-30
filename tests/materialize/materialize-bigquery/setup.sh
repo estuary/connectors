@@ -4,23 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export PROJECT_ID="${GCP_BQ_PROJECT_ID}"
-export DATASET="${GCP_BQ_DATASET}"
-export REGION="${GCP_BQ_REGION}"
-export BUCKET="${GCP_BQ_BUCKET}"
-export GCP_SERVICE_ACCOUNT_KEY_QUOTED=$(echo ${GCP_SERVICE_ACCOUNT_KEY} | jq 'tojson')
-
-config_json_template='{
-   "project_id":        "$PROJECT_ID",
-   "dataset":           "$DATASET",
-   "region":            "$REGION",
-   "bucket":            "$BUCKET",
-   "credentials_json":  $GCP_SERVICE_ACCOUNT_KEY_QUOTED,
-   "advanced": {
-      "updateDelay": "0s"
-    }
-}'
-
 resources_json_template='[
   {
     "resource": {
@@ -57,8 +40,20 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export GCP_BQ_PROJECT_ID="$(echo $CONNECTOR_CONFIG | jq -r .project_id)"
+export GCP_BQ_DATASET="$(echo $CONNECTOR_CONFIG | jq -r .dataset)"
+export GCP_BQ_REGION="$(echo $CONNECTOR_CONFIG | jq -r .region)"
+export GCP_BQ_BUCKET="$(echo $CONNECTOR_CONFIG | jq -r .bucket)"
+export GCP_SERVICE_ACCOUNT_KEY=$(echo $CONNECTOR_CONFIG | jq -r .credentials_json)
+
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"

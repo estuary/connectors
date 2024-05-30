@@ -57,7 +57,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
 		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),
 		sql.ARRAY:   sql.NewStaticMapper(textType, jsonConverter),
-		sql.BINARY:  sql.NewStaticMapper("VARBINARY(MAX)"),
+		sql.BINARY:  sql.NewStaticMapper(textType),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.PrimaryKeyMapper{
 				// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
@@ -331,7 +331,7 @@ SELECT TOP 0 -1, NULL
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Document }}
-	WHEN MATCHED AND r.{{ $.Document.Identifier }}=NULL THEN
+	WHEN MATCHED AND r.{{ $.Document.Identifier }}='"delete"' THEN
 		DELETE
 	{{- end }}
 	WHEN MATCHED THEN

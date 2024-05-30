@@ -272,3 +272,17 @@ func TestEnumEmptyString(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{5, "A"}, {6, "B"}, {7, "C"}, {8, "error"}, {200, 0}, {201, 1}, {202, ""}, {205, 5}})
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
+
+func TestUnsignedIntegers(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "45511171"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, v1 TINYINT UNSIGNED, v2 SMALLINT UNSIGNED, v3 MEDIUMINT UNSIGNED, v4 INT UNSIGNED, v8 BIGINT UNSIGNED)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	// Insert various test values and then capture them via replication
+	tb.Insert(ctx, t, tableName, [][]any{{1, "222", "55555", "11111111", "3333333333", "17777777777777777777"}})
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]any{{2, "222", "55555", "11111111", "3333333333", "17777777777777777777"}})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}

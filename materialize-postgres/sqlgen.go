@@ -16,7 +16,7 @@ var pgDialect = func() sql.Dialect {
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:   sql.NewStaticMapper("JSON"),
 		sql.ARRAY:    sql.NewStaticMapper("JSON"),
-		sql.BINARY:   sql.NewStaticMapper("BYTEA"),
+		sql.BINARY:   sql.NewStaticMapper("TEXT"),
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(
@@ -226,6 +226,15 @@ UPDATE {{$.Identifier}} SET
 	;
 {{ end }}
 
+{{ define "deleteQuery" }}
+DELETE FROM {{$.Identifier}} WHERE
+{{ range $ind, $key := $.Keys -}}
+	{{- if $ind }} AND {{ end -}}
+	{{ $key.Identifier }} = {{ $key.Placeholder }}
+{{- end -}}
+	;
+{{ end }}
+
 {{ define "installFence" }}
 with
 -- Increment the fence value of _any_ checkpoint which overlaps our key range.
@@ -287,6 +296,7 @@ END $$;
 	tplLoadInsert        = tplAll.Lookup("loadInsert")
 	tplStoreInsert       = tplAll.Lookup("storeInsert")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
+	tplDeleteQuery       = tplAll.Lookup("deleteQuery")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")

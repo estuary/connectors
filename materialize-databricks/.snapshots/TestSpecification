@@ -12,18 +12,28 @@
       "http_path": {
         "type": "string",
         "title": "HTTP path",
-        "description": "HTTP path of your SQL warehouse"
+        "description": "HTTP path of your SQL warehouse",
+        "order": 1
       },
       "catalog_name": {
         "type": "string",
         "title": "Catalog Name",
-        "description": "Name of your Unity Catalog."
+        "description": "Name of your Unity Catalog.",
+        "order": 2
       },
       "schema_name": {
         "type": "string",
         "title": "Schema Name",
         "description": "Default schema to materialize to",
-        "default": "default"
+        "default": "default",
+        "order": 3
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 4
       },
       "credentials": {
         "oneOf": [
@@ -55,7 +65,8 @@
         },
         "discriminator": {
           "propertyName": "auth_type"
-        }
+        },
+        "order": 5
       },
       "advanced": {
         "properties": {

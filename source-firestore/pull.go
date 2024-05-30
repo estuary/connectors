@@ -172,12 +172,16 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 			// change data has been skipped. To get back into a consistent state, we will have
 			// to restart from the current moment (to maximize our changes of staying caught
 			// up going forward) and start a new backfill of the entire collection.
-			var prevStartTime time.Time
+			var startTime time.Time
 			if prevState.Backfill != nil {
-				prevStartTime = prevState.Backfill.StartAfter
+				startTime = prevState.Backfill.StartAfter
 			}
-			var startTime = prevStartTime.Add(backfillRestartDelay)
-			if time.Now().After(startTime) {
+			// Add a restart delay unless the current StartAfter time is already in the future.
+			if startTime.Before(time.Now()) {
+				startTime = startTime.Add(backfillRestartDelay)
+			}
+			// If the adjusted start time is still in the past, we ought to start immediately.
+			if startTime.Before(time.Now()) {
 				startTime = time.Now()
 			}
 			state.ReadTime = now
@@ -201,11 +205,11 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 				return nil, fmt.Errorf("invalid backfill mode %q for %q", res.BackfillMode, res.Path)
 			}
 			if res.InitTimestamp != "" {
-				if ts, err := time.Parse(time.RFC3339Nano, res.InitTimestamp); err != nil {
+				var ts, err = time.Parse(time.RFC3339Nano, res.InitTimestamp)
+				if err != nil {
 					return nil, fmt.Errorf("invalid initTimestamp value %q: %w", res.InitTimestamp, err)
-				} else {
-					state.ReadTime = ts
 				}
+				state.ReadTime = ts
 			}
 		}
 		states[stateKey] = state
@@ -556,6 +560,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 				Path:       doc.Ref.Path,
 				CreateTime: &doc.CreateTime,
 				UpdateTime: &doc.UpdateTime,
+				Snapshot:   true,
 			}
 
 			if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
@@ -685,8 +690,31 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 		}
 		logEntry.WithField("resp", resp).Trace("got response")
 
+		var prevResumeToken string
+
 		switch resp := resp.ResponseType.(type) {
 		case *firestore_pb.ListenResponse_TargetChange:
+			// This is an experimental bit of debugging-in-production logging added in April 2024
+			// in order to investigate whether it might be possible to make incremental streaming
+			// progress using resume tokens instead of read times when retrying.
+			//
+			// The official Firestore client library (which we don't use because it doesn't allow
+			// us to stream incremental results before an entire consistent snapshot has been read
+			// into memory) only updates the resume token when a consistent point is reached. But
+			// it is theoretically permitted for the server to send useful resume tokens before we
+			// reach that point, and if it does then this might allow us to more reliably stream
+			// changes from high-throughput collections.
+			if len(resp.TargetChange.ResumeToken) != 0 {
+				var nextResumeToken = string(resp.TargetChange.ResumeToken)
+				if nextResumeToken != prevResumeToken {
+					logEntry.WithFields(log.Fields{
+						"token":   nextResumeToken,
+						"targets": resp.TargetChange.TargetIds,
+					}).Debug("got new resume token")
+					prevResumeToken = nextResumeToken
+				}
+			}
+
 			logEntry.WithField("tc", resp.TargetChange).Trace("TargetChange Event")
 			switch tc := resp.TargetChange; tc.TargetChangeType {
 			case firestore_pb.TargetChange_NO_CHANGE:

@@ -1,216 +1,21 @@
-{
-  "applied": {
-    "actionDescription": "create table \"flow_materializations_v2\"\ncreate table \"simple\"\ncreate table \"duplicated-keys-standard\"\ncreate table \"duplicated-keys-delta\"\ncreate table \"duplicated-keys-delta-exclude-flow-doc\"\ncreate table \"multiple-types\"\ncreate table \"formatted-strings\"\nupdate stored materialization spec and set version = test"
+[
+  "applied.actionDescription",
+  "create table \"flow_materializations_v2\"\ncreate table \"simple\"\ncreate table \"duplicated-keys-standard\"\ncreate table \"duplicated-keys-delta\"\ncreate table \"duplicated-keys-delta-exclude-flow-doc\"\ncreate table \"multiple-types\"\ncreate table \"formatted-strings\"\nupdate stored materialization spec and set version = localbuild"
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
-}
-{
-  "opened": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 1,
-      "int": 1,
-      "str": "str 1"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 2,
-      "int": 2,
-      "str": "str 2"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 3,
-      "int": 3,
-      "str": "str 3"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 4,
-      "int": 4,
-      "str": "str 4"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 5,
-      "int": 5,
-      "str": "str 5"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        61,
-        62
-      ],
-      "bool_field": true,
-      "float_field": 6.6,
-      "id": 6,
-      "multiple": [
-        "one",
-        2,
-        true
-      ],
-      "nested": {
-        "id": "i6"
-      },
-      "nullable_int": 6,
-      "str_field": "str6"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        71,
-        72
-      ],
-      "bool_field": false,
-      "float_field": 7.7,
-      "id": 7,
-      "multiple": {
-        "object": "seven"
-      },
-      "nested": {
-        "id": "i7"
-      },
-      "nullable_int": null,
-      "str_field": "str7"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        81,
-        82
-      ],
-      "bool_field": true,
-      "float_field": 8.8,
-      "id": 8,
-      "multiple": null,
-      "nested": {
-        "id": "i8"
-      },
-      "nullable_int": 8,
-      "str_field": "str8"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        91,
-        92
-      ],
-      "bool_field": false,
-      "float_field": 9.9,
-      "id": 9,
-      "nested": {
-        "id": "i9"
-      },
-      "nullable_int": null,
-      "str_field": "str9"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
+]
 {
   "_table": "simple",
   "rows": [
@@ -223,7 +28,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "1419d680-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -248,7 +53,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7676d500-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -273,7 +78,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "13814000-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -298,7 +103,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "14b26d00-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -323,7 +128,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "b4b60968-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "15e39a00-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -348,7 +153,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "1b953992-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "75de3e80-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -373,7 +178,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "8458b580-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "770f6b80-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -398,7 +203,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "134a1456-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7545a800-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -423,7 +228,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "167c3080-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -448,7 +253,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "154b0380-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -475,7 +280,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "957348bc-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "78409880-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -483,7 +288,7 @@
             "N": "2"
           },
           "int": {
-            "N": "7"
+            "N": "9"
           },
           "str": {
             "S": "str 7"
@@ -494,7 +299,7 @@
         "N": "2"
       },
       "int": {
-        "N": "7"
+        "N": "9"
       },
       "str": {
         "S": "str 7"
@@ -506,7 +311,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "8de85150-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "77a80200-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -514,7 +319,7 @@
             "N": "1"
           },
           "int": {
-            "N": "6"
+            "N": "7"
           },
           "str": {
             "S": "str 6"
@@ -525,7 +330,7 @@
         "N": "1"
       },
       "int": {
-        "N": "6"
+        "N": "7"
       },
       "str": {
         "S": "str 6"
@@ -537,7 +342,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "9afb3ff6-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "78d92f00-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -545,7 +350,7 @@
             "N": "3"
           },
           "int": {
-            "N": "8"
+            "N": "11"
           },
           "str": {
             "S": "str 8"
@@ -556,7 +361,7 @@
         "N": "3"
       },
       "int": {
-        "N": "8"
+        "N": "11"
       },
       "str": {
         "S": "str 8"
@@ -568,7 +373,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "a65203a8-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7a0a5c00-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -576,7 +381,7 @@
             "N": "5"
           },
           "int": {
-            "N": "10"
+            "N": "15"
           },
           "str": {
             "S": "str 10"
@@ -587,7 +392,7 @@
         "N": "5"
       },
       "int": {
-        "N": "10"
+        "N": "15"
       },
       "str": {
         "S": "str 10"
@@ -599,7 +404,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "a1100a70-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7971c580-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -607,7 +412,7 @@
             "N": "4"
           },
           "int": {
-            "N": "9"
+            "N": "13"
           },
           "str": {
             "S": "str 9"
@@ -618,7 +423,7 @@
         "N": "4"
       },
       "int": {
-        "N": "9"
+        "N": "13"
       },
       "str": {
         "S": "str 9"
@@ -635,7 +440,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "957348bc-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "78409880-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -666,7 +471,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "8de85150-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "77a80200-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -697,7 +502,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "9afb3ff6-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "78d92f00-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -728,7 +533,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "a65203a8-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7a0a5c00-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -759,7 +564,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "a1100a70-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7971c580-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -860,6 +665,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": true
       },
@@ -871,7 +679,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "4b37f0b8-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "1bd97b00-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -943,6 +751,9 @@
           }
         ]
       },
+      "binary_field": {
+        "B": "YWxvaGEK"
+      },
       "bool_field": {
         "BOOL": false
       },
@@ -954,7 +765,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "f5b064a8-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "82629700-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -967,6 +778,9 @@
                 "N": "92"
               }
             ]
+          },
+          "binary_field": {
+            "S": "YWxvaGEK"
           },
           "bool_field": {
             "BOOL": false
@@ -1023,6 +837,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": false
       },
@@ -1034,7 +851,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "3fd2ec78-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "1b40e480-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -1106,6 +923,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": false
       },
@@ -1117,7 +937,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "51016380-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "1c721180-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -1189,6 +1009,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": false
       },
@@ -1200,7 +1023,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "5af9e236-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "1da33e80-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -1272,6 +1095,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": true
       },
@@ -1283,7 +1109,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "f163eef6-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "81ca0080-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1355,6 +1181,9 @@
           }
         ]
       },
+      "binary_field": {
+        "B": "c2F5xY1uYXJhCg=="
+      },
       "bool_field": {
         "BOOL": true
       },
@@ -1366,7 +1195,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "82fb2d80-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1379,6 +1208,9 @@
                 "N": "2"
               }
             ]
+          },
+          "binary_field": {
+            "S": "c2F5xY1uYXJhCg=="
           },
           "bool_field": {
             "BOOL": true
@@ -1435,6 +1267,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": false
       },
@@ -1446,7 +1281,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "eb40dafc-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "81316a00-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1522,6 +1357,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": true
       },
@@ -1533,7 +1371,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "e4b646c2-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "8098d380-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1615,6 +1453,9 @@
           }
         ]
       },
+      "binary_field": {
+        "NULL": true
+      },
       "bool_field": {
         "BOOL": true
       },
@@ -1626,7 +1467,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "5660aaca-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "1d0aa800-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -1704,7 +1545,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "b81a9bf4-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7d9de300-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1765,7 +1606,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7f67a680-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1808,7 +1649,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "b1e13a0e-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7d054c80-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1869,7 +1710,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "1a0fb780-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -1930,7 +1771,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7e367980-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -1991,7 +1832,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "7ecf1000-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -2034,7 +1875,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+                "S": "80003d00-1dda-11b2-8000-071353030311"
               }
             }
           },
@@ -2077,7 +1918,7 @@
           "_meta": {
             "M": {
               "uuid": {
-                "S": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+                "S": "1aa84e00-1dd2-11b2-8000-071353030311"
               }
             }
           },
@@ -2128,14 +1969,13 @@
     }
   ]
 }
-{
-  "applied": {
-    "actionDescription": "create table \"flow_materializations_v2\"\nupdate stored materialization spec and set version = test"
+[
+  "applied.actionDescription",
+  "create table \"flow_materializations_v2\"\nupdate stored materialization spec and set version = localbuild"
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
-}
-{
-  "opened": {}
-}
-{
-  "acknowledged": {}
-}
+]

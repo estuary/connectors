@@ -1,509 +1,350 @@
-{
-  "applied": {
-    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
+[
+  "applied.actionDescription",
+  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbinary_field STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INT64 NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('localbuild', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {
+    "updated": {}
   }
+]
+{
+  "rows": [
+    {
+      "canary": "amputation's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"13814000-1dd2-11b2-8000-071353030311\"},\"canary\":\"amputation's\",\"id\":1}",
+      "flow_published_at": "1970-01-01T00:00:00Z",
+      "id": 1
+    },
+    {
+      "canary": "armament's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"1419d680-1dd2-11b2-8000-071353030311\"},\"canary\":\"armament's\",\"id\":2}",
+      "flow_published_at": "1970-01-01T00:00:01Z",
+      "id": 2
+    },
+    {
+      "canary": "splatters",
+      "flow_document": "{\"_meta\":{\"uuid\":\"14b26d00-1dd2-11b2-8000-071353030311\"},\"canary\":\"splatters\",\"id\":3}",
+      "flow_published_at": "1970-01-01T00:00:02Z",
+      "id": 3
+    },
+    {
+      "canary": "strengthen",
+      "flow_document": "{\"_meta\":{\"uuid\":\"154b0380-1dd2-11b2-8000-071353030311\"},\"canary\":\"strengthen\",\"id\":4}",
+      "flow_published_at": "1970-01-01T00:00:03Z",
+      "id": 4
+    },
+    {
+      "canary": "Kringle's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"15e39a00-1dd2-11b2-8000-071353030311\"},\"canary\":\"Kringle's\",\"id\":5}",
+      "flow_published_at": "1970-01-01T00:00:04Z",
+      "id": 5
+    },
+    {
+      "canary": "grosbeak's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"167c3080-1dd2-11b2-8000-071353030311\"},\"canary\":\"grosbeak's\",\"id\":6}",
+      "flow_published_at": "1970-01-01T00:00:05Z",
+      "id": 6
+    },
+    {
+      "canary": "pieced",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7545a800-1dda-11b2-8000-071353030311\"},\"canary\":\"pieced\",\"id\":7}",
+      "flow_published_at": "1970-01-01T01:00:00Z",
+      "id": 7
+    },
+    {
+      "canary": "roaches",
+      "flow_document": "{\"_meta\":{\"uuid\":\"75de3e80-1dda-11b2-8000-071353030311\"},\"canary\":\"roaches\",\"id\":8}",
+      "flow_published_at": "1970-01-01T01:00:01Z",
+      "id": 8
+    },
+    {
+      "canary": "devilish",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7676d500-1dda-11b2-8000-071353030311\"},\"canary\":\"devilish\",\"id\":9}",
+      "flow_published_at": "1970-01-01T01:00:02Z",
+      "id": 9
+    },
+    {
+      "canary": "glucose's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"770f6b80-1dda-11b2-8000-071353030311\"},\"canary\":\"glucose's\",\"id\":10}",
+      "flow_published_at": "1970-01-01T01:00:03Z",
+      "id": 10
+    }
+  ],
+  "table": "simple"
 }
 {
-  "opened": {
-    "runtimeCheckpoint": {}
-  }
-}
-{
-  "acknowledged": {}
-}
-{
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
+  "rows": [
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"77a80200-1dda-11b2-8000-071353030311\"},\"id\":1,\"int\":7,\"str\":\"str 6\"}",
+      "flow_published_at": "1970-01-01T01:00:04Z",
       "id": 1,
-      "int": 1,
-      "str": "str 1"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
+      "int": 7,
+      "str": "str 6"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"78409880-1dda-11b2-8000-071353030311\"},\"id\":2,\"int\":9,\"str\":\"str 7\"}",
+      "flow_published_at": "1970-01-01T01:00:05Z",
       "id": 2,
-      "int": 2,
-      "str": "str 2"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
+      "int": 9,
+      "str": "str 7"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"78d92f00-1dda-11b2-8000-071353030311\"},\"id\":3,\"int\":11,\"str\":\"str 8\"}",
+      "flow_published_at": "1970-01-01T01:00:06Z",
       "id": 3,
-      "int": 3,
-      "str": "str 3"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
+      "int": 11,
+      "str": "str 8"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"7971c580-1dda-11b2-8000-071353030311\"},\"id\":4,\"int\":13,\"str\":\"str 9\"}",
+      "flow_published_at": "1970-01-01T01:00:07Z",
       "id": 4,
-      "int": 4,
-      "str": "str 4"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
+      "int": 13,
+      "str": "str 9"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"7a0a5c00-1dda-11b2-8000-071353030311\"},\"id\":5,\"int\":15,\"str\":\"str 10\"}",
+      "flow_published_at": "1970-01-01T01:00:08Z",
       "id": 5,
-      "int": 5,
-      "str": "str 5"
+      "int": 15,
+      "str": "str 10"
     }
-  }
+  ],
+  "table": "duplicate_keys"
 }
 {
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        61,
-        62
-      ],
+  "rows": [
+    {
+      "array_int": "[11,12]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 1.1,
+      "flow_document": "{\"_meta\":{\"uuid\":\"1b40e480-1dd2-11b2-8000-071353030311\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
+      "flow_published_at": "1970-01-01T00:00:13Z",
+      "id": 1,
+      "multiple": "1",
+      "nested": "{\"id\":\"i1\"}",
+      "nullable_int": null,
+      "str_field": "str1"
+    },
+    {
+      "array_int": "[21,22]",
+      "binary_field": null,
       "bool_field": true,
-      "float_field": 6.6,
+      "float_field": 2.2,
+      "flow_document": "{\"_meta\":{\"uuid\":\"1bd97b00-1dd2-11b2-8000-071353030311\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
+      "flow_published_at": "1970-01-01T00:00:14Z",
+      "id": 2,
+      "multiple": "2.2",
+      "nested": "{\"id\":\"i2\"}",
+      "nullable_int": 2,
+      "str_field": "str2"
+    },
+    {
+      "array_int": "[31,32]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 3.3,
+      "flow_document": "{\"_meta\":{\"uuid\":\"1c721180-1dd2-11b2-8000-071353030311\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
+      "flow_published_at": "1970-01-01T00:00:15Z",
+      "id": 3,
+      "multiple": "true",
+      "nested": "{\"id\":\"i3\"}",
+      "nullable_int": null,
+      "str_field": "str3"
+    },
+    {
+      "array_int": "[41,42]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 4.4,
+      "flow_document": "{\"_meta\":{\"uuid\":\"1d0aa800-1dd2-11b2-8000-071353030311\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
+      "flow_published_at": "1970-01-01T00:00:16Z",
+      "id": 4,
+      "multiple": "false",
+      "nested": "{\"id\":\"i4\"}",
+      "nullable_int": 4,
+      "str_field": "str4"
+    },
+    {
+      "array_int": "[51,52]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 5.5,
+      "flow_document": "{\"_meta\":{\"uuid\":\"1da33e80-1dd2-11b2-8000-071353030311\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
+      "flow_published_at": "1970-01-01T00:00:17Z",
+      "id": 5,
+      "multiple": "\"string five\"",
+      "nested": "{\"id\":\"i5\"}",
+      "nullable_int": null,
+      "str_field": "str5"
+    },
+    {
+      "array_int": "[61,62]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 66.66,
+      "flow_document": "{\"_meta\":{\"uuid\":\"8098d380-1dda-11b2-8000-071353030311\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
+      "flow_published_at": "1970-01-01T01:00:19Z",
       "id": 6,
-      "multiple": [
-        "one",
-        2,
-        true
-      ],
-      "nested": {
-        "id": "i6"
-      },
+      "multiple": "[\"one\",2,true]",
+      "nested": "{\"id\":\"i6\"}",
       "nullable_int": 6,
-      "str_field": "str6"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        71,
-        72
-      ],
+      "str_field": "str6 v2"
+    },
+    {
+      "array_int": "[71,72]",
+      "binary_field": null,
       "bool_field": false,
-      "float_field": 7.7,
+      "float_field": 77.77,
+      "flow_document": "{\"_meta\":{\"uuid\":\"81316a00-1dda-11b2-8000-071353030311\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
+      "flow_published_at": "1970-01-01T01:00:20Z",
       "id": 7,
-      "multiple": {
-        "object": "seven"
-      },
-      "nested": {
-        "id": "i7"
-      },
+      "multiple": "{\"object\":\"seven\"}",
+      "nested": "{\"id\":\"i7\"}",
       "nullable_int": null,
-      "str_field": "str7"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        81,
-        82
-      ],
+      "str_field": "str7 v2"
+    },
+    {
+      "array_int": "[81,82]",
+      "binary_field": null,
       "bool_field": true,
-      "float_field": 8.8,
+      "float_field": 88.88,
+      "flow_document": "{\"_meta\":{\"uuid\":\"81ca0080-1dda-11b2-8000-071353030311\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
+      "flow_published_at": "1970-01-01T01:00:21Z",
       "id": 8,
-      "multiple": null,
-      "nested": {
-        "id": "i8"
-      },
+      "multiple": "null",
+      "nested": "{\"id\":\"i8\"}",
       "nullable_int": 8,
-      "str_field": "str8"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        91,
-        92
-      ],
+      "str_field": "str8 v2"
+    },
+    {
+      "array_int": "[91,92]",
+      "binary_field": "YWxvaGEK",
       "bool_field": false,
-      "float_field": 9.9,
+      "float_field": 99.99,
+      "flow_document": "{\"_meta\":{\"uuid\":\"82629700-1dda-11b2-8000-071353030311\"},\"array_int\":[91,92],\"binary_field\":\"YWxvaGEK\",\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
+      "flow_published_at": "1970-01-01T01:00:22Z",
       "id": 9,
-      "nested": {
-        "id": "i9"
-      },
+      "multiple": "null",
+      "nested": "{\"id\":\"i9\"}",
       "nullable_int": null,
-      "str_field": "str9"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "_meta": {
-        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        1,
-        2
-      ],
+      "str_field": "str9 v2"
+    },
+    {
+      "array_int": "[1,2]",
+      "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
-      "float_field": 10.1,
+      "float_field": 1010.101,
+      "flow_document": "{\"_meta\":{\"uuid\":\"82fb2d80-1dda-11b2-8000-071353030311\"},\"array_int\":[1,2],\"binary_field\":\"c2F5xY1uYXJhCg==\",\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
+      "flow_published_at": "1970-01-01T01:00:23Z",
       "id": 10,
-      "nested": {
-        "id": "i10"
-      },
+      "multiple": "null",
+      "nested": "{\"id\":\"i10\"}",
       "nullable_int": 10,
-      "str_field": "str10"
+      "str_field": "str10 v2"
     }
-  }
+  ],
+  "table": "multiple_types"
 }
 {
-  "flushed": {}
-}
-{
-  "startedCommit": {}
-}
-{
-  "acknowledged": {}
-}
-[
-  1,
-  "amputation's",
-  "2023-07-12T18:18:11.537199Z",
-  "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"amputation's\",\"id\":1}"
-]
-[
-  2,
-  "armament's",
-  "2023-07-12T18:18:24.946758Z",
-  "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"armament's\",\"id\":2}"
-]
-[
-  3,
-  "splatters",
-  "2023-07-12T18:18:48.441281Z",
-  "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"splatters\",\"id\":3}"
-]
-[
-  4,
-  "strengthen",
-  "2023-07-12T18:19:15.034186Z",
-  "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"strengthen\",\"id\":4}"
-]
-[
-  5,
-  "Kringle's",
-  "2023-07-12T18:19:57.165604Z",
-  "{\"_meta\":{\"uuid\":\"b4b60968-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"Kringle's\",\"id\":5}"
-]
-[
-  6,
-  "grosbeak's",
-  "2023-07-12T18:20:10.962631Z",
-  "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"grosbeak's\",\"id\":6}"
-]
-[
-  7,
-  "pieced",
-  "2023-07-12T18:22:35.841647Z",
-  "{\"_meta\":{\"uuid\":\"134a1456-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"pieced\",\"id\":7}"
-]
-[
-  8,
-  "roaches",
-  "2023-07-12T18:22:49.755893Z",
-  "{\"_meta\":{\"uuid\":\"1b953992-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"roaches\",\"id\":8}"
-]
-[
-  9,
-  "devilish",
-  "2023-07-12T18:25:35.173533Z",
-  "{\"_meta\":{\"uuid\":\"7e2df422-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"devilish\",\"id\":9}"
-]
-[
-  10,
-  "glucose's",
-  "2023-07-12T18:25:45.520064Z",
-  "{\"_meta\":{\"uuid\":\"8458b580-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"glucose's\",\"id\":10}"
-]
-[
-  1,
-  "2023-07-12T18:26:01.560712Z",
-  6,
-  "str 6",
-  "{\"_meta\":{\"uuid\":\"8de85150-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}"
-]
-[
-  2,
-  "2023-07-12T18:26:14.215494Z",
-  7,
-  "str 7",
-  "{\"_meta\":{\"uuid\":\"957348bc-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":7,\"str\":\"str 7\"}"
-]
-[
-  3,
-  "2023-07-12T18:26:23.495167Z",
-  8,
-  "str 8",
-  "{\"_meta\":{\"uuid\":\"9afb3ff6-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":8,\"str\":\"str 8\"}"
-]
-[
-  4,
-  "2023-07-12T18:26:33.697752Z",
-  9,
-  "str 9",
-  "{\"_meta\":{\"uuid\":\"a1100a70-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":9,\"str\":\"str 9\"}"
-]
-[
-  5,
-  "2023-07-12T18:26:42.518724Z",
-  10,
-  "str 10",
-  "{\"_meta\":{\"uuid\":\"a65203a8-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":10,\"str\":\"str 10\"}"
-]
-[
-  1,
-  "[11,12]",
-  false,
-  1.1,
-  "2023-07-12T18:23:50.55822Z",
-  "1",
-  "{\"id\":\"i1\"}",
-  null,
-  "str1",
-  "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}"
-]
-[
-  2,
-  "[21,22]",
-  true,
-  2.2,
-  "2023-07-12T18:24:09.67518Z",
-  "2.2",
-  "{\"id\":\"i2\"}",
-  2,
-  "str2",
-  "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}"
-]
-[
-  3,
-  "[31,32]",
-  false,
-  3.3,
-  "2023-07-12T18:24:19.384Z",
-  "true",
-  "{\"id\":\"i3\"}",
-  null,
-  "str3",
-  "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}"
-]
-[
-  4,
-  "[41,42]",
-  true,
-  4.4,
-  "2023-07-12T18:24:28.397025Z",
-  "false",
-  "{\"id\":\"i4\"}",
-  4,
-  "str4",
-  "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}"
-]
-[
-  5,
-  "[51,52]",
-  false,
-  5.5,
-  "2023-07-12T18:24:36.112031Z",
-  "\"string five\"",
-  "{\"id\":\"i5\"}",
-  null,
-  "str5",
-  "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}"
-]
-[
-  6,
-  "[61,62]",
-  true,
-  66.66,
-  "2023-07-12T18:28:27.194541Z",
-  "[\"one\",2,true]",
-  "{\"id\":\"i6\"}",
-  6,
-  "str6 v2",
-  "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}"
-]
-[
-  7,
-  "[71,72]",
-  false,
-  77.77,
-  "2023-07-12T18:28:38.169062Z",
-  "{\"object\":\"seven\"}",
-  "{\"id\":\"i7\"}",
-  null,
-  "str7 v2",
-  "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}"
-]
-[
-  8,
-  "[81,82]",
-  true,
-  88.88,
-  "2023-07-12T18:28:48.465279Z",
-  "null",
-  "{\"id\":\"i8\"}",
-  8,
-  "str8 v2",
-  "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}"
-]
-[
-  9,
-  "[91,92]",
-  false,
-  99.99,
-  "2023-07-12T18:28:55.677252Z",
-  "null",
-  "{\"id\":\"i9\"}",
-  null,
-  "str9 v2",
-  "{\"_meta\":{\"uuid\":\"f5b064a8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[91,92],\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}"
-]
-[
-  10,
-  "[1,2]",
-  true,
-  1010.101,
-  "2023-07-12T18:29:04.671352Z",
-  "null",
-  "{\"id\":\"i10\"}",
-  10,
-  "str10 v2",
-  "{\"_meta\":{\"uuid\":\"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[1,2],\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}"
-]
-[
-  1,
-  "0001-01-01",
-  "0001-01-01T00:00:00Z",
-  "2023-07-12T18:27:01.912219Z",
-  "1",
-  "10",
-  1.1,
-  10.1,
-  "00:00:00Z",
-  "{\"_meta\":{\"uuid\":\"b1e13a0e-20e1-11ee-990b-ffd12dfcd47f\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}"
-]
-[
-  2,
-  "1999-02-02",
-  "1999-02-02T14:20:12.33Z",
-  "2023-07-12T18:27:12.35461Z",
-  "2",
-  "20",
-  2.1,
-  20.1,
-  "14:20:12.33Z",
-  "{\"_meta\":{\"uuid\":\"b81a9bf4-20e1-11ee-990b-ffd12dfcd47f\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}"
-]
-[
-  3,
-  "1000-03-03",
-  "1000-03-03T23:59:38.099999Z",
-  "2023-07-12T18:18:11.537199Z",
-  "3",
-  "30",
-  3.1,
-  30.1,
-  "23:59:38.10Z",
-  "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}"
-]
-[
-  4,
-  "2023-08-29",
-  "2023-08-29T23:59:38Z",
-  "2023-07-12T18:18:48.441281Z",
-  "4",
-  "40",
-  4.1,
-  40.1,
-  "23:59:38Z",
-  "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}"
-]
-[
-  5,
-  "9999-12-31",
-  "9999-12-31T23:59:59Z",
-  "2023-07-12T18:27:25.889321Z",
-  "5",
-  "50",
-  5.1,
-  50.1,
-  "23:59:59Z",
-  "{\"_meta\":{\"uuid\":\"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}"
-]
-{
-  "applied": {
-    "actionDescription": "UPDATE `estuary-theatre`.testing.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-bigquery/materialize';"
-  }
-}
-{
-  "opened": {
-    "runtimeCheckpoint": {
-      "sources": {
-        "a/read/journal;suffix": {
-          "readThrough": "1"
-        }
-      }
+  "rows": [
+    {
+      "date": "0001-01-01",
+      "datetime": "0001-01-01T00:00:00Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7d054c80-1dda-11b2-8000-071353030311\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}",
+      "flow_published_at": "1970-01-01T01:00:13Z",
+      "id": 1,
+      "int_and_str": "1",
+      "int_str": "10",
+      "num_and_str": 1.1,
+      "num_str": 10.1,
+      "time": "00:00:00Z"
+    },
+    {
+      "date": "1999-02-02",
+      "datetime": "1999-02-02T14:20:12.33Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7d9de300-1dda-11b2-8000-071353030311\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}",
+      "flow_published_at": "1970-01-01T01:00:14Z",
+      "id": 2,
+      "int_and_str": "2",
+      "int_str": "20",
+      "num_and_str": 2.1,
+      "num_str": 20.1,
+      "time": "14:20:12.33Z"
+    },
+    {
+      "date": "1000-03-03",
+      "datetime": "1000-03-03T23:59:38.099999Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"1a0fb780-1dd2-11b2-8000-071353030311\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}",
+      "flow_published_at": "1970-01-01T00:00:11Z",
+      "id": 3,
+      "int_and_str": "3",
+      "int_str": "30",
+      "num_and_str": 3.1,
+      "num_str": 30.1,
+      "time": "23:59:38.10Z"
+    },
+    {
+      "date": "2023-08-29",
+      "datetime": "2023-08-29T23:59:38Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"1aa84e00-1dd2-11b2-8000-071353030311\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}",
+      "flow_published_at": "1970-01-01T00:00:12Z",
+      "id": 4,
+      "int_and_str": "4",
+      "int_str": "40",
+      "num_and_str": 4.1,
+      "num_str": 40.1,
+      "time": "23:59:38Z"
+    },
+    {
+      "date": "9999-12-31",
+      "datetime": "9999-12-31T23:59:59Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7e367980-1dda-11b2-8000-071353030311\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}",
+      "flow_published_at": "1970-01-01T01:00:15Z",
+      "id": 5,
+      "int_and_str": "5",
+      "int_str": "50",
+      "num_and_str": 5.1,
+      "num_str": 50.1,
+      "time": "23:59:59Z"
     }
-  }
+  ],
+  "table": "formatted_strings"
 }
 {
-  "acknowledged": {}
+  "rows": [
+    {
+      "_meta_op": "u",
+      "flow_document": "{\"_meta\":{\"op\":\"u\",\"uuid\":\"84c4f100-1dda-11b2-8000-071353030311\"},\"id\":2}",
+      "flow_published_at": "1970-01-01T01:00:26Z",
+      "id": 2
+    },
+    {
+      "_meta_op": "c",
+      "flow_document": "{\"_meta\":{\"op\":\"c\",\"uuid\":\"855d8780-1dda-11b2-8000-071353030311\"},\"id\":3}",
+      "flow_published_at": "1970-01-01T01:00:27Z",
+      "id": 3
+    }
+  ],
+  "table": "deletions"
 }
+[
+  "applied.actionDescription",
+  "UPDATE `estuary-theatre`.testing.flow_materializations_v2 SET version = 'localbuild', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-bigquery/materialize';"
+]
+[
+  "connectorState",
+  {
+    "updated": {}
+  }
+]

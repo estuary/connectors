@@ -90,7 +90,8 @@ resources_json_template='[
         "nullable_int": {},
         "array_int": {},
         "nested": {},
-        "multiple": {}
+        "multiple": {},
+        "binary_field": {}
       }
     }
   },

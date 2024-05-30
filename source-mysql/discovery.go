@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -86,21 +87,37 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 		if !ok || info.PrimaryKey != nil {
 			continue
 		}
-		for _, columns := range indexColumns {
-			// Test that for each column the value is non-nullable
+
+		// Make a list of all usable indexes.
+		logrus.WithFields(logrus.Fields{
+			"table":   streamID,
+			"indices": len(indexColumns),
+		}).Debug("checking for suitable secondary indexes")
+		var suitableIndexes []string
+		for indexName, columns := range indexColumns {
 			if columnsNonNullable(info.Columns, columns) {
 				logrus.WithFields(logrus.Fields{
-					"table": streamID,
-					"index": columns,
-				}).Trace("using unique secondary index as primary key")
-				info.PrimaryKey = columns
-				break
-			} else {
-				logrus.WithFields(logrus.Fields{
-					"table": streamID,
-					"index": columns,
-				}).Trace("cannot use secondary index because some of its columns are nullable")
+					"table":   streamID,
+					"index":   indexName,
+					"columns": columns,
+				}).Debug("secondary index could be used as primary key")
+				suitableIndexes = append(suitableIndexes, indexName)
 			}
+		}
+
+		// Sort the list by index name and pick the first one, if there are multiple.
+		// This helps ensure stable selection, although it could still change due to
+		// the creation of a new secondary index.
+		sort.Strings(suitableIndexes)
+		if len(suitableIndexes) > 0 {
+			var selectedIndex = suitableIndexes[0]
+			logrus.WithFields(logrus.Fields{
+				"table": streamID,
+				"index": selectedIndex,
+			}).Debug("selected secondary index as table key")
+			info.PrimaryKey = indexColumns[selectedIndex]
+		} else {
+			logrus.WithField("table", streamID).Debug("no secondary index is suitable")
 		}
 	}
 
@@ -164,7 +181,8 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 		}
 		schema.nullable = column.IsNullable
 		schema.extras = make(map[string]interface{})
-		if columnType.Type == "enum" {
+		switch columnType.Type {
+		case "enum":
 			var options []interface{}
 			for _, val := range columnType.EnumValues {
 				options = append(options, val)
@@ -173,6 +191,13 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 				options = append(options, nil)
 			}
 			schema.extras["enum"] = options
+		case "tinyint", "smallint", "mediumint", "int", "bigint":
+			if columnType.Unsigned {
+				// FIXME(wgd)(2024-05-08): We should be specifying `minimum: 0` for unsigned integer
+				// columns but currently there are collections and captures in production
+				// which this breaks. Re-enable this after we've fixed those.
+				// schema.extras["minimum"] = 0
+			}
 		}
 		// TODO(wgd): Is there a good way to describe possible SET values
 		// as a JSON schema? Currently discovery just says 'string'.
@@ -424,19 +449,23 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 }
 
 func parseDataType(typeName, fullColumnType string) any {
-	if typeName == "enum" {
+	switch typeName {
+	case "enum":
 		// Illegal values are represented internally by MySQL as the integer 0. Adding
 		// this to the list as the zero-th element allows everything else to flow naturally.
 		return &mysqlColumnType{Type: "enum", EnumValues: append([]string{""}, parseEnumValues(fullColumnType)...)}
-	} else if typeName == "set" {
+	case "set":
 		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
+		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}
 	}
 	return typeName
 }
 
 type mysqlColumnType struct {
-	Type       string   `json:"type" mapstructure:"type"`           // The basic name of the column type.
-	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"` // The list of values which an enum (or set) column can contain.
+	Type       string   `json:"type" mapstructure:"type"`                   // The basic name of the column type.
+	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"`         // The list of values which an enum (or set) column can contain.
+	Unsigned   bool     `json:"unsigned,omitempty" mapstructure:"unsigned"` // True IFF an integer type is unsigned
 }
 
 func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, error) {
@@ -471,6 +500,33 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 			return string(bs), nil
 		}
 		return val, nil
+	case "tinyint":
+		if sval, ok := val.(int8); ok && t.Unsigned {
+			return uint8(sval), nil
+		}
+		return val, nil
+	case "smallint":
+		if sval, ok := val.(int16); ok && t.Unsigned {
+			return uint16(sval), nil
+		}
+		return val, nil
+	case "mediumint":
+		if sval, ok := val.(int32); ok && t.Unsigned {
+			// A MySQL 'MEDIUMINT' is a 24-bit integer value which is stored into an int32 by the client library,
+			// so we convert to a uint32 and mask off any sign-extended upper bits.
+			return uint32(sval) & 0x00FFFFFF, nil
+		}
+		return val, nil
+	case "int":
+		if sval, ok := val.(int32); ok && t.Unsigned {
+			return uint32(sval), nil
+		}
+		return val, nil
+	case "bigint":
+		if sval, ok := val.(int64); ok && t.Unsigned {
+			return uint64(sval), nil
+		}
+		return val, nil
 	}
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
 }
@@ -484,6 +540,8 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 			}
 			return val, fmt.Errorf("internal error: failed to translate enum value %q to integer index", string(bs))
 		}
+		return val, nil
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return val, nil
 	}
 	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)

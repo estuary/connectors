@@ -69,7 +69,7 @@ async def fetch_rows(
     lotus_epoch = datetime(1899, 12, 30, tzinfo=user_tz)
 
     return (
-        convert_row(id, headers, row.values, lotus_epoch) for id, row in enumerate(rows)
+        convert_row(id, headers, row.values, lotus_epoch) for id, row in enumerate(rows) if row.values is not None 
     )
 
 
@@ -84,6 +84,9 @@ def convert_row(
 
         if isinstance((sv := ev.stringValue), str):
             d[headers[ind]] = sv
+
+        if isinstance((bv := ev.boolValue), bool):
+            d[headers[ind]] = bv
 
         if isinstance((nv := ev.numberValue), Decimal):
             nt = (

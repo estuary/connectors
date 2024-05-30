@@ -454,7 +454,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
 var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|# [^\n]*)$`)
 var createDefinerRegex = `CREATE\s*(OR REPLACE){0,1}\s*(ALGORITHM\s*=\s*[^ ]+)*\s*DEFINER`
-var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
+var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT)`)
 
 func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
 	// There are basically three types of query events we might receive:
@@ -681,13 +681,16 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 }
 
 func translateDataType(t sqlparser.ColumnType) any {
-	var typeName = strings.ToLower(t.Type)
-	if typeName == "enum" {
+	switch typeName := strings.ToLower(t.Type); typeName {
+	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
-	} else if typeName == "set" {
+	case "set":
 		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
+		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
+	default:
+		return typeName
 	}
-	return typeName
 }
 
 // unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted
@@ -905,7 +908,7 @@ func (db *mysqlDatabase) ReplicationDiagnostics(ctx context.Context) error {
 				}
 				logFields[key] = val
 			}
-			logrus.WithFields(logFields).Info("got row")
+			logrus.WithFields(logFields).Info("got diagnostic row")
 		}
 	}
 

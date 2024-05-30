@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -69,6 +70,10 @@ func main() {
 	if err != nil {
 		log.Fatal(fmt.Errorf("getting columns: %w", err))
 	}
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		log.Fatal(fmt.Errorf("getting column types: %w", err))
+	}
 
 	data := make([]interface{}, len(cols))
 	ptrs := make([]interface{}, len(cols))
@@ -83,6 +88,7 @@ func main() {
 			log.Fatal("scanning row: %w", err)
 		}
 		row := make(map[string]any)
+
 		for idx, val := range data {
 			switch v := val.(type) {
 			case float64:
@@ -92,6 +98,11 @@ func main() {
 					val = "Infinity"
 				} else if math.IsInf(v, -1) {
 					val = "-Infinity"
+				}
+			}
+			if v, ok := val.(string); ok && colTypes[idx].DatabaseTypeName() == "DECIMAL" {
+				if num, err := strconv.ParseUint(v, 10, 64); err == nil {
+					val = num
 				}
 			}
 			row[cols[idx]] = val

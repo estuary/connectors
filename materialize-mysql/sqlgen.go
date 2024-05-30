@@ -49,7 +49,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
-		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
+		sql.BINARY:  sql.NewStaticMapper("LONGTEXT"),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.PrimaryKeyMapper{
 				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
@@ -158,6 +158,7 @@ type templates struct {
 	tempTruncate      *template.Template
 	createLoadTable   *template.Template
 	createUpdateTable *template.Template
+	createDeleteTable *template.Template
 	createTargetTable *template.Template
 	alterTableColumns *template.Template
 	updateLoad        *template.Template
@@ -166,6 +167,9 @@ type templates struct {
 	insertLoad        *template.Template
 	loadQuery         *template.Template
 	loadLoad          *template.Template
+	deleteLoad        *template.Template
+	deleteQuery       *template.Template
+	deleteTruncate    *template.Template
 	installFence      *template.Template
 	updateFence       *template.Template
 }
@@ -178,6 +182,10 @@ flow_temp_load_table_{{ $.Binding }}
 
 {{ define "temp_update_name" -}}
 flow_temp_update_table_{{ $.Binding }}
+{{- end }}
+
+{{ define "temp_delete_name" -}}
+flow_temp_delete_table_{{ $.Binding }}
 {{- end }}
 
 -- Templated creation of a materialized table definition and comments:
@@ -347,6 +355,53 @@ FROM {{ template "temp_update_name" . }};
 TRUNCATE {{ template "temp_update_name" . }};
 {{ end }}
 
+
+{{ define "createDeleteTable" }}
+CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}} {{$col.DDL}}
+	{{- end }}
+	,
+	PRIMARY KEY (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{end -}}
+		{{$key.Identifier}}
+	{{- end -}}
+	)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
+{{ end }}
+
+{{ define "deleteLoad" }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "temp_delete_name" . }}
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+);
+{{ end }}
+
+{{ define "deleteQuery" }}
+DELETE original FROM {{ $.Identifier }} original, {{ template "temp_delete_name" . }} temp
+WHERE 
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }} AND {{ end }}
+		original.{{$col.Identifier}} = temp.{{$col.Identifier}}
+	{{- end -}}
+;
+{{ end }}
+
+{{ define "truncateDeleteTable" }}
+TRUNCATE {{ template "temp_delete_name" . }};
+{{ end }}
+
 {{ define "installFence" }}
 with
 -- Increment the fence value of _any_ checkpoint which overlaps our key range.
@@ -402,11 +457,15 @@ UPDATE {{ Identifier $.TablePath }}
 		createLoadTable:   tplAll.Lookup("createLoadTable"),
 		createUpdateTable: tplAll.Lookup("createUpdateTable"),
 		createTargetTable: tplAll.Lookup("createTargetTable"),
+		createDeleteTable: tplAll.Lookup("createDeleteTable"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),
 		updateLoad:        tplAll.Lookup("updateLoad"),
 		updateReplace:     tplAll.Lookup("updateReplace"),
 		updateTruncate:    tplAll.Lookup("truncateUpdateTable"),
 		insertLoad:        tplAll.Lookup("insertLoad"),
+		deleteLoad:        tplAll.Lookup("deleteLoad"),
+		deleteQuery:       tplAll.Lookup("deleteQuery"),
+		deleteTruncate:    tplAll.Lookup("truncateDeleteTable"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		loadLoad:          tplAll.Lookup("loadLoad"),
 		installFence:      tplAll.Lookup("installFence"),

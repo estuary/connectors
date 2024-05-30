@@ -36,11 +36,13 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for mysql.
 type config struct {
-	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 3306 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Timezone string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
+	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 3306 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -336,6 +338,8 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 }
 
 type transactor struct {
+	cfg *config
+
 	dialect   sql.Dialect
 	templates templates
 	// Variables exclusively used by Load.
@@ -350,6 +354,7 @@ type transactor struct {
 		fence        sql.Fence
 		insertInfile *infile
 		updateInfile *infile
+		deleteInfile *infile
 	}
 	bindings []*binding
 }
@@ -368,10 +373,10 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 	) (_ m.Transactor, err error) {
-		var d = &transactor{dialect: dialect, templates: templates}
+		var cfg = ep.Config.(*config)
+		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg}
 		d.store.fence = fence
 
-		var cfg = ep.Config.(*config)
 		// Establish connections.
 		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
 			return nil, fmt.Errorf("load sql.Open: %w", err)
@@ -408,6 +413,7 @@ func prepareNewTransactor(
 		d.load.infile = newInfile(loadInfileName)
 		d.store.insertInfile = newInfile(insertInfileName)
 		d.store.updateInfile = newInfile(updateInfileName)
+		d.store.deleteInfile = newInfile(deleteInfileName)
 
 		// Build a query which unions the results of each load subquery.
 		var subqueries []string
@@ -438,14 +444,21 @@ type binding struct {
 
 	createLoadTableSQL   string
 	createUpdateTableSQL string
-	loadLoadSQL          string
-	storeInsertSQL       string
-	loadQuerySQL         string
-	storeUpdateSQL       string
-	updateReplaceSQL     string
-	updateTruncateSQL    string
+	createDeleteTableSQL string
 
-	mustMerge bool
+	loadLoadSQL       string
+	storeInsertSQL    string
+	loadQuerySQL      string
+	storeUpdateSQL    string
+	updateReplaceSQL  string
+	updateTruncateSQL string
+
+	deleteQuerySQL    string
+	loadDeleteSQL     string
+	deleteTruncateSQL string
+
+	mustMerge  bool
+	mustDelete bool
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -457,12 +470,16 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}{
 		{&b.createLoadTableSQL, t.templates.createLoadTable},
 		{&b.createUpdateTableSQL, t.templates.createUpdateTable},
+		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.loadLoadSQL, t.templates.loadLoad},
 		{&b.loadQuerySQL, t.templates.loadQuery},
 		{&b.storeInsertSQL, t.templates.insertLoad},
 		{&b.storeUpdateSQL, t.templates.updateLoad},
 		{&b.updateReplaceSQL, t.templates.updateReplace},
 		{&b.updateTruncateSQL, t.templates.updateTruncate},
+		{&b.loadDeleteSQL, t.templates.deleteLoad},
+		{&b.deleteQuerySQL, t.templates.deleteQuery},
+		{&b.deleteTruncateSQL, t.templates.deleteTruncate},
 		{&b.tempTableName, t.templates.tempTableName},
 		{&b.tempTruncate, t.templates.tempTruncate},
 	} {
@@ -509,6 +526,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	if _, err := t.store.conn.ExecContext(ctx, b.createUpdateTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createUpdateTableSQL, err)
+	}
+
+	if _, err := t.store.conn.ExecContext(ctx, b.createDeleteTableSQL); err != nil {
+		return fmt.Errorf("Exec(%s): %w", b.createDeleteTableSQL, err)
 	}
 
 	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
@@ -654,6 +675,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return fmt.Errorf("store writing to insert infile for %q: %w", b.target.Identifier, err)
 		} else if err := d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
 			return fmt.Errorf("store writing to update infile for %q: %w", b.target.Identifier, err)
+		} else if err := d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
+			return fmt.Errorf("store writing to delete infile for %q: %w", b.target.Identifier, err)
 		}
 		return nil
 	}
@@ -680,9 +703,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var b = d.bindings[it.Binding]
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-		if err != nil {
-			return nil, fmt.Errorf("converting store parameters: %w", err)
+		var converted []any
+		if it.Delete && d.cfg.HardDelete {
+			converted, err = b.target.ConvertKey(it.Key)
+			if err != nil {
+				return nil, fmt.Errorf("converting delete parameters: %w", err)
+			}
+		} else {
+			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+			if err != nil {
+				return nil, fmt.Errorf("converting store parameters: %w", err)
+			}
 		}
 
 		// See if we need to increase any VARCHAR column lengths
@@ -710,7 +741,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		var inf *infile
 		var drainQuery string
 
-		if it.Exists {
+		if it.Delete && d.cfg.HardDelete {
+			b.mustDelete = true
+			inf = d.store.deleteInfile
+			drainQuery = b.loadDeleteSQL
+		} else if it.Exists {
 			b.mustMerge = true
 			inf = d.store.updateInfile
 			drainQuery = b.storeUpdateSQL
@@ -734,21 +769,29 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			defer txn.Rollback()
 
 			for _, b := range d.bindings {
-				if !b.mustMerge {
-					// Keys that don't already exist are inserted directly into the target table.
-					continue
+				if b.mustDelete {
+					// Apply any deletions
+					if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
+						return fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err)
+					} else if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
+						return fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err)
+					}
+
+					b.mustDelete = false
 				}
 
-				// Merge data from the temporary staging table into the target table, replacing keys
-				// that already exist.
-				if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
-					return fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err)
-				} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
-					return fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err)
-				}
+				if b.mustMerge {
+					// Merge data from the temporary staging table into the target table, replacing keys
+					// that already exist.
+					if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+						return fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err)
+					} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+						return fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err)
+					}
 
-				// Reset for the next round.
-				b.mustMerge = false
+					// Reset for the next round.
+					b.mustMerge = false
+				}
 			}
 
 			var err error

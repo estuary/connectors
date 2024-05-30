@@ -308,7 +308,6 @@
         },
         "ad_group_ad.ad.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -935,7 +934,6 @@
         },
         "segments.date": {
           "type": [
-            "null",
             "string"
           ],
           "format": "date"
@@ -977,7 +975,6 @@
         },
         "ad_group_ad_label.resource_name": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -1113,7 +1110,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -1200,7 +1196,6 @@
         },
         "segments.date": {
           "type": [
-            "null",
             "string"
           ],
           "format": "date"
@@ -1242,7 +1237,6 @@
         },
         "ad_group_label.resource_name": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -1351,7 +1345,6 @@
         },
         "customer.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -1414,7 +1407,6 @@
         },
         "segments.date": {
           "type": [
-            "null",
             "string"
           ],
           "format": "date"
@@ -1456,7 +1448,6 @@
         },
         "campaign_label.resource_name": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -1511,7 +1502,6 @@
         },
         "click_view.gclid": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -1553,7 +1543,6 @@
         },
         "segments.date": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -1571,7 +1560,6 @@
         },
         "segments.ad_network_type": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -1793,7 +1781,6 @@
         },
         "campaign.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -2138,14 +2125,12 @@
         },
         "segments.date": {
           "type": [
-            "null",
             "string"
           ],
           "format": "date"
         },
         "segments.hour": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -2550,7 +2535,6 @@
         },
         "segments.ad_network_type": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -2682,7 +2666,6 @@
         },
         "segments.date": {
           "type": [
-            "null",
             "string"
           ],
           "format": "date"
@@ -2695,7 +2678,6 @@
         },
         "segments.device": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -2713,7 +2695,6 @@
         },
         "customer.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -2930,7 +2911,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -3456,7 +3436,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -3931,7 +3910,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -4323,7 +4301,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -5218,7 +5195,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },
@@ -5271,7 +5247,6 @@
         },
         "ad_group.id": {
           "type": [
-            "null",
             "integer"
           ]
         },

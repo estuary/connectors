@@ -123,7 +123,8 @@ type Database interface {
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) error
+	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.

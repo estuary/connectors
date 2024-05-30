@@ -125,6 +125,18 @@ UPDATE "Delta Updates" SET
 	 WHERE "theKey" = $1;
 --- End "Delta Updates" storeUpdate ---
 
+--- Begin "a-schema".target_table deleteQuery ---
+
+DELETE FROM "a-schema".target_table WHERE
+key1 = $1 AND "key!2" = $2;
+--- End "a-schema".target_table deleteQuery ---
+
+--- Begin "Delta Updates" deleteQuery ---
+
+DELETE FROM "Delta Updates" WHERE
+"theKey" = $1;
+--- End "Delta Updates" deleteQuery ---
+
 --- Begin alter table add columns and drop not nulls ---
 
 ALTER TABLE "a-schema".target_table

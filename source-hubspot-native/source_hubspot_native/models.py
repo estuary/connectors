@@ -1,11 +1,9 @@
-from datetime import datetime
-from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator
-from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING
 import urllib.parse
+from datetime import datetime, timedelta
+from enum import StrEnum, auto
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, Self, TypeVar
 
 from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
     AccessToken,
     BaseDocument,
     BaseOAuth2Credentials,
@@ -13,6 +11,10 @@ from estuary_cdk.capture.common import (
     ResourceConfig,
     ResourceState,
 )
+from estuary_cdk.capture.common import (
+    ConnectorState as GenericConnectorState,
+)
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 scopes = [
     "crm.lists.read",
@@ -90,6 +92,7 @@ class Names(StrEnum):
     companies = auto()
     contacts = auto()
     deals = auto()
+    email_events = auto()
     engagements = auto()
     line_items = auto()
     properties = auto()
@@ -111,16 +114,14 @@ class Properties(BaseDocument, extra="forbid"):
 
 # Base Struct for all CRM Objects within HubSpot.
 class BaseCRMObject(BaseDocument, extra="forbid"):
-    # Class-scoped metadata attached to concrete subclasses.
-    NAME: ClassVar[str]
     ASSOCIATED_ENTITIES: ClassVar[list[str]]
-    CACHED_PROPERTIES: ClassVar[Properties]
 
     class History(BaseDocument, extra="forbid"):
         timestamp: datetime
         value: str
         sourceType: str
         sourceId: str | None = None
+        sourceLabel: str | None = None
         updatedByUserId: int | None = None
 
     id: int
@@ -147,7 +148,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     ] = {}
 
     @model_validator(mode="after")
-    def _post_init(self) -> "BaseCRMObject":
+    def _post_init(self) -> Self:
         # Clear properties and history which don't have current values.
         self.properties = {k: v for k, v in self.properties.items() if v is not None}
         self.propertiesWithHistory = {
@@ -169,7 +170,6 @@ CRMObject = TypeVar("CRMObject", bound=BaseCRMObject)
 
 
 class Company(BaseCRMObject):
-    NAME = Names.companies
     ASSOCIATED_ENTITIES = [Names.contacts, Names.deals]
 
     contacts: list[int] = []
@@ -177,14 +177,12 @@ class Company(BaseCRMObject):
 
 
 class Contact(BaseCRMObject):
-    NAME = Names.contacts
     ASSOCIATED_ENTITIES = [Names.companies]
 
     companies: list[int] = []
 
 
 class Deal(BaseCRMObject):
-    NAME = Names.deals
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
@@ -193,14 +191,12 @@ class Deal(BaseCRMObject):
 
 
 class Engagement(BaseCRMObject):
-    NAME = Names.engagements
     ASSOCIATED_ENTITIES = [Names.deals]
 
     deals: list[int] = []
 
 
 class Ticket(BaseCRMObject):
-    NAME = Names.tickets
     ASSOCIATED_ENTITIES = [Names.contacts, Names.engagements, Names.line_items]
 
     contacts: list[int] = []
@@ -240,7 +236,8 @@ class Association(BaseModel, extra="forbid"):
 Item = TypeVar("Item")
 
 
-# Common shape of a v3 API paged listing.
+# Common shape of a v3 API paged listing for a GET request to the objects endpoint for a particular
+# object.
 class PageResult(BaseModel, Generic[Item], extra="forbid"):
 
     class Cursor(BaseModel, extra="forbid"):
@@ -252,6 +249,21 @@ class PageResult(BaseModel, Generic[Item], extra="forbid"):
 
     results: list[Item]
     paging: Paging | None = None
+
+
+# Common shape of a v3 search API listing, which is the same as PageResult but includes a field for
+# the total number of records returned, and doesn't have a "link" in the paging.next object.
+class SearchPageResult(BaseModel, Generic[Item], extra="forbid"):
+
+    class Cursor(BaseModel, extra="forbid"):
+        after: str
+
+    class Paging(BaseModel, extra="forbid"):
+        next: "SearchPageResult.Cursor"
+
+    results: list[Item]
+    paging: Paging | None = None
+    total: int
 
 
 # Common shape of a v3 API batch read.
@@ -351,3 +363,63 @@ class OldRecentEngagements(BaseModel):
 class OldRecentTicket(BaseModel):
     timestamp: int
     objectId: int
+
+
+# EmailEvent and EmailEventsResponse represent an email event and the shape of the email events API
+# response, respectively.
+
+class EmailEvent(BaseDocument, extra="allow"):
+    id: str
+    created: AwareDatetime
+    type: Literal[
+        "SENT",
+        "DROPPED",
+        "PROCESSED",
+        "DELIVERED",
+        "DEFERRED",
+        "BOUNCE",
+        "OPEN",
+        "CLICK",
+        "STATUSCHANGE",
+        "SPAMREPORT",
+        "SUPPRESSED",
+        "UNBOUNCE", # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
+    ] = Field(
+        default="UNBOUNCE",
+        json_schema_extra=lambda x: x.pop('default'), # Don't schematize the default value.
+    )
+
+
+class EmailEventsResponse(BaseModel, extra="forbid"):
+    hasMore: bool
+    offset: str
+    events: list[EmailEvent]
+
+
+# Custom objects can be associated with contacts, companies, deals, tickets, and any other custom
+# object. For simplicity we are only capturing associations with the non-custom objects for now.
+class CustomObject(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [Names.contacts, Names.companies, Names.deals, Names.tickets]
+
+    contacts: list[int] = []
+    companies: list[int] = []
+    deals: list[int] = []
+    tickets: list[int] = []
+
+
+# There's quite a bit more information available from v3/schemas, but none of it seems particularly
+# useful right now.
+class CustomObjectSchema(BaseDocument, extra="allow"):
+    name: str
+    archived: bool
+
+
+# This is the shape of a response from the V3 search API for custom objects. As above, we are
+# modeling only the minimum needed to get the IDs and modification time.
+class CustomObjectSearchResult(BaseModel):
+
+    class Properties(BaseModel):
+        hs_lastmodifieddate: AwareDatetime
+
+    id: int
+    properties: Properties

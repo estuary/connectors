@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -290,11 +291,8 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	cs.Sanitizers[`"backfilled":999`] = regexp.MustCompile(`"backfilled":[0-9]+`)
 	cs.Validator.Reset()
 
-	// Run the load generator for at most 60s
-	loadgenCtx, cancelLoadgen := context.WithCancel(ctx)
-	time.AfterFunc(60*time.Second, cancelLoadgen)
-	defer cancelLoadgen()
-	go func(ctx context.Context) {
+	var loadgenDone atomic.Bool
+	go func() {
 		var nextID int
 		var activeIDs = make(map[int]int) // Map from ID to counter value
 		for {
@@ -306,7 +304,7 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 			// Thus if we run out of active IDs we must be done
 			if len(activeIDs) == 0 {
 				log.Info("load generator complete")
-				return
+				break
 			}
 
 			// Randomly select an entry from the active set
@@ -340,10 +338,19 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 			// Slow down database load generation to at most 500 QPS
 			time.Sleep(2 * time.Millisecond)
 		}
-	}(loadgenCtx)
 
-	// Start the capture in parallel with the ongoing database load
-	VerifiedCapture(ctx, t, cs)
+		time.Sleep(1 * time.Second)
+		loadgenDone.Store(true)
+	}()
+
+	// Repeatedly run the capture in parallel with the ongoing database load,
+	// killing and restarting it regularly, until the load generator is done.
+	for !loadgenDone.Load() {
+		var captureCtx, cancelCapture = context.WithCancel(ctx)
+		time.AfterFunc(5*time.Second, cancelCapture)
+		cs.Capture(captureCtx, t, nil)
+	}
+	cupaloy.SnapshotT(t, cs.Summary())
 }
 
 // We can see new IDs occurring out of order, so long as they make it to

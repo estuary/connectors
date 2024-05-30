@@ -26,7 +26,8 @@ config_json_template='{
    "address":  "$SQLSERVER_HOST:$SQLSERVER_PORT",
    "database": "$SQLSERVER_DATABASE",
    "password": "$SQLSERVER_PASSWORD",
-   "user":     "$SQLSERVER_USER"
+   "user":     "$SQLSERVER_USER",
+   "hardDelete": true
 }'
 
 resources_json_template='[
@@ -97,6 +98,12 @@ resources_json_template='[
       "table": "compound_key"
     },
     "source": "${TEST_COLLECTION_COMPOUND_KEY}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
