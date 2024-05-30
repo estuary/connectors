@@ -1,13 +1,13 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE IF NOT EXISTS `some-schema`.simple (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  canary STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_standard (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_delta (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_delta_exclude_flow_doc (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.multiple_types (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  array_int STRING COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n  binary_field BINARY COMMENT 'auto-generated projection of JSON at: /binary_field with inferred types: [string]',\n  bool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n  float_field DOUBLE COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]',\n  nested STRING COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n  nullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n  str_field STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.formatted_strings (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  date DATE COMMENT 'auto-generated projection of JSON at: /date with inferred types: [string]',\n  datetime TIMESTAMP COMMENT 'auto-generated projection of JSON at: /datetime with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n  int_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n  num_and_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n  num_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n  time STRING COMMENT 'auto-generated projection of JSON at: /time with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/formatted-strings';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.unsigned_bigint (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  unsigned_bigint DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /unsigned_bigint with inferred types: [integer]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/unsigned-bigint';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.deletions (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/deletions';\n\nINSERT INTO `some-schema`.flow_materializations_v2 (version, spec, materialization) VALUES ('localbuild', '(a-base64-encoded-value)', 'tests/materialize-databricks/materialize');"
+  "\nCREATE TABLE IF NOT EXISTS `some-schema`.simple (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  canary STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_standard (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_delta (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.duplicate_keys_delta_exclude_flow_doc (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.multiple_types (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  array_int STRING COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n  binary_field BINARY COMMENT 'auto-generated projection of JSON at: /binary_field with inferred types: [string]',\n  bool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n  float_field DOUBLE COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]',\n  nested STRING COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n  nullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n  str_field STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.formatted_strings (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  date DATE COMMENT 'auto-generated projection of JSON at: /date with inferred types: [string]',\n  datetime TIMESTAMP COMMENT 'auto-generated projection of JSON at: /datetime with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n  int_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n  num_and_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n  num_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n  time STRING COMMENT 'auto-generated projection of JSON at: /time with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/formatted-strings';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.unsigned_bigint (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  unsigned_bigint DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /unsigned_bigint with inferred types: [integer]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/unsigned-bigint';\n\n\nCREATE TABLE IF NOT EXISTS `some-schema`.deletions (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  `_meta/op` STRING COMMENT 'auto-generated projection of JSON at: /_meta/op with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/deletions';\n\nINSERT INTO `some-schema`.flow_materializations_v2 (version, spec, materialization) VALUES ('localbuild', '(a-base64-encoded-value)', 'tests/materialize-databricks/materialize');"
 ]
 [
   "connectorState",
   {
     "updated": {
       "some-schema%2Fdeletions": {
-        "Query": "\n\tCOPY INTO `some-schema`.deletions FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+        "Query": "\n\tCOPY INTO `some-schema`.deletions FROM (\n    SELECT\n\t\tid::BIGINT, `_meta/op`::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/some-schema/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
         "ToDelete": [
           "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
         ]
@@ -62,7 +62,7 @@
   {
     "updated": {
       "some-schema%2Fdeletions": {
-        "Query": "\n\tMERGE INTO `some-schema`.deletions AS l\n\tUSING (\n\t\t(\n\t\t\tSELECT\n\t\t\tid::BIGINT, flow_published_at::TIMESTAMP, flow_document::STRING\n\t\t\tFROM json.`/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>`\n\t\t)\n\t) AS r\n\tON l.id = r.id\n\tWHEN MATCHED AND r.flow_document='\"delete\"' THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, flow_document)\n\t\tVALUES (r.id, r.flow_published_at, r.flow_document);\n",
+        "Query": "\n\tMERGE INTO `some-schema`.deletions AS l\n\tUSING (\n\t\t(\n\t\t\tSELECT\n\t\t\tid::BIGINT, `_meta/op`::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n\t\t\tFROM json.`/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>`\n\t\t)\n\t) AS r\n\tON l.id = r.id\n\tWHEN MATCHED AND r.flow_document='\"delete\"' THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.`_meta/op` = r.`_meta/op`, l.flow_published_at = r.flow_published_at, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, `_meta/op`, flow_published_at, flow_document)\n\t\tVALUES (r.id, r.`_meta/op`, r.flow_published_at, r.flow_document);\n",
         "ToDelete": [
           "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
         ]
@@ -111,7 +111,7 @@
   {
     "updated": {
       "some-schema%2Fdeletions": {
-        "Query": "\n\tMERGE INTO `some-schema`.deletions AS l\n\tUSING (\n\t\t(\n\t\t\tSELECT\n\t\t\tid::BIGINT, flow_published_at::TIMESTAMP, flow_document::STRING\n\t\t\tFROM json.`/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>`\n\t\t)\n\t) AS r\n\tON l.id = r.id\n\tWHEN MATCHED AND r.flow_document='\"delete\"' THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, flow_document)\n\t\tVALUES (r.id, r.flow_published_at, r.flow_document);\n",
+        "Query": "\n\tMERGE INTO `some-schema`.deletions AS l\n\tUSING (\n\t\t(\n\t\t\tSELECT\n\t\t\tid::BIGINT, `_meta/op`::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n\t\t\tFROM json.`/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>`\n\t\t)\n\t) AS r\n\tON l.id = r.id\n\tWHEN MATCHED AND r.flow_document='\"delete\"' THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.`_meta/op` = r.`_meta/op`, l.flow_published_at = r.flow_published_at, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, `_meta/op`, flow_published_at, flow_document)\n\t\tVALUES (r.id, r.`_meta/op`, r.flow_published_at, r.flow_document);\n",
         "ToDelete": [
           "/Volumes/main/some-schema/flow_staging/flow_temp_tables/<uuid>"
         ]
@@ -159,61 +159,51 @@
   "rows": [
     {
       "canary": "amputation's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"13814000-1dd2-11b2-8000-071353030311\"},\"canary\":\"amputation's\",\"id\":1}",
       "flow_published_at": "1970-01-01T00:00:00Z",
       "id": 1
     },
     {
       "canary": "armament's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"1419d680-1dd2-11b2-8000-071353030311\"},\"canary\":\"armament's\",\"id\":2}",
       "flow_published_at": "1970-01-01T00:00:01Z",
       "id": 2
     },
     {
       "canary": "splatters",
-      "flow_document": "{\"_meta\":{\"uuid\":\"14b26d00-1dd2-11b2-8000-071353030311\"},\"canary\":\"splatters\",\"id\":3}",
       "flow_published_at": "1970-01-01T00:00:02Z",
       "id": 3
     },
     {
       "canary": "strengthen",
-      "flow_document": "{\"_meta\":{\"uuid\":\"154b0380-1dd2-11b2-8000-071353030311\"},\"canary\":\"strengthen\",\"id\":4}",
       "flow_published_at": "1970-01-01T00:00:03Z",
       "id": 4
     },
     {
       "canary": "Kringle's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"15e39a00-1dd2-11b2-8000-071353030311\"},\"canary\":\"Kringle's\",\"id\":5}",
       "flow_published_at": "1970-01-01T00:00:04Z",
       "id": 5
     },
     {
       "canary": "grosbeak's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"167c3080-1dd2-11b2-8000-071353030311\"},\"canary\":\"grosbeak's\",\"id\":6}",
       "flow_published_at": "1970-01-01T00:00:05Z",
       "id": 6
     },
     {
       "canary": "pieced",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7545a800-1dda-11b2-8000-071353030311\"},\"canary\":\"pieced\",\"id\":7}",
       "flow_published_at": "1970-01-01T01:00:00Z",
       "id": 7
     },
     {
       "canary": "roaches",
-      "flow_document": "{\"_meta\":{\"uuid\":\"75de3e80-1dda-11b2-8000-071353030311\"},\"canary\":\"roaches\",\"id\":8}",
       "flow_published_at": "1970-01-01T01:00:01Z",
       "id": 8
     },
     {
       "canary": "devilish",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7676d500-1dda-11b2-8000-071353030311\"},\"canary\":\"devilish\",\"id\":9}",
       "flow_published_at": "1970-01-01T01:00:02Z",
       "id": 9
     },
     {
       "canary": "glucose's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"770f6b80-1dda-11b2-8000-071353030311\"},\"canary\":\"glucose's\",\"id\":10}",
       "flow_published_at": "1970-01-01T01:00:03Z",
       "id": 10
     }
@@ -223,35 +213,30 @@
 {
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"77a80200-1dda-11b2-8000-071353030311\"},\"id\":1,\"int\":7,\"str\":\"str 6\"}",
       "flow_published_at": "1970-01-01T01:00:04Z",
       "id": 1,
       "int": 7,
       "str": "str 6"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"78409880-1dda-11b2-8000-071353030311\"},\"id\":2,\"int\":9,\"str\":\"str 7\"}",
       "flow_published_at": "1970-01-01T01:00:05Z",
       "id": 2,
       "int": 9,
       "str": "str 7"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"78d92f00-1dda-11b2-8000-071353030311\"},\"id\":3,\"int\":11,\"str\":\"str 8\"}",
       "flow_published_at": "1970-01-01T01:00:06Z",
       "id": 3,
       "int": 11,
       "str": "str 8"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7971c580-1dda-11b2-8000-071353030311\"},\"id\":4,\"int\":13,\"str\":\"str 9\"}",
       "flow_published_at": "1970-01-01T01:00:07Z",
       "id": 4,
       "int": 13,
       "str": "str 9"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7a0a5c00-1dda-11b2-8000-071353030311\"},\"id\":5,\"int\":15,\"str\":\"str 10\"}",
       "flow_published_at": "1970-01-01T01:00:08Z",
       "id": 5,
       "int": 15,
@@ -263,70 +248,60 @@
 {
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"1714c700-1dd2-11b2-8000-071353030311\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
       "flow_published_at": "1970-01-01T00:00:06Z",
       "id": 1,
       "int": 1,
       "str": "str 1"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"77a80200-1dda-11b2-8000-071353030311\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}",
       "flow_published_at": "1970-01-01T01:00:04Z",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"17ad5d80-1dd2-11b2-8000-071353030311\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
       "flow_published_at": "1970-01-01T00:00:07Z",
       "id": 2,
       "int": 2,
       "str": "str 2"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"78409880-1dda-11b2-8000-071353030311\"},\"id\":2,\"int\":7,\"str\":\"str 7\"}",
       "flow_published_at": "1970-01-01T01:00:05Z",
       "id": 2,
       "int": 7,
       "str": "str 7"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"1845f400-1dd2-11b2-8000-071353030311\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
       "flow_published_at": "1970-01-01T00:00:08Z",
       "id": 3,
       "int": 3,
       "str": "str 3"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"78d92f00-1dda-11b2-8000-071353030311\"},\"id\":3,\"int\":8,\"str\":\"str 8\"}",
       "flow_published_at": "1970-01-01T01:00:06Z",
       "id": 3,
       "int": 8,
       "str": "str 8"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"18de8a80-1dd2-11b2-8000-071353030311\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
       "flow_published_at": "1970-01-01T00:00:09Z",
       "id": 4,
       "int": 4,
       "str": "str 4"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7971c580-1dda-11b2-8000-071353030311\"},\"id\":4,\"int\":9,\"str\":\"str 9\"}",
       "flow_published_at": "1970-01-01T01:00:07Z",
       "id": 4,
       "int": 9,
       "str": "str 9"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"19772100-1dd2-11b2-8000-071353030311\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
       "flow_published_at": "1970-01-01T00:00:10Z",
       "id": 5,
       "int": 5,
       "str": "str 5"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7a0a5c00-1dda-11b2-8000-071353030311\"},\"id\":5,\"int\":10,\"str\":\"str 10\"}",
       "flow_published_at": "1970-01-01T01:00:08Z",
       "id": 5,
       "int": 10,
@@ -407,7 +382,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
-      "flow_document": "{\"_meta\":{\"uuid\":\"1b40e480-1dd2-11b2-8000-071353030311\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
       "flow_published_at": "1970-01-01T00:00:13Z",
       "id": 1,
       "multiple": "1",
@@ -420,7 +394,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
-      "flow_document": "{\"_meta\":{\"uuid\":\"1bd97b00-1dd2-11b2-8000-071353030311\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
       "flow_published_at": "1970-01-01T00:00:14Z",
       "id": 2,
       "multiple": "2.2",
@@ -433,7 +406,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
-      "flow_document": "{\"_meta\":{\"uuid\":\"1c721180-1dd2-11b2-8000-071353030311\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
       "flow_published_at": "1970-01-01T00:00:15Z",
       "id": 3,
       "multiple": "true",
@@ -446,7 +418,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
-      "flow_document": "{\"_meta\":{\"uuid\":\"1d0aa800-1dd2-11b2-8000-071353030311\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
       "flow_published_at": "1970-01-01T00:00:16Z",
       "id": 4,
       "multiple": "false",
@@ -459,7 +430,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
-      "flow_document": "{\"_meta\":{\"uuid\":\"1da33e80-1dd2-11b2-8000-071353030311\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
       "flow_published_at": "1970-01-01T00:00:17Z",
       "id": 5,
       "multiple": "\"string five\"",
@@ -472,7 +442,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
-      "flow_document": "{\"_meta\":{\"uuid\":\"8098d380-1dda-11b2-8000-071353030311\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
       "flow_published_at": "1970-01-01T01:00:19Z",
       "id": 6,
       "multiple": "[\"one\",2,true]",
@@ -485,7 +454,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
-      "flow_document": "{\"_meta\":{\"uuid\":\"81316a00-1dda-11b2-8000-071353030311\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
       "flow_published_at": "1970-01-01T01:00:20Z",
       "id": 7,
       "multiple": "{\"object\":\"seven\"}",
@@ -498,7 +466,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
-      "flow_document": "{\"_meta\":{\"uuid\":\"81ca0080-1dda-11b2-8000-071353030311\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
       "flow_published_at": "1970-01-01T01:00:21Z",
       "id": 8,
       "multiple": null,
@@ -511,7 +478,6 @@
       "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
-      "flow_document": "{\"_meta\":{\"uuid\":\"82629700-1dda-11b2-8000-071353030311\"},\"array_int\":[91,92],\"binary_field\":\"YWxvaGEK\",\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
       "flow_published_at": "1970-01-01T01:00:22Z",
       "id": 9,
       "multiple": null,
@@ -524,7 +490,6 @@
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,
-      "flow_document": "{\"_meta\":{\"uuid\":\"82fb2d80-1dda-11b2-8000-071353030311\"},\"array_int\":[1,2],\"binary_field\":\"c2F5xY1uYXJhCg==\",\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
       "flow_published_at": "1970-01-01T01:00:23Z",
       "id": 10,
       "multiple": null,
@@ -540,7 +505,6 @@
     {
       "date": "0000-01-01T00:00:00Z",
       "datetime": "0000-01-01T00:00:00Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7d054c80-1dda-11b2-8000-071353030311\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}",
       "flow_published_at": "1970-01-01T01:00:13Z",
       "id": 1,
       "int_and_str": 1,
@@ -552,7 +516,6 @@
     {
       "date": "1999-02-02T00:00:00Z",
       "datetime": "1999-02-02T14:20:12.33Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7d9de300-1dda-11b2-8000-071353030311\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}",
       "flow_published_at": "1970-01-01T01:00:14Z",
       "id": 2,
       "int_and_str": 2,
@@ -564,7 +527,6 @@
     {
       "date": "1000-03-03T00:00:00Z",
       "datetime": "1000-03-03T23:59:38.1Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"1a0fb780-1dd2-11b2-8000-071353030311\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}",
       "flow_published_at": "1970-01-01T00:00:11Z",
       "id": 3,
       "int_and_str": 3,
@@ -576,7 +538,6 @@
     {
       "date": "2023-08-29T00:00:00Z",
       "datetime": "2023-08-29T23:59:38Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"1aa84e00-1dd2-11b2-8000-071353030311\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}",
       "flow_published_at": "1970-01-01T00:00:12Z",
       "id": 4,
       "int_and_str": 4,
@@ -588,7 +549,6 @@
     {
       "date": "9999-12-31T00:00:00Z",
       "datetime": "9999-12-31T23:59:59Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7e367980-1dda-11b2-8000-071353030311\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}",
       "flow_published_at": "1970-01-01T01:00:15Z",
       "id": 5,
       "int_and_str": 5,
@@ -600,7 +560,6 @@
     {
       "date": null,
       "datetime": null,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7ecf1000-1dda-11b2-8000-071353030311\"},\"id\":8,\"num_str\":\"NaN\"}",
       "flow_published_at": "1970-01-01T01:00:16Z",
       "id": 8,
       "int_and_str": null,
@@ -612,7 +571,6 @@
     {
       "date": null,
       "datetime": null,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7f67a680-1dda-11b2-8000-071353030311\"},\"id\":9,\"num_str\":\"Infinity\"}",
       "flow_published_at": "1970-01-01T01:00:17Z",
       "id": 9,
       "int_and_str": null,
@@ -624,7 +582,6 @@
     {
       "date": null,
       "datetime": null,
-      "flow_document": "{\"_meta\":{\"uuid\":\"80003d00-1dda-11b2-8000-071353030311\"},\"id\":10,\"num_str\":\"-Infinity\"}",
       "flow_published_at": "1970-01-01T01:00:18Z",
       "id": 10,
       "int_and_str": null,
@@ -639,7 +596,6 @@
 {
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"2431b600-1dd2-11b2-8000-071353030311\"},\"id\":1,\"unsigned_bigint\":18446744073709551615}",
       "flow_published_at": "1970-01-01T00:00:28Z",
       "id": 1,
       "unsigned_bigint": 18446744073709552000
@@ -648,7 +604,18 @@
   "table": "`main`.`some-schema`.unsigned_bigint"
 }
 {
-  "rows": [],
+  "rows": [
+    {
+      "_meta/op": "u",
+      "flow_published_at": "1970-01-01T01:00:26Z",
+      "id": 2
+    },
+    {
+      "_meta/op": "c",
+      "flow_published_at": "1970-01-01T01:00:27Z",
+      "id": 3
+    }
+  ],
   "table": "`main`.`some-schema`.deletions"
 }
 [
