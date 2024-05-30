@@ -778,7 +778,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					}
 
 					b.mustDelete = false
-				} else if b.mustMerge {
+				}
+
+				if b.mustMerge {
 					// Merge data from the temporary staging table into the target table, replacing keys
 					// that already exist.
 					if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
