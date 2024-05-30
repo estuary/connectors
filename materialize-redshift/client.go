@@ -115,7 +115,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	// never need to drop nullability constraints, since Redshift does not allow dropping
 	// nullability and we don't ever create columns as NOT NULL as a result.
 	if len(ta.DropNotNulls) != 0 { // sanity check
-		return "", nil, fmt.Errorf("redshift cannot drop nullability constraints but got %d DropNotNulls", len(ta.DropNotNulls))
+		return "", nil, fmt.Errorf("redshift cannot drop nullability constraints but got %d DropNotNulls for table %s", len(ta.DropNotNulls), ta.Identifier)
 	}
 
 	statements := []string{}
