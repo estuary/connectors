@@ -6,22 +6,22 @@ import (
 )
 
 type countingWriteCloser struct {
-	Written int
-	W       io.WriteCloser
+	written int
+	w       io.WriteCloser
 }
 
 func (c *countingWriteCloser) Write(p []byte) (int, error) {
-	n, err := c.W.Write(p)
+	n, err := c.w.Write(p)
 	if err != nil {
 		return 0, fmt.Errorf("countingWriteCloser writing to w: %w", err)
 	}
-	c.Written += n
+	c.written += n
 
 	return n, nil
 }
 
 func (c *countingWriteCloser) Close() error {
-	if err := c.W.Close(); err != nil {
+	if err := c.w.Close(); err != nil {
 		return fmt.Errorf("countingWriteCloser closing w: %w", err)
 	}
 	return nil

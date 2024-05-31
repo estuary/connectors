@@ -113,3 +113,19 @@ func makeTestRow(t testing.TB, seed int) []any {
 
 	return row
 }
+
+func makeTestParquetSchema(required bool) ParquetSchema {
+	return []ParquetSchemaElement{
+		{Name: "intField", DataType: PrimitiveTypeInteger, Required: required},
+		{Name: "numField", DataType: PrimitiveTypeNumber, Required: required},
+		{Name: "boolField", DataType: PrimitiveTypeBoolean, Required: required},
+		{Name: "binaryField", DataType: PrimitiveTypeBinary, Required: required},
+		{Name: "stringField", DataType: LogicalTypeString, Required: required},
+		{Name: "uuidField", DataType: LogicalTypeUuid, Required: required},
+		{Name: "jsonField", DataType: LogicalTypeJson, Required: required},
+		{Name: "dateField", DataType: LogicalTypeDate, Required: required},
+		{Name: "timeField", DataType: LogicalTypeTime, Required: required},
+		{Name: "timestampField", DataType: LogicalTypeTimestamp, Required: required},
+		{Name: "intervalField", DataType: LogicalTypeInterval, Required: required},
+	}
+}
