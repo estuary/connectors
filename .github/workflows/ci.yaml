@@ -98,6 +98,7 @@ jobs:
           - materialize-elasticsearch
           - materialize-firebolt
           - materialize-gcs-csv
+          - materialize-gcs-parquet
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-mongodb
