@@ -53,7 +53,7 @@ func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *Json
 	}
 
 	enc := &JsonEncoder{
-		cwc: &countingWriteCloser{W: w},
+		cwc: &countingWriteCloser{w: w},
 	}
 
 	if !cfg.disableCompression {
@@ -113,7 +113,7 @@ func (e *JsonEncoder) Encode(vals []any) (err error) {
 }
 
 func (e *JsonEncoder) Written() int {
-	return e.cwc.Written
+	return e.cwc.written
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
