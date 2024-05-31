@@ -108,6 +108,7 @@ jobs:
           - materialize-postgres
           - materialize-redshift
           - materialize-rockset
+          - materialize-s3-csv
           - materialize-s3-parquet
           - materialize-snowflake
           - materialize-starburst
