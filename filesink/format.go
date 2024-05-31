@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	enc "github.com/estuary/connectors/go/stream-encode"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
