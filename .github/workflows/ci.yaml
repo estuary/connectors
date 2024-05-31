@@ -273,7 +273,6 @@ jobs:
               "materialize-pinecone",
               "materialize-postgres",
               "materialize-mysql",
-              "materialize-s3-parquet",
               "materialize-sqlserver",
               "materialize-mongodb",
               "materialize-motherduck",
