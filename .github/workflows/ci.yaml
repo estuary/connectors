@@ -97,6 +97,7 @@ jobs:
           - materialize-dynamodb
           - materialize-elasticsearch
           - materialize-firebolt
+          - materialize-gcs-csv
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-mongodb
