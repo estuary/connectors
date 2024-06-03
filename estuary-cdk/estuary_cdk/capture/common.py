@@ -611,14 +611,26 @@ async def _binding_incremental_task(
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc=state)}
     )
-    task.log.info(f"resuming incremental replication", state)
 
     while True:
+        if isinstance(state.cursor, datetime):
+            lag = (datetime.now(tz=UTC) - state.cursor)
+
+            if lag < binding.resourceConfig.interval:
+                sleep_time = (binding.resourceConfig.interval - lag).total_seconds()
+                task.log.info("incremental task sleeping until interval has elapsed", {"sleep_time": sleep_time})
+                # We're idle. Sleep until the cursor is `interval` old.
+                if await task.should_stop_while(sleep_time):
+                    return
+            # Otherwise we're not idle. Attempt to fetch the next changes.
+                
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
         checkpoints = 0
         pending = False
+        
+        task.log.info(f"resuming incremental replication", state)
 
         async for item in fetch_changes(task.log, state.cursor):
             if isinstance(item, BaseDocument) or isinstance(item, dict):
@@ -654,35 +666,13 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for : timedelta = binding.resourceConfig.interval
 
         if not checkpoints:
+            task.log.info("incremental task is idle", {"cursor": state.cursor})
             # We're idle. Sleep for the full back-off interval.
-            sleep_for = binding.resourceConfig.interval
-
-        elif isinstance(state.cursor, datetime):
-            lag = (datetime.now(tz=UTC) - state.cursor)
-
-            if lag > binding.resourceConfig.interval:
-                # We're not idle. Attempt to fetch the next changes.
-                continue
-            else:
-                # We're idle. Sleep until the cursor is `interval` old.
-                sleep_for = binding.resourceConfig.interval - lag
+            if await task.should_stop_while(binding.resourceConfig.interval.total_seconds()):
+                return
         else:
-            # We're not idle. Attempt to fetch the next changes.
+            # We've got a new checkpoint with which to calculate lag 
+            # so let's `continue` and possibly sleep.
             continue
-
-        task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
-
-        # At this point we've fully caught up with the log and are idle.
-        try:
-            if not task.stopping.event.is_set():
-                await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
-                )
-
-            task.log.debug(f"incremental replication is idle and is yielding to stop")
-            return
-        except asyncio.TimeoutError:
-            pass  # `interval` elapsed.
