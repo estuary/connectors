@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"text/template"
 
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -105,46 +106,31 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	return db, nil
 }
 
-const tableQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  SELECT xmin AS txid, * FROM %[1]s ORDER BY xmin::text::bigint;
+const tableQueryTemplate = `{{if .IsFirstQuery -}}
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} ORDER BY xmin::text::bigint;
 {{- else -}}
-  SELECT xmin AS txid, * FROM %[1]s WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint;
-{{- end}}`
-
-// This is currently unused, but is a useful example of how the function
-// generatePostgresResource might be extended to support view discovery.
-const viewQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  {{- /* This query will be executed first, without cursor values */ -}}
-  SELECT * FROM %[1]s;
-{{- else -}}
-  {{- /**************************************************************
-       * Subsequently (if cursor columns are listed in the resource *
-	   * config) this query will be executed with the value(s) from *
-	   * the last row of the previous query provided as parameters. *
-	   *                                                            *
-	   * Consult the connector documentation for examples.          *
-       **************************************************************/ -}}
-  SELECT * FROM %[1]s WHERE columnName > queryParameter;
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint;
 {{- end}}`
 
 func quoteTableName(schema, table string) string {
-	return fmt.Sprintf(`"%s"."%s"`, schema, table)
+	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
+}
+
+var templateFuncs = template.FuncMap{
+	"quoteTableName":  quoteTableName,
+	"quoteIdentifier": quoteIdentifier,
 }
 
 func generatePostgresResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	var queryTemplate string
-	var cursorColumns []string
-	if strings.EqualFold(tableType, "BASE TABLE") {
-		queryTemplate = fmt.Sprintf(tableQueryTemplateTemplate, quoteTableName(schemaName, tableName))
-		cursorColumns = []string{"txid"}
-	} else {
+	if !strings.EqualFold(tableType, "BASE TABLE") {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
 
 	return &Resource{
-		Name:     resourceName,
-		Template: queryTemplate,
-		Cursor:   cursorColumns,
+		Name:       resourceName,
+		SchemaName: schemaName,
+		TableName:  tableName,
+		Cursor:     []string{"txid"},
 	}, nil
 }
 
@@ -161,11 +147,12 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 }
 
 var postgresDriver = &BatchSQLDriver{
-	DocumentationURL: "https://go.estuary.dev/source-postgres-batch",
-	ConfigSchema:     generateConfigSchema(),
-	Connect:          connectPostgres,
-	GenerateResource: generatePostgresResource,
-	TranslateValue:   translatePostgresValue,
+	DocumentationURL:     "https://go.estuary.dev/source-postgres-batch",
+	ConfigSchema:         generateConfigSchema(),
+	Connect:              connectPostgres,
+	GenerateResource:     generatePostgresResource,
+	TranslateValue:       translatePostgresValue,
+	DefaultQueryTemplate: tableQueryTemplate,
 }
 
 func generateConfigSchema() json.RawMessage {
