@@ -38,32 +38,41 @@ type BatchSQLDriver struct {
 	DocumentationURL string
 	ConfigSchema     json.RawMessage
 
-	Connect          func(ctx context.Context, cfg *Config) (*sql.DB, error)
-	TranslateValue   func(val any, databaseTypeName string) (any, error)
-	GenerateResource func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
+	Connect              func(ctx context.Context, cfg *Config) (*sql.DB, error)
+	TranslateValue       func(val any, databaseTypeName string) (any, error)
+	GenerateResource     func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
+	DefaultQueryTemplate string
 }
 
 // Resource represents the capture configuration of a single resource binding.
 type Resource struct {
-	Name         string   `json:"name" jsonschema:"title=Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
-	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) which will be rendered and then executed." jsonschema_extras:"multiline=true,order=3"`
-	Cursor       []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=2"`
-	PollSchedule string   `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=1,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	Name string `json:"name" jsonschema:"title=Resource Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
+
+	SchemaName string   `json:"schema,omitempty" jsonschema:"title=Schema Name,description=The name of the schema in which the captured table lives. The query template must be overridden if this is unset."  jsonschema_extras:"order=1"`
+	TableName  string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
+	Cursor     []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=3"`
+
+	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	Template     string `json:"template,omitempty" jsonschema:"title=Query Template Override,description=Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples." jsonschema_extras:"multiline=true,order=5"`
 }
 
 // Validate checks that the resource spec possesses all required properties.
 func (r Resource) Validate() error {
 	var requiredProperties = [][]string{
 		{"name", r.Name},
-		{"template", r.Template},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	if _, err := template.New("query").Parse(r.Template); err != nil {
-		return fmt.Errorf("error parsing template: %w", err)
+	if r.Template == "" && (r.SchemaName == "" || r.TableName == "") {
+		return fmt.Errorf("must specify schema+table name or else a template override")
+	}
+	if r.Template != "" {
+		if _, err := template.New("query").Funcs(templateFuncs).Parse(r.Template); err != nil {
+			return fmt.Errorf("error parsing template: %w", err)
+		}
 	}
 	if slices.Contains(r.Cursor, "") {
 		return fmt.Errorf("cursor column names can't be empty (got %q)", r.Cursor)
@@ -469,12 +478,13 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 
 	var capture = &capture{
-		Config:         &cfg,
-		State:          &state,
-		DB:             db,
-		Bindings:       bindings,
-		Output:         stream,
-		TranslateValue: drv.TranslateValue,
+		Config:               &cfg,
+		State:                &state,
+		DB:                   db,
+		Bindings:             bindings,
+		Output:               stream,
+		TranslateValue:       drv.TranslateValue,
+		DefaultQueryTemplate: drv.DefaultQueryTemplate,
 	}
 	return capture.Run(stream.Context())
 }
@@ -504,12 +514,13 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 }
 
 type capture struct {
-	Config         *Config
-	State          *captureState
-	DB             *sql.DB
-	Bindings       []bindingInfo
-	Output         *boilerplate.PullOutput
-	TranslateValue func(val any, databaseTypeName string) (any, error)
+	Config               *Config
+	State                *captureState
+	DB                   *sql.DB
+	Bindings             []bindingInfo
+	Output               *boilerplate.PullOutput
+	TranslateValue       func(val any, databaseTypeName string) (any, error)
+	DefaultQueryTemplate string
 }
 
 type bindingInfo struct {
@@ -559,7 +570,11 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 		"poll":   res.PollSchedule,
 	}).Info("starting worker")
 
-	var queryTemplate, err = template.New("query").Parse(res.Template)
+	var templateString = res.Template
+	if templateString == "" {
+		templateString = c.DefaultQueryTemplate
+	}
+	var queryTemplate, err = template.New("query").Funcs(templateFuncs).Parse(templateString)
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
@@ -584,12 +599,14 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 
 	var quotedCursorNames []string
 	for _, cursorName := range cursorNames {
-		quotedCursorNames = append(quotedCursorNames, quoteColumnName(cursorName))
+		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
 	}
 
 	var templateArg = map[string]any{
 		"IsFirstQuery": len(cursorValues) == 0,
 		"CursorFields": quotedCursorNames,
+		"SchemaName":   res.SchemaName,
+		"TableName":    res.TableName,
 	}
 
 	// Polling schedule can be configured per binding. If unset, falls back to the
@@ -737,7 +754,7 @@ func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamSt
 	return nil
 }
 
-func quoteColumnName(name string) string {
+func quoteIdentifier(name string) string {
 	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
 	//
 	//     Quoted identifiers can contain any character, except the character with code zero.
