@@ -614,11 +614,29 @@ async def _binding_incremental_task(
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc=state)}
     )
+
+    sleep_for = timedelta()
+
     task.log.info(f"resuming incremental replication", state)
 
+    if isinstance(state.cursor, datetime):
+        lag = datetime.now(tz=UTC) - state.cursor
+
+        if lag < binding.resourceConfig.interval:
+            sleep_for = binding.resourceConfig.interval - lag
+            task.log.info("incremental task ran recently, sleeping until `interval` has fully elapsed", {"sleep_for": sleep_for, "interval": binding.resourceConfig.interval})
+
     while True:
-        # Yield to the event loop to prevent starvation.
-        await asyncio.sleep(0)
+        try:
+            if not task.stopping.event.is_set():
+                await asyncio.wait_for(
+                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                )
+
+            task.log.debug(f"incremental replication is idle and is yielding to stop")
+            return
+        except asyncio.TimeoutError:
+            pass  # `sleep_for` elapsed.
 
         checkpoints = 0
         pending = False
@@ -657,8 +675,6 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for: timedelta = binding.resourceConfig.interval
-
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.
             sleep_for = binding.resourceConfig.interval
@@ -668,24 +684,14 @@ async def _binding_incremental_task(
 
             if lag > binding.resourceConfig.interval:
                 # We're not idle. Attempt to fetch the next changes.
+                sleep_for = timedelta()
                 continue
             else:
                 # We're idle. Sleep until the cursor is `interval` old.
                 sleep_for = binding.resourceConfig.interval - lag
         else:
             # We're not idle. Attempt to fetch the next changes.
+            sleep_for = timedelta()
             continue
 
         task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
-
-        # At this point we've fully caught up with the log and are idle.
-        try:
-            if not task.stopping.event.is_set():
-                await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
-                )
-
-            task.log.debug(f"incremental replication is idle and is yielding to stop")
-            return
-        except asyncio.TimeoutError:
-            pass  # `interval` elapsed.
