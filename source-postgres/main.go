@@ -121,6 +121,20 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Connection poolers like pgbouncer or the Supabase one are not supported. They will silently
+	// ignore the `replication=database` option, meaning that captures can never be successful, and
+	// they can introduce other weird failure modes which aren't worth trying to fix given that core
+	// incompatibility.
+	//
+	// It might be useful to add a generic "are we connected via a pooler" heuristic if we can figure
+	// one out. Until then all we can do is check for specific address patterns that match common ones
+	// we see people trying to use. Even once we have a generic check this is probably still useful,
+	// since it lets us name the specific thing they're using and give instructions for precisely how
+	// to get the correct address instead.
+	if strings.HasSuffix(c.Address, ".pooler.supabase.com:6543") || strings.HasSuffix(c.Address, ".pooler.supabase.com") {
+		return cerrors.NewUserError(nil, fmt.Sprintf("address must be a direct connection: address %q is using the Supabase connection pooler, uncheck the 'Display connection pooler' option", c.Address))
+	}
+
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
 	}
