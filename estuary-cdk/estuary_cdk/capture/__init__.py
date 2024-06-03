@@ -182,7 +182,7 @@ class Task:
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)
         return task
-
+    
     def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
         self._buffer.write(
             response.model_dump_json(by_alias=True, exclude_unset=True).encode()
