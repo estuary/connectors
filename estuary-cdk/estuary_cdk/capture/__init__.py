@@ -182,6 +182,23 @@ class Task:
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)
         return task
+    
+    async def should_stop_while(self, timeout: float):
+        """
+        Sleep for at most `timeout` seconds, or until the task is asked to stop.
+        Returns True if task should stop, False otherwise.
+        """
+        try:
+            if not self.stopping.event.is_set():
+                await asyncio.wait_for(
+                    self.stopping.event.wait(), timeout=timeout
+                )
+
+            self.log.debug(f"yielding to stop")
+            return True
+        except asyncio.TimeoutError:
+            return False
+
 
     def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
         self._buffer.write(
