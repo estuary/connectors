@@ -1153,6 +1153,7 @@
         "hs_created_by_user_id": "63843671",
         "hs_date_entered_lead": "2024-02-08T02:36:27.739Z",
         "hs_lastmodifieddate": "2024-02-29T17:12:01.335Z",
+        "hs_notes_last_activity": "0-46-47494434080",
         "hs_num_blockers": "0",
         "hs_num_child_companies": "0",
         "hs_num_contacts_with_buying_roles": "0",
@@ -1558,6 +1559,14 @@
             "timestamp": "2024-02-16T17:37:34.730000Z",
             "updatedByUserId": 63843671,
             "value": "2024-02-16T17:37:34.730Z"
+          }
+        ],
+        "hs_notes_last_activity": [
+          {
+            "sourceId": "RecalculateEngagementRollupProperties",
+            "sourceType": "MIGRATION",
+            "timestamp": "2024-05-24T04:18:21.334000Z",
+            "value": "0-46-47494434080"
           }
         ],
         "hs_num_blockers": [
