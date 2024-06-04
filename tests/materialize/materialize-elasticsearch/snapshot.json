@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "create index \"flow_materializations_v2\"\ncreate index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\nupdate stored materialization spec and set version = localbuild"
+  "create index \"flow_materializations_v2\"\ncreate index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\ncreate index \"index-deletions\"\nupdate stored materialization spec and set version = localbuild"
 ]
 [
   "connectorState",
@@ -966,6 +966,37 @@
       "num_and_str": null,
       "num_str": null,
       "time": null
+    }
+  ]
+}
+{
+  "index": "index-deletions",
+  "rows": [
+    {
+      "_meta/flow_truncated": false,
+      "_meta/op": "u",
+      "flow_document": {
+        "_meta": {
+          "op": "u",
+          "uuid": "84c4f100-1dda-11b2-8000-071353030311"
+        },
+        "id": 2
+      },
+      "flow_published_at": "1970-01-01T01:00:26Z",
+      "id": 2
+    },
+    {
+      "_meta/flow_truncated": false,
+      "_meta/op": "c",
+      "flow_document": {
+        "_meta": {
+          "op": "c",
+          "uuid": "855d8780-1dda-11b2-8000-071353030311"
+        },
+        "id": 3
+      },
+      "flow_published_at": "1970-01-01T01:00:27Z",
+      "id": 3
     }
   ]
 }

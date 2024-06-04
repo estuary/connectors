@@ -14,6 +14,7 @@ docker compose -f materialize-elasticsearch/docker-compose.yaml up --wait
 
 config_json_template='{
     "endpoint": "${TEST_ES_ENDPOINT}",
+    "hardDelete": true,
     "credentials": {
       "username": "${TEST_ES_USERNAME}",
       "password": "${TEST_ES_PASSWORD}"
@@ -82,6 +83,13 @@ resources_json_template='[
       "number_of_shards": 1
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}"
+  },
+  {
+    "resource": {
+      "index": "index-deletions",
+      "number_of_shards": 1
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
