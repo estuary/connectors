@@ -1,0 +1,5369 @@
+[
+  [
+    "acmeCo/Accounts",
+    {
+      "business_profile": {
+        "annual_revenue": null,
+        "estimated_worker_count": null,
+        "mcc": "5734",
+        "name": "Teste",
+        "support_address": null,
+        "support_email": null,
+        "support_phone": null,
+        "support_url": null,
+        "url": "www.pudim.com.br"
+      },
+      "capabilities": {
+        "card_payments": "active",
+        "transfers": "active"
+      },
+      "charges_enabled": true,
+      "controller": {
+        "fees": {
+          "payer": "application_express"
+        },
+        "is_controller": true,
+        "losses": {
+          "payments": "application"
+        },
+        "requirement_collection": "stripe",
+        "stripe_dashboard": {
+          "type": "express"
+        },
+        "type": "application"
+      },
+      "country": "BR",
+      "created": 1715111618,
+      "default_currency": "brl",
+      "details_submitted": true,
+      "email": null,
+      "external_accounts": {
+        "data": [
+          {
+            "account": "acct_1PDu50Q1qnzwasyf",
+            "account_holder_name": null,
+            "account_holder_type": null,
+            "account_type": null,
+            "available_payout_methods": [
+              "standard"
+            ],
+            "bank_name": "STRIPE TEST BANK",
+            "country": "BR",
+            "currency": "brl",
+            "default_for_currency": true,
+            "fingerprint": "FfkcPo9saEcVWPmL",
+            "future_requirements": {
+              "currently_due": [],
+              "errors": [],
+              "past_due": [],
+              "pending_verification": []
+            },
+            "id": "ba_1PEBQcQ1qnzwasyfS0uS5zM0",
+            "last4": "1234",
+            "metadata": {},
+            "object": "bank_account",
+            "requirements": {
+              "currently_due": [],
+              "errors": [],
+              "past_due": [],
+              "pending_verification": []
+            },
+            "routing_number": "110-0000",
+            "status": "new"
+          }
+        ],
+        "has_more": false,
+        "object": "list",
+        "total_count": 1,
+        "url": "/v1/accounts/acct_1PDu50Q1qnzwasyf/external_accounts"
+      },
+      "future_requirements": {
+        "alternatives": [],
+        "current_deadline": null,
+        "currently_due": [],
+        "disabled_reason": null,
+        "errors": [],
+        "eventually_due": [],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "id": "acct_1PDu50Q1qnzwasyf",
+      "login_links": {
+        "data": [],
+        "has_more": false,
+        "object": "list",
+        "total_count": 0,
+        "url": "/v1/accounts/acct_1PDu50Q1qnzwasyf/login_links"
+      },
+      "metadata": {},
+      "object": "account",
+      "payouts_enabled": true,
+      "requirements": {
+        "alternatives": [],
+        "current_deadline": null,
+        "currently_due": [],
+        "disabled_reason": null,
+        "errors": [],
+        "eventually_due": [],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "settings": {
+        "bacs_debit_payments": {
+          "display_name": null,
+          "service_user_number": null
+        },
+        "branding": {
+          "icon": null,
+          "logo": null,
+          "primary_color": null,
+          "secondary_color": null
+        },
+        "card_issuing": {
+          "tos_acceptance": {
+            "date": null,
+            "ip": null
+          }
+        },
+        "card_payments": {
+          "decline_on": {
+            "avs_failure": false,
+            "cvc_failure": false
+          },
+          "statement_descriptor_prefix": null,
+          "statement_descriptor_prefix_kana": null,
+          "statement_descriptor_prefix_kanji": null
+        },
+        "dashboard": {
+          "display_name": "pudim.com.br",
+          "timezone": "Etc/UTC"
+        },
+        "invoices": {
+          "default_account_tax_ids": null
+        },
+        "payments": {
+          "statement_descriptor": "WWW.PUDIM.COM.BR",
+          "statement_descriptor_kana": null,
+          "statement_descriptor_kanji": null
+        },
+        "payouts": {
+          "debit_negative_balances": true,
+          "schedule": {
+            "delay_days": 30,
+            "interval": "daily"
+          },
+          "statement_descriptor": null
+        },
+        "sepa_debit_payments": {}
+      },
+      "tos_acceptance": {
+        "date": 1715112768
+      },
+      "type": "express"
+    }
+  ],
+  [
+    "acmeCo/Accounts",
+    {
+      "business_profile": {
+        "annual_revenue": null,
+        "estimated_worker_count": null,
+        "mcc": null,
+        "name": null,
+        "product_description": null,
+        "support_address": null,
+        "support_email": null,
+        "support_phone": null,
+        "support_url": null,
+        "url": null
+      },
+      "business_type": "company",
+      "capabilities": {
+        "card_payments": "inactive",
+        "transfers": "inactive"
+      },
+      "charges_enabled": false,
+      "company": {
+        "address": {
+          "city": null,
+          "country": "BR",
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "directors_provided": false,
+        "executives_provided": false,
+        "name": null,
+        "owners_provided": false,
+        "tax_id_provided": false,
+        "verification": {
+          "document": {
+            "back": null,
+            "details": null,
+            "details_code": null,
+            "front": null
+          }
+        }
+      },
+      "controller": {
+        "fees": {
+          "payer": "application_custom"
+        },
+        "is_controller": true,
+        "losses": {
+          "payments": "application"
+        },
+        "requirement_collection": "application",
+        "stripe_dashboard": {
+          "type": "none"
+        },
+        "type": "application"
+      },
+      "country": "BR",
+      "created": 1715113936,
+      "default_currency": "brl",
+      "details_submitted": false,
+      "email": null,
+      "external_accounts": {
+        "data": [
+          {
+            "account": "acct_1PDugNPwuHD69DFD",
+            "account_holder_name": "Jenny Rosen",
+            "account_holder_type": "individual",
+            "account_type": null,
+            "available_payout_methods": [
+              "standard"
+            ],
+            "bank_name": "STRIPE TEST BANK",
+            "country": "BR",
+            "currency": "brl",
+            "default_for_currency": true,
+            "fingerprint": "FfkcPo9saEcVWPmL",
+            "future_requirements": {
+              "currently_due": [],
+              "errors": [],
+              "past_due": [],
+              "pending_verification": []
+            },
+            "id": "ba_1PEBMiPwuHD69DFDrbKh6UkV",
+            "last4": "1234",
+            "metadata": {},
+            "object": "bank_account",
+            "requirements": {
+              "currently_due": [],
+              "errors": [],
+              "past_due": [],
+              "pending_verification": []
+            },
+            "routing_number": "110-0000",
+            "status": "new"
+          }
+        ],
+        "has_more": false,
+        "object": "list",
+        "total_count": 1,
+        "url": "/v1/accounts/acct_1PDugNPwuHD69DFD/external_accounts"
+      },
+      "future_requirements": {
+        "alternatives": [],
+        "current_deadline": null,
+        "currently_due": [],
+        "disabled_reason": null,
+        "errors": [],
+        "eventually_due": [],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "id": "acct_1PDugNPwuHD69DFD",
+      "metadata": {},
+      "object": "account",
+      "payouts_enabled": false,
+      "requirements": {
+        "alternatives": [],
+        "current_deadline": null,
+        "currently_due": [
+          "business_profile.mcc",
+          "business_profile.product_description",
+          "company.address.city",
+          "company.address.line1",
+          "company.address.postal_code",
+          "company.address.state",
+          "company.directors_provided",
+          "company.executives_provided",
+          "company.name",
+          "company.owners_provided",
+          "company.phone",
+          "company.tax_id",
+          "company.verification.document",
+          "directors.address.city",
+          "directors.address.line1",
+          "directors.address.postal_code",
+          "directors.address.state",
+          "directors.dob.day",
+          "directors.dob.month",
+          "directors.dob.year",
+          "directors.email",
+          "directors.first_name",
+          "directors.id_number",
+          "directors.last_name",
+          "directors.political_exposure",
+          "directors.relationship.title",
+          "directors.verification.document",
+          "executives.address.city",
+          "executives.address.line1",
+          "executives.address.postal_code",
+          "executives.address.state",
+          "executives.dob.day",
+          "executives.dob.month",
+          "executives.dob.year",
+          "executives.email",
+          "executives.first_name",
+          "executives.id_number",
+          "executives.last_name",
+          "executives.political_exposure",
+          "executives.relationship.title",
+          "executives.verification.document",
+          "owners.address.city",
+          "owners.address.line1",
+          "owners.address.postal_code",
+          "owners.address.state",
+          "owners.dob.day",
+          "owners.dob.month",
+          "owners.dob.year",
+          "owners.first_name",
+          "owners.id_number",
+          "owners.last_name",
+          "owners.political_exposure",
+          "owners.relationship.percent_ownership",
+          "owners.verification.document",
+          "representative.address.city",
+          "representative.address.line1",
+          "representative.address.postal_code",
+          "representative.address.state",
+          "representative.dob.day",
+          "representative.dob.month",
+          "representative.dob.year",
+          "representative.email",
+          "representative.first_name",
+          "representative.id_number",
+          "representative.last_name",
+          "representative.phone",
+          "representative.political_exposure",
+          "representative.relationship.executive",
+          "representative.relationship.title",
+          "representative.verification.document"
+        ],
+        "disabled_reason": "requirements.past_due",
+        "errors": [],
+        "eventually_due": [
+          "business_profile.mcc",
+          "business_profile.product_description",
+          "company.address.city",
+          "company.address.line1",
+          "company.address.postal_code",
+          "company.address.state",
+          "company.directors_provided",
+          "company.executives_provided",
+          "company.name",
+          "company.owners_provided",
+          "company.phone",
+          "company.tax_id",
+          "company.verification.document",
+          "directors.address.city",
+          "directors.address.line1",
+          "directors.address.postal_code",
+          "directors.address.state",
+          "directors.dob.day",
+          "directors.dob.month",
+          "directors.dob.year",
+          "directors.email",
+          "directors.first_name",
+          "directors.id_number",
+          "directors.last_name",
+          "directors.political_exposure",
+          "directors.relationship.title",
+          "directors.verification.document",
+          "executives.address.city",
+          "executives.address.line1",
+          "executives.address.postal_code",
+          "executives.address.state",
+          "executives.dob.day",
+          "executives.dob.month",
+          "executives.dob.year",
+          "executives.email",
+          "executives.first_name",
+          "executives.id_number",
+          "executives.last_name",
+          "executives.political_exposure",
+          "executives.relationship.title",
+          "executives.verification.document",
+          "owners.address.city",
+          "owners.address.line1",
+          "owners.address.postal_code",
+          "owners.address.state",
+          "owners.dob.day",
+          "owners.dob.month",
+          "owners.dob.year",
+          "owners.first_name",
+          "owners.id_number",
+          "owners.last_name",
+          "owners.political_exposure",
+          "owners.relationship.percent_ownership",
+          "owners.verification.document",
+          "representative.address.city",
+          "representative.address.line1",
+          "representative.address.postal_code",
+          "representative.address.state",
+          "representative.dob.day",
+          "representative.dob.month",
+          "representative.dob.year",
+          "representative.email",
+          "representative.first_name",
+          "representative.id_number",
+          "representative.last_name",
+          "representative.phone",
+          "representative.political_exposure",
+          "representative.relationship.executive",
+          "representative.relationship.title",
+          "representative.verification.document"
+        ],
+        "past_due": [
+          "business_profile.mcc",
+          "business_profile.product_description",
+          "company.address.city",
+          "company.address.line1",
+          "company.address.postal_code",
+          "company.address.state",
+          "company.directors_provided",
+          "company.executives_provided",
+          "company.name",
+          "company.owners_provided",
+          "company.phone",
+          "company.tax_id",
+          "company.verification.document",
+          "directors.address.city",
+          "directors.address.line1",
+          "directors.address.postal_code",
+          "directors.address.state",
+          "directors.dob.day",
+          "directors.dob.month",
+          "directors.dob.year",
+          "directors.email",
+          "directors.first_name",
+          "directors.id_number",
+          "directors.last_name",
+          "directors.political_exposure",
+          "directors.relationship.title",
+          "directors.verification.document",
+          "executives.address.city",
+          "executives.address.line1",
+          "executives.address.postal_code",
+          "executives.address.state",
+          "executives.dob.day",
+          "executives.dob.month",
+          "executives.dob.year",
+          "executives.email",
+          "executives.first_name",
+          "executives.id_number",
+          "executives.last_name",
+          "executives.political_exposure",
+          "executives.relationship.title",
+          "executives.verification.document",
+          "owners.address.city",
+          "owners.address.line1",
+          "owners.address.postal_code",
+          "owners.address.state",
+          "owners.dob.day",
+          "owners.dob.month",
+          "owners.dob.year",
+          "owners.first_name",
+          "owners.id_number",
+          "owners.last_name",
+          "owners.political_exposure",
+          "owners.relationship.percent_ownership",
+          "owners.verification.document",
+          "representative.address.city",
+          "representative.address.line1",
+          "representative.address.postal_code",
+          "representative.address.state",
+          "representative.dob.day",
+          "representative.dob.month",
+          "representative.dob.year",
+          "representative.email",
+          "representative.first_name",
+          "representative.id_number",
+          "representative.last_name",
+          "representative.phone",
+          "representative.political_exposure",
+          "representative.relationship.executive",
+          "representative.relationship.title",
+          "representative.verification.document"
+        ],
+        "pending_verification": []
+      },
+      "settings": {
+        "bacs_debit_payments": {
+          "display_name": null,
+          "service_user_number": null
+        },
+        "branding": {
+          "icon": null,
+          "logo": null,
+          "primary_color": null,
+          "secondary_color": null
+        },
+        "card_issuing": {
+          "tos_acceptance": {
+            "date": null,
+            "ip": null
+          }
+        },
+        "card_payments": {
+          "decline_on": {
+            "avs_failure": false,
+            "cvc_failure": false
+          },
+          "statement_descriptor_prefix": null,
+          "statement_descriptor_prefix_kana": null,
+          "statement_descriptor_prefix_kanji": null
+        },
+        "dashboard": {
+          "display_name": null,
+          "timezone": "Etc/UTC"
+        },
+        "invoices": {
+          "default_account_tax_ids": null
+        },
+        "payments": {
+          "statement_descriptor": null,
+          "statement_descriptor_kana": null,
+          "statement_descriptor_kanji": null
+        },
+        "payouts": {
+          "debit_negative_balances": false,
+          "schedule": {
+            "delay_days": 30,
+            "interval": "daily"
+          },
+          "statement_descriptor": null
+        },
+        "sepa_debit_payments": {}
+      },
+      "tos_acceptance": {
+        "date": 1715113935,
+        "ip": "127.0.0.1",
+        "user_agent": null
+      },
+      "type": "custom"
+    }
+  ],
+  [
+    "acmeCo/Accounts",
+    {
+      "business_profile": {
+        "annual_revenue": null,
+        "estimated_worker_count": null,
+        "mcc": null,
+        "name": null,
+        "support_address": null,
+        "support_email": null,
+        "support_phone": null,
+        "support_url": null,
+        "url": null
+      },
+      "capabilities": {},
+      "charges_enabled": false,
+      "controller": {
+        "fees": {
+          "payer": "account"
+        },
+        "is_controller": true,
+        "losses": {
+          "payments": "stripe"
+        },
+        "requirement_collection": "stripe",
+        "stripe_dashboard": {
+          "type": "full"
+        },
+        "type": "application"
+      },
+      "country": "US",
+      "created": 1715177798,
+      "default_currency": "usd",
+      "details_submitted": false,
+      "email": null,
+      "external_accounts": {
+        "data": [],
+        "has_more": false,
+        "object": "list",
+        "total_count": 0,
+        "url": "/v1/accounts/acct_1PEBIPKJ8Atczg1v/external_accounts"
+      },
+      "future_requirements": {
+        "alternatives": [],
+        "current_deadline": null,
+        "currently_due": [],
+        "disabled_reason": null,
+        "errors": [],
+        "eventually_due": [],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "id": "acct_1PEBIPKJ8Atczg1v",
+      "metadata": {},
+      "object": "account",
+      "payouts_enabled": false,
+      "requirements": {
+        "alternatives": [],
+        "current_deadline": null,
+        "currently_due": [
+          "business_profile.product_description",
+          "business_profile.support_phone",
+          "business_profile.url",
+          "external_account",
+          "tos_acceptance.date",
+          "tos_acceptance.ip"
+        ],
+        "disabled_reason": "requirements.past_due",
+        "errors": [],
+        "eventually_due": [
+          "business_profile.product_description",
+          "business_profile.support_phone",
+          "business_profile.url",
+          "external_account",
+          "tos_acceptance.date",
+          "tos_acceptance.ip"
+        ],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "settings": {
+        "bacs_debit_payments": {
+          "display_name": null,
+          "service_user_number": null
+        },
+        "branding": {
+          "icon": null,
+          "logo": null,
+          "primary_color": null,
+          "secondary_color": null
+        },
+        "card_issuing": {
+          "tos_acceptance": {
+            "date": null,
+            "ip": null
+          }
+        },
+        "card_payments": {
+          "decline_on": {
+            "avs_failure": true,
+            "cvc_failure": true
+          },
+          "statement_descriptor_prefix": null,
+          "statement_descriptor_prefix_kana": null,
+          "statement_descriptor_prefix_kanji": null
+        },
+        "dashboard": {
+          "display_name": null,
+          "timezone": "Etc/UTC"
+        },
+        "invoices": {
+          "default_account_tax_ids": null
+        },
+        "payments": {
+          "statement_descriptor": null,
+          "statement_descriptor_kana": null,
+          "statement_descriptor_kanji": null
+        },
+        "payouts": {
+          "debit_negative_balances": true,
+          "schedule": {
+            "delay_days": 2,
+            "interval": "daily"
+          },
+          "statement_descriptor": null
+        },
+        "sepa_debit_payments": {}
+      },
+      "tos_acceptance": {
+        "date": null
+      },
+      "type": "standard"
+    }
+  ],
+  [
+    "acmeCo/Customers",
+    {
+      "address": {
+        "city": "",
+        "country": "BR",
+        "line1": "",
+        "line2": "",
+        "postal_code": "",
+        "state": ""
+      },
+      "balance": 0,
+      "created": 1698086773,
+      "currency": "brl",
+      "default_source": "card_1PBuDHLzZ0uyKPmdYnUUV7jF",
+      "delinquent": true,
+      "description": "abcdefghijk",
+      "discount": null,
+      "email": "costumer@costumer.com",
+      "id": "cus_OsDZA9pqByjT9H",
+      "invoice_prefix": "E32C691C",
+      "invoice_settings": {
+        "custom_fields": null,
+        "default_payment_method": null,
+        "footer": null,
+        "rendering_options": null
+      },
+      "livemode": false,
+      "metadata": {},
+      "name": "Cos Tumer",
+      "next_invoice_sequence": 1,
+      "object": "customer",
+      "phone": null,
+      "preferred_locales": [
+        "pt-BR"
+      ],
+      "shipping": null,
+      "tax_exempt": "none",
+      "test_clock": null
+    }
+  ],
+  [
+    "acmeCo/Customers",
+    {
+      "address": null,
+      "balance": 0,
+      "created": 1715026232,
+      "currency": "usd",
+      "default_source": null,
+      "delinquent": false,
+      "description": null,
+      "discount": null,
+      "email": "my_cool_customer@example.com",
+      "id": "cus_Q3fCJO6pdqbdAr",
+      "invoice_prefix": "A2BF5CFE",
+      "invoice_settings": {
+        "custom_fields": null,
+        "default_payment_method": null,
+        "footer": null,
+        "rendering_options": null
+      },
+      "livemode": false,
+      "metadata": {
+        "some-interesting": "piece-of-information"
+      },
+      "name": "My Cool Customer",
+      "next_invoice_sequence": 25,
+      "object": "customer",
+      "phone": null,
+      "preferred_locales": [],
+      "shipping": null,
+      "tax_exempt": "none",
+      "test_clock": null
+    }
+  ],
+  [
+    "acmeCo/Customers",
+    {
+      "address": {
+        "city": "Maringa",
+        "country": "BR",
+        "line1": "TestAddress123",
+        "line2": "TestAddres783",
+        "postal_code": "87013060",
+        "state": ""
+      },
+      "balance": 0,
+      "created": 1715127216,
+      "currency": "brl",
+      "default_source": null,
+      "delinquent": false,
+      "description": "TestCostumer4 description",
+      "discount": null,
+      "email": "TestCostumer4@test.com",
+      "id": "cus_Q46LTJbMTO3UCt",
+      "invoice_prefix": "0473A85D",
+      "invoice_settings": {
+        "custom_fields": null,
+        "default_payment_method": null,
+        "footer": null,
+        "rendering_options": null
+      },
+      "livemode": false,
+      "metadata": {},
+      "name": "TestCostumer4",
+      "next_invoice_sequence": 2,
+      "object": "customer",
+      "phone": "+55000000000",
+      "preferred_locales": [
+        "pt-BR"
+      ],
+      "shipping": {
+        "address": {
+          "city": "Maringa",
+          "country": "BR",
+          "line1": "TestAddress123",
+          "line2": "TestAddres783",
+          "postal_code": "87013060",
+          "state": ""
+        },
+        "name": "TestCostumer4",
+        "phone": "+55000000000"
+      },
+      "tax_exempt": "none",
+      "test_clock": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PDXrqLzZ0uyKPmd1XWLyEvt",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715026235,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription creation",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PDXrqLzZ0uyKPmd1ykWN7T1",
+      "invoice": "in_1PDXrqLzZ0uyKPmdT2P1KFcv",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 21,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PDXrqLzZ0uyKPmd1nlXHjdc",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 1000,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PDvJ5LzZ0uyKPmd0fdw5euW",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715116336,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PDvJ5LzZ0uyKPmd0MFObctU",
+      "invoice": "in_1PDuMFLzZ0uyKPmd9AJ2IBWg",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 36,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PDvJ5LzZ0uyKPmd0N1g9L4I",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": true,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 23000,
+      "amount_captured": 23000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PEAKNLzZ0uyKPmd1ygJbXDs",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": true,
+      "created": 1715174075,
+      "currency": "brl",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "one-time payment test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEAKNLzZ0uyKPmd1LsLoTxx",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 16,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEAKNLzZ0uyKPmd1LvJ2AxR",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 23000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 23000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 4500,
+      "amount_captured": 4500,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PEANELzZ0uyKPmd0whsGkzK",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": true,
+      "created": 1715174252,
+      "currency": "brl",
+      "customer": "cus_Q46LTJbMTO3UCt",
+      "description": "Dispute test",
+      "destination": null,
+      "dispute": "dp_1PEANFLzZ0uyKPmdtYNVONVG",
+      "disputed": true,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEANELzZ0uyKPmd0Ie5GPEo",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 30,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEANELzZ0uyKPmd0UIzwMqd",
+      "payment_method": "pm_1PEANDLzZ0uyKPmdIglQmnuN",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 4500,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "Dz0lQ7lnC5JrH3wz",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "0079",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 4500,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 104000,
+      "amount_captured": 0,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": null,
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": false,
+      "created": 1715174322,
+      "currency": "brl",
+      "customer": null,
+      "description": "insufficient funds test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": "card_declined",
+      "failure_message": "Your card has insufficient funds.",
+      "fraud_details": {},
+      "id": "ch_3PEAOMLzZ0uyKPmd14wODZDS",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "declined_by_network",
+        "reason": "insufficient_funds",
+        "risk_level": "normal",
+        "risk_score": 51,
+        "seller_message": "The bank returned the decline code `insufficient_funds`.",
+        "type": "issuer_declined"
+      },
+      "paid": false,
+      "payment_intent": "pi_3PEAOMLzZ0uyKPmd13iSf0TZ",
+      "payment_method": "pm_1PEAOLLzZ0uyKPmdJYab6jmj",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": null,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "CZOdnFVJ0gh8Pr9d",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "9995",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 104000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "failed",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 104000,
+      "amount_captured": 0,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": null,
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": false,
+      "created": 1715174347,
+      "currency": "brl",
+      "customer": null,
+      "description": "insufficient funds test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": "card_declined",
+      "failure_message": "Your card has insufficient funds.",
+      "fraud_details": {},
+      "id": "ch_3PEAOlLzZ0uyKPmd1soj3V7i",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "declined_by_network",
+        "reason": "insufficient_funds",
+        "risk_level": "normal",
+        "risk_score": 54,
+        "seller_message": "The bank returned the decline code `insufficient_funds`.",
+        "type": "issuer_declined"
+      },
+      "paid": false,
+      "payment_intent": "pi_3PEAOlLzZ0uyKPmd1MqzFOqB",
+      "payment_method": "pm_1PEAOkLzZ0uyKPmd0FzVnPg8",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": null,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "CZOdnFVJ0gh8Pr9d",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "9995",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 104000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "failed",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 104000,
+      "amount_captured": 0,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": null,
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": false,
+      "created": 1715174422,
+      "currency": "brl",
+      "customer": null,
+      "description": "insufficient funds test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": "card_declined",
+      "failure_message": "Your card was declined.",
+      "fraud_details": {},
+      "id": "ch_3PEAPxLzZ0uyKPmd0ZfRmMgS",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "declined_by_network",
+        "reason": "generic_decline",
+        "risk_level": "normal",
+        "risk_score": 62,
+        "seller_message": "The bank did not return any further details with this decline.",
+        "type": "issuer_declined"
+      },
+      "paid": false,
+      "payment_intent": "pi_3PEAPxLzZ0uyKPmd0HilAgQ7",
+      "payment_method": "pm_1PEAPxLzZ0uyKPmdtQ2gZDke",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": null,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "zNf6WpScWOfmgMxf",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "0002",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 104000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "failed",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 300,
+      "amount_captured": 0,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": null,
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": null,
+      "captured": false,
+      "created": 1715174544,
+      "currency": "brl",
+      "customer": null,
+      "description": "early_fraud test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": "card_declined",
+      "failure_message": "Your card was declined.",
+      "fraud_details": {},
+      "id": "ch_3PEARwLzZ0uyKPmd1VBACHqy",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "not_sent_to_network",
+        "reason": "highest_risk_level",
+        "risk_level": "highest",
+        "risk_score": 91,
+        "rule": "block_if_high_risk",
+        "seller_message": "Stripe blocked this payment as too risky.",
+        "type": "blocked"
+      },
+      "paid": false,
+      "payment_intent": "pi_3PEARwLzZ0uyKPmd1UODkLgR",
+      "payment_method": "pm_1PEARvLzZ0uyKPmdKJaXk5Pm",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": null,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "unavailable",
+            "cvc_check": "unavailable"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "ZvhadnEexcPPXOIa",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4954",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 300,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "failed",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 300,
+      "amount_captured": 0,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": null,
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": null,
+      "captured": false,
+      "created": 1715174581,
+      "currency": "brl",
+      "customer": null,
+      "description": "early_fraud test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": "card_declined",
+      "failure_message": "Your card was declined.",
+      "fraud_details": {},
+      "id": "ch_3PEASWLzZ0uyKPmd0twux2HX",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "not_sent_to_network",
+        "reason": "highest_risk_level",
+        "risk_level": "highest",
+        "risk_score": 77,
+        "rule": "block_if_high_risk",
+        "seller_message": "Stripe blocked this payment as too risky.",
+        "type": "blocked"
+      },
+      "paid": false,
+      "payment_intent": "pi_3PEASWLzZ0uyKPmd0Z3Q4hfW",
+      "payment_method": "pm_1PEASWLzZ0uyKPmdXPCoIKys",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": null,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "unavailable",
+            "cvc_check": "unavailable"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "ZvhadnEexcPPXOIa",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4954",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 300,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "failed",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 300,
+      "amount_captured": 0,
+      "amount_refunded": 300,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": null,
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": false,
+      "created": 1715174608,
+      "currency": "brl",
+      "customer": null,
+      "description": "early_fraud test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEASxLzZ0uyKPmd0qXFh6QD",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "elevated",
+        "risk_score": 73,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEASxLzZ0uyKPmd0yXM3RkM",
+      "payment_method": "pm_1PEASxLzZ0uyKPmd8LQCC3T9",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 300,
+          "brand": "visa",
+          "capture_before": 1715779408,
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "0AgJhD3PL0WGi5uQ",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "9235",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 300,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": true,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1200,
+      "amount_captured": 1200,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PEAU5LzZ0uyKPmd0adw2fLY",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": true,
+      "created": 1715174677,
+      "currency": "brl",
+      "customer": null,
+      "description": "Test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEAU5LzZ0uyKPmd0Jbia7xj",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 41,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEAU5LzZ0uyKPmd00DBL41E",
+      "payment_method": "pm_1PEAU4LzZ0uyKPmdAqsWobcC",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1200,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "MLuQgnCIAU8Z0acL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "7726",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1200,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1200,
+      "amount_captured": 1200,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PEAVCLzZ0uyKPmd0vLKFR4e",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": true,
+      "created": 1715174747,
+      "currency": "brl",
+      "customer": null,
+      "description": "refunded failed",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEAVCLzZ0uyKPmd0ESSoHlk",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 14,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEAVCLzZ0uyKPmd0uePmIgg",
+      "payment_method": "pm_1PEAVCLzZ0uyKPmdFfy14Glb",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1200,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "5mcoKqLTJUDAM8Ze",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "5126",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1200,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": "ORDER_95"
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 3400,
+      "amount_captured": 3400,
+      "amount_refunded": 3400,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PEAVdLzZ0uyKPmd0JxrZeIw",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": "00000",
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "DESCRIPTOR",
+      "captured": true,
+      "created": 1715174773,
+      "currency": "brl",
+      "customer": null,
+      "description": "early_fraud test",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEAVdLzZ0uyKPmd0oCTgsIN",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "elevated",
+        "risk_score": 73,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEAVdLzZ0uyKPmd0t2ipdpx",
+      "payment_method": "pm_1PEAVcLzZ0uyKPmdon6QPJpQ",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 3400,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": "pass",
+            "cvc_check": "pass"
+          },
+          "country": "US",
+          "exp_month": 12,
+          "exp_year": 2034,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "0AgJhD3PL0WGi5uQ",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "9235",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 3400,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": true,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": "descriptor",
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PEeLHLzZ0uyKPmd0oiTOzUO",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715289453,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PEeLHLzZ0uyKPmd038rL1eX",
+      "invoice": "in_1PEdKFLzZ0uyKPmd1hIqmMtw",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 32,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PEeLHLzZ0uyKPmd0BbmZ5Cw",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PF0mTLzZ0uyKPmd0Ki4YEin",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715375706,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PF0mTLzZ0uyKPmd0mqJ2BBR",
+      "invoice": "in_1PEzmWLzZ0uyKPmdbw1iDMnP",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 3,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PF0mTLzZ0uyKPmd0YsT8kLG",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PFNGYLzZ0uyKPmd1ybzHRoH",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715462139,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PFNGYLzZ0uyKPmd1iCQNi4O",
+      "invoice": "in_1PFMGDLzZ0uyKPmdTzJYjFnv",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 9,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PFNGYLzZ0uyKPmd1C9L15CS",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PFjodLzZ0uyKPmd1e3FfXqd",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715548819,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PFjodLzZ0uyKPmd1FRKWHh5",
+      "invoice": "in_1PFikwLzZ0uyKPmdopPv2iyM",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 4,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PFjodLzZ0uyKPmd1yVtEi7u",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PG6E4LzZ0uyKPmd0n5mIOnA",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715634965,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PG6E4LzZ0uyKPmd0WIEqM7f",
+      "invoice": "in_1PG5DHLzZ0uyKPmdEEw9P5DC",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 54,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PG6E4LzZ0uyKPmd09vIf8Lo",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PGScsLzZ0uyKPmd1q8yOOSa",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715721071,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PGScsLzZ0uyKPmd1bhLOPfF",
+      "invoice": "in_1PGRgeLzZ0uyKPmdhPFG8oZO",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 64,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PGScsLzZ0uyKPmd1gVDNvcV",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PGp9ELzZ0uyKPmd0gKRYo66",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715807645,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PGp9ELzZ0uyKPmd0ZrKpDzn",
+      "invoice": "in_1PGo9oLzZ0uyKPmdG0gfXtpE",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 54,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PGp9ELzZ0uyKPmd0TCbIqjl",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PHBbDLzZ0uyKPmd1hdPN4EB",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715893948,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PHBbDLzZ0uyKPmd1MRYu16V",
+      "invoice": "in_1PHAeELzZ0uyKPmd8isYi7wW",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 44,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PHBbDLzZ0uyKPmd1uom6gce",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PHY4bLzZ0uyKPmd1mh1CBg6",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1715980338,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PHY4bLzZ0uyKPmd1sGDcuXB",
+      "invoice": "in_1PHX6zLzZ0uyKPmdmoCmCVCS",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 53,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PHY4bLzZ0uyKPmd1jav3CH7",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PHuYcLzZ0uyKPmd14nnZegh",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716066767,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PHuYcLzZ0uyKPmd151kgcVg",
+      "invoice": "in_1PHtbtLzZ0uyKPmdigs0QEXJ",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 19,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PHuYcLzZ0uyKPmd1UneyT7f",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PIH1xLzZ0uyKPmd0bThGJwY",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716153154,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PIH1xLzZ0uyKPmd0mAHO7lY",
+      "invoice": "in_1PIG4qLzZ0uyKPmdZ39nabHw",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 15,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PIH1xLzZ0uyKPmd0ywkEkyL",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PIdVULzZ0uyKPmd1uvIy5mU",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716239552,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PIdVULzZ0uyKPmd1nm7RvtQ",
+      "invoice": "in_1PIcYcLzZ0uyKPmdz1jXdM4y",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 62,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PIdVULzZ0uyKPmd1KA26m7N",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PIzyKLzZ0uyKPmd1swvnwOK",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716325909,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PIzyKLzZ0uyKPmd11nyd5nu",
+      "invoice": "in_1PIz1jLzZ0uyKPmdXjGuUwon",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 3,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PIzyKLzZ0uyKPmd1ZedcZeF",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PJMSyLzZ0uyKPmd13wcERko",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716412377,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PJMSyLzZ0uyKPmd1tnQFH4i",
+      "invoice": "in_1PJLVqLzZ0uyKPmdOfoGmIxp",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 27,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PJMSyLzZ0uyKPmd12QyUrfu",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PJivKLzZ0uyKPmd00wWLUvj",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716498703,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PJivKLzZ0uyKPmd0PY44qae",
+      "invoice": "in_1PJhyNLzZ0uyKPmdTYv4n2ba",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 10,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PJivKLzZ0uyKPmd0BfjD5IQ",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PK5P3LzZ0uyKPmd07m6QqCu",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716585114,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PK5P3LzZ0uyKPmd07QCBOMC",
+      "invoice": "in_1PK4StLzZ0uyKPmdQDsKPFwY",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 32,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PK5P3LzZ0uyKPmd0QQJdmW9",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PKRsnLzZ0uyKPmd0Q0xlRvt",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716671526,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PKRsnLzZ0uyKPmd0bWGqETo",
+      "invoice": "in_1PKQveLzZ0uyKPmdePped3ue",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 7,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PKRsnLzZ0uyKPmd0xVkfbZz",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PKoMvLzZ0uyKPmd1AK4Crkg",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716757962,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PKoMvLzZ0uyKPmd1kdr1jet",
+      "invoice": "in_1PKnPwLzZ0uyKPmdr2o30uua",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 50,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PKoMvLzZ0uyKPmd1fT2iSTx",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PLApRLzZ0uyKPmd0QQeIqEY",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716844297,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PLApRLzZ0uyKPmd09W4ZAd3",
+      "invoice": "in_1PL9sqLzZ0uyKPmddjY7Bf3m",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 53,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PLApRLzZ0uyKPmd04ngl4bI",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PLXIlLzZ0uyKPmd1C3u1mtT",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1716930684,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PLXIlLzZ0uyKPmd1ovAWeiZ",
+      "invoice": "in_1PLWMALzZ0uyKPmdpuDVZIqM",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 6,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PLXIlLzZ0uyKPmd1PzA6kOv",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/Charges",
+    {
+      "amount": 1000,
+      "amount_captured": 1000,
+      "amount_refunded": 0,
+      "application": null,
+      "application_fee": null,
+      "application_fee_amount": null,
+      "balance_transaction": "txn_3PLtmYLzZ0uyKPmd1Sp2TVpS",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null
+      },
+      "calculated_statement_descriptor": "Stripe",
+      "captured": true,
+      "created": 1717017099,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "description": "Subscription update",
+      "destination": null,
+      "dispute": null,
+      "disputed": false,
+      "failure_balance_transaction": null,
+      "failure_code": null,
+      "failure_message": null,
+      "fraud_details": {},
+      "id": "ch_3PLtmYLzZ0uyKPmd1ZNMMgm1",
+      "invoice": "in_1PLspWLzZ0uyKPmdC9tCYNdm",
+      "livemode": false,
+      "metadata": {},
+      "object": "charge",
+      "on_behalf_of": null,
+      "order": null,
+      "outcome": {
+        "network_status": "approved_by_network",
+        "reason": null,
+        "risk_level": "normal",
+        "risk_score": 56,
+        "seller_message": "Payment complete.",
+        "type": "authorized"
+      },
+      "paid": true,
+      "payment_intent": "pi_3PLtmYLzZ0uyKPmd1HR1xtxp",
+      "payment_method": "pm_1PDXrnLzZ0uyKPmdelC1923W",
+      "payment_method_details": {
+        "card": {
+          "amount_authorized": 1000,
+          "brand": "visa",
+          "checks": {
+            "address_line1_check": null,
+            "address_postal_code_check": null,
+            "cvc_check": null
+          },
+          "country": "US",
+          "exp_month": 5,
+          "exp_year": 2025,
+          "extended_authorization": {
+            "status": "disabled"
+          },
+          "fingerprint": "RIa1hFrmo5OK93gL",
+          "funding": "credit",
+          "incremental_authorization": {
+            "status": "unavailable"
+          },
+          "installments": null,
+          "last4": "4242",
+          "mandate": null,
+          "multicapture": {
+            "status": "unavailable"
+          },
+          "network": "visa",
+          "network_token": {
+            "used": false
+          },
+          "overcapture": {
+            "maximum_amount_capturable": 1000,
+            "status": "unavailable"
+          },
+          "three_d_secure": null,
+          "wallet": null
+        },
+        "type": "card"
+      },
+      "radar_options": {},
+      "receipt_email": null,
+      "receipt_number": null,
+      "receipt_url": "redacted",
+      "refunded": false,
+      "review": null,
+      "shipping": null,
+      "source": null,
+      "source_transfer": null,
+      "statement_descriptor": null,
+      "statement_descriptor_suffix": null,
+      "status": "succeeded",
+      "transfer_data": null,
+      "transfer_group": null
+    }
+  ],
+  [
+    "acmeCo/CheckoutSessions",
+    {
+      "after_expiration": null,
+      "allow_promotion_codes": null,
+      "amount_subtotal": 144000,
+      "amount_total": 144000,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "status": null
+      },
+      "billing_address_collection": null,
+      "cancel_url": null,
+      "client_reference_id": null,
+      "consent": null,
+      "consent_collection": null,
+      "created": 1715194927,
+      "currency": "brl",
+      "currency_conversion": null,
+      "custom_fields": [],
+      "custom_text": {
+        "after_submit": null,
+        "shipping_address": null,
+        "submit": null,
+        "terms_of_service_acceptance": null
+      },
+      "customer": null,
+      "customer_creation": "always",
+      "customer_details": null,
+      "customer_email": null,
+      "expires_at": 1715281327,
+      "id": "cs_test_a1QJ4hdfF65wQzKpswtfLR8lhAydNT2P1Fc5FXroyFLqgGZM459MUWB2DK",
+      "invoice": null,
+      "invoice_creation": null,
+      "livemode": false,
+      "locale": null,
+      "metadata": {},
+      "mode": "subscription",
+      "object": "checkout.session",
+      "payment_intent": null,
+      "payment_link": null,
+      "payment_method_collection": "always",
+      "payment_method_configuration_details": null,
+      "payment_method_options": {
+        "card": {
+          "request_three_d_secure": "automatic"
+        }
+      },
+      "payment_method_types": [
+        "card"
+      ],
+      "payment_status": "unpaid",
+      "phone_number_collection": {
+        "enabled": false
+      },
+      "recovered_from": null,
+      "saved_payment_method_options": {
+        "allow_redisplay_filters": [
+          "always"
+        ],
+        "payment_method_remove": null,
+        "payment_method_save": null
+      },
+      "setup_intent": null,
+      "shipping_address_collection": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "shipping_options": [],
+      "status": "expired",
+      "submit_type": null,
+      "subscription": null,
+      "success_url": "https://example.com/success",
+      "total_details": {
+        "amount_discount": 0,
+        "amount_shipping": 0,
+        "amount_tax": 0
+      },
+      "ui_mode": "hosted",
+      "url": null
+    }
+  ],
+  [
+    "acmeCo/Coupons",
+    {
+      "amount_off": null,
+      "created": 1715177451,
+      "currency": null,
+      "duration": "forever",
+      "duration_in_months": null,
+      "id": "GatEFZ6Z",
+      "livemode": false,
+      "max_redemptions": null,
+      "metadata": {},
+      "name": "TestCoupon",
+      "object": "coupon",
+      "percent_off": 20.0,
+      "redeem_by": null,
+      "times_redeemed": 0,
+      "valid": true
+    }
+  ],
+  [
+    "acmeCo/CreditNotes",
+    {
+      "amount": 1000,
+      "amount_shipping": 0,
+      "created": 1715194504,
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "customer_balance_transaction": "cbtxn_1PEFdsLzZ0uyKPmd4dYYJUI9",
+      "discount_amount": 0,
+      "discount_amounts": [],
+      "effective_at": 1715194471,
+      "id": "cn_1PEFdsLzZ0uyKPmdEiJG0LBY",
+      "invoice": "in_1PDXrqLzZ0uyKPmdT2P1KFcv",
+      "livemode": false,
+      "memo": "abuble",
+      "metadata": {},
+      "number": "A2BF5CFE-0001-CN-01",
+      "object": "credit_note",
+      "out_of_band_amount": null,
+      "pdf": "redacted",
+      "reason": "order_change",
+      "refund": null,
+      "shipping_cost": null,
+      "status": "issued",
+      "subtotal": 1000,
+      "subtotal_excluding_tax": 1000,
+      "tax_amounts": [],
+      "total": 1000,
+      "total_excluding_tax": 1000,
+      "type": "post_payment",
+      "voided_at": null
+    }
+  ],
+  [
+    "acmeCo/Disputes",
+    {
+      "amount": 2250,
+      "balance_transaction": "txn_1PEANFLzZ0uyKPmdJ294AFtR",
+      "balance_transactions": [
+        {
+          "amount": -2250,
+          "available_on": 1715731200,
+          "created": 1715174253,
+          "currency": "brl",
+          "description": "Chargeback withdrawal for ch_3PEANELzZ0uyKPmd0Ie5GPEo",
+          "exchange_rate": null,
+          "fee": 5500,
+          "fee_details": [
+            {
+              "amount": 5500,
+              "application": null,
+              "currency": "brl",
+              "description": "Dispute fee",
+              "type": "stripe_fee"
+            }
+          ],
+          "id": "txn_1PEANFLzZ0uyKPmdJ294AFtR",
+          "net": -7750,
+          "object": "balance_transaction",
+          "reporting_category": "dispute",
+          "source": "dp_1PEANFLzZ0uyKPmdtYNVONVG",
+          "status": "available",
+          "type": "adjustment"
+        }
+      ],
+      "charge": "ch_3PEANELzZ0uyKPmd0Ie5GPEo",
+      "created": 1715174253,
+      "currency": "brl",
+      "evidence": {
+        "access_activity_log": null,
+        "billing_address": "00000",
+        "cancellation_policy": null,
+        "cancellation_policy_disclosure": null,
+        "cancellation_rebuttal": null,
+        "customer_communication": null,
+        "customer_email_address": "testcostumer4@test.com",
+        "customer_name": "TestCostumer4",
+        "customer_purchase_ip": null,
+        "customer_signature": null,
+        "duplicate_charge_documentation": null,
+        "duplicate_charge_explanation": null,
+        "duplicate_charge_id": null,
+        "product_description": null,
+        "receipt": null,
+        "refund_policy": null,
+        "refund_policy_disclosure": null,
+        "refund_refusal_explanation": null,
+        "service_date": null,
+        "service_documentation": null,
+        "shipping_address": "TestAddress123\nTestAddres783\nMaringa, , 87013060, BR",
+        "shipping_carrier": null,
+        "shipping_date": null,
+        "shipping_documentation": null,
+        "shipping_tracking_number": null,
+        "uncategorized_file": null,
+        "uncategorized_text": null
+      },
+      "evidence_details": {
+        "due_by": 1715990399,
+        "has_evidence": false,
+        "past_due": false,
+        "submission_count": 0
+      },
+      "id": "dp_1PEANFLzZ0uyKPmdtYNVONVG",
+      "is_charge_refundable": false,
+      "livemode": false,
+      "metadata": {},
+      "object": "dispute",
+      "payment_intent": "pi_3PEANELzZ0uyKPmd0UIzwMqd",
+      "payment_method_details": {
+        "card": {
+          "brand": "visa",
+          "network_reason_code": "83"
+        },
+        "type": "card"
+      },
+      "reason": "fraudulent",
+      "status": "needs_response"
+    }
+  ],
+  [
+    "acmeCo/Disputes",
+    {
+      "amount": 2250,
+      "balance_transaction": "txn_1PEANGLzZ0uyKPmdio38Pgeo",
+      "balance_transactions": [
+        {
+          "amount": -2250,
+          "available_on": 1715731200,
+          "created": 1715174254,
+          "currency": "brl",
+          "description": "Chargeback withdrawal for ch_3PEANELzZ0uyKPmd0Ie5GPEo",
+          "exchange_rate": null,
+          "fee": 5500,
+          "fee_details": [
+            {
+              "amount": 5500,
+              "application": null,
+              "currency": "brl",
+              "description": "Dispute fee",
+              "type": "stripe_fee"
+            }
+          ],
+          "id": "txn_1PEANGLzZ0uyKPmdio38Pgeo",
+          "net": -7750,
+          "object": "balance_transaction",
+          "reporting_category": "dispute",
+          "source": "dp_1PEANGLzZ0uyKPmdeLML7H5D",
+          "status": "available",
+          "type": "adjustment"
+        }
+      ],
+      "charge": "ch_3PEANELzZ0uyKPmd0Ie5GPEo",
+      "created": 1715174254,
+      "currency": "brl",
+      "evidence": {
+        "access_activity_log": null,
+        "billing_address": "00000",
+        "cancellation_policy": null,
+        "cancellation_policy_disclosure": null,
+        "cancellation_rebuttal": null,
+        "customer_communication": null,
+        "customer_email_address": "testcostumer4@test.com",
+        "customer_name": "TestCostumer4",
+        "customer_purchase_ip": null,
+        "customer_signature": null,
+        "duplicate_charge_documentation": null,
+        "duplicate_charge_explanation": null,
+        "duplicate_charge_id": null,
+        "product_description": null,
+        "receipt": null,
+        "refund_policy": null,
+        "refund_policy_disclosure": null,
+        "refund_refusal_explanation": null,
+        "service_date": null,
+        "service_documentation": null,
+        "shipping_address": "TestAddress123\nTestAddres783\nMaringa, , 87013060, BR",
+        "shipping_carrier": null,
+        "shipping_date": null,
+        "shipping_documentation": null,
+        "shipping_tracking_number": null,
+        "uncategorized_file": null,
+        "uncategorized_text": null
+      },
+      "evidence_details": {
+        "due_by": 1715990399,
+        "has_evidence": false,
+        "past_due": false,
+        "submission_count": 0
+      },
+      "id": "dp_1PEANGLzZ0uyKPmdeLML7H5D",
+      "is_charge_refundable": false,
+      "livemode": false,
+      "metadata": {},
+      "object": "dispute",
+      "payment_intent": "pi_3PEANELzZ0uyKPmd0UIzwMqd",
+      "payment_method_details": {
+        "card": {
+          "brand": "visa",
+          "network_reason_code": "83"
+        },
+        "type": "card"
+      },
+      "reason": "fraudulent",
+      "status": "needs_response"
+    }
+  ],
+  [
+    "acmeCo/Invoices",
+    {
+      "account_country": "BR",
+      "account_name": null,
+      "account_tax_ids": null,
+      "amount_due": 1000,
+      "amount_paid": 1000,
+      "amount_remaining": 0,
+      "amount_shipping": 0,
+      "application": null,
+      "application_fee_amount": null,
+      "attempt_count": 1,
+      "attempted": true,
+      "auto_advance": false,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "status": null
+      },
+      "billing_reason": "subscription_create",
+      "charge": "ch_3PDXrqLzZ0uyKPmd1ykWN7T1",
+      "collection_method": "charge_automatically",
+      "created": 1715026234,
+      "currency": "usd",
+      "custom_fields": null,
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "customer_address": null,
+      "customer_email": "my_cool_customer@example.com",
+      "customer_name": "My Cool Customer",
+      "customer_phone": null,
+      "customer_shipping": null,
+      "customer_tax_exempt": "none",
+      "customer_tax_ids": [],
+      "default_payment_method": null,
+      "default_source": null,
+      "default_tax_rates": [],
+      "description": null,
+      "discount": null,
+      "discounts": [],
+      "due_date": null,
+      "effective_at": 1715026234,
+      "ending_balance": 0,
+      "footer": null,
+      "from_invoice": null,
+      "hosted_invoice_url": "redacted",
+      "id": "in_1PDXrqLzZ0uyKPmdT2P1KFcv",
+      "invoice_pdf": "redacted",
+      "issuer": {
+        "type": "self"
+      },
+      "last_finalization_error": null,
+      "latest_revision": null,
+      "livemode": false,
+      "metadata": {},
+      "next_payment_attempt": null,
+      "number": "A2BF5CFE-0001",
+      "object": "invoice",
+      "on_behalf_of": null,
+      "paid": true,
+      "paid_out_of_band": false,
+      "payment_intent": "pi_3PDXrqLzZ0uyKPmd1nlXHjdc",
+      "payment_settings": {
+        "default_mandate": null,
+        "payment_method_options": null,
+        "payment_method_types": null
+      },
+      "period_end": 1715026234,
+      "period_start": 1715026234,
+      "post_payment_credit_notes_amount": 1000,
+      "pre_payment_credit_notes_amount": 0,
+      "quote": null,
+      "receipt_number": null,
+      "rendering": null,
+      "rendering_options": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "starting_balance": 0,
+      "statement_descriptor": null,
+      "status": "paid",
+      "status_transitions": {
+        "finalized_at": 1715026234,
+        "marked_uncollectible_at": null,
+        "paid_at": 1715026234,
+        "voided_at": null
+      },
+      "subscription": "sub_1PDXrqLzZ0uyKPmdnoxWai8f",
+      "subscription_details": {
+        "metadata": {}
+      },
+      "subtotal": 1000,
+      "subtotal_excluding_tax": 1000,
+      "tax": null,
+      "test_clock": null,
+      "total": 1000,
+      "total_discount_amounts": [],
+      "total_excluding_tax": 1000,
+      "total_tax_amounts": [],
+      "transfer_data": null,
+      "webhooks_delivered_at": 1715026234
+    }
+  ],
+  [
+    "acmeCo/Invoices",
+    {
+      "account_country": "BR",
+      "account_name": null,
+      "account_tax_ids": null,
+      "amount_due": 1000,
+      "amount_paid": 1000,
+      "amount_remaining": 0,
+      "amount_shipping": 0,
+      "application": null,
+      "application_fee_amount": null,
+      "attempt_count": 1,
+      "attempted": true,
+      "auto_advance": false,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "status": null
+      },
+      "billing_reason": "subscription_cycle",
+      "charge": "ch_3PDvJ5LzZ0uyKPmd0MFObctU",
+      "collection_method": "charge_automatically",
+      "created": 1715112687,
+      "currency": "usd",
+      "custom_fields": null,
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "customer_address": null,
+      "customer_email": "my_cool_customer@example.com",
+      "customer_name": "My Cool Customer",
+      "customer_phone": null,
+      "customer_shipping": null,
+      "customer_tax_exempt": "none",
+      "customer_tax_ids": [],
+      "default_payment_method": null,
+      "default_source": null,
+      "default_tax_rates": [],
+      "description": null,
+      "discount": null,
+      "discounts": [],
+      "due_date": null,
+      "effective_at": 1715116335,
+      "ending_balance": 0,
+      "footer": null,
+      "from_invoice": null,
+      "hosted_invoice_url": "redacted",
+      "id": "in_1PDuMFLzZ0uyKPmd9AJ2IBWg",
+      "invoice_pdf": "redacted",
+      "issuer": {
+        "type": "self"
+      },
+      "last_finalization_error": null,
+      "latest_revision": null,
+      "livemode": false,
+      "metadata": {},
+      "next_payment_attempt": null,
+      "number": "A2BF5CFE-0002",
+      "object": "invoice",
+      "on_behalf_of": null,
+      "paid": true,
+      "paid_out_of_band": false,
+      "payment_intent": "pi_3PDvJ5LzZ0uyKPmd0N1g9L4I",
+      "payment_settings": {
+        "default_mandate": null,
+        "payment_method_options": null,
+        "payment_method_types": null
+      },
+      "period_end": 1715112634,
+      "period_start": 1715026234,
+      "post_payment_credit_notes_amount": 0,
+      "pre_payment_credit_notes_amount": 0,
+      "quote": null,
+      "receipt_number": null,
+      "rendering": null,
+      "rendering_options": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "starting_balance": 0,
+      "statement_descriptor": null,
+      "status": "paid",
+      "status_transitions": {
+        "finalized_at": 1715116335,
+        "marked_uncollectible_at": null,
+        "paid_at": 1715116335,
+        "voided_at": null
+      },
+      "subscription": "sub_1PDXrqLzZ0uyKPmdnoxWai8f",
+      "subscription_details": {
+        "metadata": {}
+      },
+      "subtotal": 1000,
+      "subtotal_excluding_tax": 1000,
+      "tax": null,
+      "test_clock": null,
+      "total": 1000,
+      "total_discount_amounts": [],
+      "total_excluding_tax": 1000,
+      "total_tax_amounts": [],
+      "transfer_data": null,
+      "webhooks_delivered_at": 1715112687
+    }
+  ],
+  [
+    "acmeCo/Invoices",
+    {
+      "account_country": "BR",
+      "account_name": null,
+      "account_tax_ids": null,
+      "amount_due": 72000,
+      "amount_paid": 0,
+      "amount_remaining": 72000,
+      "amount_shipping": 0,
+      "application": null,
+      "application_fee_amount": null,
+      "attempt_count": 0,
+      "attempted": false,
+      "auto_advance": true,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "status": null
+      },
+      "billing_reason": "subscription_create",
+      "charge": null,
+      "collection_method": "send_invoice",
+      "created": 1715127287,
+      "currency": "brl",
+      "custom_fields": null,
+      "customer": "cus_Q46LTJbMTO3UCt",
+      "customer_address": {
+        "city": "Maringa",
+        "country": "BR",
+        "line1": "TestAddress123",
+        "line2": "TestAddres783",
+        "postal_code": "87013060",
+        "state": ""
+      },
+      "customer_email": "TestCostumer4@test.com",
+      "customer_name": "TestCostumer4",
+      "customer_phone": "+55000000000",
+      "customer_shipping": {
+        "address": {
+          "city": "Maringa",
+          "country": "BR",
+          "line1": "TestAddress123",
+          "line2": "TestAddres783",
+          "postal_code": "87013060",
+          "state": ""
+        },
+        "name": "TestCostumer4",
+        "phone": "+55000000000"
+      },
+      "customer_tax_exempt": "none",
+      "customer_tax_ids": [],
+      "default_payment_method": null,
+      "default_source": null,
+      "default_tax_rates": [],
+      "description": null,
+      "discount": null,
+      "discounts": [],
+      "due_date": 1717719286,
+      "effective_at": 1715130907,
+      "ending_balance": 0,
+      "footer": null,
+      "from_invoice": null,
+      "hosted_invoice_url": "redacted",
+      "id": "in_1PDy9jLzZ0uyKPmdL9xBVKaK",
+      "invoice_pdf": "redacted",
+      "issuer": {
+        "type": "self"
+      },
+      "last_finalization_error": null,
+      "latest_revision": null,
+      "livemode": false,
+      "metadata": {},
+      "next_payment_attempt": null,
+      "number": "0473A85D-0001",
+      "object": "invoice",
+      "on_behalf_of": null,
+      "paid": false,
+      "paid_out_of_band": false,
+      "payment_intent": "pi_3PDz68LzZ0uyKPmd0K4mbKxv",
+      "payment_settings": {
+        "default_mandate": null,
+        "payment_method_options": null,
+        "payment_method_types": null
+      },
+      "period_end": 1715127286,
+      "period_start": 1715127286,
+      "post_payment_credit_notes_amount": 0,
+      "pre_payment_credit_notes_amount": 0,
+      "quote": null,
+      "receipt_number": null,
+      "rendering": null,
+      "rendering_options": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "starting_balance": 0,
+      "statement_descriptor": null,
+      "status": "open",
+      "status_transitions": {
+        "finalized_at": 1715130907,
+        "marked_uncollectible_at": null,
+        "paid_at": null,
+        "voided_at": null
+      },
+      "subscription": "sub_1PDy9iLzZ0uyKPmdGaAS6cAO",
+      "subscription_details": {
+        "metadata": {}
+      },
+      "subtotal": 72000,
+      "subtotal_excluding_tax": 72000,
+      "tax": null,
+      "test_clock": null,
+      "total": 72000,
+      "total_discount_amounts": [],
+      "total_excluding_tax": 72000,
+      "total_tax_amounts": [],
+      "transfer_data": null,
+      "webhooks_delivered_at": 1715127287
+    }
+  ],
+  [
+    "acmeCo/Invoices",
+    {
+      "account_country": "BR",
+      "account_name": null,
+      "account_tax_ids": null,
+      "amount_due": 0,
+      "amount_paid": 0,
+      "amount_remaining": 0,
+      "amount_shipping": 0,
+      "application": null,
+      "application_fee_amount": null,
+      "attempt_count": 0,
+      "attempted": true,
+      "auto_advance": false,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "status": null
+      },
+      "billing_reason": "subscription_cycle",
+      "charge": null,
+      "collection_method": "charge_automatically",
+      "created": 1715199383,
+      "currency": "usd",
+      "custom_fields": null,
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "customer_address": null,
+      "customer_email": "my_cool_customer@example.com",
+      "customer_name": "My Cool Customer",
+      "customer_phone": null,
+      "customer_shipping": null,
+      "customer_tax_exempt": "none",
+      "customer_tax_ids": [],
+      "default_payment_method": null,
+      "default_source": null,
+      "default_tax_rates": [],
+      "description": null,
+      "discount": null,
+      "discounts": [],
+      "due_date": null,
+      "effective_at": 1715203016,
+      "ending_balance": 0,
+      "footer": null,
+      "from_invoice": null,
+      "hosted_invoice_url": "redacted",
+      "id": "in_1PEGuZLzZ0uyKPmdujrJ1IxG",
+      "invoice_pdf": "redacted",
+      "issuer": {
+        "type": "self"
+      },
+      "last_finalization_error": null,
+      "latest_revision": null,
+      "livemode": false,
+      "metadata": {},
+      "next_payment_attempt": null,
+      "number": "A2BF5CFE-0003",
+      "object": "invoice",
+      "on_behalf_of": null,
+      "paid": true,
+      "paid_out_of_band": false,
+      "payment_intent": null,
+      "payment_settings": {
+        "default_mandate": null,
+        "payment_method_options": null,
+        "payment_method_types": null
+      },
+      "period_end": 1715199034,
+      "period_start": 1715112634,
+      "post_payment_credit_notes_amount": 0,
+      "pre_payment_credit_notes_amount": 0,
+      "quote": null,
+      "receipt_number": null,
+      "rendering": null,
+      "rendering_options": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "starting_balance": -1000,
+      "statement_descriptor": null,
+      "status": "paid",
+      "status_transitions": {
+        "finalized_at": 1715203016,
+        "marked_uncollectible_at": null,
+        "paid_at": 1715203016,
+        "voided_at": null
+      },
+      "subscription": "sub_1PDXrqLzZ0uyKPmdnoxWai8f",
+      "subscription_details": {
+        "metadata": {}
+      },
+      "subtotal": 1000,
+      "subtotal_excluding_tax": 1000,
+      "tax": null,
+      "test_clock": null,
+      "total": 1000,
+      "total_discount_amounts": [],
+      "total_excluding_tax": 1000,
+      "total_tax_amounts": [],
+      "transfer_data": null,
+      "webhooks_delivered_at": 1715199383
+    }
+  ],
+  [
+    "acmeCo/Invoices",
+    {
+      "account_country": "BR",
+      "account_name": null,
+      "account_tax_ids": null,
+      "amount_due": 1000,
+      "amount_paid": 1000,
+      "amount_remaining": 0,
+      "amount_shipping": 0,
+      "application": null,
+      "application_fee_amount": null,
+      "attempt_count": 1,
+      "attempted": true,
+      "auto_advance": false,
+      "automatic_tax": {
+        "enabled": false,
+        "liability": null,
+        "status": null
+      },
+      "billing_reason": "subscription_cycle",
+      "charge": "ch_3PEeLHLzZ0uyKPmd038rL1eX",
+      "collection_method": "charge_automatically",
+      "created": 1715285543,
+      "currency": "usd",
+      "custom_fields": null,
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "customer_address": null,
+      "customer_email": "my_cool_customer@example.com",
+      "customer_name": "My Cool Customer",
+      "customer_phone": null,
+      "customer_shipping": null,
+      "customer_tax_exempt": "none",
+      "customer_tax_ids": [],
+      "default_payment_method": null,
+      "default_source": null,
+      "default_tax_rates": [],
+      "description": null,
+      "discount": null,
+      "discounts": [],
+      "due_date": null,
+      "effective_at": 1715289447,
+      "ending_balance": 0,
+      "footer": null,
+      "from_invoice": null,
+      "hosted_invoice_url": "redacted",
+      "id": "in_1PEdKFLzZ0uyKPmd1hIqmMtw",
+      "invoice_pdf": "redacted",
+      "issuer": {
+        "type": "self"
+      },
+      "last_finalization_error": null,
+      "latest_revision": null,
+      "livemode": false,
+      "metadata": {},
+      "next_payment_attempt": null,
+      "number": "A2BF5CFE-0004",
+      "object": "invoice",
+      "on_behalf_of": null,
+      "paid": true,
+      "paid_out_of_band": false,
+      "payment_intent": "pi_3PEeLHLzZ0uyKPmd0BbmZ5Cw",
+      "payment_settings": {
+        "default_mandate": null,
+        "payment_method_options": null,
+        "payment_method_types": null
+      },
+      "period_end": 1715285434,
+      "period_start": 1715199034,
+      "post_payment_credit_notes_amount": 0,
+      "pre_payment_credit_notes_amount": 0,
+      "quote": null,
+      "receipt_number": null,
+      "rendering": null,
+      "rendering_options": null,
+      "shipping_cost": null,
+      "shipping_details": null,
+      "starting_balance": 0,
+      "statement_descriptor": null,
+      "status": "paid",
+      "status_transitions": {
+        "finalized_at": 1715289447,
+        "marked_uncollectible_at": null,
+        "paid_at": 1715289447,
+        "voided_at": null
+      },
+      "subscription": "sub_1PDXrqLzZ0uyKPmdnoxWai8f",
+      "subscription_details": {
+        "metadata": {}
+      },
+      "subtotal": 1000,
+      "subtotal_excluding_tax": 1000,
+      "tax": null,
+      "test_clock": null,
+      "total": 1000,
+      "total_discount_amounts": [],
+      "total_excluding_tax": 1000,
+      "total_tax_amounts": [],
+      "transfer_data": null,
+      "webhooks_delivered_at": 1715285543
+    }
+  ]
+]

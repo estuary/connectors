@@ -1,0 +1,106 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: review
+    enum:
+      - review
+    title: Object
+    type: string
+  billing_zip:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Billing Zip
+  charge:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Charge
+  closed_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Closed Reason
+  created:
+    title: Created
+    type: integer
+  ip_address:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Ip Address
+  ip_address_location:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Ip Address Location
+  livemode:
+    title: Livemode
+    type: boolean
+  open:
+    title: Open
+    type: boolean
+  opened_reason:
+    title: Opened Reason
+    type: string
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  reason:
+    title: Reason
+    type: string
+  session:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Session
+required:
+  - id
+  - object
+  - created
+  - livemode
+  - open
+  - opened_reason
+  - reason
+title: Reviews
+type: object
+x-infer-schema: true

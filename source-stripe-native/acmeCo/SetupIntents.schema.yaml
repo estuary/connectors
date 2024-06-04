@@ -1,0 +1,170 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: setup_intent
+    enum:
+      - setup_intent
+    title: Object
+    type: string
+  application:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application
+  automatic_payment_methods:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Automatic Payment Methods
+  cancellation_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Cancellation Reason
+  created:
+    title: Created
+    type: integer
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  flow_directions:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Flow Directions
+  last_setup_error:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Last Setup Error
+  latest_attempt:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Latest Attempt
+  livemode:
+    title: Livemode
+    type: boolean
+  mandate:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Mandate
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  next_action:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Next Action
+  on_behalf_of:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: On Behalf Of
+  payment_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Method
+  payment_method_configuration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Configuration Details
+  payment_method_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Options
+  payment_method_types:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Payment Method Types
+  single_use_mandate:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Single Use Mandate
+  status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Status
+  usage:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Usage
+required:
+  - id
+  - object
+  - created
+  - livemode
+title: SetupIntents
+type: object
+x-infer-schema: true

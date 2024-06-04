@@ -1,0 +1,89 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+description: "Child Stream\nParent Stream: SubscriptionItems"
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
+  object:
+    const: usage_record_summary
+    enum:
+      - usage_record_summary
+    title: Object
+    type: string
+  livemode:
+    title: Livemode
+    type: boolean
+  quantity:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Quantity
+  subscription_item:
+    title: Subscription Item
+    type: string
+  timestamp:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Timestamp
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
+  period:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Period
+  total_usage:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Total Usage
+required:
+  - id
+  - object
+  - livemode
+  - subscription_item
+title: UsageRecords
+type: object
+x-infer-schema: true

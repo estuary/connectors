@@ -1,0 +1,482 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: invoice
+    enum:
+      - invoice
+    title: Object
+    type: string
+  account_country:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Country
+  account_name:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Name
+  account_tax_ids:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Account Tax Ids
+  amount_due:
+    title: Amount Due
+    type: integer
+  amount_paid:
+    title: Amount Paid
+    type: integer
+  amount_remaining:
+    title: Amount Remaining
+    type: integer
+  amount_shipping:
+    title: Amount Shipping
+    type: integer
+  application:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application
+  application_fee_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Application Fee Amount
+  attempt_count:
+    title: Attempt Count
+    type: integer
+  attempted:
+    title: Attempted
+    type: boolean
+  auto_advance:
+    title: Auto Advance
+    type: boolean
+  automatic_tax:
+    title: Automatic Tax
+    type: object
+  billing_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Billing Reason
+  charge:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Charge
+  collection_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Collection Method
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  custom_fields:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Custom Fields
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  customer_address:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Customer Address
+  customer_email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Email
+  customer_name:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Name
+  customer_phone:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Phone
+  customer_shipping:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Customer Shipping
+  customer_tax_exempt:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Tax Exempt
+  customer_tax_ids:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Customer Tax Ids
+  default_payment_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Payment Method
+  default_source:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Source
+  default_tax_rates:
+    items:
+      type: object
+    title: Default Tax Rates
+    type: array
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  discount:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Discount
+  discounts:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Discounts
+  due_date:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Due Date
+  ending_balance:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Ending Balance
+  effective_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Effective At
+  rendering:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Rendering
+  footer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Footer
+  from_invoice:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: From Invoice
+  hosted_invoice_url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Hosted Invoice Url
+  invoice_pdf:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice Pdf
+  issuer:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Issuer
+  last_finalization_error:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Last Finalization Error
+  latest_revision:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Latest Revision
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  next_payment_attempt:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Next Payment Attempt
+  number:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Number
+  on_behalf_of:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: On Behalf Of
+  paid:
+    title: Paid
+    type: boolean
+  paid_out_of_band:
+    title: Paid Out Of Band
+    type: boolean
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  payment_settings:
+    title: Payment Settings
+    type: object
+  period_end:
+    title: Period End
+    type: integer
+  period_start:
+    title: Period Start
+    type: integer
+  post_payment_credit_notes_amount:
+    title: Post Payment Credit Notes Amount
+    type: integer
+  pre_payment_credit_notes_amount:
+    title: Pre Payment Credit Notes Amount
+    type: integer
+  quote:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Quote
+  receipt_number:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Receipt Number
+  rendering_options:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Rendering Options
+  shipping_cost:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping Cost
+  shipping_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping Details
+  starting_balance:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Starting Balance
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Status
+  status_transitions:
+    title: Status Transitions
+    type: object
+  subscription:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Subscription
+  subscription_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Subscription Details
+  subtotal:
+    title: Subtotal
+    type: integer
+  subtotal_excluding_tax:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Subtotal Excluding Tax
+  tax:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Tax
+  test_clock:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Test Clock
+  total:
+    title: Total
+    type: integer
+  total_discount_amounts:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Total Discount Amounts
+  total_excluding_tax:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Total Excluding Tax
+  total_tax_amounts:
+    items:
+      type: object
+    title: Total Tax Amounts
+    type: array
+  transfer_data:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Transfer Data
+  webhooks_delivered_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Webhooks Delivered At
+required:
+  - id
+  - object
+  - amount_due
+  - amount_paid
+  - amount_remaining
+  - amount_shipping
+  - attempt_count
+  - attempted
+  - auto_advance
+  - automatic_tax
+  - created
+  - default_tax_rates
+  - livemode
+  - paid
+  - paid_out_of_band
+  - payment_settings
+  - period_end
+  - period_start
+  - post_payment_credit_notes_amount
+  - pre_payment_credit_notes_amount
+  - status_transitions
+  - subtotal
+  - total
+  - total_tax_amounts
+title: Invoices
+type: object
+x-infer-schema: true
