@@ -23,15 +23,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	// When processing large tables we need to emit checkpoints in between query result
-	// rows, since we don't want a single Flow transaction to have contain millions of
-	// documents. But emitting a checkpoint after every row could be a significant drag
-	// on overall throughput, and isn't really needed anyway. So instead we emit one for
-	// every N rows, plus one when the query results are fully processed.
-	documentsPerCheckpoint = 1000
-)
-
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
 // by a config schema, connect function, and value translation logic.
 type BatchSQLDriver struct {
@@ -722,17 +713,10 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		state.CursorValues = cursorValues
 
 		count++
-		if count%documentsPerCheckpoint == 0 {
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
-		}
 	}
 
-	if count%documentsPerCheckpoint != 0 {
-		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-			return err
-		}
+	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+		return err
 	}
 
 	log.WithFields(log.Fields{
