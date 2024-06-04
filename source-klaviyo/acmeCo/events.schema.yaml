@@ -1,0 +1,60 @@
+---
+properties:
+  campaign_id:
+    type:
+      - "null"
+      - string
+  datetime:
+    type: string
+  event_name:
+    type: string
+  event_properties:
+    properties:
+      $value:
+        type: number
+      items:
+        items:
+          properties:
+            name:
+              type: string
+            object:
+              type: string
+            price:
+              type: number
+            quantity:
+              type: integer
+            sku:
+              type: string
+          type: object
+        type: array
+    type: object
+  flow_id:
+    type:
+      - "null"
+      - string
+  flow_message_id:
+    type:
+      - "null"
+      - string
+  id:
+    type: string
+  object:
+    type: string
+  person:
+    properties:
+      $email:
+        type: string
+      id:
+        type: string
+      object:
+        type: string
+    type: object
+  statistic_id:
+    type: string
+  timestamp:
+    type: integer
+  uuid:
+    type: string
+required:
+  - id
+type: object

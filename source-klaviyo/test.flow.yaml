@@ -1,0 +1,58 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-klaviyo:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-klaviyo:dev"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: campaigns
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/campaigns
+      - resource:
+          stream: events
+          syncMode: incremental
+          cursorField:
+            - timestamp
+        target: acmeCo/events
+      - resource:
+          stream: global_exclusions
+          syncMode: incremental
+          cursorField:
+            - timestamp
+        target: acmeCo/global_exclusions
+      - resource:
+          stream: lists
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/lists
+      - resource:
+          stream: metrics
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/metrics
+      - resource:
+          stream: flows
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/flows
+      - resource:
+          stream: email_templates
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/email_templates
+      - resource:
+          stream: profiles
+          syncMode: incremental
+          cursorField:
+            - updated
+        target: acmeCo/profiles

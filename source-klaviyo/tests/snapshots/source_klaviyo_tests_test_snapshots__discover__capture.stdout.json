@@ -1,0 +1,656 @@
+[
+  {
+    "documentSchema": {
+      "properties": {
+        "campaign_type": {
+          "type": "string"
+        },
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "excluded_lists": {
+          "items": {
+            "properties": {
+              "created": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "folder": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "list_type": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "object": {
+                "type": "string"
+              },
+              "person_count": {
+                "type": "integer"
+              },
+              "updated": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "from_email": {
+          "type": "string"
+        },
+        "from_name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "is_segmented": {
+          "type": "boolean"
+        },
+        "lists": {
+          "items": {
+            "properties": {
+              "created": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "folder": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "list_type": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "object": {
+                "type": "string"
+              },
+              "person_count": {
+                "type": "integer"
+              },
+              "updated": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message_type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "num_recipients": {
+          "type": "integer"
+        },
+        "object": {
+          "type": "string"
+        },
+        "send_time": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "sent_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "status_id": {
+          "type": "integer"
+        },
+        "status_label": {
+          "type": "string"
+        },
+        "subject": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "template_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "cursorField": [
+        "id"
+      ],
+      "stream": "campaigns",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "campaign_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "datetime": {
+          "type": "string"
+        },
+        "event_name": {
+          "type": "string"
+        },
+        "event_properties": {
+          "properties": {
+            "$value": {
+              "type": "number"
+            },
+            "items": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "object": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "quantity": {
+                    "type": "integer"
+                  },
+                  "sku": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "flow_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "flow_message_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "person": {
+          "properties": {
+            "$email": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "object": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "statistic_id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "integer"
+        },
+        "uuid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "events",
+    "resourceConfig": {
+      "cursorField": [
+        "timestamp"
+      ],
+      "stream": "events",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/email"
+    ],
+    "recommendedName": "global_exclusions",
+    "resourceConfig": {
+      "cursorField": [
+        "timestamp"
+      ],
+      "stream": "global_exclusions",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "created": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "folder": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "list_type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "person_count": {
+          "type": "integer"
+        },
+        "updated": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "lists",
+    "resourceConfig": {
+      "cursorField": [
+        "id"
+      ],
+      "stream": "lists",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "created": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "integration": {
+          "properties": {
+            "category": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "object": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "updated": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "metrics",
+    "resourceConfig": {
+      "cursorField": [
+        "id"
+      ],
+      "stream": "metrics",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "created": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "customer_filter": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "object"
+        },
+        "updated": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "flows",
+    "resourceConfig": {
+      "cursorField": [
+        "created"
+      ],
+      "stream": "flows",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "additionalProperties": true,
+      "properties": {
+        "created": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "html": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "is_writeable": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "object": {
+          "type": "string"
+        },
+        "updated": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "email_templates",
+    "resourceConfig": {
+      "cursorField": [
+        "id"
+      ],
+      "stream": "email_templates",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "additionalProperties": true,
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "properties": {
+            "created": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "email": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "last_event_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "organization": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "phone_number": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "properties": {
+              "additionalProperties": true,
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "subscriptions": {
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "title": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "updated": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "links": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "relationships": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "segments": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "profiles",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "profiles",
+      "syncMode": "incremental"
+    }
+  }
+]
