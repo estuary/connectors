@@ -1,0 +1,164 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: payout
+    enum:
+      - payout
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  application_fee:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application Fee
+  application_fee_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Application Fee Amount
+  arrival_date:
+    title: Arrival Date
+    type: integer
+  automatic:
+    title: Automatic
+    type: boolean
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  destination:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Destination
+  failure_balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Balance Transaction
+  failure_code:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Code
+  failure_message:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Message
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  method:
+    title: Method
+    type: string
+  original_payout:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Original Payout
+  reconciliation_status:
+    title: Reconciliation Status
+    type: string
+  reversed_by:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Reversed By
+  source_type:
+    title: Source Type
+    type: string
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  status:
+    title: Status
+    type: string
+  type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Type
+required:
+  - id
+  - object
+  - amount
+  - arrival_date
+  - automatic
+  - created
+  - livemode
+  - method
+  - reconciliation_status
+  - source_type
+  - status
+title: Payouts
+type: object
+x-infer-schema: true

@@ -1,0 +1,112 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: coupon
+    enum:
+      - coupon
+    title: Object
+    type: string
+  amount_off:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Amount Off
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  duration:
+    title: Duration
+    type: string
+  duration_in_months:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Duration In Months
+  livemode:
+    title: Livemode
+    type: boolean
+  max_redemptions:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Max Redemptions
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  name:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Name
+  percent_off:
+    anyOf:
+      - type: number
+      - type: "null"
+    default: ~
+    title: Percent Off
+  redeem_by:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Redeem By
+  times_redeemed:
+    title: Times Redeemed
+    type: integer
+  valid:
+    title: Valid
+    type: boolean
+required:
+  - id
+  - object
+  - created
+  - duration
+  - livemode
+  - times_redeemed
+  - valid
+title: Coupons
+type: object
+x-infer-schema: true

@@ -1,0 +1,294 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: charge
+    enum:
+      - charge
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  amount_captured:
+    title: Amount Captured
+    type: integer
+  amount_refunded:
+    title: Amount Refunded
+    type: integer
+  application:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application
+  application_fee:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application Fee
+  application_fee_amount:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application Fee Amount
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  billing_details:
+    title: Billing Details
+    type: object
+  calculated_statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Calculated Statement Descriptor
+  captured:
+    title: Captured
+    type: boolean
+  created:
+    title: Created
+    type: integer
+  currency:
+    title: Currency
+    type: string
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  refunds:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Refunds
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  disputed:
+    title: Disputed
+    type: boolean
+  destination:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Destination
+  dispute:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Dispute
+  order:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Order
+  radar_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Radar Options
+  source:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Source
+  failure_balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Balance Transaction
+  failure_code:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Code
+  failure_message:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Message
+  fraud_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Fraud Details
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  on_behalf_of:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: On Behalf Of
+  outcome:
+    anyOf:
+      - type: object
+      - type: "null"
+    title: Outcome
+  paid:
+    title: Paid
+    type: boolean
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  payment_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Method
+  payment_method_details:
+    title: Payment Method Details
+    type: object
+  receipt_email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Receipt Email
+  receipt_number:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Receipt Number
+  receipt_url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Receipt Url
+  refunded:
+    title: Refunded
+    type: boolean
+  review:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Review
+  shipping:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping
+  source_transfer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Source Transfer
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  statement_descriptor_suffix:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor Suffix
+  status:
+    title: Status
+    type: string
+  transfer_data:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Transfer Data
+  transfer_group:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Transfer Group
+required:
+  - id
+  - object
+  - amount
+  - amount_captured
+  - amount_refunded
+  - billing_details
+  - captured
+  - created
+  - currency
+  - disputed
+  - livemode
+  - outcome
+  - paid
+  - payment_method_details
+  - refunded
+  - status
+title: Charges
+type: object
+x-infer-schema: true

@@ -1,0 +1,89 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+description: "Child Stream\nParent Stream: CheckoutSessions"
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
+  object:
+    const: item
+    enum:
+      - item
+    title: Object
+    type: string
+  amount_discount:
+    title: Amount Discount
+    type: integer
+  amount_subtotal:
+    title: Amount Subtotal
+    type: integer
+  amount_tax:
+    title: Amount Tax
+    type: integer
+  amount_total:
+    title: Amount Total
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  price:
+    title: Price
+    type: object
+  quantity:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Quantity
+required:
+  - id
+  - object
+  - amount_discount
+  - amount_subtotal
+  - amount_tax
+  - amount_total
+  - price
+title: CheckoutSessionsLine
+type: object
+x-infer-schema: true

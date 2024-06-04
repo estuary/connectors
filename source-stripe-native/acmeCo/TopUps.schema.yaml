@@ -1,0 +1,108 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: topup
+    enum:
+      - topup
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  expected_availability_date:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Expected Availability Date
+  failure_code:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Code
+  failure_message:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Message
+  livemode:
+    title: Livemode
+    type: boolean
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  status:
+    title: Status
+    type: string
+  transfer_group:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Transfer Group
+required:
+  - id
+  - object
+  - amount
+  - created
+  - livemode
+  - status
+title: TopUps
+type: object
+x-infer-schema: true

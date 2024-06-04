@@ -1,0 +1,96 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: promotion_code
+    enum:
+      - promotion_code
+    title: Object
+    type: string
+  active:
+    title: Active
+    type: boolean
+  code:
+    title: Code
+    type: string
+  coupon:
+    title: Coupon
+    type: object
+  created:
+    title: Created
+    type: integer
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  expires_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Expires At
+  livemode:
+    title: Livemode
+    type: boolean
+  max_redemptions:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Max Redemptions
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  restrictions:
+    title: Restrictions
+    type: object
+  times_redeemed:
+    title: Times Redeemed
+    type: integer
+required:
+  - id
+  - object
+  - active
+  - code
+  - coupon
+  - created
+  - livemode
+  - restrictions
+  - times_redeemed
+title: PromotionCode
+type: object
+x-infer-schema: true

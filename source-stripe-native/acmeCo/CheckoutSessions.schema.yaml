@@ -1,0 +1,328 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: checkout.session
+    enum:
+      - checkout.session
+    title: Object
+    type: string
+  after_expiration:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: After Expiration
+  allow_promotion_codes:
+    anyOf:
+      - type: boolean
+      - type: "null"
+    default: ~
+    title: Allow Promotion Codes
+  amount_subtotal:
+    title: Amount Subtotal
+    type: integer
+  amount_total:
+    title: Amount Total
+    type: integer
+  automatic_tax:
+    title: Automatic Tax
+    type: object
+  billing_address_collection:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Billing Address Collection
+  cancel_url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Cancel Url
+  client_reference_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Client Reference Id
+  consent:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Consent
+  consent_collection:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Consent Collection
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  custom_fields:
+    items:
+      type: object
+    title: Custom Fields
+    type: array
+  custom_text:
+    title: Custom Text
+    type: object
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  customer_creation:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Creation
+  customer_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Customer Details
+  customer_email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer Email
+  expires_at:
+    title: Expires At
+    type: integer
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
+  invoice_creation:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Invoice Creation
+  currency_conversion:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Currency Conversion
+  payment_method_configuration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Configuration Details
+  saved_payment_method_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Saved Payment Method Options
+  ui_mode:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Ui Mode
+  livemode:
+    title: Livemode
+    type: boolean
+  locale:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Locale
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  mode:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Mode
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  payment_link:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Link
+  payment_method_collection:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Method Collection
+  payment_method_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Options
+  payment_method_types:
+    items:
+      type: string
+    title: Payment Method Types
+    type: array
+  payment_status:
+    title: Payment Status
+    type: string
+  phone_number_collection:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Phone Number Collection
+  recovered_from:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Recovered From
+  setup_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Setup Intent
+  shipping:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Shipping
+  shipping_rate:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Shipping Rate
+  shipping_address_collection:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping Address Collection
+  shipping_cost:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping Cost
+  shipping_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping Details
+  shipping_options:
+    items:
+      type: object
+    title: Shipping Options
+    type: array
+  status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Status
+  submit_type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Submit Type
+  subscription:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Subscription
+  success_url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Success Url
+  total_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Total Details
+  url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Url
+required:
+  - id
+  - object
+  - amount_subtotal
+  - amount_total
+  - automatic_tax
+  - created
+  - custom_fields
+  - custom_text
+  - expires_at
+  - livemode
+  - payment_method_types
+  - payment_status
+  - shipping_options
+title: CheckoutSessions
+type: object
+x-infer-schema: true

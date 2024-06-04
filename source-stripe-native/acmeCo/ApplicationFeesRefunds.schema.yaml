@@ -1,0 +1,79 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+description: "Child Stream\nParent Stream: ApplicationFees"
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
+  object:
+    const: fee_refund
+    enum:
+      - fee_refund
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  created:
+    title: Created
+    type: integer
+  currency:
+    title: Currency
+    type: string
+  fee:
+    title: Fee
+    type: string
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+required:
+  - id
+  - object
+  - amount
+  - created
+  - currency
+  - fee
+title: ApplicationFeesRefunds
+type: object
+x-infer-schema: true

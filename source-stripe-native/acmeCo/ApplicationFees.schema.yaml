@@ -1,0 +1,92 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: application_fee
+    enum:
+      - application_fee
+    title: Object
+    type: string
+  account:
+    title: Account
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  amount_refunded:
+    title: Amount Refunded
+    type: integer
+  application:
+    title: Application
+    type: string
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  charge:
+    title: Charge
+    type: string
+  created:
+    title: Created
+    type: integer
+  currency:
+    title: Currency
+    type: string
+  livemode:
+    title: Livemode
+    type: boolean
+  originating_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Originating Transaction
+  refunded:
+    title: Refunded
+    type: boolean
+required:
+  - id
+  - object
+  - account
+  - amount
+  - amount_refunded
+  - application
+  - charge
+  - created
+  - currency
+  - livemode
+  - refunded
+title: ApplicationFees
+type: object
+x-infer-schema: true
