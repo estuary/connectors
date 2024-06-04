@@ -46,6 +46,7 @@ type binding struct {
 }
 
 type transactor struct {
+	cfg      *config
 	client   *client
 	bindings []binding
 
@@ -187,52 +188,59 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		doc := make(map[string]any)
 
-		for idx, v := range append(it.Key, it.Values...) {
-			if b, ok := v.([]byte); ok {
-				// An object or array field is received as raw JSON bytes. We currently only support
-				// objects.
-				v = json.RawMessage(b)
-			}
-			if s, ok := v.(string); b.floatFields[idx] && ok {
-				// ElasticSearch does not supporting indexing these special Float values.
-				if s == "Infinity" || s == "-Infinity" || s == "NaN" {
-					v = nil
-				}
-			}
-
-			doc[b.fields[idx]] = v
-		}
-		if b.docField != "" {
-			doc[b.docField] = it.RawJSON
-		}
-
 		var id string
 		if !b.deltaUpdates {
 			// Leave ID blank for delta updates so that ES will automatically generate one.
 			id = base64.RawStdEncoding.EncodeToString(it.PackedKey)
 		}
 
-		// The "create" action will fail if an item by the provided ID already exists, and "index"
-		// is like a PUT where it will create or replace. We could just use "index" all the time,
-		// but using "create" when we believe the item does not already exist provides a bit of
-		// extra consistency checking.
-		action := "create"
-		if it.Exists {
-			action = "index"
-		}
+		var action string
+		var bodyReader *bytes.Reader = bytes.NewReader([]byte{})
+		if it.Delete && t.cfg.HardDelete {
+			action = "delete"
+		} else {
+			for idx, v := range append(it.Key, it.Values...) {
+				if b, ok := v.([]byte); ok {
+					// An object or array field is received as raw JSON bytes. We currently only support
+					// objects.
+					v = json.RawMessage(b)
+				}
+				if s, ok := v.(string); b.floatFields[idx] && ok {
+					// ElasticSearch does not supporting indexing these special Float values.
+					if s == "Infinity" || s == "-Infinity" || s == "NaN" {
+						v = nil
+					}
+				}
 
-		// This needs to be a ReadSeeker - a streaming reader can't be used in
-		// esutil.BulkIndexerItem.
-		body, err := json.Marshal(doc)
-		if err != nil {
-			return nil, err
+				doc[b.fields[idx]] = v
+			}
+			if b.docField != "" {
+				doc[b.docField] = it.RawJSON
+			}
+
+			// The "create" action will fail if an item by the provided ID already exists, and "index"
+			// is like a PUT where it will create or replace. We could just use "index" all the time,
+			// but using "create" when we believe the item does not already exist provides a bit of
+			// extra consistency checking.
+			action = "create"
+			if it.Exists {
+				action = "index"
+			}
+
+			// This needs to be a ReadSeeker - a streaming reader can't be used in
+			// esutil.BulkIndexerItem.
+			body, err := json.Marshal(doc)
+			if err != nil {
+				return nil, err
+			}
+			bodyReader = bytes.NewReader(body)
 		}
 
 		if err := indexer.Add(it.Context(), esutil.BulkIndexerItem{
 			Index:      b.index,
 			Action:     action,
 			DocumentID: id,
-			Body:       bytes.NewReader(body),
+			Body:       bodyReader,
 			OnFailure:  onItemFailure,
 		}); err != nil {
 			return nil, fmt.Errorf("adding item to bulk indexer: %w", err)
@@ -251,13 +259,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	// Sanity checks that everything went as expected.
 	stats := indexer.Stats()
-	if stats.NumFailed != 0 || stats.NumAdded != uint64(it.Total) || stats.NumIndexed+stats.NumCreated != uint64(it.Total) {
+	if stats.NumFailed != 0 || stats.NumAdded != uint64(it.Total) || (stats.NumIndexed+stats.NumCreated+stats.NumDeleted) != uint64(it.Total) {
 		log.WithFields(log.Fields{
 			"stored":     it.Total,
 			"numFailed":  stats.NumFailed,
 			"numAdded":   stats.NumAdded,
 			"numIndex":   stats.NumIndexed,
 			"numCreated": stats.NumCreated,
+			"numDeleted": stats.NumDeleted,
 		}).Info("indexer stats")
 		return nil, fmt.Errorf("indexer stats did not report successful completion of all %d stored documents", it.Total)
 	}

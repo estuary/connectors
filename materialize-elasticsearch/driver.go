@@ -42,9 +42,11 @@ type credentials struct {
 }
 
 type config struct {
-	Credentials credentials    `json:"credentials"`
-	Endpoint    string         `json:"endpoint"`
-	Advanced    advancedConfig `json:"advanced,omitempty"`
+	Credentials credentials `json:"credentials"`
+	Endpoint    string      `json:"endpoint"`
+	HardDelete  bool        `json:"hardDelete,omitempty"`
+
+	Advanced advancedConfig `json:"advanced,omitempty"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty"`
 }
@@ -67,6 +69,13 @@ func configSchema() json.RawMessage {
 			"description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
 			"pattern": "^(http://|https://).+$",
 			"order": 0
+		  },
+		  "hardDelete": {
+		    "type": "boolean",
+		    "title": "Hard Delete",
+		    "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+		    "default": false,
+		    "order": 1
 		  },
 		  "credentials": {
 			"type": "object",
@@ -493,6 +502,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	}
 
 	var transactor = &transactor{
+		cfg:            &cfg,
 		client:         client,
 		bindings:       bindings,
 		indexToBinding: indexToBinding,
