@@ -106,10 +106,34 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	return db, nil
 }
 
+// A discussion on the use of XIDs as query cursors:
+//
+// XID values are 32-bit unsigned integers with implicit wraparound on overflow and underflow.
+// The lowest 'normal' XID value is 3. The values 0-2 are reserved as sentinels, with 2 being
+// the "Frozen XID" value.
+//
+// While Postgres has a comparison function `TransactionIdPrecedes()` internally, this is not
+// exposed in the form of a comparison predicate or ordering method. So we have to cast XIDs
+// to integers (by way of text) and then reimplement the desired ordering behavior ourselves.
+//
+// Given a particular "cursor" value obtained from a previous polling query execution, we can
+// begin by assuming that there are fewer than 2^31 "live" XIDs greater than that cursor. The
+// issue is that with XID wraparound some of these values may be numerically smaller. Given a
+// wrapping uint32 wrapping subtraction operator the expression `xmin - cursor` would compute
+// an orderable count of "how far past the previous cursor" a given row is.
+//
+// We can emulate wrapping uint32 subtraction using PostgreSQL int64 values by simply writing
+// the expression `((x::bigint - y::bigint)<<32)>>32`.
+//
+// The xmin polling query below assumes that the source table is updated more frequently than
+// the XID epoch wraps around. If this assumption is violated it would in principle be doable
+// to `SELECT txid_current() as polled_txid, ...` and use "polled_txid" as the cursor value.
 const tableQueryTemplate = `{{if .IsFirstQuery -}}
   SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} ORDER BY xmin::text::bigint;
 {{- else -}}
-  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint;
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
+    WHERE (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3
+    ORDER BY (((xmin::text::bigint - $1::bigint)<<32)>>32);
 {{- end}}`
 
 func quoteTableName(schema, table string) string {
