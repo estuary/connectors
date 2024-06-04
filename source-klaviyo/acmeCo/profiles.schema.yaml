@@ -1,0 +1,83 @@
+---
+additionalProperties: true
+properties:
+  attributes:
+    additionalProperties: true
+    properties:
+      created:
+        format: date-time
+        type:
+          - "null"
+          - string
+      email:
+        type:
+          - "null"
+          - string
+      first_name:
+        type:
+          - "null"
+          - string
+      last_event_date:
+        format: date-time
+        type:
+          - "null"
+          - string
+      last_name:
+        type:
+          - "null"
+          - string
+      organization:
+        type:
+          - "null"
+          - string
+      phone_number:
+        type:
+          - "null"
+          - string
+      properties:
+        additionalProperties: true
+        type:
+          - "null"
+          - object
+      subscriptions:
+        type:
+          - "null"
+          - object
+      title:
+        type:
+          - "null"
+          - string
+      updated:
+        format: date-time
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  id:
+    type: string
+  links:
+    type:
+      - "null"
+      - object
+  relationships:
+    type:
+      - "null"
+      - object
+  segments:
+    type:
+      - "null"
+      - object
+  type:
+    type:
+      - "null"
+      - string
+  updated:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

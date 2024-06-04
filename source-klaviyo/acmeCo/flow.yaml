@@ -1,0 +1,149 @@
+---
+collections:
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/email_templates:
+    schema:
+      additionalProperties: true
+      properties:
+        created:
+          format: date-time
+          type: string
+        html:
+          type:
+            - "null"
+            - string
+        id:
+          type: string
+        is_writeable:
+          type:
+            - "null"
+            - boolean
+        name:
+          type:
+            - "null"
+            - string
+        object:
+          type: string
+        updated:
+          format: date-time
+          type: string
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /id
+  acmeCo/flows:
+    schema:
+      properties:
+        created:
+          format: date-time
+          type: string
+        customer_filter:
+          type:
+            - "null"
+            - object
+        id:
+          type: string
+        name:
+          type: string
+        object:
+          type: string
+        status:
+          type: string
+        trigger:
+          type: object
+        updated:
+          format: date-time
+          type: string
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/global_exclusions:
+    schema:
+      properties:
+        email:
+          type: string
+        object:
+          type: string
+        reason:
+          type: string
+        timestamp:
+          format: date-time
+          type: string
+      required:
+        - email
+      type: object
+    key:
+      - /email
+  acmeCo/lists:
+    schema:
+      properties:
+        created:
+          format: date-time
+          type: string
+        folder:
+          type:
+            - "null"
+            - string
+        id:
+          type: string
+        list_type:
+          type: string
+        name:
+          type: string
+        object:
+          type: string
+        person_count:
+          type: integer
+        updated:
+          format: date-time
+          type: string
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/metrics:
+    schema:
+      properties:
+        created:
+          format: date-time
+          type: string
+        id:
+          type: string
+        integration:
+          properties:
+            category:
+              type: string
+            id:
+              type: string
+            name:
+              type: string
+            object:
+              type: string
+          type: object
+        name:
+          type: string
+        object:
+          type: string
+        updated:
+          format: date-time
+          type: string
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/profiles:
+    schema: profiles.schema.yaml
+    key:
+      - /id

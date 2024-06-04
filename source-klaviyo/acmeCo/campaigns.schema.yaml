@@ -1,0 +1,107 @@
+---
+properties:
+  campaign_type:
+    type: string
+  created:
+    format: date-time
+    type:
+      - "null"
+      - string
+  excluded_lists:
+    items:
+      properties:
+        created:
+          format: date-time
+          type: string
+        folder:
+          type:
+            - "null"
+            - string
+        id:
+          type: string
+        list_type:
+          type: string
+        name:
+          type: string
+        object:
+          type: string
+        person_count:
+          type: integer
+        updated:
+          format: date-time
+          type: string
+      type: object
+    type: array
+  from_email:
+    type: string
+  from_name:
+    type: string
+  id:
+    type: string
+  is_segmented:
+    type: boolean
+  lists:
+    items:
+      properties:
+        created:
+          format: date-time
+          type: string
+        folder:
+          type:
+            - "null"
+            - string
+        id:
+          type: string
+        list_type:
+          type: string
+        name:
+          type: string
+        object:
+          type: string
+        person_count:
+          type: integer
+        updated:
+          format: date-time
+          type: string
+      type: object
+    type: array
+  message_type:
+    type: string
+  name:
+    type: string
+  num_recipients:
+    type: integer
+  object:
+    type: string
+  send_time:
+    format: date-time
+    type:
+      - "null"
+      - string
+  sent_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  status:
+    type: string
+  status_id:
+    type: integer
+  status_label:
+    type: string
+  subject:
+    type:
+      - "null"
+      - string
+  template_id:
+    type:
+      - "null"
+      - string
+  updated:
+    format: date-time
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object
