@@ -19,3 +19,4 @@ function exportToJsonl() {
 exportToJsonl "Simple"
 exportToJsonl "duplicate_keys_standard"
 exportToJsonl "duplicate_keys_delta" "{'_meta':0,'_id':0}"
+exportToJsonl "deletions"
