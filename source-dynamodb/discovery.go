@@ -172,11 +172,40 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 								Required: []string{"op"},
 							},
 						},
-						"reduce": map[string]interface{}{
-							"strategy": "merge",
-						},
 					},
 					Required: []string{"_meta"},
+					If: &jsonschema.Schema{
+						Extras: map[string]interface{}{
+							"properties": map[string]*jsonschema.Schema{
+								"_meta": {
+									Extras: map[string]interface{}{
+										"properties": map[string]*jsonschema.Schema{
+											"op": {
+												Extras: map[string]interface{}{
+													"const": "d",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Then: &jsonschema.Schema{
+						Extras: map[string]interface{}{
+							"reduce": map[string]interface{}{
+								"strategy": "merge",
+								"delete":   true,
+							},
+						},
+					},
+					Else: &jsonschema.Schema{
+						Extras: map[string]interface{}{
+							"reduce": map[string]interface{}{
+								"strategy": "merge",
+							},
+						},
+					},
 				},
 				{Ref: "#" + anchor},
 			},
