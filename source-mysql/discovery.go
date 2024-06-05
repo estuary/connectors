@@ -480,6 +480,7 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 			if 0 <= index && int(index) < len(t.EnumValues) {
 				return t.EnumValues[index], nil
 			}
+			return "", fmt.Errorf("enum value out of range: index %d does not match known options %q, backfill the table to reinitialize the inconsistent table metadata", index, t.EnumValues)
 		} else if bs, ok := val.([]byte); ok {
 			return string(bs), nil
 		}
