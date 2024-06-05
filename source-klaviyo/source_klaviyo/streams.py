@@ -327,6 +327,14 @@ class Events(IncrementalKlaviyoStream):
 
     def path(self, **kwargs) -> str:
         return "events"
+    
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        for record in super().parse_response(response, **kwargs):
+            if not record.get("datetime", {}):
+                continue
+            record['datetime'] = record['datetime'].replace(" ","T")
+            record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
+            yield record
 
 
 class Flows(ArchivedRecordsMixin, IncrementalKlaviyoStream):

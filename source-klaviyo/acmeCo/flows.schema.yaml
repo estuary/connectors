@@ -9,30 +9,34 @@ properties:
     type: string
   id:
     type: string
-  datetime:
+  updated:
     type: string
     format: date-time
   attributes:
     type:
       - "null"
       - object
+    additionalProperties: true
     properties:
-      timestamp:
-        type: integer
-      event_properties:
-        type:
-          - "null"
-          - object
-        additionalProperties: true
-      datetime:
+      name:
+        type: string
+      status:
+        type: string
+      archived:
+        type: boolean
+      created:
         type: string
         format: date-time
-      uuid:
+      updated:
+        type: string
+        format: date-time
+      trigger_type:
         type: string
   links:
     type:
       - "null"
       - object
+    additionalProperties: true
     properties:
       self:
         type: string
@@ -40,50 +44,54 @@ properties:
     type:
       - "null"
       - object
+    additionalProperties: true
     properties:
-      profile:
+      flow-actions:
         type:
           - "null"
           - object
         properties:
           data:
-            type:
-              - "null"
-              - object
-            properties:
+            type: array
+            items:
               type:
-                type: string
-              id:
-                type: string
+                - "null"
+                - object
+              additionalProperties: true
+              properties:
+                type:
+                  type: string
+                id:
+                  type: string
           links:
             type:
               - "null"
               - object
-            additionalProperties: true
             properties:
               self:
                 type: string
               related:
                 type: string
-      metric:
+      tags:
         type:
           - "null"
           - object
         properties:
           data:
-            type:
-              - "null"
-              - object
-            properties:
+            type: array
+            items:
               type:
-                type: string
-              id:
-                type: string
+                - "null"
+                - object
+              properties:
+                type:
+                  type: string
+                id:
+                  type: string
           links:
             type:
               - "null"
               - object
-            additionalProperties: true
             properties:
               self:
                 type: string

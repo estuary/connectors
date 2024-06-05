@@ -1,107 +1,206 @@
 ---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+additionalProperties: true
+required:
+  - id
 properties:
-  campaign_type:
-    type: string
-  created:
-    format: date-time
-    type:
-      - "null"
-      - string
-  excluded_lists:
-    items:
-      properties:
-        created:
-          format: date-time
-          type: string
-        folder:
-          type:
-            - "null"
-            - string
-        id:
-          type: string
-        list_type:
-          type: string
-        name:
-          type: string
-        object:
-          type: string
-        person_count:
-          type: integer
-        updated:
-          format: date-time
-          type: string
-      type: object
-    type: array
-  from_email:
-    type: string
-  from_name:
+  type:
     type: string
   id:
     type: string
-  is_segmented:
-    type: boolean
-  lists:
-    items:
-      properties:
-        created:
-          format: date-time
-          type: string
-        folder:
-          type:
-            - "null"
-            - string
-        id:
-          type: string
-        list_type:
-          type: string
-        name:
-          type: string
-        object:
-          type: string
-        person_count:
-          type: integer
-        updated:
-          format: date-time
-          type: string
-      type: object
-    type: array
-  message_type:
-    type: string
-  name:
-    type: string
-  num_recipients:
-    type: integer
-  object:
-    type: string
-  send_time:
+  updated_at:
+    type:
+      - "null"
+      - string
     format: date-time
+  attributes:
     type:
       - "null"
-      - string
-  sent_at:
-    format: date-time
+      - object
+    additionalProperties: true
+    properties:
+      name:
+        type: string
+      status:
+        type: string
+      archived:
+        type: boolean
+      channel:
+        type: string
+      audiences:
+        type:
+          - "null"
+          - object
+        additionalProperties: true
+        properties:
+          included:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - string
+          excluded:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - string
+      send_options:
+        type:
+          - "null"
+          - object
+        properties:
+          ignore_unsubscribes:
+            type:
+              - "null"
+              - boolean
+          use_smart_sending:
+            type:
+              - "null"
+              - boolean
+      message:
+        type: string
+      tracking_options:
+        type:
+          - "null"
+          - object
+        additionalProperties: true
+        properties:
+          is_tracking_opens:
+            type:
+              - "null"
+              - boolean
+          is_tracking_clicks:
+            type:
+              - "null"
+              - boolean
+          is_add_utm:
+            type:
+              - "null"
+              - boolean
+          utm_params:
+            type:
+              - "null"
+              - array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                name:
+                  type: string
+                value:
+                  type: string
+      send_strategy:
+        type:
+          - "null"
+          - object
+        additionalProperties: true
+        properties:
+          method:
+            type: string
+          options_static:
+            type:
+              - "null"
+              - object
+            properties:
+              datetime:
+                type: string
+                format: date-time
+              is_local:
+                type:
+                  - "null"
+                  - boolean
+              send_past_recipients_immediately:
+                type:
+                  - "null"
+                  - boolean
+          options_throttled:
+            type:
+              - "null"
+              - object
+            properties:
+              datetime:
+                type: string
+                format: date-time
+              throttle_percentage:
+                type: integer
+          options_sto:
+            type:
+              - "null"
+              - object
+            properties:
+              date:
+                type: string
+                format: date
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      scheduled_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      updated_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      send_time:
+        type:
+          - "null"
+          - string
+        format: date-time
+  links:
     type:
       - "null"
-      - string
-  status:
-    type: string
-  status_id:
-    type: integer
-  status_label:
-    type: string
-  subject:
+      - object
+    additionalProperties: true
+    properties:
+      self:
+        type: string
+  relationships:
     type:
       - "null"
-      - string
-  template_id:
-    type:
-      - "null"
-      - string
-  updated:
-    format: date-time
-    type:
-      - "null"
-      - string
-required:
-  - id
-type: object
+      - object
+    additionalProperties: true
+    properties:
+      tags:
+        type:
+          - "null"
+          - object
+        properties:
+          data:
+            type: array
+            items:
+              type:
+                - "null"
+                - object
+              properties:
+                type:
+                  type: string
+                id:
+                  type: string
+          links:
+            type:
+              - "null"
+              - object
+            properties:
+              self:
+                type: string
+              related:
+                type: string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
