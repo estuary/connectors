@@ -1,0 +1,155 @@
+[
+  {
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "account_ids": {
+          "default": [],
+          "description": "Specify the account IDs separated by a space, to pull the data from. Leave empty if you want to pull the data from all associated accounts. See the Linkedin Ads docs for more info: https://go.estuary.dev/oNY6ct",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Account IDs",
+          "type": "array"
+        },
+        "credentials": {
+          "discriminator": {
+            "propertyName": "auth_method"
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "auth_method": {
+                  "const": "oAuth2.0",
+                  "default": "oAuth2.0",
+                  "type": "string"
+                },
+                "client_id": {
+                  "airbyte_secret": true,
+                  "description": "The client ID of the LinkedIn Ads developer application.",
+                  "title": "Client ID",
+                  "type": "string"
+                },
+                "client_secret": {
+                  "airbyte_secret": true,
+                  "description": "The client secret the LinkedIn Ads developer application.",
+                  "title": "Client secret",
+                  "type": "string"
+                },
+                "refresh_token": {
+                  "airbyte_secret": true,
+                  "description": "The key to refresh the expired access token.",
+                  "title": "Refresh token",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "auth_method",
+                "client_id",
+                "client_secret",
+                "refresh_token"
+              ],
+              "title": "OAuth2.0",
+              "type": "object",
+              "x-oauth2-provider": "linkedin"
+            },
+            {
+              "properties": {
+                "access_token": {
+                  "airbyte_secret": true,
+                  "description": "The token value generated using the authentication code. See the doc on how to obtain yours: https://go.estuary.dev/sLJLUX",
+                  "title": "Access token",
+                  "type": "string"
+                },
+                "auth_method": {
+                  "const": "access_token",
+                  "default": "acceess_token",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "auth_method",
+                "access_token"
+              ],
+              "title": "Access token",
+              "type": "object"
+            }
+          ],
+          "title": "Authentication",
+          "type": "object"
+        },
+        "start_date": {
+          "description": "UTC date in the format 2020-09-17. Any data before this date will not be replicated.",
+          "examples": [
+            "2021-05-17"
+          ],
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "title": "Start date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_date",
+        "credentials"
+      ],
+      "title": "Linkedin Ads Spec",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/TQRAbs",
+    "oauth2": {
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "refresh_token": "/refresh_token"
+      },
+      "accessTokenUrlTemplate": "https://www.linkedin.com/oauth/v2/accessToken",
+      "authUrlTemplate": "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=r_emailaddress%20r_liteprofile%20r_ads%20r_ads_reporting%20r_organization_social&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "provider": "linkedin"
+    },
+    "protocol": 3032023,
+    "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "cursorField": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "title": "ResourceSpec",
+      "type": "object"
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

@@ -1,0 +1,204 @@
+---
+properties:
+  account:
+    type:
+      - "null"
+      - string
+  associatedEntity:
+    type:
+      - "null"
+      - string
+  audienceExpansionEnabled:
+    type:
+      - "null"
+      - boolean
+  campaignGroup:
+    type:
+      - "null"
+      - string
+  costType:
+    type:
+      - "null"
+      - string
+  created:
+    format: date-time
+    type:
+      - "null"
+      - string
+  creativeSelection:
+    type:
+      - "null"
+      - string
+  dailyBudget:
+    properties:
+      amount:
+        type:
+          - "null"
+          - string
+      currencyCode:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  format:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  lastModified:
+    format: date-time
+    type:
+      - "null"
+      - string
+  locale:
+    properties:
+      country:
+        type:
+          - "null"
+          - string
+      language:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  name:
+    type:
+      - "null"
+      - string
+  objectiveType:
+    type:
+      - "null"
+      - string
+  offsiteDeliveryEnabled:
+    type:
+      - "null"
+      - boolean
+  optimizationTargetType:
+    type:
+      - "null"
+      - string
+  pacingStrategy:
+    type:
+      - "null"
+      - string
+  runSchedule:
+    properties:
+      end:
+        type:
+          - "null"
+          - integer
+      start:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  servingStatuses:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  status:
+    type:
+      - "null"
+      - string
+  storyDeliveryEnabled:
+    type:
+      - "null"
+      - boolean
+  targetingCriteria:
+    properties:
+      exclude:
+        properties:
+          or:
+            items:
+              properties:
+                type:
+                  type:
+                    - "null"
+                    - string
+                values:
+                  items:
+                    type:
+                      - "null"
+                      - string
+                  type:
+                    - "null"
+                    - array
+              type:
+                - "null"
+                - object
+            type:
+              - "null"
+              - array
+        type:
+          - "null"
+          - object
+      include:
+        properties:
+          and:
+            items:
+              properties:
+                type:
+                  type:
+                    - "null"
+                    - string
+                values:
+                  items:
+                    type:
+                      - "null"
+                      - string
+                  type:
+                    - "null"
+                    - array
+              type:
+                - "null"
+                - object
+            type:
+              - "null"
+              - array
+        type:
+          - "null"
+          - object
+    type:
+      - "null"
+      - object
+  type:
+    type:
+      - "null"
+      - string
+  unitCost:
+    properties:
+      amount:
+        type:
+          - "null"
+          - string
+      currencyCode:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  version:
+    properties:
+      versionTag:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+required:
+  - id
+type:
+  - object

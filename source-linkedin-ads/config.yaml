@@ -1,0 +1,20 @@
+credentials:
+    auth_method: oAuth2.0
+    client_id_sops: ENC[AES256_GCM,data:wwBt6geLfZD0Ps2VeUo=,iv:QdHJYwHFY4iS5mVh/PkrQj5/2E/ZzMbxSkZ4MjQ9VF4=,tag:QpoDQi0yC3T3f/pzlkFcYg==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:wntlImP2drAalzorBT1DEg==,iv:EHiIVADtUp1HAxYXz2E1THcNXKzuHuJ1AhWRJuEF0Go=,tag:0ft6pPrgn0Y+dOv6bblxQg==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:3N//l7LgzwNje/bOrTNw/G/kRkwdWOnr359T1l6y5VbVEKDlQWaoQE7IZLTk032YTladf0BbQnCvq/ENfXTUB3mrtg6m5lk9lYdKahBEsWMOgxgid41r6+DhAsr1ekMeZTaLckorIh/UIqaXKQACnIziRzAfAYdtvhSt6Ryvii1MTEYq/t9kCCSGamFi3xs2QbDF90HmNPWz9q1IHj91LdSJUkmQNecjpQDLAc9M9+ES66thYP629AGyg8z4okLYPTupagODHgJiraBMLrUw8kruUBG9d4LjNBIJiZaWBCe3AHDGfd3vFNCitdo+LAAy0a1nN/w0Erjew+om4lBFlowtnxWxYLC9SekSGQv1VpzjttVPOoRjzoicjfF1eJSQtZ5mrpgl0w2nWsKRkbyTJ11uS3ye9gYMmSRhjBz2zoxqlb/IVtyX7ampvf9svYk4+cnZmInrxKCP24/aH/g=,iv:tayXpJRmA6262eyOoopyQG8V2GnHx1IbnIDgfSOQ384=,tag:EOsucNz8RzQ29SWfop5P+g==,type:str]
+start_date: "2020-01-01"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-06-05T19:57:54Z"
+          enc: CiQAdmEdwkHmEbvZYCbr9lFDJFiUzIjIxg5rbVljlPJlpyF9cRUSSACSobQj+X3yw95A+3IIFLDYFoxT5UA8roL1ot/XnpJhpMKypAQnQJ80ILOIwKRor1i3apaH5p77QHjP6tR24g8Q/X2L0uUBDg==
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-06-05T19:57:55Z"
+    mac: ENC[AES256_GCM,data:PWNnsQD74e3/yQMWKVxnxE6XwE2jG+YnAGI9bBX4xVa+4VT7IIC900XiWrBhq6yDJiLQ4xUWpMW0yXuGt+8K3oE2yBRaWSGc9HdbQaAKmVs6sqV328UfLmvCAQVqPw9KHhCpMYCfkuDF0edSd59O7mAEDnbpjYln67fdWkTMZF4=,iv:QsgUilT07cKx0jxnROsmnbiVWwQgHz7O9y9VyiaeisQ=,tag:8+s0WefC5CREyGoTyMfcHQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
