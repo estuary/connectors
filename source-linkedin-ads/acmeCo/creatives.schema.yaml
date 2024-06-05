@@ -1,0 +1,94 @@
+---
+properties:
+  campaign:
+    type:
+      - "null"
+      - string
+  created:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  lastModified:
+    format: date-time
+    type:
+      - "null"
+      - string
+  reference:
+    type:
+      - "null"
+      - string
+  review:
+    properties:
+      reviewStatus:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  servingStatuses:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  status:
+    type:
+      - "null"
+      - string
+  test:
+    type:
+      - "null"
+      - boolean
+  type:
+    type:
+      - "null"
+      - string
+  variables:
+    properties:
+      click_uri:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      values:
+        items:
+          properties:
+            key:
+              type:
+                - "null"
+                - string
+            value:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        type:
+          - "null"
+          - array
+    type:
+      - "null"
+      - object
+  version:
+    properties:
+      versionTag:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+required:
+  - id
+type:
+  - object

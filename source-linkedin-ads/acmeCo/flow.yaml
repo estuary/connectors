@@ -1,0 +1,98 @@
+---
+collections:
+  acmeCo/account_users:
+    schema:
+      properties:
+        account:
+          type: string
+        created:
+          format: date-time
+          type:
+            - "null"
+            - string
+        lastModified:
+          format: date-time
+          type:
+            - "null"
+            - string
+        role:
+          type:
+            - "null"
+            - string
+        user:
+          type:
+            - "null"
+            - string
+      required:
+        - account
+      type:
+        - object
+    key:
+      - /account
+  acmeCo/accounts:
+    schema: accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/ad_campaign_analytics:
+    schema: ad_campaign_analytics.schema.yaml
+    key:
+      - /pivotValue
+      - /end_date
+  acmeCo/ad_creative_analytics:
+    schema: ad_creative_analytics.schema.yaml
+    key:
+      - /pivotValue
+      - /end_date
+  acmeCo/ad_direct_sponsored_contents:
+    schema:
+      properties:
+        account:
+          type: string
+        contentReference:
+          type:
+            - "null"
+            - string
+        created:
+          format: date-time
+          type:
+            - "null"
+            - string
+        lastModified:
+          format: date-time
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        owner:
+          type:
+            - "null"
+            - string
+        status:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      required:
+        - account
+      type:
+        - object
+    key:
+      - /account
+  acmeCo/campaign_groups:
+    schema: campaign_groups.schema.yaml
+    key:
+      - /id
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/creatives:
+    schema: creatives.schema.yaml
+    key:
+      - /id

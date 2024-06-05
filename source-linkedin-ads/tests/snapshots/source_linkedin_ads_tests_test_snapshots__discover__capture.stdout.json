@@ -1,0 +1,1642 @@
+[
+  {
+    "documentSchema": {
+      "properties": {
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "lastModified": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "notifiedOnCampaignOptimization": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "notifiedOnCreativeApproval": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "notifiedOnCreativeRejection": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "notifiedOnEndOfCampaign": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "reference": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "servingStatuses": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "test": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "version": {
+          "properties": {
+            "versionTag": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "accounts",
+    "resourceConfig": {
+      "cursorField": [
+        "id"
+      ],
+      "stream": "accounts",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "lastModified": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "role": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "user": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "account"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/account"
+    ],
+    "recommendedName": "account_users",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "account_users",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_pivot": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "actionClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "adUnitClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "clicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "comments": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "companyPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "conversionValueInLocalCurrency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "costInLocalCurrency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "costInUsd": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "end_date": {
+          "format": "date",
+          "type": "string"
+        },
+        "externalWebsiteConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "externalWebsitePostClickConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "externalWebsitePostViewConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "follows": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "fullScreenPlays": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "impressions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "landingPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "leadGenerationMailContactInfoShares": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "leadGenerationMailInterestedClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "likes": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "oneClickLeadFormOpens": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "oneClickLeads": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "opens": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "otherEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "pivotValue": {
+          "type": "string"
+        },
+        "pivotValues": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "reactions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sends": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "shares": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "start_date": {
+          "format": "date",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "textUrlClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "totalEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoFirstQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoMidpointCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoStarts": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoThirdQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoViews": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralCommentLikes": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralComments": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralCompanyPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralExternalWebsiteConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralExternalWebsitePostClickConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralExternalWebsitePostViewConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralFollows": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralFullScreenPlays": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralImpressions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralLandingPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralLikes": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralOneClickLeadFormOpens": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralOneClickLeads": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralOtherEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralReactions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralShares": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralTotalEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoFirstQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoMidpointCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoStarts": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoThirdQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoViews": {
+          "type": [
+            "null",
+            "number"
+          ]
+        }
+      },
+      "required": [
+        "pivotValue",
+        "end_date"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/pivotValue",
+      "/end_date"
+    ],
+    "recommendedName": "ad_campaign_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_campaign_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_pivot": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "actionClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "adUnitClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "clicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "comments": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "companyPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "conversionValueInLocalCurrency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "costInLocalCurrency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "costInUsd": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "end_date": {
+          "format": "date",
+          "type": "string"
+        },
+        "externalWebsiteConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "externalWebsitePostClickConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "externalWebsitePostViewConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "follows": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "fullScreenPlays": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "impressions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "landingPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "leadGenerationMailContactInfoShares": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "leadGenerationMailInterestedClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "likes": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "oneClickLeadFormOpens": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "oneClickLeads": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "opens": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "otherEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "pivotValue": {
+          "type": "string"
+        },
+        "pivotValues": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "reactions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sends": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "shares": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "start_date": {
+          "format": "date",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "textUrlClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "totalEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoFirstQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoMidpointCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoStarts": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoThirdQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "videoViews": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralCommentLikes": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralComments": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralCompanyPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralExternalWebsiteConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralExternalWebsitePostClickConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralExternalWebsitePostViewConversions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralFollows": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralFullScreenPlays": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralImpressions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralLandingPageClicks": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralLikes": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralOneClickLeadFormOpens": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralOneClickLeads": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralOtherEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralReactions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralShares": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralTotalEngagements": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoFirstQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoMidpointCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoStarts": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoThirdQuartileCompletions": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "viralVideoViews": {
+          "type": [
+            "null",
+            "number"
+          ]
+        }
+      },
+      "required": [
+        "pivotValue",
+        "end_date"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/pivotValue",
+      "/end_date"
+    ],
+    "recommendedName": "ad_creative_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_creative_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "contentReference": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "lastModified": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "owner": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "account"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/account"
+    ],
+    "recommendedName": "ad_direct_sponsored_contents",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "ad_direct_sponsored_contents",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "account": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "allowedCampaignTypes": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "backfilled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "lastModified": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "runSchedule": {
+          "properties": {
+            "end": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "start": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "servingStatuses": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "test": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaign_groups",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "campaign_groups",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "account": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "associatedEntity": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "audienceExpansionEnabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "campaignGroup": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "costType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "creativeSelection": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "dailyBudget": {
+          "properties": {
+            "amount": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "currencyCode": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "format": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "lastModified": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "locale": {
+          "properties": {
+            "country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "language": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "objectiveType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "offsiteDeliveryEnabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "optimizationTargetType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "pacingStrategy": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "runSchedule": {
+          "properties": {
+            "end": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "start": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "servingStatuses": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "storyDeliveryEnabled": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "targetingCriteria": {
+          "properties": {
+            "exclude": {
+              "properties": {
+                "or": {
+                  "items": {
+                    "properties": {
+                      "type": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "values": {
+                        "items": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "type": [
+                          "null",
+                          "array"
+                        ]
+                      }
+                    },
+                    "type": [
+                      "null",
+                      "object"
+                    ]
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                }
+              },
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "include": {
+              "properties": {
+                "and": {
+                  "items": {
+                    "properties": {
+                      "type": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "values": {
+                        "items": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "type": [
+                          "null",
+                          "array"
+                        ]
+                      }
+                    },
+                    "type": [
+                      "null",
+                      "object"
+                    ]
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                }
+              },
+              "type": [
+                "null",
+                "object"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "unitCost": {
+          "properties": {
+            "amount": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "currencyCode": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "version": {
+          "properties": {
+            "versionTag": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "campaigns",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "campaign": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "lastModified": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "reference": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "review": {
+          "properties": {
+            "reviewStatus": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "servingStatuses": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "test": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "variables": {
+          "properties": {
+            "click_uri": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "values": {
+              "items": {
+                "properties": {
+                  "key": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                },
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "version": {
+          "properties": {
+            "versionTag": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": [
+        "object"
+      ]
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "creatives",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "creatives",
+      "syncMode": "incremental"
+    }
+  }
+]

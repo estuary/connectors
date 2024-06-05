@@ -1,0 +1,75 @@
+---
+properties:
+  created:
+    format: date-time
+    type:
+      - "null"
+      - string
+  currency:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  lastModified:
+    format: date-time
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  notifiedOnCampaignOptimization:
+    type:
+      - "null"
+      - boolean
+  notifiedOnCreativeApproval:
+    type:
+      - "null"
+      - boolean
+  notifiedOnCreativeRejection:
+    type:
+      - "null"
+      - boolean
+  notifiedOnEndOfCampaign:
+    type:
+      - "null"
+      - boolean
+  reference:
+    type:
+      - "null"
+      - string
+  servingStatuses:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  status:
+    type:
+      - "null"
+      - string
+  test:
+    type:
+      - "null"
+      - boolean
+  type:
+    type:
+      - "null"
+      - string
+  version:
+    properties:
+      versionTag:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+required:
+  - id
+type:
+  - object

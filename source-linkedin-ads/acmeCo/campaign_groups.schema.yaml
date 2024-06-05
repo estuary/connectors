@@ -1,0 +1,67 @@
+---
+properties:
+  account:
+    type:
+      - "null"
+      - string
+  allowedCampaignTypes:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  backfilled:
+    type:
+      - "null"
+      - boolean
+  created:
+    format: date-time
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  lastModified:
+    format: date-time
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  runSchedule:
+    properties:
+      end:
+        type:
+          - "null"
+          - integer
+      start:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  servingStatuses:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  status:
+    type:
+      - "null"
+      - string
+  test:
+    type:
+      - "null"
+      - boolean
+required:
+  - id
+type:
+  - object

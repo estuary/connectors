@@ -1,0 +1,58 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-linkedin-ads:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-linkedin-ads:dev"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: accounts
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/accounts
+      - resource:
+          stream: account_users
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/account_users
+      - resource:
+          stream: ad_campaign_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_campaign_analytics
+      - resource:
+          stream: ad_creative_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_creative_analytics
+      - resource:
+          stream: ad_direct_sponsored_contents
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/ad_direct_sponsored_contents
+      - resource:
+          stream: campaign_groups
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/campaign_groups
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/campaigns
+      - resource:
+          stream: creatives
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/creatives
