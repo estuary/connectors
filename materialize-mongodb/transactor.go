@@ -269,8 +269,12 @@ func (t *transactor) storeWorker(
 				return fmt.Errorf("bulk write for collection %s: %w", collection.Name(), err)
 			}
 
-			// Sanity check the result of the bulk write operation.
-			if res.ModifiedCount != expectModified || res.InsertedCount != expectInserted || res.DeletedCount != expectDeleted {
+			// Sanity check the result of the bulk write operation. For updated documents, we check
+			// MatchedCount instead of ModifiedCount since certain Flow reduction strategies can
+			// result in identical documents being stored, and MongoDB does not report an attempted
+			// "replace" with an identical document as an update when it's part of a bulk write
+			// operation.
+			if res.MatchedCount != expectModified || res.InsertedCount != expectInserted || res.DeletedCount != expectDeleted {
 				logrus.WithFields(logrus.Fields{
 					"deleted":        res.DeletedCount,
 					"inserted":       res.InsertedCount,
@@ -283,11 +287,15 @@ func (t *transactor) storeWorker(
 				}).Warn("bulk write counts")
 
 				return fmt.Errorf(
-					"unexpected bulkWrite counts: got %d modified vs %d expected, %d inserted vs %d expected",
-					res.UpsertedCount,
+					"unexpected bulkWrite counts for MongoDB collection %s.%s: got %d matched vs %d expected, %d inserted vs %d expected, %d deleted vs %d expected",
+					collection.Database().Name(),
+					collection.Name(),
+					res.MatchedCount,
 					expectModified,
 					res.InsertedCount,
 					expectInserted,
+					res.DeletedCount,
+					expectDeleted,
 				)
 			}
 		}
