@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/admin_generic_replicationupdates_79710599": 3 Documents
+# ================================
+{"DATA":"A","ID":0,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONUPDATES_79710599","row_id":"AAAGrDAAAAAAAMmAAA"}}}
+{"DATA":"CDEFGHIJKLMNOP","ID":2,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONUPDATES_79710599","row_id":"AAAGrDAAAAAAAMmAAC"}}}
+{"DATA":"bbb","ID":1,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONUPDATES_79710599","row_id":"AAAGrDAAAAAAAMmAAB"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FGENERIC_REPLICATIONUPDATES_79710599":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+
