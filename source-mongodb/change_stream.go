@@ -184,18 +184,10 @@ func (c *capture) streamForever(
 	return group.Wait()
 }
 
-// serverHello is used to get information regarding the most recent operation times from the server
+// serverHello is used to get information regarding the most recent operation time from the server
 // to use as a high watermark for catching up change streams.
 type serverHello struct {
-	LastWrite lastWrite `bson:"lastWrite"`
-}
-
-type lastWrite struct {
-	OpTime helloTs `bson:"opTime"`
-}
-
-type helloTs struct {
-	Ts primitive.Timestamp `bson:"ts"`
+	OperationTime primitive.Timestamp `bson:"operationTime"`
 }
 
 // streamCatchup is similar to streamForever, but returns when `TryNext` yields no documents, or
@@ -223,7 +215,7 @@ func (c *capture) streamCatchup(
 	}
 
 	ts := time.Now()
-	opTime := helloRes.LastWrite.OpTime.Ts
+	opTime := helloRes.OperationTime
 	log.WithField("lastWriteOpTime", opTime).Info("catching up streams")
 	defer func() { log.WithField("took", time.Since(ts).String()).Info("finished catching up streams") }()
 
@@ -345,6 +337,7 @@ func (c *capture) handleEvent(ev changeEvent, db string, tok bson.Raw) error {
 	c.mu.Lock()
 	c.state.DatabaseResumeTokens[db] = tok
 	c.processedStreamEvents += 1
+	c.lastEventClusterTime = ev.ClusterTime
 	if doc != nil {
 		c.emittedStreamDocs += 1
 	}
@@ -357,27 +350,28 @@ func (c *capture) startStreamLogger() {
 	c.streamLoggerStop = make(chan struct{})
 	c.streamLoggerActive.Add(1)
 
-	eventCounts := func() (int, int) {
+	eventInfo := func() (int, int, primitive.Timestamp) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		return c.processedStreamEvents, c.emittedStreamDocs
+		return c.processedStreamEvents, c.emittedStreamDocs, c.lastEventClusterTime
 	}
 
 	go func() {
 		defer func() { c.streamLoggerActive.Done() }()
 
-		initialProcessed, initialEmitted := eventCounts()
+		initialProcessed, initialEmitted, _ := eventInfo()
 
 		for {
 			select {
 			case <-time.After(streamLoggerInterval):
-				nextProcessed, nextEmitted := eventCounts()
+				nextProcessed, nextEmitted, clusterTime := eventInfo()
 
 				if nextProcessed != initialProcessed {
 					log.WithFields(log.Fields{
-						"events": nextProcessed - initialProcessed,
-						"docs":   nextEmitted - initialEmitted,
+						"events":               nextProcessed - initialProcessed,
+						"docs":                 nextEmitted - initialEmitted,
+						"lastEventClusterTime": clusterTime,
 					}).Info("processed change stream events")
 				} else {
 					log.Info("change stream idle")
