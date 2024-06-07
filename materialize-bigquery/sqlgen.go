@@ -250,7 +250,7 @@ WHEN MATCHED THEN
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED {{ if $.Document }}AND r.c{{ Add (len $.Columns) -1 }}<>'"delete"' {{ end }}THEN
 	INSERT (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}

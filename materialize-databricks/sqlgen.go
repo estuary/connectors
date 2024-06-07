@@ -290,7 +290,7 @@ SELECT -1, ""
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED {{ if $.Table.Document -}}AND r.{{ $.Table.Document.Identifier }}<>'"delete"' {{ end }}THEN
 		INSERT (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}

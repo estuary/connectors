@@ -43,7 +43,7 @@ WHEN MATCHED AND r.c10='"delete"' THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET l.`defAULT` = r.c5, l.number = r.c6, l.person_place_ = r.c7, l.source_name = r.c8, l.`with-dash` = r.c9, l.flow_document = r.c10
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED AND r.c10<>'"delete"' THEN
 	INSERT (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
 	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10);
 --- End projectID.dataset.target_table storeUpdate ---
@@ -78,7 +78,7 @@ WHEN MATCHED AND r.c2='"delete"' THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET l.flow_document = r.c2
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED AND r.c2<>'"delete"' THEN
 	INSERT (key1, key2, flow_document)
 	VALUES (r.c0, r.c1, r.c2);
 --- End target_table_no_values_materialized storeUpdate ---

@@ -35,7 +35,7 @@ SELECT 0, `a-schema`.target_table.flow_document
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.binary = r.binary, l.boolean = r.boolean, l.integer = r.integer, l.`unsigned-integer` = r.`unsigned-integer`, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r.flow_document<>'"delete"' THEN
 		INSERT (key1, key2, binary, boolean, integer, `unsigned-integer`, number, string, flow_document)
 		VALUES (r.key1, r.key2, r.binary, r.boolean, r.integer, r.`unsigned-integer`, r.number, r.string, r.flow_document);
 --- End `a-schema`.target_table mergeInto ---
@@ -139,7 +139,7 @@ ALTER TABLE `a-schema`.target_table ADD COLUMN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r.flow_document<>'"delete"' THEN
 		INSERT (key1, key2, flow_document)
 		VALUES (r.key1, r.key2, r.flow_document);
 --- End target_table_no_values_materialized mergeInto ---

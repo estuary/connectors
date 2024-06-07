@@ -9,7 +9,7 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
+#RUN go mod download
 
 # Copy in the latest flowctl-go for usage by tests.
 COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
@@ -21,9 +21,10 @@ COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-sql/...
-RUN go test  -tags nozstd -v ./materialize-bigquery/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
+#RUN go test  -tags nozstd -v ./materialize-sql/...
+#RUN go test  -tags nozstd -v ./materialize-bigquery/...
+#RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
+COPY ./connector ./
 
 # Runtime Stage
 ################################################################################

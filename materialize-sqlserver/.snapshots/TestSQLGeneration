@@ -133,7 +133,7 @@ END;
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET target_table."Camel_Case" = r."Camel_Case", target_table."a Time" = r."a Time", target_table."array" = r."array", target_table.lower_case = r.lower_case, target_table."value" = r."value", target_table.flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r.flow_document<>'"delete"' THEN
 		INSERT (key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document)
 		VALUES (r.key1, r."key!2", r."Camel_Case", r."a Time", r."array", r.lower_case, r."value", r.flow_document);
 --- End target_table mergeInto ---

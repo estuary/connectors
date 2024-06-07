@@ -342,7 +342,7 @@ SELECT TOP 0 -1, NULL
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}{{ $.Identifier }}.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED {{ if $.Document }}AND r.{{ $.Document.Identifier }}<>'"delete"' {{ end }}THEN
 		INSERT (
 		{{- range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}
