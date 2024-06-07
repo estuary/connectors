@@ -1,0 +1,304 @@
+package main
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/estuary/connectors/sqlcapture"
+	"github.com/invopop/jsonschema"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	infinityTimestamp         = "9999-12-31T23:59:59Z"
+	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
+	RFC3339TimeFormat         = "15:04:05.999999999Z07:00"
+	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
+)
+
+// DiscoverTables queries the database for information about tables available for capture.
+func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
+	// Get lists of all tables, columns and primary keys in the database
+	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	columns, primaryKeys, err := getColumns(ctx, db.conn, tables)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database columns: %w", err)
+	}
+
+	// Aggregate column and primary key information into DiscoveryInfo structs
+	// using a map from fully-qualified "<schema>.<name>" table names to
+	// the corresponding DiscoveryInfo.
+	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	for _, table := range tables {
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableMap[streamID] = table
+	}
+	for _, column := range columns {
+		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
+		var info, ok = tableMap[streamID]
+		if !ok {
+			continue
+		}
+
+		if info.Columns == nil {
+			info.Columns = make(map[string]sqlcapture.ColumnInfo)
+		}
+		info.Columns[column.Name] = column
+		info.ColumnNames = append(info.ColumnNames, column.Name)
+		tableMap[streamID] = info
+	}
+
+	for streamID, key := range primaryKeys {
+		// The `getColumns()` query implements the "exclude system schemas" logic,
+		// so here we ignore primary key information for tables we don't care about.
+		var info, ok = tableMap[streamID]
+		if !ok {
+			continue
+		}
+		logrus.WithFields(logrus.Fields{
+			"table": streamID,
+			"key":   key,
+		}).Trace("queried primary key")
+		info.PrimaryKey = key
+		tableMap[streamID] = info
+	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		for id, info := range tableMap {
+			logrus.WithFields(logrus.Fields{
+				"stream":     id,
+				"keyColumns": info.PrimaryKey,
+			}).Debug("discovered table")
+		}
+	}
+
+	return tableMap, nil
+}
+
+// Returns true if the bytewise lexicographic ordering of serialized row keys for
+// this column type matches the database backfill ordering.
+func predictableColumnOrder(colType any) bool {
+	// Currently all textual primary key columns are considered to be 'unpredictable' so that backfills
+	// will default to using the 'imprecise' ordering semantics which avoids full-table sorts. Refer to
+	// https://github.com/estuary/connectors/issues/1343 for more details.
+	if colType == "varchar" || colType == "bpchar" || colType == "text" {
+		return false
+	}
+	return true
+}
+
+func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnNames []string) bool {
+	for _, columnName := range columnNames {
+		if columnsInfo[columnName].IsNullable {
+			return false
+		}
+	}
+	return true
+}
+
+// TranslateDBToJSONType returns JSON schema information about the provided database column type.
+func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
+	var jsonType *jsonschema.Schema
+	return jsonType, nil
+}
+
+func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
+	return nil
+}
+
+func oversizePlaceholderJSON(orig []byte) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
+}
+
+// translateRecordField "translates" a value from the PostgreSQL driver into
+// an appropriate JSON-encodeable output format. As a concrete example, the
+// PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
+// marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
+// the `String()` method to get the usual "192.168.100.0/24" notation.
+func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+	return val, nil
+}
+
+func formatRFC3339(t time.Time) (any, error) {
+	if t.Year() < 0 || t.Year() > 9999 {
+		// We could in theory clamp excessively large years to positive infinity, but this
+		// is of limited usefulness since these are never real dates, they're mostly just
+		// dumb typos like `20221` and so we might as well normalize errors consistently.
+		return negativeInfinityTimestamp, nil
+	}
+	return t.Format(time.RFC3339Nano), nil
+}
+
+type columnSchema struct {
+	contentEncoding string
+	format          string
+	nullable        bool
+	jsonType        string
+}
+
+func (s columnSchema) toType() *jsonschema.Schema {
+	var out = &jsonschema.Schema{
+		Format: s.format,
+		Extras: make(map[string]interface{}),
+	}
+
+	if s.contentEncoding != "" {
+		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
+	}
+
+	if s.jsonType == "" {
+		// No type constraint.
+	} else if s.nullable {
+		out.Extras["type"] = []string{s.jsonType, "null"} // Use variadic form.
+	} else {
+		out.Type = s.jsonType
+	}
+	return out
+}
+
+var postgresTypeToJSON = map[string]columnSchema{
+	"bool": {jsonType: "boolean"},
+
+	"int2": {jsonType: "integer"},
+	"int4": {jsonType: "integer"},
+	"int8": {jsonType: "integer"},
+
+	"numeric": {jsonType: "string", format: "number"},
+	"float4":  {jsonType: "number"},
+	"float8":  {jsonType: "number"},
+
+	"varchar": {jsonType: "string"},
+	"bpchar":  {jsonType: "string"},
+	"text":    {jsonType: "string"},
+	"bytea":   {jsonType: "string", contentEncoding: "base64"},
+	"xml":     {jsonType: "string"},
+	"bit":     {jsonType: "string"},
+	"varbit":  {jsonType: "string"},
+
+	"json":     {},
+	"jsonb":    {},
+	"jsonpath": {jsonType: "string"},
+
+	// Domain-Specific Types
+	"date":        {jsonType: "string", format: "date-time"},
+	"timestamp":   {jsonType: "string", format: "date-time"},
+	"timestamptz": {jsonType: "string", format: "date-time"},
+	"time":        {jsonType: "integer"},
+	"timetz":      {jsonType: "string", format: "time"},
+	"interval":    {jsonType: "string"},
+	"money":       {jsonType: "string"},
+	"point":       {jsonType: "string"},
+	"line":        {jsonType: "string"},
+	"lseg":        {jsonType: "string"},
+	"box":         {jsonType: "string"},
+	"path":        {jsonType: "string"},
+	"polygon":     {jsonType: "string"},
+	"circle":      {jsonType: "string"},
+	"inet":        {jsonType: "string"},
+	"cidr":        {jsonType: "string"},
+	"macaddr":     {jsonType: "string"},
+	"macaddr8":    {jsonType: "string"},
+	"tsvector":    {jsonType: "string"},
+	"tsquery":     {jsonType: "string"},
+	"uuid":        {jsonType: "string", format: "uuid"},
+}
+
+const queryDiscoverTables = `
+  SELECT owner, table_name FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
+` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
+
+func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
+	logrus.Debug("listing all tables in the database")
+	var tables []*sqlcapture.DiscoveryInfo
+	var rows, err = conn.QueryContext(ctx, queryDiscoverTables)
+	if err != nil {
+		return nil, fmt.Errorf("fetching tables: %w", err)
+	}
+
+	var owner, tableName string
+	for rows.Next() {
+		if err := rows.Scan(&owner, &tableName); err != nil {
+			return nil, fmt.Errorf("scanning table row: %w", err)
+		}
+
+		var omitBinding = false
+		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, owner) {
+			logrus.WithFields(logrus.Fields{
+				"owner": owner,
+				"table": tableName,
+			}).Debug("table in filtered schema")
+			omitBinding = true
+		}
+		tables = append(tables, &sqlcapture.DiscoveryInfo{
+			Schema:      owner,
+			Name:        tableName,
+			BaseTable:   true,
+			OmitBinding: omitBinding,
+		})
+	}
+	return tables, nil
+}
+
+const queryDiscoverColumns = `
+SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type/*, t.data_length, t.data_precision, t.data_scale*/, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
+    LEFT JOIN (
+            SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
+                INNER JOIN all_cons_columns ac ON (
+                    c.constraint_name = ac.constraint_name
+                    AND c.table_name = ac.table_name
+                    AND c.owner = ac.owner
+                    AND c.constraint_type = 'P'
+                )
+            ) c
+    ON (t.owner = c.owner AND t.table_name = c.table_name AND t.column_name = c.column_name)`
+
+func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
+	var pks = make(map[string][]string)
+	var columns []sqlcapture.ColumnInfo
+	var sc sqlcapture.ColumnInfo
+
+	var ownersMap = make(map[string]bool)
+	for _, t := range tables {
+		ownersMap[t.Schema] = true
+	}
+	var owners []string
+	for k, _ := range ownersMap {
+		owners = append(owners, k)
+	}
+	var ownersCondition = " WHERE t.owner IN ('" + strings.Join(owners, "','") + "')"
+
+	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns+ownersCondition)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("fetching columns: %w", err)
+	}
+
+	for rows.Next() {
+		var isPrimaryKey bool
+		var isNullableStr string
+		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &sc.DataType, &isPrimaryKey); err != nil {
+			return nil, nil, fmt.Errorf("scanning column: %w", err)
+		}
+
+		if isNullableStr == "Y" {
+			sc.IsNullable = true
+		}
+
+		if isPrimaryKey {
+			var streamID = sqlcapture.JoinStreamID(sc.TableSchema, sc.TableName)
+
+			pks[streamID] = append(pks[streamID], sc.Name)
+		}
+
+		columns = append(columns, sc)
+	}
+	return columns, pks, nil
+}
