@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/admin_skipbackfills_24310805": 3 Documents
+# ================================
+{"DATA":"five","ID":5,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"SKIPBACKFILLS_24310805","row_id":"AAAGqfAAAAAAAM3AAB"}}}
+{"DATA":"four","ID":4,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"SKIPBACKFILLS_24310805","row_id":"AAAGqfAAAAAAAM3AAA"}}}
+{"DATA":"six","ID":6,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"SKIPBACKFILLS_24310805","row_id":"AAAGqfAAAAAAAM3AAC"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FSKIPBACKFILLS_18110541":{"backfilled":0,"key_columns":["ID"],"mode":"Active"},"ADMIN%2FSKIPBACKFILLS_24310805":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"ADMIN%2FSKIPBACKFILLS_38410024":{"backfilled":0,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+
