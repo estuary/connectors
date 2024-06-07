@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test/admin_generic_simplecapture_24869578": 5 Documents
+# ================================
+{"DATA":"5","ID":4,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_SIMPLECAPTURE_24869578","row_id":"AAAGq/AAAAAAAMmAAE"}}}
+{"DATA":"A","ID":0,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_SIMPLECAPTURE_24869578","row_id":"AAAGq/AAAAAAAMmAAA"}}}
+{"DATA":"CDEFGHIJKLMNOP","ID":2,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_SIMPLECAPTURE_24869578","row_id":"AAAGq/AAAAAAAMmAAC"}}}
+{"DATA":"Four","ID":3,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_SIMPLECAPTURE_24869578","row_id":"AAAGq/AAAAAAAMmAAD"}}}
+{"DATA":"bbb","ID":1,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_SIMPLECAPTURE_24869578","row_id":"AAAGq/AAAAAAAMmAAB"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FGENERIC_SIMPLECAPTURE_24869578":{"backfilled":5,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+

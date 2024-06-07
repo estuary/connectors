@@ -1,0 +1,23 @@
+# ================================
+# Collection "acmeCo/test/admin_skipbackfills_18110541": 3 Documents
+# ================================
+{"DATA":"eleven","ID":11,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_18110541","scn":11111111,"row_id":"AAAGqdAAAAAAAMnAAE"}}}
+{"DATA":"ten","ID":10,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_18110541","scn":11111111,"row_id":"AAAGqdAAAAAAAMnAAD"}}}
+{"DATA":"twelve","ID":12,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_18110541","scn":11111111,"row_id":"AAAGqdAAAAAAAMnAAF"}}}
+# ================================
+# Collection "acmeCo/test/admin_skipbackfills_24310805": 3 Documents
+# ================================
+{"DATA":"fifteen","ID":15,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_24310805","scn":11111111,"row_id":"AAAGqfAAAAAAAM3AAF"}}}
+{"DATA":"fourteen","ID":14,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_24310805","scn":11111111,"row_id":"AAAGqfAAAAAAAM3AAE"}}}
+{"DATA":"thirteen","ID":13,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_24310805","scn":11111111,"row_id":"AAAGqfAAAAAAAM3AAD"}}}
+# ================================
+# Collection "acmeCo/test/admin_skipbackfills_38410024": 3 Documents
+# ================================
+{"DATA":"eighteen","ID":18,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_38410024","scn":11111111,"row_id":"AAAGqhAAAAAAANHAAF"}}}
+{"DATA":"seventeen","ID":17,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_38410024","scn":11111111,"row_id":"AAAGqhAAAAAAANHAAE"}}}
+{"DATA":"sixteen","ID":16,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"SKIPBACKFILLS_38410024","scn":11111111,"row_id":"AAAGqhAAAAAAANHAAD"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FSKIPBACKFILLS_18110541":{"backfilled":0,"key_columns":["ID"],"mode":"Active"},"ADMIN%2FSKIPBACKFILLS_24310805":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"ADMIN%2FSKIPBACKFILLS_38410024":{"backfilled":0,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+

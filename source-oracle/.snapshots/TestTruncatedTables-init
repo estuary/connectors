@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/admin_truncatedtables_14026504": 3 Documents
+# ================================
+{"DATA":"one","ID":1,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"TRUNCATEDTABLES_14026504","row_id":"AAAGqjAAAAAAAMnAAA"}}}
+{"DATA":"three","ID":3,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"TRUNCATEDTABLES_14026504","row_id":"AAAGqjAAAAAAAMnAAC"}}}
+{"DATA":"two","ID":2,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"TRUNCATEDTABLES_14026504","row_id":"AAAGqjAAAAAAAMnAAB"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FTRUNCATEDTABLES_14026504":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+
