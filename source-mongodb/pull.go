@@ -160,6 +160,7 @@ type capture struct {
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int
+	lastEventClusterTime  primitive.Timestamp
 
 	// Controls for starting and stopping the stream progress logger.
 	streamLoggerStop   chan (struct{})
