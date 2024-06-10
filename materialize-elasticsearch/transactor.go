@@ -176,6 +176,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
+	var ignoredDocuments = 0
 	for it.Next() {
 		select {
 		case err := <-errCh:
@@ -197,7 +198,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var action string
 		var bodyReader *bytes.Reader = bytes.NewReader([]byte{})
 		if it.Delete && t.cfg.HardDelete {
-			action = "delete"
+			if it.Exists {
+				action = "delete"
+			} else {
+				// Ignore items which do not exist and are already deleted
+				ignoredDocuments++
+				continue
+			}
 		} else {
 			for idx, v := range append(it.Key, it.Values...) {
 				if b, ok := v.([]byte); ok {
@@ -259,7 +266,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	// Sanity checks that everything went as expected.
 	stats := indexer.Stats()
-	if stats.NumFailed != 0 || stats.NumAdded != uint64(it.Total) || (stats.NumIndexed+stats.NumCreated+stats.NumDeleted) != uint64(it.Total) {
+	if stats.NumFailed != 0 || stats.NumAdded != uint64(it.Total-ignoredDocuments) || (stats.NumIndexed+stats.NumCreated+stats.NumDeleted) != uint64(it.Total-ignoredDocuments) {
 		log.WithFields(log.Fields{
 			"stored":     it.Total,
 			"numFailed":  stats.NumFailed,

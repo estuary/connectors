@@ -251,7 +251,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var flowDocument = it.RawJSON
 		if t.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
+			if it.Exists {
+				flowDocument = json.RawMessage(`"delete"`)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
 		}
 		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
