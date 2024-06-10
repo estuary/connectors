@@ -644,11 +644,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// so we can't use it to both update and delete rows. So instead we use a separate
 		// temporary table and run a `DELETE USING` query to delete rows
 		if d.cfg.HardDelete && it.Delete {
-			file = b.deleteFile
+			if it.Exists {
+				file = b.deleteFile
 
-			converted, err = b.target.ConvertKey(it.Key)
-			if err != nil {
-				return nil, fmt.Errorf("converting delete parameters: %w", err)
+				converted, err = b.target.ConvertKey(it.Key)
+				if err != nil {
+					return nil, fmt.Errorf("converting delete parameters: %w", err)
+				}
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
 			}
 		} else {
 			file = b.storeFile
