@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import decimal
 from pydantic import Field
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
 import orjson
@@ -43,6 +44,13 @@ class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSt
     captured: response.Captured | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
 
+def orjson_default(obj):
+    # Pydantic automatically serializes Decimals as strings, but orjson doesn't
+    # know about that. In order to handle this, we must provide this as 
+    # the default= kwarg to orjson.dumps
+    if isinstance(obj, decimal.Decimal):
+        return str(obj)
+    raise TypeError
 
 @dataclass
 class Task:
@@ -115,7 +123,7 @@ class Task:
                     "binding": binding,
                     "doc": document,
                 }
-            })
+            }, default=orjson_default)
         else:
             b = Response(
                 captured=response.Captured(binding=binding, doc=document)
