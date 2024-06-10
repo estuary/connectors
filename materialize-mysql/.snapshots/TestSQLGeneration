@@ -57,7 +57,7 @@ TRUNCATE flow_temp_load_table_1;
 
 --- Begin target_table loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_0
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_0 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -72,7 +72,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_
 
 --- Begin `Delta Updates` loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_1
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_1 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -102,7 +102,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 --- Begin target_table insertLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE target_table
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE target_table CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -123,7 +123,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE target_table
 
 --- Begin `Delta Updates` insertLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE `Delta Updates`
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE `Delta Updates` CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -138,7 +138,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE `Delta Update
 
 --- Begin target_table updateLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_0
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_0 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -159,7 +159,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 
 --- Begin `Delta Updates` updateLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_1
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_1 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -237,7 +237,7 @@ WHERE
 
 --- Begin target_table deleteLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_0
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_0 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -252,7 +252,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_del
 
 --- Begin `Delta Updates` deleteLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_1
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_1 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
