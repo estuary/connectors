@@ -401,13 +401,18 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		var b = d.bindings[it.Binding]
 
 		if it.Delete && d.cfg.HardDelete {
-			if converted, err := b.target.ConvertKey(it.Key); err != nil {
-				return nil, fmt.Errorf("converting delete keys: %w", err)
-			} else if it.Exists {
-				batch.Queue(b.deleteQuerySQL, converted...)
-			}
+			if it.Exists {
+				if converted, err := b.target.ConvertKey(it.Key); err != nil {
+					return nil, fmt.Errorf("converting delete keys: %w", err)
+				} else if it.Exists {
+					batch.Queue(b.deleteQuerySQL, converted...)
+				}
 
-			batchBytes += len(it.PackedKey)
+				batchBytes += len(it.PackedKey)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
 		} else {
 			// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
 			// tuples & the document JSON are proportional to the size of the item in the batch.

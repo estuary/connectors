@@ -134,9 +134,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		key := fmt.Sprintf("%x", it.PackedKey) // Hex-encode
 
 		if it.Delete && t.cfg.HardDelete {
-			del := &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
-			batch = append(batch, del)
-			batchSize += len(key)
+			if it.Exists {
+				del := &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
+				batch = append(batch, del)
+				batchSize += len(key)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
 		} else {
 			var doc bson.M
 			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
