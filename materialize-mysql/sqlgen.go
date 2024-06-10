@@ -252,7 +252,7 @@ TRUNCATE {{ template "temp_load_name" . }};
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -287,7 +287,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 -- Template to load data into target table
 
 {{ define "insertLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -319,7 +319,7 @@ CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 {{ end }}
 
 {{ define "updateLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -373,7 +373,7 @@ CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
 {{ end }}
 
 {{ define "deleteLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "temp_delete_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "temp_delete_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
