@@ -250,11 +250,12 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 
 	es, err := elasticsearch.NewClient(
 		elasticsearch.Config{
-			Addresses:     []string{endpoint},
-			Username:      c.Credentials.Username,
-			Password:      c.Credentials.Password,
-			APIKey:        c.Credentials.ApiKey,
-			RetryOnStatus: []int{429, 502, 503, 504},
+			Addresses:           []string{endpoint},
+			CompressRequestBody: true,
+			Username:            c.Credentials.Username,
+			Password:            c.Credentials.Password,
+			APIKey:              c.Credentials.ApiKey,
+			RetryOnStatus:       []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
 				d := time.Duration(1<<i) * time.Second
 				log.WithFields(log.Fields{
