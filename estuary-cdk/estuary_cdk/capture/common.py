@@ -182,7 +182,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     doc: _BaseDocument
     binding: int
 
-FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
+FetchSnapshotFn = Callable[[Logger, Task], AsyncGenerator[_BaseDocument | dict, None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 
@@ -193,7 +193,7 @@ not emitted by the connector.
 """
 
 FetchPageFn = Callable[
-    [Logger, PageCursor, LogCursor],
+    [Logger, PageCursor, LogCursor, Task],
     AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
 ]
 """
@@ -218,7 +218,7 @@ returning without yielding a final PageCursor.
 """
 
 FetchChangesFn = Callable[
-    [Logger, LogCursor],
+    [Logger, LogCursor, Task],
     AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
 ]
 """
@@ -510,7 +510,7 @@ async def _binding_snapshot_task(
             state.updated_at = datetime.now(tz=UTC)
 
         count = 0
-        async for doc in fetch_snapshot(task.log):
+        async for doc in fetch_snapshot(task.log, task):
             if isinstance(doc, dict):
                 doc["meta_"] = {
                     "op": "u" if count < state.last_count else "c",
@@ -575,7 +575,7 @@ async def _binding_backfill_task(
         # Track if fetch_page returns without having yielded a PageCursor.
         done = True
 
-        async for item in fetch_page(task.log, state.next_page, state.cutoff):
+        async for item in fetch_page(task.log, state.next_page, state.cutoff, task):
             if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 done = True
@@ -632,7 +632,7 @@ async def _binding_incremental_task(
         
         task.log.info(f"resuming incremental replication", state)
 
-        async for item in fetch_changes(task.log, state.cursor):
+        async for item in fetch_changes(task.log, state.cursor, task):
             if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 pending = True
