@@ -144,11 +144,11 @@ func (p *State) shouldSkip(path string, modTime time.Time) (_ bool, reason strin
 	}
 	// Is the path modified before our window (exclusive) ?
 	if !modTime.After(p.MinBound) {
-		return true, "!modTime.After(MinBound)"
+		return true, fmt.Sprintf("!modTime.After(MinBound): modTime %s vs. MinBound %s", modTime.UTC().String(), p.MinBound.UTC().String())
 	}
 	// Is the path modified after our window (exclusive) ?
 	if !p.MaxBound.After(modTime) {
-		return true, "!MaxBound.After(modTime)"
+		return true, fmt.Sprintf("!MaxBound.After(modTime): MaxBound %s vs. modTime %s", p.MaxBound.UTC().String(), modTime.UTC().String())
 	}
 	return false, ""
 }
