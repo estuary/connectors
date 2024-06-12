@@ -44,11 +44,15 @@ class SourceAirtable(AbstractSource):
         for index, configured_stream in enumerate(catalog.streams):
             stream_instance = stream_instances.get(configured_stream.stream.name)
             if not stream_instance:
-                table_id = configured_stream.stream.name.split("/")[2]
-                similar_streams = [s for s in stream_instances if s.endswith(table_id)]
+                # Removing table_id and similar_streams
+                # As we are not outputting the table_id within
+                # The table name anymore.
+
+                #table_id = configured_stream.stream.name.split("/")[2]
+                #similar_streams = [s for s in stream_instances if s.endswith(table_id)]
                 logger.warn(
                     f"The requested stream {configured_stream.stream.name} was not found in the source. Please check if this stream was renamed or removed previously and reset data, removing from catalog for this sync run. For more information please refer to documentation: https://docs.airbyte.com/integrations/sources/airtable/#note-on-changed-table-names-and-deleted-tables"
-                    f" Similar streams: {similar_streams}"
+                    #f" Similar streams: {similar_streams}"
                     f" Available streams: {stream_instances.keys()}"
                 )
                 del catalog.streams[index]
@@ -83,7 +87,7 @@ class SourceAirtable(AbstractSource):
                     {
                         "stream_path": f"{base_id}/{table.get('id')}",
                         "stream": SchemaHelpers.get_airbyte_stream(
-                            f"{base_name}/{SchemaHelpers.clean_name(table.get('name'))}/{table.get('id')}",
+                            f"{base_name}/{SchemaHelpers.clean_name(table.get('name'))}",
                             SchemaHelpers.get_json_schema(table),
                         ),
                         "table_name": table.get("name"),
