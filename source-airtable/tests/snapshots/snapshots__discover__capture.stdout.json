@@ -1,8 +1,8 @@
 [
   {
-    "recommendedName": "test_base/pizzas/tblY71QcPfB7SjY1f",
+    "recommendedName": "test_base/pizzas",
     "resourceConfig": {
-      "stream": "test_base/pizzas/tblY71QcPfB7SjY1f",
+      "stream": "test_base/pizzas",
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -24,26 +24,6 @@
             "null",
             "string"
           ]
-        },
-        "name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "status": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "cost": {
-          "type": [
-            "null",
-            "number",
-            "string"
-          ],
-          "format": "number"
         },
         "_meta": {
           "type": "object",
@@ -67,9 +47,9 @@
     ]
   },
   {
-    "recommendedName": "test_base/soups/tblDi5DS0EjiYi83h",
+    "recommendedName": "test_base/soups",
     "resourceConfig": {
-      "stream": "test_base/soups/tblDi5DS0EjiYi83h",
+      "stream": "test_base/soups",
       "syncMode": "full_refresh"
     },
     "documentSchema": {
@@ -87,24 +67,6 @@
           ]
         },
         "_airtable_table_name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "notes": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "status": {
           "type": [
             "null",
             "string"

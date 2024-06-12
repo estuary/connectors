@@ -39,7 +39,7 @@ def fake_tables_response():
 
 @pytest.fixture
 def expected_discovery_stream_name():
-    return ["test_base/test_table/5678"]
+    return ["test_base/test_table"]
 
 
 @pytest.fixture
@@ -176,8 +176,8 @@ def make_stream(prepared_stream):
 
 @pytest.fixture
 def fake_catalog(make_stream):
-    stream1 = make_stream(name="test_base/test_table1/abcdef")
-    stream2 = make_stream(name="test_base/test_table2/qwerty")
+    stream1 = make_stream(name="test_base/test_table1")
+    stream2 = make_stream(name="test_base/test_table2")
     return ConfiguredAirbyteCatalog(
         streams=[stream1, stream2],
     )
@@ -185,6 +185,6 @@ def fake_catalog(make_stream):
 
 @pytest.fixture
 def fake_streams(make_airtable_stream):
-    stream1 = make_airtable_stream(name="test_base/test_table1/abcdef")
-    stream2 = make_airtable_stream(name="test_base/test_table2_renamed/qwerty")
+    stream1 = make_airtable_stream(name="test_base/test_table1")
+    stream2 = make_airtable_stream(name="test_base/test_table2_renamed")
     yield [stream1, stream2]
