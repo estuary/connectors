@@ -21,7 +21,6 @@ properties:
       - UNSPECIFIED
   ad_group.id:
     type:
-      - "null"
       - integer
   segments.date:
     type:

@@ -44,7 +44,6 @@ properties:
       - boolean
   customer.id:
     type:
-      - "null"
       - integer
   customer.manager:
     type:
@@ -86,7 +85,6 @@ properties:
       - string
   segments.date:
     type:
-      - "null"
       - string
     format: date
   _meta:

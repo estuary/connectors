@@ -23,7 +23,6 @@ collections:
             - string
         ad_group_ad_label.resource_name:
           type:
-            - "null"
             - string
         label.name:
           type:
@@ -68,7 +67,6 @@ collections:
             - string
         ad_group_label.resource_name:
           type:
-            - "null"
             - string
         label.name:
           type:
@@ -104,7 +102,6 @@ collections:
             - string
         campaign_label.resource_name:
           type:
-            - "null"
             - string
         label.name:
           type:
