@@ -200,7 +200,6 @@ properties:
       - string
   ad_group_ad.ad.id:
     type:
-      - "null"
       - integer
   ad_group_ad.ad.image_ad.image_url:
     type:
@@ -618,7 +617,6 @@ properties:
       - string
   segments.date:
     type:
-      - "null"
       - string
     format: date
   _meta:

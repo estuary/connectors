@@ -44,7 +44,6 @@ properties:
       - number
   ad_group.id:
     type:
-      - "null"
       - integer
   ad_group.name:
     type:

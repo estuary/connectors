@@ -8,8 +8,8 @@ properties:
       - string
   ad_group.id:
     type:
-      - "null"
       - integer
+      - "null"
   customer.currency_code:
     type:
       - "null"

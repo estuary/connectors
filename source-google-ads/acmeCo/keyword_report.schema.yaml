@@ -8,7 +8,6 @@ properties:
       - string
   ad_group.id:
     type:
-      - "null"
       - integer
   ad_group_criterion.type:
     type:

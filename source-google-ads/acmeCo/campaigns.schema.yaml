@@ -110,7 +110,6 @@ properties:
       - integer
   campaign.id:
     type:
-      - "null"
       - integer
   campaign.labels:
     type:
@@ -340,12 +339,10 @@ properties:
       - number
   segments.date:
     type:
-      - "null"
       - string
     format: date
   segments.hour:
     type:
-      - "null"
       - integer
   _meta:
     type: object
