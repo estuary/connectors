@@ -102,426 +102,6 @@
     }
   ],
   [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 2
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:30-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550077750,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:30-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 3
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:30-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550176054,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:30-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 4
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550372662,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 5
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550405430,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 6
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550438198,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 7
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550470966,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 8
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550503734,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 9
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550536502,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 10
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550569270,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 11
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550602038,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 12
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550634806,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 13
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550667574,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "sku-untracked-1",
-      "tracked": false,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 14
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550700342,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 15
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:31-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550733110,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:31-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 16
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550765878,
-      "province_code_of_origin": null,
-      "requires_shipping": false,
-      "sku": "",
-      "tracked": false,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 17
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550798646,
-      "province_code_of_origin": null,
-      "requires_shipping": false,
-      "sku": "",
-      "tracked": false,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 18
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550831414,
-      "province_code_of_origin": null,
-      "requires_shipping": false,
-      "sku": "",
-      "tracked": false,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 19
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550864182,
-      "province_code_of_origin": null,
-      "requires_shipping": false,
-      "sku": "",
-      "tracked": false,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 1
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550929718,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 20
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550929718,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/inventory_items",
-    {
-      "_meta": {
-        "row_id": 21
-      },
-      "cost": null,
-      "country_code_of_origin": null,
-      "country_harmonized_system_codes": [],
-      "created_at": "2023-11-09T13:19:32-05:00",
-      "harmonized_system_code": null,
-      "id": 49446550995254,
-      "province_code_of_origin": null,
-      "requires_shipping": true,
-      "sku": "sku-managed-1",
-      "tracked": true,
-      "updated_at": "2023-11-09T13:19:32-05:00",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
     "acmeCo/inventory_levels",
     {
       "_meta": {
@@ -759,6 +339,19 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
+        "row_id": 27
+      },
+      "available": 20,
+      "inventory_item_id": 49446550896950,
+      "location_id": 94210228534,
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
         "row_id": 1
       },
       "available": 50,
@@ -778,6 +371,125 @@
       "inventory_item_id": 49446550929718,
       "location_id": 94210130230,
       "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 21
+      },
+      "available": 50,
+      "inventory_item_id": 49446550995254,
+      "location_id": 94210130230,
+      "updated_at": "2023-11-09T13:19:36-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 28
+      },
+      "available": 50,
+      "inventory_item_id": 49446550995254,
+      "location_id": 94210228534,
+      "updated_at": "2023-11-09T13:19:36-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 22
+      },
+      "available": 50,
+      "inventory_item_id": 49446551028022,
+      "location_id": 94210130230,
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 23
+      },
+      "available": 50,
+      "inventory_item_id": 49446551060790,
+      "location_id": 94210130230,
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 24
+      },
+      "available": 10,
+      "inventory_item_id": 49446551093558,
+      "location_id": 94210130230,
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 25
+      },
+      "available": 10,
+      "inventory_item_id": 49446551126326,
+      "location_id": 94210130230,
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "_meta": {
+        "row_id": 26
+      },
+      "available": 10,
+      "inventory_item_id": 49446551159094,
+      "location_id": 94210130230,
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/locations",
+    {
+      "_meta": {
+        "row_id": 2
+      },
+      "active": true,
+      "address1": null,
+      "address2": null,
+      "admin_graphql_api_id": "gid://shopify/Location/94210130230",
+      "city": null,
+      "country": "US",
+      "country_code": "US",
+      "country_name": "United States",
+      "created_at": "2023-11-09T13:19:15-05:00",
+      "id": 94210130230,
+      "legacy": false,
+      "localized_country_name": "United States",
+      "localized_province_name": null,
+      "name": "Shop location",
+      "phone": null,
+      "province": null,
+      "province_code": null,
+      "updated_at": "2023-11-09T13:19:15-05:00",
+      "zip": null,
       "ts": "redacted-timestamp"
     }
   ],
@@ -806,6 +518,1905 @@
       "province_code": "ON",
       "updated_at": "2023-11-09T13:19:30-05:00",
       "zip": "A1A 1A1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/locations",
+    {
+      "_meta": {
+        "row_id": 3
+      },
+      "active": true,
+      "address1": null,
+      "address2": null,
+      "admin_graphql_api_id": "gid://shopify/Location/94210228534",
+      "city": null,
+      "country": "US",
+      "country_code": "US",
+      "country_name": "United States",
+      "created_at": "2023-11-09T13:19:30-05:00",
+      "id": 94210228534,
+      "legacy": true,
+      "localized_country_name": "United States",
+      "localized_province_name": null,
+      "name": "Snow City Warehouse",
+      "phone": null,
+      "province": null,
+      "province_code": null,
+      "updated_at": "2023-11-09T13:19:30-05:00",
+      "zip": null,
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/metafields",
+    {
+      "_meta": {
+        "row_id": 1
+      },
+      "created_at": "2023-11-09T13:19:20-05:00",
+      "description": null,
+      "id": 31252065485110,
+      "key": "pos_attributes",
+      "namespace": "shopify_pos",
+      "owner_id": 84816101686,
+      "owner_resource": "shop",
+      "type": "string",
+      "updated_at": "2023-11-09T13:19:20-05:00",
+      "value": true,
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/metafields",
+    {
+      "_meta": {
+        "row_id": 2
+      },
+      "created_at": "2023-11-09T13:19:30-05:00",
+      "description": null,
+      "id": 31252066369846,
+      "key": "alpine_sports",
+      "namespace": "test_data",
+      "owner_id": 84816101686,
+      "owner_resource": "shop",
+      "type": "list.single_line_text_field",
+      "updated_at": "2023-11-09T13:19:30-05:00",
+      "value": true,
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 13
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741167926",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:30-05:00",
+      "handle": "the-minimal-snowboard",
+      "id": 8907741167926,
+      "image": null,
+      "images": [],
+      "options": [
+        {
+          "id": 11195515863350,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741167926,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": null,
+      "published_scope": "web",
+      "status": "active",
+      "tags": "",
+      "template_suffix": null,
+      "title": "The Minimal Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025694006",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:30-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429025694006,
+          "image_id": null,
+          "inventory_item_id": 49446550077750,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "885.95",
+          "product_id": 8907741167926,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:30-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 17
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741200694",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:30-05:00",
+      "handle": "the-videographer-snowboard",
+      "id": 8907741200694,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534979297590",
+        "alt": "The top and bottom view of a snowboard. The top has view is turquoise and black with graphics of\n        trees. The bottom view is turquoise with the word hydrogen written in cursive.",
+        "created_at": "2023-11-09T13:19:30-05:00",
+        "height": 1600,
+        "id": 44534979297590,
+        "position": 1,
+        "product_id": 8907741200694,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/files/Main.jpg?v=1699553972",
+        "updated_at": "2023-11-09T13:19:32-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534979297590",
+          "alt": "The top and bottom view of a snowboard. The top has view is turquoise and black with graphics of\n        trees. The bottom view is turquoise with the word hydrogen written in cursive.",
+          "created_at": "2023-11-09T13:19:30-05:00",
+          "height": 1600,
+          "id": 44534979297590,
+          "position": 1,
+          "product_id": 8907741200694,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/files/Main.jpg?v=1699553972",
+          "updated_at": "2023-11-09T13:19:32-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195515896118,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741200694,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:31-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "",
+      "template_suffix": null,
+      "title": "The Videographer Snowboard",
+      "updated_at": "2023-11-09T13:19:32-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025726774",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:30-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429025726774,
+          "image_id": null,
+          "inventory_item_id": 49446550176054,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "885.95",
+          "product_id": 8907741200694,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:30-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 4
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741298998",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-archived-snowboard",
+      "id": 8907741298998,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534977003830",
+        "alt": "The top and bottom view of a snowboard.The top view is a gradient light purple and dark purple with\n          a cube geometric pattern. The bottom view blue with light blue octagon geometric pattern.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 1600,
+        "id": 44534977003830,
+        "position": 1,
+        "product_id": 8907741298998,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_52f8e304-92d9-4a36-82af-50df8fe31c69.jpg?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534977003830",
+          "alt": "The top and bottom view of a snowboard.The top view is a gradient light purple and dark purple with\n          a cube geometric pattern. The bottom view blue with light blue octagon geometric pattern.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 1600,
+          "id": 44534977003830,
+          "position": 1,
+          "product_id": 8907741298998,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_52f8e304-92d9-4a36-82af-50df8fe31c69.jpg?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195515994422,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741298998,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": null,
+      "published_scope": "web",
+      "status": "archived",
+      "tags": "Archived, Premium, Snow, Snowboard, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Archived Snowboard",
+      "updated_at": "2023-11-09T13:19:36-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025923382",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429025923382,
+          "image_id": null,
+          "inventory_item_id": 49446550372662,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "629.95",
+          "product_id": 8907741298998,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Snowboard Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 10
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741331766",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-draft-snowboard",
+      "id": 8907741331766,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534977528118",
+        "alt": "Top and bottom view of a snowboard.The top view shows the text \u201chydrogen\u201d in overlapping blue, pink\n          and black font. The bottom view is a purple to blue gradient with white geometric pattern overlay.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 1600,
+        "id": 44534977528118,
+        "position": 1,
+        "product_id": 8907741331766,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_5127218a-8f6c-498f-b489-09242c0fab0a.jpg?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534977528118",
+          "alt": "Top and bottom view of a snowboard.The top view shows the text \u201chydrogen\u201d in overlapping blue, pink\n          and black font. The bottom view is a purple to blue gradient with white geometric pattern overlay.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 1600,
+          "id": 44534977528118,
+          "position": 1,
+          "product_id": 8907741331766,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_5127218a-8f6c-498f-b489-09242c0fab0a.jpg?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516027190,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741331766,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": null,
+      "published_scope": "web",
+      "status": "draft",
+      "tags": "",
+      "template_suffix": null,
+      "title": "The Draft Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025956150",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429025956150,
+          "image_id": null,
+          "inventory_item_id": 49446550405430,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 20,
+          "old_inventory_quantity": 20,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "2629.95",
+          "product_id": 8907741331766,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Snowboard Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 9
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741364534",
+      "body_html": "This <b>PREMIUM</b> <i>snowboard</i> is so <b>SUPER</b><i>DUPER</i> awesome!",
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-complete-snowboard",
+      "id": 8907741364534,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534977724726",
+        "alt": "Top and bottom view of a snowboard. The top view shows abstract circles and lines in shades of teal.\n          The bottom view shows abstract circles and lines in shades of purple and blue with the text \u201cSHOPIFY\u201d in a\n          sans serif typeface on top.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 1600,
+        "id": 44534977724726,
+        "position": 1,
+        "product_id": 8907741364534,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_589fc064-24a2-4236-9eaf-13b2bd35d21d.jpg?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534977724726",
+          "alt": "Top and bottom view of a snowboard. The top view shows abstract circles and lines in shades of teal.\n          The bottom view shows abstract circles and lines in shades of purple and blue with the text \u201cSHOPIFY\u201d in a\n          sans serif typeface on top.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 1600,
+          "id": 44534977724726,
+          "position": 1,
+          "product_id": 8907741364534,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_589fc064-24a2-4236-9eaf-13b2bd35d21d.jpg?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516059958,
+          "name": "Color",
+          "position": 1,
+          "product_id": 8907741364534,
+          "values": [
+            "Ice",
+            "Dawn",
+            "Powder",
+            "Electric",
+            "Sunset"
+          ]
+        }
+      ],
+      "product_type": "snowboard",
+      "published_at": "2023-11-09T13:19:32-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Premium, Snow, Snowboard, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Complete Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025988918",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 4536,
+          "id": 47429025988918,
+          "image_id": null,
+          "inventory_item_id": 49446550470966,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Ice",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "699.95",
+          "product_id": 8907741364534,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Ice",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 10.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026021686",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 4536,
+          "id": 47429026021686,
+          "image_id": null,
+          "inventory_item_id": 49446550503734,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Dawn",
+          "option2": null,
+          "option3": null,
+          "position": 2,
+          "price": "699.95",
+          "product_id": 8907741364534,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Dawn",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 10.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026054454",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 4536,
+          "id": 47429026054454,
+          "image_id": null,
+          "inventory_item_id": 49446550536502,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Powder",
+          "option2": null,
+          "option3": null,
+          "position": 3,
+          "price": "699.95",
+          "product_id": 8907741364534,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Powder",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 10.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026087222",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 4536,
+          "id": 47429026087222,
+          "image_id": null,
+          "inventory_item_id": 49446550569270,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Electric",
+          "option2": null,
+          "option3": null,
+          "position": 4,
+          "price": "699.95",
+          "product_id": 8907741364534,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Electric",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 10.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026152758",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 4536,
+          "id": 47429026152758,
+          "image_id": null,
+          "inventory_item_id": 49446550602038,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Sunset",
+          "option2": null,
+          "option3": null,
+          "position": 5,
+          "price": "699.95",
+          "product_id": 8907741364534,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Sunset",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 10.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Snowboard Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 11
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741397302",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-hidden-snowboard",
+      "id": 8907741397302,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534977823030",
+        "alt": "The top view and bottom view of a snowboard. The top view is black with a singular peach cube.\n          The bottom view has a graphic of a stack of blocks in a gradient from light blue, to pink to peach.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 1600,
+        "id": 44534977823030,
+        "position": 1,
+        "product_id": 8907741397302,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_c8ff0b5d-c712-429a-be00-b29bd55cbc9d.jpg?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534977823030",
+          "alt": "The top view and bottom view of a snowboard. The top view is black with a singular peach cube.\n          The bottom view has a graphic of a stack of blocks in a gradient from light blue, to pink to peach.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 1600,
+          "id": 44534977823030,
+          "position": 1,
+          "product_id": 8907741397302,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_c8ff0b5d-c712-429a-be00-b29bd55cbc9d.jpg?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516092726,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741397302,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": null,
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Premium, Snow, Snowboard, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Hidden Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026119990",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026119990,
+          "image_id": null,
+          "inventory_item_id": 49446550634806,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "749.95",
+          "product_id": 8907741397302,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Snowboard Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 5
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741430070",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-collection-snowboard-hydrogen",
+      "id": 8907741430070,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534977855798",
+        "alt": "Top and bottom view of a snowboard. The top view shows stylized hydrogen bonds and the bottom view\n        shows \u201cH2\u201d in a brush script typeface.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 1600,
+        "id": 44534977855798,
+        "position": 1,
+        "product_id": 8907741430070,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_0a40b01b-5021-48c1-80d1-aa8ab4876d3d.jpg?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534977855798",
+          "alt": "Top and bottom view of a snowboard. The top view shows stylized hydrogen bonds and the bottom view\n        shows \u201cH2\u201d in a brush script typeface.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 1600,
+          "id": 44534977855798,
+          "position": 1,
+          "product_id": 8907741430070,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_0a40b01b-5021-48c1-80d1-aa8ab4876d3d.jpg?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516125494,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741430070,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:35-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Collection Snowboard: Hydrogen",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026185526",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026185526,
+          "image_id": null,
+          "inventory_item_id": 49446550438198,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "600.00",
+          "product_id": 8907741430070,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Hydrogen Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 12
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741462838",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-inventory-not-tracked-snowboard",
+      "id": 8907741462838,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534978511158",
+        "alt": "Top and bottom view of a snowboard. The top view shows a centred hexagonal logo for Hydrogen that\n          appears to radiate outwards, as well as some overlapping hexagons at the bottom. The bottom view shows an\n          abstract angular grid in purples.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 3908,
+        "id": 44534978511158,
+        "position": 1,
+        "product_id": 8907741462838,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/snowboard_purple_hydrogen.png?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 3097
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534978511158",
+          "alt": "Top and bottom view of a snowboard. The top view shows a centred hexagonal logo for Hydrogen that\n          appears to radiate outwards, as well as some overlapping hexagons at the bottom. The bottom view shows an\n          abstract angular grid in purples.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 3908,
+          "id": 44534978511158,
+          "position": 1,
+          "product_id": 8907741462838,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/snowboard_purple_hydrogen.png?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 3097
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516158262,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741462838,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:32-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Inventory Not Tracked Snowboard",
+      "updated_at": "2023-11-09T13:19:32-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026218294",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026218294,
+          "image_id": null,
+          "inventory_item_id": 49446550667574,
+          "inventory_management": null,
+          "inventory_policy": "deny",
+          "inventory_quantity": 0,
+          "old_inventory_quantity": 0,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "949.95",
+          "product_id": 8907741462838,
+          "requires_shipping": true,
+          "sku": "sku-untracked-1",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 16
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741495606",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-out-of-stock-snowboard",
+      "id": 8907741495606,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534978838838",
+        "alt": "Top and bottom view of a snowboard. The top view shows a toggle at the top in shades of blue and\n        yellow. The bottom view shows an abstract illustration of toggles in blues and yellows.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 3908,
+        "id": 44534978838838,
+        "position": 1,
+        "product_id": 8907741495606,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_f44a9605-cd62-464d-b095-d45cdaa0d0d7.jpg?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 3908
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534978838838",
+          "alt": "Top and bottom view of a snowboard. The top view shows a toggle at the top in shades of blue and\n        yellow. The bottom view shows an abstract illustration of toggles in blues and yellows.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 3908,
+          "id": 44534978838838,
+          "position": 1,
+          "product_id": 8907741495606,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_f44a9605-cd62-464d-b095-d45cdaa0d0d7.jpg?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 3908
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516191030,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741495606,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:32-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Out of Stock Snowboard",
+      "updated_at": "2023-11-09T13:19:32-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026251062",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026251062,
+          "image_id": null,
+          "inventory_item_id": 49446550700342,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 0,
+          "old_inventory_quantity": 0,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "885.95",
+          "product_id": 8907741495606,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 8
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741528374",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "the-compare-at-price-snowboard",
+      "id": 8907741528374,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534979068214",
+        "alt": "Top and bottom view of a snowboard. The top view shows pixelated clouds, with the top-most one being\n        the shape of the Shopify bag logo. The bottom view has a pixelated cloudy sky with blue, pink and purple\n        colours.",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 3908,
+        "id": 44534979068214,
+        "position": 1,
+        "product_id": 8907741528374,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/snowboard_sky.png?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 3097
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534979068214",
+          "alt": "Top and bottom view of a snowboard. The top view shows pixelated clouds, with the top-most one being\n        the shape of the Shopify bag logo. The bottom view has a pixelated cloudy sky with blue, pink and purple\n        colours.",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 3908,
+          "id": 44534979068214,
+          "position": 1,
+          "product_id": 8907741528374,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/snowboard_sky.png?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 3097
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516223798,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741528374,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:32-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Compare at Price Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026283830",
+          "barcode": null,
+          "compare_at_price": "885.95",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026283830,
+          "image_id": null,
+          "inventory_item_id": 49446550733110,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "785.95",
+          "product_id": 8907741528374,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 1
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741561142",
+      "body_html": "This is a gift card for the store",
+      "created_at": "2023-11-09T13:19:31-05:00",
+      "handle": "gift-card",
+      "id": 8907741561142,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534979264822",
+        "alt": "Gift card that shows text: Generated data gift card",
+        "created_at": "2023-11-09T13:19:31-05:00",
+        "height": 2881,
+        "id": 44534979264822,
+        "position": 1,
+        "product_id": 8907741561142,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/gift_card.png?v=1699553971",
+        "updated_at": "2023-11-09T13:19:31-05:00",
+        "variant_ids": [],
+        "width": 2881
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534979264822",
+          "alt": "Gift card that shows text: Generated data gift card",
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "height": 2881,
+          "id": 44534979264822,
+          "position": 1,
+          "product_id": 8907741561142,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/gift_card.png?v=1699553971",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "variant_ids": [],
+          "width": 2881
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516256566,
+          "name": "Denominations",
+          "position": 1,
+          "product_id": 8907741561142,
+          "values": [
+            "$10",
+            "$25",
+            "$50",
+            "$100"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:32-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "",
+      "template_suffix": null,
+      "title": "Gift Card",
+      "updated_at": "2024-04-19T06:20:35-04:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026316598",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "gift_card",
+          "grams": 0,
+          "id": 47429026316598,
+          "image_id": null,
+          "inventory_item_id": 49446550765878,
+          "inventory_management": null,
+          "inventory_policy": "deny",
+          "inventory_quantity": 0,
+          "old_inventory_quantity": 0,
+          "option1": "$10",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "10.00",
+          "product_id": 8907741561142,
+          "requires_shipping": false,
+          "sku": "",
+          "taxable": false,
+          "title": "$10",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026349366",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:31-05:00",
+          "fulfillment_service": "gift_card",
+          "grams": 0,
+          "id": 47429026349366,
+          "image_id": null,
+          "inventory_item_id": 49446550798646,
+          "inventory_management": null,
+          "inventory_policy": "deny",
+          "inventory_quantity": 0,
+          "old_inventory_quantity": 0,
+          "option1": "$25",
+          "option2": null,
+          "option3": null,
+          "position": 2,
+          "price": "25.00",
+          "product_id": 8907741561142,
+          "requires_shipping": false,
+          "sku": "",
+          "taxable": false,
+          "title": "$25",
+          "updated_at": "2023-11-09T13:19:31-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026382134",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "fulfillment_service": "gift_card",
+          "grams": 0,
+          "id": 47429026382134,
+          "image_id": null,
+          "inventory_item_id": 49446550831414,
+          "inventory_management": null,
+          "inventory_policy": "deny",
+          "inventory_quantity": 0,
+          "old_inventory_quantity": 0,
+          "option1": "$50",
+          "option2": null,
+          "option3": null,
+          "position": 3,
+          "price": "50.00",
+          "product_id": 8907741561142,
+          "requires_shipping": false,
+          "sku": "",
+          "taxable": false,
+          "title": "$50",
+          "updated_at": "2023-11-09T13:19:32-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026414902",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "fulfillment_service": "gift_card",
+          "grams": 0,
+          "id": 47429026414902,
+          "image_id": null,
+          "inventory_item_id": 49446550864182,
+          "inventory_management": null,
+          "inventory_policy": "deny",
+          "inventory_quantity": 0,
+          "old_inventory_quantity": 0,
+          "option1": "$100",
+          "option2": null,
+          "option3": null,
+          "position": 4,
+          "price": "100.00",
+          "product_id": 8907741561142,
+          "requires_shipping": false,
+          "sku": "",
+          "taxable": false,
+          "title": "$100",
+          "updated_at": "2023-11-09T13:19:32-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Snowboard Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 14
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741593910",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:32-05:00",
+      "handle": "the-multi-location-snowboard",
+      "id": 8907741593910,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534979723574",
+        "alt": "Top and bottom view of a snowboard. The top view shows a pixelated Shopify bag logo and a pixelated\n          character reviewing a clipboard with a questioning expression with a bright green-blue background. The bottom\n          view is a pattern of many pixel characters with a bright green-blue background.",
+        "created_at": "2023-11-09T13:19:32-05:00",
+        "height": 1600,
+        "id": 44534979723574,
+        "position": 1,
+        "product_id": 8907741593910,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_0a4e9096-021a-4c1e-8750-24b233166a12.jpg?v=1699553972",
+        "updated_at": "2023-11-09T13:19:32-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534979723574",
+          "alt": "Top and bottom view of a snowboard. The top view shows a pixelated Shopify bag logo and a pixelated\n          character reviewing a clipboard with a questioning expression with a bright green-blue background. The bottom\n          view is a pattern of many pixel characters with a bright green-blue background.",
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "height": 1600,
+          "id": 44534979723574,
+          "position": 1,
+          "product_id": 8907741593910,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_0a4e9096-021a-4c1e-8750-24b233166a12.jpg?v=1699553972",
+          "updated_at": "2023-11-09T13:19:32-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516289334,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741593910,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:33-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Premium, Snow, Snowboard, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Multi-location Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026447670",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026447670,
+          "image_id": null,
+          "inventory_item_id": 49446550929718,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 100,
+          "old_inventory_quantity": 100,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "729.95",
+          "product_id": 8907741593910,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:35-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 3
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741626678",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:32-05:00",
+      "handle": "the-3p-fulfilled-snowboard",
+      "id": 8907741626678,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534979854646",
+        "alt": "Top and bottom view of a snowboard. The top view shows 7 stacked hexagons and the bottom view shows\n          a small, centred hexagonal logo for Hydrogen.",
+        "created_at": "2023-11-09T13:19:32-05:00",
+        "height": 1600,
+        "id": 44534979854646,
+        "position": 1,
+        "product_id": 8907741626678,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_b9e0da7f-db89-4d41-83f0-7f417b02831d.jpg?v=1699553972",
+        "updated_at": "2023-11-09T13:19:32-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534979854646",
+          "alt": "Top and bottom view of a snowboard. The top view shows 7 stacked hexagons and the bottom view shows\n          a small, centred hexagonal logo for Hydrogen.",
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "height": 1600,
+          "id": 44534979854646,
+          "position": 1,
+          "product_id": 8907741626678,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_b9e0da7f-db89-4d41-83f0-7f417b02831d.jpg?v=1699553972",
+          "updated_at": "2023-11-09T13:19:32-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516322102,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741626678,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:32-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The 3p Fulfilled Snowboard",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026480438",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026480438,
+          "image_id": null,
+          "inventory_item_id": 49446550896950,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 20,
+          "old_inventory_quantity": 20,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "2629.95",
+          "product_id": 8907741626678,
+          "requires_shipping": true,
+          "sku": "sku-hosted-1",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:35-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "estuary-testing-1",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 15
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741659446",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:32-05:00",
+      "handle": "the-multi-managed-snowboard",
+      "id": 8907741659446,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534980804918",
+        "alt": "Top and bottom view of a snowboard. The top view shows an illustration with varied outlined shapes\n          in black. The bottom view shows a black box character with an H pointing, and surrounded by black outlined\n          illustrative elements.",
+        "created_at": "2023-11-09T13:19:32-05:00",
+        "height": 1600,
+        "id": 44534980804918,
+        "position": 1,
+        "product_id": 8907741659446,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_9129b69a-0c7b-4f66-b6cf-c4222f18028a.jpg?v=1699553972",
+        "updated_at": "2023-11-09T13:19:32-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534980804918",
+          "alt": "Top and bottom view of a snowboard. The top view shows an illustration with varied outlined shapes\n          in black. The bottom view shows a black box character with an H pointing, and surrounded by black outlined\n          illustrative elements.",
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "height": 1600,
+          "id": 44534980804918,
+          "position": 1,
+          "product_id": 8907741659446,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_9129b69a-0c7b-4f66-b6cf-c4222f18028a.jpg?v=1699553972",
+          "updated_at": "2023-11-09T13:19:32-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516354870,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741659446,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:33-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Premium, Snow, Snowboard, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Multi-managed Snowboard",
+      "updated_at": "2023-11-09T13:19:36-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026545974",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:32-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026545974,
+          "image_id": null,
+          "inventory_item_id": 49446550995254,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 100,
+          "old_inventory_quantity": 100,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "629.95",
+          "product_id": 8907741659446,
+          "requires_shipping": true,
+          "sku": "sku-managed-1",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:36-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Multi-managed Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 7
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741692214",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:33-05:00",
+      "handle": "the-collection-snowboard-oxygen",
+      "id": 8907741692214,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534982574390",
+        "alt": "Top and bottom view of a snowboard. The top view shows a stylized scene of trees, mountains, sky and\n        a sun in red colours. The bottom view has blue wavy lines in the background with the text \u201cOxygen\u201d in a\n        stylized script typeface.",
+        "created_at": "2023-11-09T13:19:33-05:00",
+        "height": 1600,
+        "id": 44534982574390,
+        "position": 1,
+        "product_id": 8907741692214,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_d624f226-0a89-4fe1-b333-0d1548b43c06.jpg?v=1699553973",
+        "updated_at": "2023-11-09T13:19:33-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534982574390",
+          "alt": "Top and bottom view of a snowboard. The top view shows a stylized scene of trees, mountains, sky and\n        a sun in red colours. The bottom view has blue wavy lines in the background with the text \u201cOxygen\u201d in a\n        stylized script typeface.",
+          "created_at": "2023-11-09T13:19:33-05:00",
+          "height": 1600,
+          "id": 44534982574390,
+          "position": 1,
+          "product_id": 8907741692214,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_d624f226-0a89-4fe1-b333-0d1548b43c06.jpg?v=1699553973",
+          "updated_at": "2023-11-09T13:19:33-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516387638,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741692214,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:35-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Collection Snowboard: Oxygen",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026578742",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:33-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026578742,
+          "image_id": null,
+          "inventory_item_id": 49446551028022,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "1025.00",
+          "product_id": 8907741692214,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:33-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Hydrogen Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 6
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741724982",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:34-05:00",
+      "handle": "the-collection-snowboard-liquid",
+      "id": 8907741724982,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534986015030",
+        "alt": "Top and bottom view of a snowboard. The top view shows a stylized scene of water, trees, mountains,\n        sky and a moon in blue colours. The bottom view has a blue liquid, drippy background with the text \u201cliquid\u201d in\n        a stylized script typeface.",
+        "created_at": "2023-11-09T13:19:34-05:00",
+        "height": 1600,
+        "id": 44534986015030,
+        "position": 1,
+        "product_id": 8907741724982,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_b13ad453-477c-4ed1-9b43-81f3345adfd6.jpg?v=1699553974",
+        "updated_at": "2023-11-09T13:19:34-05:00",
+        "variant_ids": [],
+        "width": 1600
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534986015030",
+          "alt": "Top and bottom view of a snowboard. The top view shows a stylized scene of water, trees, mountains,\n        sky and a moon in blue colours. The bottom view has a blue liquid, drippy background with the text \u201cliquid\u201d in\n        a stylized script typeface.",
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "height": 1600,
+          "id": 44534986015030,
+          "position": 1,
+          "product_id": 8907741724982,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/Main_b13ad453-477c-4ed1-9b43-81f3345adfd6.jpg?v=1699553974",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "variant_ids": [],
+          "width": 1600
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516420406,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741724982,
+          "values": [
+            "Default Title"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:35-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "The Collection Snowboard: Liquid",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026611510",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "fulfillment_service": "manual",
+          "grams": 0,
+          "id": 47429026611510,
+          "image_id": null,
+          "inventory_item_id": 49446551060790,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 50,
+          "old_inventory_quantity": 50,
+          "option1": "Default Title",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "749.95",
+          "product_id": 8907741724982,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Default Title",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "weight": 0.0,
+          "weight_unit": "lb"
+        }
+      ],
+      "vendor": "Hydrogen Vendor",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "row_id": 2
+      },
+      "admin_graphql_api_id": "gid://shopify/Product/8907741757750",
+      "body_html": null,
+      "created_at": "2023-11-09T13:19:34-05:00",
+      "handle": "selling-plans-ski-wax",
+      "id": 8907741757750,
+      "image": {
+        "admin_graphql_api_id": "gid://shopify/ProductImage/44534985982262",
+        "alt": "A bar of golden yellow wax",
+        "created_at": "2023-11-09T13:19:34-05:00",
+        "height": 2881,
+        "id": 44534985982262,
+        "position": 1,
+        "product_id": 8907741757750,
+        "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/snowboard_wax.png?v=1699553974",
+        "updated_at": "2023-11-09T13:19:34-05:00",
+        "variant_ids": [
+          47429026644278
+        ],
+        "width": 2881
+      },
+      "images": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534985982262",
+          "alt": "A bar of golden yellow wax",
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "height": 2881,
+          "id": 44534985982262,
+          "position": 1,
+          "product_id": 8907741757750,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/snowboard_wax.png?v=1699553974",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "variant_ids": [
+            47429026644278
+          ],
+          "width": 2881
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534986080566",
+          "alt": "A bar of purple wax",
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "height": 2881,
+          "id": 44534986080566,
+          "position": 2,
+          "product_id": 8907741757750,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/wax-special.png?v=1699553974",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "variant_ids": [
+            47429026677046
+          ],
+          "width": 2881
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductImage/44534986211638",
+          "alt": "a small cube of wax",
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "height": 2881,
+          "id": 44534986211638,
+          "position": 3,
+          "product_id": 8907741757750,
+          "src": "https://cdn.shopify.com/s/files/1/0848/1610/1686/products/sample-normal-wax.png?v=1699553974",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "variant_ids": [
+            47429026709814
+          ],
+          "width": 2881
+        }
+      ],
+      "options": [
+        {
+          "id": 11195516453174,
+          "name": "Title",
+          "position": 1,
+          "product_id": 8907741757750,
+          "values": [
+            "Selling Plans Ski Wax",
+            "Special Selling Plans Ski Wax",
+            "Sample Selling Plans Ski Wax"
+          ]
+        }
+      ],
+      "product_type": "",
+      "published_at": "2023-11-09T13:19:35-05:00",
+      "published_scope": "web",
+      "status": "active",
+      "tags": "Accessory, Sport, Winter",
+      "template_suffix": null,
+      "title": "Selling Plans Ski Wax",
+      "updated_at": "2023-11-09T13:19:35-05:00",
+      "variants": [
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026644278",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "fulfillment_service": "manual",
+          "grams": 57,
+          "id": 47429026644278,
+          "image_id": 44534985982262,
+          "inventory_item_id": 49446551093558,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Selling Plans Ski Wax",
+          "option2": null,
+          "option3": null,
+          "position": 1,
+          "price": "24.95",
+          "product_id": 8907741757750,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Selling Plans Ski Wax",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "weight": 2.0,
+          "weight_unit": "oz"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026677046",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "fulfillment_service": "manual",
+          "grams": 71,
+          "id": 47429026677046,
+          "image_id": 44534986080566,
+          "inventory_item_id": 49446551126326,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Special Selling Plans Ski Wax",
+          "option2": null,
+          "option3": null,
+          "position": 2,
+          "price": "49.95",
+          "product_id": 8907741757750,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Special Selling Plans Ski Wax",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "weight": 2.5,
+          "weight_unit": "oz"
+        },
+        {
+          "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026709814",
+          "barcode": null,
+          "compare_at_price": null,
+          "created_at": "2023-11-09T13:19:34-05:00",
+          "fulfillment_service": "manual",
+          "grams": 14,
+          "id": 47429026709814,
+          "image_id": 44534986211638,
+          "inventory_item_id": 49446551159094,
+          "inventory_management": "shopify",
+          "inventory_policy": "deny",
+          "inventory_quantity": 10,
+          "old_inventory_quantity": 10,
+          "option1": "Sample Selling Plans Ski Wax",
+          "option2": null,
+          "option3": null,
+          "position": 3,
+          "price": "9.95",
+          "product_id": 8907741757750,
+          "requires_shipping": true,
+          "sku": "",
+          "taxable": true,
+          "title": "Sample Selling Plans Ski Wax",
+          "updated_at": "2023-11-09T13:19:34-05:00",
+          "weight": 0.5,
+          "weight_unit": "oz"
+        }
+      ],
+      "vendor": "estuary-testing-1",
       "ts": "redacted-timestamp"
     }
   ]

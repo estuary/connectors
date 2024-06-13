@@ -19,8 +19,8 @@ captures:
         target: acmeCo/custom_collections
       # - resource: source-shopify.resource.2.config.yaml
       #   target: acmeCo/customers
-      - resource: source-shopify.resource.3.config.yaml
-        target: acmeCo/inventory_items
+      # - resource: source-shopify.resource.3.config.yaml
+      #   target: acmeCo/inventory_items
       - resource: source-shopify.resource.4.config.yaml
         target: acmeCo/inventory_levels
       - resource: source-shopify.resource.5.config.yaml
