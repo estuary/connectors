@@ -1,0 +1,157 @@
+---
+tap_stream_id: transactions
+replication_method: FULL_TABLE
+key_properties:
+  - id
+stream: transactions
+metadata:
+  - breadcrumb:
+      - properties
+      - amount
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - authorization
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - authorization_expires_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - currency
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - device_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - error_code
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - extended_authorization_attributes
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - gateway
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - kind
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - location_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - message
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - order_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - payment_details
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - parent_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - payments_refund_attributes
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - processed_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - receipt
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - source_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - status
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - test
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - user_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - currency_exchange_adjustment
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id

@@ -7,28 +7,39 @@ captures:
       local:
         command:
           - python
-          # - "-m"
-          # - "debugpy"
-          # - "--listen"
-          # - "0.0.0.0:5678"
-          # - "--wait-for-client"
           - "-m"
           - source-shopify
         config: connector_config.yaml
         env:
           LOG_LEVEL: debug
     bindings:
-      - resource: acmeCo/configs/source-shopify.resource.0.config.yaml
+      - resource: source-shopify.resource.0.config.yaml
         target: acmeCo/collects
-      - resource: acmeCo/configs/source-shopify.resource.1.config.yaml
+      - resource: source-shopify.resource.1.config.yaml
         target: acmeCo/custom_collections
-      - resource: acmeCo/configs/source-shopify.resource.2.config.yaml
+      # - resource: source-shopify.resource.2.config.yaml
+      #   target: acmeCo/customers
+      - resource: source-shopify.resource.3.config.yaml
         target: acmeCo/inventory_items
-      - resource: acmeCo/configs/source-shopify.resource.3.config.yaml
+      - resource: source-shopify.resource.4.config.yaml
         target: acmeCo/inventory_levels
-      - resource: acmeCo/configs/source-shopify.resource.4.config.yaml
+      - resource: source-shopify.resource.5.config.yaml
         target: acmeCo/locations
-      - resource: acmeCo/configs/source-shopify.resource.5.config.yaml
+      - resource: source-shopify.resource.6.config.yaml
         target: acmeCo/metafields
-      - resource: acmeCo/configs/source-shopify.resource.6.config.yaml
+      # - resource: source-shopify.resource.7.config.yaml
+      #   target: acmeCo/orders
+      - resource: source-shopify.resource.8.config.yaml
         target: acmeCo/products
+      # - resource: source-shopify.resource.9.config.yaml
+      #   target: acmeCo/transactions
+      # - resource: source-shopify.resource.10.config.yaml
+      #   target: acmeCo/refunds
+      # - resource: source-shopify.resource.11.config.yaml
+      #   target: acmeCo/discount_code
+      # - resource: source-shopify.resource.12.config.yaml
+      #   target: acmeCo/price_rules
+      # - resource: source-shopify.resource.13.config.yaml
+      #   target: acmeCo/carrier_services
+      # - resource: source-shopify.resource.14.config.yaml
+      #   target: acmeCo/order_risks

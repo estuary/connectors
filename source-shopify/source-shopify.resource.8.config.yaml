@@ -1,0 +1,123 @@
+---
+tap_stream_id: products
+replication_key: updated_at
+replication_method: INCREMENTAL
+key_properties:
+  - id
+stream: products
+metadata:
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - title
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - body_html
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - vendor
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - product_type
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - handle
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - published_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - template_suffix
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - status
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - published_scope
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tags
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - admin_graphql_api_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - variants
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - options
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - images
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - image
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id
+      valid-replication-keys:
+        - updated_at

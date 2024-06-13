@@ -82,16 +82,8 @@
             ]
         },
         "location_id": {
-            "properties": {
-                "id": {
-                    "type": [
-                        "integer",
-                        "null"
-                    ]
-                }
-            },
             "type": [
-                "object",
+                "integer",
                 "null"
             ]
         },

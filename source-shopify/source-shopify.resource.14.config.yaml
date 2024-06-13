@@ -1,0 +1,73 @@
+---
+tap_stream_id: order_risks
+replication_method: FULL_TABLE
+key_properties:
+  - id
+stream: order_risks
+metadata:
+  - breadcrumb:
+      - properties
+      - cause_cancel
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - checkout_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - display
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - merchant_message
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - message
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - order_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - recommendation
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - score
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - source
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id

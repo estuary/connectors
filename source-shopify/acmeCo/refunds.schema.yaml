@@ -1,0 +1,55 @@
+---
+properties:
+  created_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  duties:
+    type:
+      - array
+      - "null"
+  id:
+    type: integer
+  note:
+    type:
+      - string
+      - "null"
+  order_adjustments:
+    type:
+      - array
+      - "null"
+  processed_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  refund_duties:
+    type:
+      - array
+      - "null"
+  refund_line_items:
+    type:
+      - array
+      - "null"
+  transactions:
+    type:
+      - array
+      - "null"
+  user_id:
+    type:
+      - integer
+      - "null"
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type:
+          - integer
+    required:
+      - row_id
+type: object
+required:
+  - _meta
+additionalProperties: true
+x-infer-schema: true

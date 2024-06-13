@@ -1,5 +1,45 @@
 ---
 collections:
+  acmeCo/carrier_services:
+    schema:
+      properties:
+        active:
+          type:
+            - boolean
+            - "null"
+        callback_url:
+          type:
+            - string
+            - "null"
+        id:
+          type: integer
+        name:
+          type:
+            - string
+            - "null"
+        service_discovery:
+          type:
+            - boolean
+            - "null"
+        admin_graphql_api_id:
+          type:
+            - string
+            - "null"
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type:
+                - integer
+          required:
+            - row_id
+      type: object
+      required:
+        - _meta
+      additionalProperties: true
+      x-infer-schema: true
+    key:
+      - /id
   acmeCo/collects:
     schema:
       properties:
@@ -30,12 +70,74 @@ collections:
           type:
             - string
             - "null"
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type:
+                - integer
+          required:
+            - row_id
       type: object
+      required:
+        - _meta
       x-infer-schema: true
     key:
       - /id
   acmeCo/custom_collections:
     schema: custom_collections.schema.yaml
+    key:
+      - /id
+  acmeCo/customers:
+    schema: customers.schema.yaml
+    key:
+      - /id
+  acmeCo/discount_code:
+    schema:
+      properties:
+        code:
+          type:
+            - string
+            - "null"
+        created_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        updated_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        id:
+          type:
+            - integer
+            - "null"
+        price_rule_id:
+          type:
+            - integer
+            - "null"
+        usage_count:
+          type:
+            - integer
+            - "null"
+        errors:
+          type:
+            - object
+            - "null"
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type:
+                - integer
+          required:
+            - row_id
+      type: object
+      required:
+        - _meta
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/inventory_items:
@@ -60,7 +162,17 @@ collections:
           type:
             - string
             - "null"
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type:
+                - integer
+          required:
+            - row_id
       type: object
+      required:
+        - _meta
       x-infer-schema: true
     key:
       - /inventory_item_id
@@ -69,58 +181,30 @@ collections:
     key:
       - /id
   acmeCo/metafields:
-    schema:
-      properties:
-        created_at:
-          type:
-            - string
-            - "null"
-        description:
-          type:
-            - string
-            - "null"
-        id:
-          type:
-            - integer
-        key:
-          type:
-            - string
-            - "null"
-        namespace:
-          type:
-            - string
-            - "null"
-        owner_id:
-          type:
-            - integer
-            - "null"
-        owner_resource:
-          type:
-            - string
-            - "null"
-        updated_at:
-          type:
-            - string
-            - "null"
-        value:
-          type:
-            - string
-            - integer
-            - boolean
-            - "null"
-        type:
-          type:
-            - string
-            - "null"
-        value_type:
-          type:
-            - string
-            - "null"
-      type: object
-      x-infer-schema: true
+    schema: metafields.schema.yaml
+    key:
+      - /id
+  acmeCo/order_risks:
+    schema: order_risks.schema.yaml
+    key:
+      - /id
+  acmeCo/orders:
+    schema: orders.schema.yaml
+    key:
+      - /id
+  acmeCo/price_rules:
+    schema: price_rules.schema.yaml
     key:
       - /id
   acmeCo/products:
     schema: products.schema.yaml
+    key:
+      - /id
+  acmeCo/refunds:
+    schema: refunds.schema.yaml
+    key:
+      - /id
+  acmeCo/transactions:
+    schema: transactions.schema.yaml
     key:
       - /id

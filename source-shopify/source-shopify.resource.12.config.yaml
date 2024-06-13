@@ -1,0 +1,189 @@
+---
+tap_stream_id: price_rules
+replication_key: updated_at
+replication_method: INCREMENTAL
+key_properties:
+  - id
+stream: price_rules
+metadata:
+  - breadcrumb:
+      - properties
+      - allocation_method
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - customer_selection
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - ends_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - entitled_collection_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - entitled_country_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - entitled_product_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - entitled_variant_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - once_per_customer
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_customer_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_quantity_range
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - customer_segment_prerequisite_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_shipping_price_range
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_subtotal_range
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_to_entitlement_purchase
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - starts_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - target_selection
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - target_type
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - title
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - usage_limit
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_product_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_variant_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_collection_ids
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - value
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - value_type
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - prerequisite_to_entitlement_quantity_ratio
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - allocation_limit
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id
+      valid-replication-keys:
+        - updated_at
