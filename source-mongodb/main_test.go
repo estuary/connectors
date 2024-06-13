@@ -105,6 +105,71 @@ func TestCapture(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+func TestCaptureExclusiveCollectionFilter(t *testing.T) {
+	database1 := "testDb1"
+	database2 := "testDb2"
+	col1 := "collectionOne"
+	col2 := "collectionTwo"
+	col3 := "collectionThree"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		dropCollection(ctx, t, client, database1, col1)
+		dropCollection(ctx, t, client, database1, col2)
+		dropCollection(ctx, t, client, database2, col3)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	stringPkVals := func(idx int) any {
+		return fmt.Sprintf("pk val %d", idx)
+	}
+
+	numberPkVals := func(idx int) any {
+		if idx%2 == 0 {
+			return idx
+		}
+
+		return float64(idx) + 0.5
+	}
+
+	binaryPkVals := func(idx int) any {
+		return []byte(fmt.Sprintf("pk val %d", idx))
+	}
+
+	addTestTableData(ctx, t, client, database1, col1, 5, 0, stringPkVals, "onlyColumn")
+	addTestTableData(ctx, t, client, database1, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
+	addTestTableData(ctx, t, client, database2, col3, 5, 0, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
+
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    &st.SortedCaptureValidator{},
+		Sanitizers:   commonSanitizers(),
+		Bindings: []*flow.CaptureSpec_Binding{
+			makeBinding(t, database1, col1),
+			// makeBinding(t, database1, col2), Note: Binding disabled for this collection.
+			makeBinding(t, database2, col3),
+		},
+	}
+
+	// Do the initial backfill.
+	advanceCapture(ctx, t, cs)
+
+	// Add data to the MongoDB collections.
+	addTestTableData(ctx, t, client, database1, col1, 5, 5, stringPkVals, "onlyColumn")
+	addTestTableData(ctx, t, client, database1, col2, 5, 5, numberPkVals, "firstColumn", "secondColumn")
+	addTestTableData(ctx, t, client, database2, col3, 5, 5, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
+
+	// Read change stream documents.
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func commonSanitizers() map[string]*regexp.Regexp {
 	sanitizers := make(map[string]*regexp.Regexp)
 	sanitizers[`"<TOKEN>"`] = regexp.MustCompile(`"[A-Za-z0-9+/=]{32,}"`)

@@ -90,30 +90,20 @@ type changeEvent struct {
 	ClusterTime   primitive.Timestamp `bson:"clusterTime"`
 }
 
-var (
-	// Use a pipeline to project the fields we need from the change stream. Importantly, this
-	// suppresses fields like `updateDescription`, which contain a list of fields in the document
-	// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
-	// `updateDescription`, which can cause the change stream total BSON document size to exceed the
-	// 16MB limit.
-	pl = mongo.Pipeline{
-		{{Key: "$project", Value: bson.M{
-			"documentKey":   1,
-			"operationType": 1,
-			"fullDocument":  1,
-			"ns":            1,
-			"clusterTime":   1,
-		}}},
-	}
-)
-
 // initializeStreams starts change streams for the capture. Streams are started from any prior
 // resume tokens stored in the capture's state.
 func (c *capture) initializeStreams(
 	ctx context.Context,
 	bindings []bindingInfo,
+	exclusiveCollectionFilter bool,
 ) ([]changeStream, error) {
 	var out []changeStream
+
+	// Used if exclusiveCollectionFilter is enabled.
+	var collsPerDb = make(map[string][]string)
+	for _, b := range bindings {
+		collsPerDb[b.resource.Database] = append(collsPerDb[b.resource.Database], b.resource.Collection)
+	}
 
 	started := make(map[string]bool)
 	for _, b := range bindings {
@@ -125,6 +115,39 @@ func (c *capture) initializeStreams(
 		started[db] = true
 
 		logEntry := log.WithField("db", db)
+
+		// Use a pipeline to project the fields we need from the change stream. Importantly, this
+		// suppresses fields like `updateDescription`, which contain a list of fields in the document
+		// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
+		// `updateDescription`, which can cause the change stream total BSON document size to exceed the
+		// 16MB limit.
+		pl := mongo.Pipeline{
+			{{Key: "$project", Value: bson.M{
+				"documentKey":   1,
+				"operationType": 1,
+				"fullDocument":  1,
+				"ns":            1,
+				"clusterTime":   1,
+			}}},
+		}
+
+		if exclusiveCollectionFilter {
+			// Build a filter that only matches documents in MongoDB collections for the enabled
+			// bindings of this database.
+			var collectionFilters bson.A
+
+			for _, coll := range collsPerDb[db] {
+				collectionFilters = append(collectionFilters, bson.D{{
+					Key: "ns", Value: bson.D{
+						{Key: "$eq", Value: bson.D{
+							{Key: "db", Value: db},
+							{Key: "coll", Value: coll},
+						}},
+					}}})
+			}
+
+			pl = append(pl, bson.D{{Key: "$match", Value: bson.D{{Key: "$or", Value: collectionFilters}}}})
+		}
 
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
