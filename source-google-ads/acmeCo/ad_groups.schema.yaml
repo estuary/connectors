@@ -61,9 +61,7 @@ properties:
       - "null"
       - string
   ad_group.id:
-    type:
-      - integer
-      - "null"
+    type: integer
   ad_group.labels:
     type:
       - "null"
