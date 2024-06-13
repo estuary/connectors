@@ -44,7 +44,6 @@ properties:
       - number
   segments.ad_network_type:
     type:
-      - "null"
       - string
   metrics.all_conversions_from_interactions_rate:
     type:
@@ -132,7 +131,6 @@ properties:
       - number
   segments.date:
     type:
-      - "null"
       - string
     format: date
   segments.day_of_week:
@@ -141,7 +139,6 @@ properties:
       - string
   segments.device:
     type:
-      - "null"
       - string
   metrics.engagement_rate:
     type:
@@ -153,7 +150,6 @@ properties:
       - integer
   customer.id:
     type:
-      - "null"
       - integer
   metrics.impressions:
     type:
