@@ -1,0 +1,73 @@
+---
+tap_stream_id: refunds
+replication_method: FULL_TABLE
+key_properties:
+  - id
+stream: refunds
+metadata:
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - duties
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - note
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - order_adjustments
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - processed_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - refund_duties
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - refund_line_items
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - transactions
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - user_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id

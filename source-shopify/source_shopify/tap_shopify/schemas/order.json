@@ -517,7 +517,7 @@
         },
         "subtotal_price": {
             "type": [
-                "number",
+                "string",
                 "null"
             ]
         },
@@ -705,9 +705,8 @@
             ]
         },
         "total_price": {
-            "minimum": 0,
             "type": [
-                "number",
+                "string",
                 "null"
             ]
         },

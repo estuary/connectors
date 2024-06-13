@@ -1,53 +1,50 @@
 ---
 properties:
-  cost:
-    type:
-      - string
-      - "null"
-  country_code_of_origin:
-    type:
-      - string
-      - "null"
-  country_harmonized_system_codes:
-    items:
-      properties:
-        country_code:
-          type:
-            - string
-            - "null"
-        harmonized_system_code:
-          type:
-            - string
-            - "null"
-      type: object
-    type: array
   created_at:
     type:
       - string
       - "null"
-  harmonized_system_code:
+  description:
     type:
-      - number
+      - string
       - "null"
   id:
     type:
       - integer
-  province_code_of_origin:
+  key:
     type:
       - string
       - "null"
-  sku:
+  namespace:
     type:
       - string
       - "null"
-  tracked:
-    type: boolean
+  owner_id:
+    type:
+      - integer
+      - "null"
+  owner_resource:
+    type:
+      - string
+      - "null"
   updated_at:
     type:
       - string
       - "null"
-  requires_shipping:
-    type: boolean
+  value:
+    type:
+      - string
+      - integer
+      - boolean
+      - "null"
+  type:
+    type:
+      - string
+      - "null"
+  value_type:
+    type:
+      - string
+      - "null"
   _meta:
     type: object
     properties:

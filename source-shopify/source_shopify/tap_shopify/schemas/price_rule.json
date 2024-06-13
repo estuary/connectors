@@ -1,0 +1,97 @@
+{
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+        "allocation_method": {
+            "type": ["string","null"]
+        },
+        "created_at": {
+            "type": ["string","null"],
+            "format": "date-time"
+        },
+        "updated_at": {
+            "type": ["string","null"],
+            "format": "date-time"
+        },
+        "customer_selection": {
+            "type": ["string","null"]
+        },
+        "ends_at": {
+            "type": ["string","null"],
+            "format": "date-time"
+        },
+        "entitled_collection_ids": {
+            "type": ["array","null"]
+        },
+        "entitled_country_ids": {
+            "type": ["array","null"]
+        },
+        "entitled_product_ids": {
+            "type": ["array","null"]
+        },
+        "entitled_variant_ids": {
+            "type": ["array","null"]
+        },
+        "id": {
+            "type": "integer"
+        },
+        "once_per_customer": {
+            "type": ["boolean","null"]
+        },
+        "prerequisite_customer_ids": {
+            "type": ["array","null"]
+        },
+        "prerequisite_quantity_range": {
+            "type": ["object","null"]
+        },
+        "customer_segment_prerequisite_ids": {
+            "type": ["array","null"]
+        },
+        "prerequisite_shipping_price_range": {
+            "type": ["object","null"]
+        },
+        "prerequisite_subtotal_range": {
+            "type": ["object","null"]
+        },
+        "prerequisite_to_entitlement_purchase": {
+            "type": ["object","null"]
+        },
+        "starts_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+        },
+        "target_selection": {
+            "type": ["string", "null"]
+        },
+        "target_type": {
+            "type": ["string", "null"]
+        },
+        "title": {
+            "type": ["string", "null"]
+        },
+        "usage_limit": {
+            "type": ["integer","null"]
+        },
+        "prerequisite_product_ids": {
+            "type": ["array","null"]
+        },
+        "prerequisite_variant_ids": {
+            "type": ["array","null"]
+        },
+        "prerequisite_collection_ids": {
+            "type": ["array","null"]
+        },
+        "value": {
+            "type": ["string", "null"]
+        },
+        "value_type": {
+            "type": ["string", "null"]
+        },
+        "prerequisite_to_entitlement_quantity_ratio": {
+            "type": ["object","null"]
+        },
+        "allocation_limit": {
+            "type": ["integer","null"]
+        }
+    }
+}
