@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/invopop/jsonschema"
 )
@@ -122,6 +123,9 @@ type Database interface {
 	WriteWatermark(ctx context.Context, watermark string) error
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
+	// Once the capture is indefinitely streaming changes, it will write a heartbeat watermark this often.
+	HeartbeatWatermarkInterval() time.Duration
+
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
 	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)

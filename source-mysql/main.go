@@ -386,6 +386,10 @@ func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }
 
+func (db *mysqlDatabase) HeartbeatWatermarkInterval() time.Duration {
+	return 60 * time.Second
+}
+
 // mysqlSourceInfo is source metadata for data capture events.
 type mysqlSourceInfo struct {
 	sqlcapture.SourceCommon
