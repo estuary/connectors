@@ -1,0 +1,1248 @@
+---
+properties:
+  id:
+    type:
+      - integer
+  admin_graphql_api_id:
+    type:
+      - string
+      - "null"
+  app_id:
+    type:
+      - integer
+      - "null"
+  browser_ip:
+    type:
+      - string
+      - "null"
+  buyer_accepts_marketing:
+    type: boolean
+  cancel_reason:
+    type:
+      - string
+      - "null"
+  cancelled_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  cart_token:
+    type:
+      - string
+      - "null"
+  checkout_id:
+    type:
+      - integer
+      - "null"
+  checkout_token:
+    type:
+      - string
+      - "null"
+  client_details:
+    properties:
+      accept_language:
+        type:
+          - string
+          - "null"
+      browser_height:
+        type:
+          - integer
+          - "null"
+      browser_ip:
+        type:
+          - string
+          - "null"
+      browser_width:
+        type:
+          - integer
+          - "null"
+      session_hash:
+        type:
+          - string
+          - "null"
+      user_agent:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  closed_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  confirmed:
+    type: boolean
+  contact_email:
+    type:
+      - string
+      - "null"
+  created_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  currency:
+    type:
+      - string
+      - "null"
+  current_subtotal_price:
+    type:
+      - string
+      - "null"
+  current_subtotal_price_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  current_total_discounts:
+    type:
+      - string
+      - "null"
+  current_total_discounts_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  current_total_duties_set:
+    type:
+      - object
+      - "null"
+  current_total_price:
+    type:
+      - string
+      - "null"
+  current_total_price_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  current_total_tax:
+    type:
+      - string
+      - "null"
+  current_total_tax_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  customer_locale:
+    type:
+      - string
+      - "null"
+  device_id:
+    type:
+      - integer
+      - "null"
+  discount_codes:
+    type: array
+  email:
+    type:
+      - string
+      - "null"
+  estimated_taxes:
+    type: boolean
+  financial_status:
+    type:
+      - string
+      - "null"
+  fulfillment_status:
+    type:
+      - string
+      - "null"
+  gateway:
+    type:
+      - string
+      - "null"
+  landing_site:
+    type:
+      - string
+      - "null"
+  landing_site_ref:
+    type:
+      - string
+      - "null"
+  location_id:
+    type:
+      - string
+      - integer
+      - "null"
+  name:
+    type:
+      - string
+      - "null"
+  note:
+    type:
+      - string
+      - "null"
+  note_attributes:
+    type: array
+  number:
+    type:
+      - integer
+      - "null"
+  order_number:
+    type:
+      - integer
+      - "null"
+  order_status_url:
+    type:
+      - string
+      - "null"
+  original_total_duties_set:
+    type:
+      - object
+      - "null"
+  payment_gateway_names:
+    items:
+      type: string
+    type: array
+  phone:
+    type:
+      - string
+      - "null"
+  presentment_currency:
+    type:
+      - string
+      - "null"
+  processed_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  processing_method:
+    type:
+      - string
+      - "null"
+  reference:
+    type:
+      - string
+      - "null"
+  referring_site:
+    type:
+      - string
+      - "null"
+  source_identifier:
+    type:
+      - string
+      - "null"
+  source_name:
+    type:
+      - string
+      - "null"
+  source_url:
+    type:
+      - string
+      - "null"
+  subtotal_price:
+    type:
+      - string
+      - "null"
+  subtotal_price_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  tags:
+    type:
+      - string
+      - "null"
+  tax_lines:
+    type: array
+  taxes_included:
+    type: boolean
+  test:
+    type: boolean
+  token:
+    type:
+      - string
+      - "null"
+  total_discounts:
+    type:
+      - string
+      - "null"
+  total_discounts_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  total_line_items_price:
+    type:
+      - string
+      - "null"
+  total_line_items_price_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  total_outstanding:
+    type:
+      - string
+      - "null"
+  total_price:
+    type:
+      - string
+      - "null"
+  total_price_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  total_price_usd:
+    type:
+      - string
+      - "null"
+  total_shipping_price_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  total_tax:
+    type:
+      - string
+      - "null"
+  total_tax_set:
+    properties:
+      shop_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      presentment_money:
+        properties:
+          amount:
+            type:
+              - string
+              - "null"
+          currency_code:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  total_tip_received:
+    type:
+      - object
+      - string
+      - "null"
+  total_weight:
+    type:
+      - integer
+      - "null"
+  updated_at:
+    format: date-time
+    type:
+      - string
+      - "null"
+  user_id:
+    type:
+      - integer
+      - string
+      - "null"
+  billing_address:
+    properties:
+      first_name:
+        type:
+          - string
+          - "null"
+      address1:
+        type:
+          - string
+          - "null"
+      phone:
+        type:
+          - string
+          - "null"
+      city:
+        type:
+          - string
+          - "null"
+      zip:
+        type:
+          - string
+          - "null"
+      province:
+        type:
+          - string
+          - "null"
+      country:
+        type:
+          - string
+          - "null"
+      last_name:
+        type:
+          - string
+          - "null"
+      address2:
+        type:
+          - string
+          - "null"
+      company:
+        type:
+          - string
+          - "null"
+      latitude:
+        type:
+          - number
+          - "null"
+      longitude:
+        type:
+          - number
+          - "null"
+      name:
+        type:
+          - string
+          - "null"
+      country_code:
+        type:
+          - string
+          - "null"
+      province_code:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  customer:
+    properties:
+      id:
+        type:
+          - integer
+          - "null"
+      email:
+        type:
+          - string
+          - "null"
+      accepts_marketing:
+        type: boolean
+      created_at:
+        type:
+          - string
+          - "null"
+      updated_at:
+        type:
+          - string
+          - "null"
+      first_name:
+        type:
+          - string
+          - "null"
+      last_name:
+        type:
+          - string
+          - "null"
+      orders_count:
+        type:
+          - integer
+          - "null"
+      state:
+        type:
+          - string
+          - "null"
+      total_spent:
+        type:
+          - string
+          - "null"
+      last_order_id:
+        type:
+          - string
+          - "null"
+      note:
+        type:
+          - string
+          - "null"
+      verified_email:
+        type: boolean
+      multipass_identifier:
+        type:
+          - string
+          - "null"
+      tax_exempt:
+        type: boolean
+      phone:
+        type:
+          - string
+          - "null"
+      tags:
+        type:
+          - string
+          - "null"
+      last_order_name:
+        type:
+          - string
+          - "null"
+      currency:
+        type:
+          - string
+          - "null"
+      accepts_marketing_updated_at:
+        type:
+          - string
+          - "null"
+      marketing_opt_in_level:
+        type:
+          - string
+          - "null"
+      tax_exemptions:
+        type: array
+      sms_marketing_consent:
+        properties:
+          consent_collected_from:
+            type:
+              - string
+              - "null"
+          consent_updated_at:
+            type:
+              - string
+              - "null"
+          opt_in_level:
+            type:
+              - string
+              - "null"
+          state:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      email_marketing_consent:
+        properties:
+          state:
+            type:
+              - string
+              - "null"
+          opt_in_level:
+            type:
+              - string
+              - "null"
+          consent_updated_at:
+            type:
+              - string
+              - "null"
+        type:
+          - object
+          - "null"
+      admin_graphql_api_id:
+        type:
+          - string
+          - "null"
+      default_address:
+        properties:
+          id:
+            type:
+              - integer
+              - "null"
+          customer_id:
+            type:
+              - integer
+              - "null"
+          first_name:
+            type:
+              - string
+              - "null"
+          last_name:
+            type:
+              - string
+              - "null"
+          company:
+            type:
+              - string
+              - "null"
+          address1:
+            type:
+              - string
+              - "null"
+          address2:
+            type:
+              - string
+              - "null"
+          city:
+            type:
+              - string
+              - "null"
+          province:
+            type:
+              - string
+              - "null"
+          country:
+            type:
+              - string
+              - "null"
+          zip:
+            type:
+              - string
+              - "null"
+          phone:
+            type:
+              - string
+              - "null"
+          name:
+            type:
+              - string
+              - "null"
+          province_code:
+            type:
+              - string
+              - "null"
+          country_code:
+            type:
+              - string
+              - "null"
+          country_name:
+            type:
+              - string
+              - "null"
+          default:
+            type: boolean
+        type:
+          - object
+          - "null"
+    type:
+      - object
+      - "null"
+  discount_applications:
+    type: array
+  fulfillments:
+    type: array
+  line_items:
+    items:
+      properties:
+        id:
+          type:
+            - integer
+            - "null"
+        admin_graphql_api_id:
+          type:
+            - string
+            - "null"
+        fulfillable_quantity:
+          type:
+            - integer
+            - "null"
+        fulfillment_service:
+          type:
+            - string
+            - "null"
+        fulfillment_status:
+          type:
+            - string
+            - "null"
+        gift_card:
+          type: boolean
+        grams:
+          type:
+            - integer
+            - "null"
+        name:
+          type:
+            - string
+            - "null"
+        origin_location:
+          properties:
+            id:
+              type:
+                - integer
+                - "null"
+            country_code:
+              type:
+                - string
+                - "null"
+            province_code:
+              type:
+                - string
+                - "null"
+            name:
+              type:
+                - string
+                - "null"
+            address1:
+              type:
+                - string
+                - "null"
+            address2:
+              type:
+                - string
+                - "null"
+            city:
+              type:
+                - string
+                - "null"
+            zip:
+              type:
+                - string
+                - "null"
+          type:
+            - object
+            - "null"
+        price:
+          type:
+            - string
+            - "null"
+        price_set:
+          properties:
+            shop_money:
+              properties:
+                amount:
+                  type:
+                    - string
+                    - "null"
+                currency_code:
+                  type:
+                    - string
+                    - "null"
+              type:
+                - object
+                - "null"
+            presentment_money:
+              properties:
+                amount:
+                  type:
+                    - string
+                    - "null"
+                currency_code:
+                  type:
+                    - string
+                    - "null"
+              type:
+                - object
+                - "null"
+          type:
+            - object
+            - "null"
+        product_exists:
+          type: boolean
+        product_id:
+          type:
+            - integer
+            - "null"
+        properties:
+          type: array
+        quantity:
+          type:
+            - integer
+            - "null"
+        requires_shipping:
+          type: boolean
+        sku:
+          type:
+            - string
+            - "null"
+        taxable:
+          type: boolean
+        title:
+          type:
+            - string
+            - "null"
+        total_discount:
+          type:
+            - string
+            - "null"
+        total_discount_set:
+          properties:
+            shop_money:
+              properties:
+                amount:
+                  type:
+                    - string
+                    - "null"
+                currency_code:
+                  type:
+                    - string
+                    - "null"
+              type:
+                - object
+                - "null"
+            presentment_money:
+              properties:
+                amount:
+                  type:
+                    - string
+                    - "null"
+                currency_code:
+                  type:
+                    - string
+                    - "null"
+              type:
+                - object
+                - "null"
+          type:
+            - object
+            - "null"
+        variant_id:
+          type:
+            - integer
+            - "null"
+        variant_inventory_management:
+          type:
+            - string
+            - "null"
+        variant_title:
+          type:
+            - string
+            - "null"
+        vendor:
+          type:
+            - string
+            - "null"
+        tax_lines:
+          type: array
+        duties:
+          type: array
+        discount_allocations:
+          type: array
+      type: object
+    type: array
+  payment_details:
+    properties:
+      credit_card_bin:
+        type:
+          - string
+          - "null"
+      avs_result_code:
+        type:
+          - string
+          - "null"
+      cvv_result_code:
+        type:
+          - string
+          - "null"
+      credit_card_number:
+        type:
+          - string
+          - "null"
+      credit_card_company:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  payment_terms:
+    properties:
+      created_at:
+        format: date-time
+        type:
+          - string
+          - "null"
+      due_in_days:
+        type:
+          - integer
+          - "null"
+      id:
+        type:
+          - integer
+          - "null"
+      payment_schedules:
+        items:
+          properties:
+            amount:
+              type:
+                - string
+                - "null"
+            completed_at:
+              format: date-time
+              type:
+                - string
+                - "null"
+            created_at:
+              format: date-time
+              type:
+                - string
+                - "null"
+            currency:
+              type:
+                - string
+                - "null"
+            due_at:
+              format: date-time
+              type:
+                - string
+                - "null"
+            id:
+              type:
+                - integer
+                - "null"
+            issued_at:
+              format: date-time
+              type:
+                - string
+                - "null"
+            updated_at:
+              format: date-time
+              type:
+                - string
+                - "null"
+          type: object
+        type: array
+      payment_terms_name:
+        type:
+          - string
+          - "null"
+      payment_terms_type:
+        type:
+          - string
+          - "null"
+      updated_at:
+        format: date-time
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  refunds:
+    type: array
+  shipping_lines:
+    type: array
+  company:
+    type:
+      - string
+      - "null"
+  confirmation_number:
+    type:
+      - string
+      - "null"
+  current_total_additional_fees_set:
+    type:
+      - object
+      - "null"
+  merchant_of_record_app_id:
+    type:
+      - string
+      - "null"
+  original_total_additional_fees_set:
+    type:
+      - object
+      - "null"
+  po_number:
+    type:
+      - string
+      - "null"
+  tax_exempt:
+    type: boolean
+  shipping_address:
+    properties:
+      zip:
+        type:
+          - string
+          - "null"
+      city:
+        type:
+          - string
+          - "null"
+      name:
+        type:
+          - string
+          - "null"
+      phone:
+        type:
+          - string
+          - "null"
+      company:
+        type:
+          - string
+          - "null"
+      country:
+        type:
+          - string
+          - "null"
+      address1:
+        type:
+          - string
+          - "null"
+      address2:
+        type:
+          - string
+          - "null"
+      latitude:
+        type:
+          - number
+          - "null"
+      province:
+        type:
+          - string
+          - "null"
+      last_name:
+        type:
+          - string
+          - "null"
+      longitude:
+        type:
+          - number
+          - "null"
+      first_name:
+        type:
+          - string
+          - "null"
+      country_code:
+        type:
+          - string
+          - "null"
+      province_code:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type:
+          - integer
+    required:
+      - row_id
+type: object
+required:
+  - _meta
+x-infer-schema: true

@@ -1,0 +1,38 @@
+{
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+        "created_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+        },
+        "duties": {
+            "type": ["array", "null"]
+        },
+        "id": {
+            "type": "integer"
+        },
+        "note": {
+            "type": ["string", "null"]
+        },
+        "order_adjustments": {
+            "type": ["array", "null"]
+        },
+        "processed_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+        },
+        "refund_duties": {
+            "type": ["array", "null"]
+        },
+        "refund_line_items": {
+            "type": ["array", "null"]
+        },
+        "transactions": {
+            "type": ["array", "null"]
+        },
+        "user_id": {
+            "type": ["integer", "null"]
+        }
+    }
+}

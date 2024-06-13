@@ -1,0 +1,37 @@
+---
+tap_stream_id: inventory_levels
+replication_method: FULL_TABLE
+key_properties:
+  - inventory_item_id
+stream: inventory_levels
+metadata:
+  - breadcrumb:
+      - properties
+      - available
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - inventory_item_id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - location_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - inventory_item_id

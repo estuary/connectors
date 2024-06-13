@@ -1,52 +1,55 @@
 ---
 properties:
-  cost:
-    type:
-      - string
-      - "null"
-  country_code_of_origin:
-    type:
-      - string
-      - "null"
-  country_harmonized_system_codes:
-    items:
-      properties:
-        country_code:
-          type:
-            - string
-            - "null"
-        harmonized_system_code:
-          type:
-            - string
-            - "null"
-      type: object
-    type: array
-  created_at:
-    type:
-      - string
-      - "null"
-  harmonized_system_code:
-    type:
-      - number
-      - "null"
   id:
     type:
       - integer
-  province_code_of_origin:
+  first_name:
     type:
       - string
       - "null"
-  sku:
+  email:
     type:
       - string
       - "null"
-  tracked:
+  url:
+    type:
+      - string
+      - "null"
+  im:
+    type: "null"
+  screen_name:
+    type: "null"
+  phone:
+    type: "null"
+  last_name:
+    type:
+      - string
+      - "null"
+  account_owner:
     type: boolean
-  updated_at:
+  receive_announcements:
+    type:
+      - integer
+      - "null"
+  bio:
+    type: "null"
+  permissions:
+    items:
+      type: string
+    type: array
+  locale:
     type:
       - string
       - "null"
-  requires_shipping:
+  user_type:
+    type:
+      - string
+      - "null"
+  admin_graphql_api_id:
+    type:
+      - string
+      - "null"
+  tfa_enabled?:
     type: boolean
   _meta:
     type: object

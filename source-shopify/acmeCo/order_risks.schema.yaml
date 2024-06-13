@@ -1,0 +1,53 @@
+---
+properties:
+  cause_cancel:
+    type:
+      - boolean
+      - "null"
+  checkout_id:
+    type:
+      - integer
+      - "null"
+  display:
+    type:
+      - boolean
+      - "null"
+  id:
+    type: integer
+  merchant_message:
+    type:
+      - string
+      - "null"
+  message:
+    type:
+      - string
+      - "null"
+  order_id:
+    type:
+      - integer
+      - "null"
+  recommendation:
+    type:
+      - string
+      - "null"
+  score:
+    type:
+      - string
+      - "null"
+  source:
+    type:
+      - string
+      - "null"
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type:
+          - integer
+    required:
+      - row_id
+type: object
+required:
+  - _meta
+additionalProperties: true
+x-infer-schema: true

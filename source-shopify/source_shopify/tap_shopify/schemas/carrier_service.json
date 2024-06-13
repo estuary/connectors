@@ -1,0 +1,24 @@
+{
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+        "active": {
+            "type": ["boolean","null"]
+        },
+        "callback_url": {
+            "type": ["string", "null"]
+        },
+        "id": {
+            "type": "integer"
+        },
+        "name": {
+            "type": ["string", "null"]
+        },
+        "service_discovery": {
+            "type": ["boolean","null"]
+        },
+        "admin_graphql_api_id": {
+            "type": ["string", "null"]
+        }
+    }
+}
