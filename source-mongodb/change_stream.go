@@ -337,7 +337,7 @@ func (c *capture) handleEvent(ev changeEvent, db string, tok bson.Raw) error {
 	c.mu.Lock()
 	c.state.DatabaseResumeTokens[db] = tok
 	c.processedStreamEvents += 1
-	c.lastEventClusterTime = ev.ClusterTime
+	c.lastEventClusterTime[ev.Ns.Database] = ev.ClusterTime
 	if doc != nil {
 		c.emittedStreamDocs += 1
 	}
@@ -350,7 +350,7 @@ func (c *capture) startStreamLogger() {
 	c.streamLoggerStop = make(chan struct{})
 	c.streamLoggerActive.Add(1)
 
-	eventInfo := func() (int, int, primitive.Timestamp) {
+	eventInfo := func() (int, int, map[string]primitive.Timestamp) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
@@ -365,13 +365,13 @@ func (c *capture) startStreamLogger() {
 		for {
 			select {
 			case <-time.After(streamLoggerInterval):
-				nextProcessed, nextEmitted, clusterTime := eventInfo()
+				nextProcessed, nextEmitted, clusterTimes := eventInfo()
 
 				if nextProcessed != initialProcessed {
 					log.WithFields(log.Fields{
-						"events":               nextProcessed - initialProcessed,
-						"docs":                 nextEmitted - initialEmitted,
-						"lastEventClusterTime": clusterTime,
+						"events":                nextProcessed - initialProcessed,
+						"docs":                  nextEmitted - initialEmitted,
+						"lastEventClusterTimes": clusterTimes,
 					}).Info("processed change stream events")
 				} else {
 					log.Info("change stream idle")
