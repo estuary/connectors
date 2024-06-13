@@ -100,10 +100,11 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var c = capture{
-		client:              client,
-		output:              stream,
-		state:               prevState,
-		resourceBindingInfo: resourceBindingInfo,
+		client:               client,
+		output:               stream,
+		state:                prevState,
+		resourceBindingInfo:  resourceBindingInfo,
+		lastEventClusterTime: make(map[string]primitive.Timestamp),
 	}
 
 	if err := c.output.Ready(false); err != nil {
@@ -160,7 +161,7 @@ type capture struct {
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int
-	lastEventClusterTime  primitive.Timestamp
+	lastEventClusterTime  map[string]primitive.Timestamp
 
 	// Controls for starting and stopping the stream progress logger.
 	streamLoggerStop   chan (struct{})
