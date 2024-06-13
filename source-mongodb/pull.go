@@ -127,7 +127,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
 		// and streamCatchup catches up the streams to the present and closes the cursors out while
 		// the backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, bindings); err != nil {
+		if streams, err := c.initializeStreams(ctx, bindings, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
 		} else if err := c.streamCatchup(ctx, streams); err != nil {
 			return err
@@ -141,7 +141,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, bindings); err != nil {
+	if streams, err := c.initializeStreams(ctx, bindings, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 		return err
 	} else if err := c.streamForever(ctx, streams); err != nil {
 		return fmt.Errorf("streaming changes forever: %w", err)
