@@ -3,17 +3,10 @@ import:
   - acmeCo/flow.yaml
 captures:
   acmeCo/source-google-ads:
-    shards:
-      logLevel: debug
     endpoint:
       local:
         command:
           - python
-          # - "-m"
-          # - debugpy
-          # - "--listen"
-          # - "0.0.0.0:5678"
-          # - "--wait-for-client"
           - "-m"
           - source_google_ads
         config: connector_config.yaml
@@ -21,6 +14,8 @@ captures:
       - resource:
           stream: ad_group_ads
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/ad_group_ads
       - resource:
           stream: ad_group_ad_labels
@@ -29,6 +24,8 @@ captures:
       - resource:
           stream: ad_groups
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/ad_groups
       - resource:
           stream: ad_group_labels
@@ -37,6 +34,8 @@ captures:
       - resource:
           stream: accounts
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/accounts
       - resource:
           stream: campaign_labels
@@ -45,40 +44,62 @@ captures:
       - resource:
           stream: click_view
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/click_view
       - resource:
           stream: campaigns
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/campaigns
       - resource:
           stream: user_location_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/user_location_report
       - resource:
           stream: account_performance_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/account_performance_report
       - resource:
           stream: display_topics_performance_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/display_topics_performance_report
       - resource:
           stream: display_keyword_performance_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/display_keyword_performance_report
       - resource:
           stream: shopping_performance_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/shopping_performance_report
       - resource:
           stream: ad_group_ad_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/ad_group_ad_report
       - resource:
           stream: geographic_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/geographic_report
       - resource:
           stream: keyword_report
           syncMode: incremental
+          cursorField:
+            - segments.date
         target: acmeCo/keyword_report
+    shards:
+      logLevel: debug

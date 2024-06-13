@@ -62,8 +62,8 @@ properties:
       - string
   ad_group.id:
     type:
-      - "null"
       - integer
+      - "null"
   ad_group.labels:
     type:
       - "null"
@@ -120,7 +120,6 @@ properties:
       type: string
   segments.date:
     type:
-      - "null"
       - string
     format: date
   _meta:

@@ -1110,7 +1110,8 @@
         },
         "ad_group.id": {
           "type": [
-            "integer"
+            "integer",
+            "null"
           ]
         },
         "ad_group.labels": {
@@ -4301,7 +4302,8 @@
         },
         "ad_group.id": {
           "type": [
-            "integer"
+            "integer",
+            "null"
           ]
         },
         "customer.currency_code": {
