@@ -1,6 +1,6 @@
 ---
 collections:
-  acmeCo/test_base/soups:
+  acmeCo/test_base/soups/tblDi5DS0EjiYi83h:
     schema:
       $schema: "https://json-schema.org/draft-07/schema#"
       type: object
