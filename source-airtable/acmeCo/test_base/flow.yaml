@@ -1,4 +1,58 @@
 ---
-import:
-  - pizzas/flow.yaml
-  - soups/flow.yaml
+collections:
+  acmeCo/test_base/pizzas:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      properties:
+        _airtable_id:
+          type: string
+        _airtable_created_time:
+          type:
+            - "null"
+            - string
+        _airtable_table_name:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - _airtable_id
+      x-infer-schema: true
+    key:
+      - /_airtable_id
+  acmeCo/test_base/soups:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      properties:
+        _airtable_id:
+          type: string
+        _airtable_created_time:
+          type:
+            - "null"
+            - string
+        _airtable_table_name:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - _airtable_id
+      x-infer-schema: true
+    key:
+      - /_airtable_id
