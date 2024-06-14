@@ -156,18 +156,49 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 	}
 }
 
-func FieldsToParquetSchema(fields []string, collection pf.CollectionSpec) ParquetSchema {
+type parquetSchemaConfig struct {
+	durationAsString bool
+	arrayAsString    bool
+	objectAsString   bool
+}
+
+type ParquetSchemaOption func(*parquetSchemaConfig)
+
+func WithParquetSchemaDurationAsString() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.durationAsString = true
+	}
+}
+
+func WithParquetSchemaArrayAsString() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.arrayAsString = true
+	}
+}
+
+func WithParquetSchemaObjectAsString() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.objectAsString = true
+	}
+}
+
+func FieldsToParquetSchema(fields []string, collection pf.CollectionSpec, opts ...ParquetSchemaOption) ParquetSchema {
 	out := make(ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
 		p := collection.GetProjection(f)
-		out = append(out, projToSchemaElement(*p))
+		out = append(out, ProjectionToParquetSchemaElement(*p, opts...))
 	}
 
 	return out
 }
 
-func projToSchemaElement(p pf.Projection) ParquetSchemaElement {
+func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOption) ParquetSchemaElement {
+	cfg := parquetSchemaConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	out := ParquetSchemaElement{
 		Name:     p.Field,
 		Required: p.Inference.Exists == pf.Inference_MUST,
@@ -195,15 +226,17 @@ func projToSchemaElement(p pf.Projection) ParquetSchemaElement {
 		}
 
 		if hadType {
-			out.DataType = LogicalTypeJson
+			out.DataType = typeOrString(LogicalTypeJson, cfg.objectAsString)
 			break
 		}
 
 		hadType = true
 
 		switch t {
-		case "array", "object":
-			out.DataType = LogicalTypeJson
+		case "array":
+			out.DataType = typeOrString(LogicalTypeJson, cfg.arrayAsString)
+		case "object":
+			out.DataType = typeOrString(LogicalTypeJson, cfg.objectAsString)
 		case "boolean":
 			out.DataType = PrimitiveTypeBoolean
 		case "integer":
@@ -222,7 +255,7 @@ func projToSchemaElement(p pf.Projection) ParquetSchemaElement {
 			case "date-time":
 				out.DataType = LogicalTypeTimestamp
 			case "duration":
-				out.DataType = LogicalTypeInterval
+				out.DataType = typeOrString(LogicalTypeInterval, cfg.durationAsString)
 			case "time":
 				out.DataType = LogicalTypeTime
 			case "uuid":
@@ -238,4 +271,11 @@ func projToSchemaElement(p pf.Projection) ParquetSchemaElement {
 	}
 
 	return out
+}
+
+func typeOrString[T ParquetDataType](base T, shouldString bool) T {
+	if shouldString {
+		return T(LogicalTypeString)
+	}
+	return base
 }
