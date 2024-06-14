@@ -1,6 +1,7 @@
 {
     "type": "object",
     "additionalProperties": true,
+    "required": ["id"],
     "properties": {
         "code": {
             "type": ["string", "null"]
@@ -14,7 +15,7 @@
             "format": "date-time"
         },
         "id": {
-            "type": ["integer","null"]
+            "type": "integer"
         },
         "price_rule_id": {
             "type": ["integer","null"]
