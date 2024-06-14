@@ -20,6 +20,7 @@ import (
 // This file contains helpers for building common Store implementations.
 
 type S3Store struct {
+	client   *s3.Client
 	uploader *manager.Uploader
 	bucket   string
 }
@@ -85,12 +86,15 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	uploader := manager.NewUploader(s3.NewFromConfig(awsCfg), func(u *manager.Uploader) {
+	s3Client := s3.NewFromConfig(awsCfg)
+
+	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) {
 		u.Concurrency = 1
 		u.PartSize = manager.MinUploadPartSize
 	})
 
 	return &S3Store{
+		client:   s3Client,
 		uploader: uploader,
 		bucket:   cfg.Bucket,
 	}, nil
@@ -103,6 +107,10 @@ func (s *S3Store) PutStream(ctx context.Context, r io.Reader, key string) error 
 		Body:   r,
 	})
 	return err
+}
+
+func (s *S3Store) Client() *s3.Client {
+	return s.client
 }
 
 type GCSStore struct {
