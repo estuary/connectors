@@ -603,6 +603,10 @@ func getStringVal(val any) (got parquet.ByteArray, err error) {
 	switch v := val.(type) {
 	case string:
 		got = []byte(v)
+	case []byte:
+		got = v
+	case json.RawMessage:
+		got = []byte(v)
 	default:
 		err = fmt.Errorf("getStringVal unhandled type: %T", v)
 	}
