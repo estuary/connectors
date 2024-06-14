@@ -128,6 +128,9 @@ jobs:
           - connector: source-shopify
             connector_type: capture
             python: true
+          - connector: source-hackernews
+            python: true
+            connector_type: capture
 
     steps:
       - uses: actions/checkout@v2
