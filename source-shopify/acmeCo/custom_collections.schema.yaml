@@ -76,5 +76,6 @@ properties:
       - row_id
 type: object
 required:
+  - id
   - _meta
 x-infer-schema: true

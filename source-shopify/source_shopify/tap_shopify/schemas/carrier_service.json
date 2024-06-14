@@ -1,6 +1,7 @@
 {
     "type": "object",
     "additionalProperties": true,
+    "required": ["id"],
     "properties": {
         "active": {
             "type": ["boolean","null"]

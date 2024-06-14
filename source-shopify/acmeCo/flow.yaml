@@ -35,6 +35,7 @@ collections:
             - row_id
       type: object
       required:
+        - id
         - _meta
       additionalProperties: true
       x-infer-schema: true
@@ -80,6 +81,7 @@ collections:
             - row_id
       type: object
       required:
+        - id
         - _meta
       x-infer-schema: true
     key:
@@ -110,9 +112,7 @@ collections:
             - string
             - "null"
         id:
-          type:
-            - integer
-            - "null"
+          type: integer
         price_rule_id:
           type:
             - integer
@@ -135,6 +135,7 @@ collections:
             - row_id
       type: object
       required:
+        - id
         - _meta
       additionalProperties: true
       x-infer-schema: true
@@ -172,6 +173,7 @@ collections:
             - row_id
       type: object
       required:
+        - inventory_item_id
         - _meta
       x-infer-schema: true
     key:

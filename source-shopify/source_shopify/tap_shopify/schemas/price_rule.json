@@ -1,6 +1,7 @@
 {
     "type": "object",
     "additionalProperties": true,
+    "required": ["id"],
     "properties": {
         "allocation_method": {
             "type": ["string","null"]
