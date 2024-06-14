@@ -1,6 +1,6 @@
 [
   [
-    "acmeCo/test_base/pizzas",
+    "acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f",
     {
       "_airtable_created_time": "2023-10-26T19:15:35.000Z",
       "_airtable_id": "recEi9L0zVx5T1TXa",
@@ -16,7 +16,7 @@
     }
   ],
   [
-    "acmeCo/test_base/pizzas",
+    "acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f",
     {
       "_airtable_created_time": "2023-10-26T19:15:35.000Z",
       "_airtable_id": "recwIuv53qfJI2o7E",
@@ -32,7 +32,7 @@
     }
   ],
   [
-    "acmeCo/test_base/pizzas",
+    "acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f",
     {
       "_airtable_created_time": "2023-10-26T19:15:35.000Z",
       "_airtable_id": "recyiWwcNMoh2SDvd",
@@ -44,54 +44,6 @@
       "cost": 300,
       "name": "Cheese",
       "status": "To do",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/test_base/soups",
-    {
-      "_airtable_created_time": "2024-01-26T17:57:14.000Z",
-      "_airtable_id": "recKrbxbdBYUS9XqG",
-      "_airtable_table_name": "Soups",
-      "_meta": {
-        "op": "u",
-        "row_id": 0
-      },
-      "name": "Broccoli Cheddar",
-      "notes": "Absolutely Delicious",
-      "status": "In progress",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/test_base/soups",
-    {
-      "_airtable_created_time": "2024-01-26T17:57:14.000Z",
-      "_airtable_id": "recccWEXsqTf0cxw6",
-      "_airtable_table_name": "Soups",
-      "_meta": {
-        "op": "u",
-        "row_id": 1
-      },
-      "name": "Minestrone",
-      "notes": "Yum Yum Yum",
-      "status": "Todo",
-      "ts": "redacted-timestamp"
-    }
-  ],
-  [
-    "acmeCo/test_base/soups",
-    {
-      "_airtable_created_time": "2024-01-26T17:57:14.000Z",
-      "_airtable_id": "recuhWw0rDiAgWS6T",
-      "_airtable_table_name": "Soups",
-      "_meta": {
-        "op": "u",
-        "row_id": 2
-      },
-      "name": "Italian Wedding",
-      "notes": "It's a meata ball!",
-      "status": "Done",
       "ts": "redacted-timestamp"
     }
   ]
