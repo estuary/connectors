@@ -21,17 +21,22 @@ const (
 	icebergTypeDouble      icebergType = "double" // 64 bit float
 	icebergTypeTimestamptz icebergType = "timestamptz"
 	icebergTypeDate        icebergType = "date"
-	icebergTypeTime        icebergType = "time"
 	icebergTypeUuid        icebergType = "uuid"
 	icebergTypeBinary      icebergType = "binary"
 )
 
-// Iceberg does not support column types corresponding to Parquet's JSON or INTERVAL types. Because
-// of this, these fields will be materialized as strings.
 var schemaOptions = []enc.ParquetSchemaOption{
+	// Iceberg does not support column types corresponding to Parquet's JSON or INTERVAL types. Because
+	// of this, these fields will be materialized as strings.
 	enc.WithParquetSchemaArrayAsString(),
 	enc.WithParquetSchemaObjectAsString(),
 	enc.WithParquetSchemaDurationAsString(),
+	// Spark can't read Iceberg tables with "time" column types, see
+	// https://github.com/apache/iceberg/issues/9006. Prioritizing support for Spark seems important
+	// enough to force materializing these as strings.
+	enc.WithParquetTimeAsString(),
+	// Many commonly used versions of Spark also can't read Iceberg tables with "UUID" column types.
+	enc.WithParquetUUIDAsString(),
 }
 
 func schemaWithOptions(fields []string, collection pf.CollectionSpec) enc.ParquetSchema {
@@ -52,8 +57,6 @@ func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
 		return icebergTypeString
 	case enc.LogicalTypeDate:
 		return icebergTypeDate
-	case enc.LogicalTypeTime:
-		return icebergTypeTime
 	case enc.LogicalTypeTimestamp:
 		return icebergTypeTimestamptz
 	case enc.LogicalTypeUuid:

@@ -107,13 +107,13 @@ Big Schema Changed Types Constraints:
 {"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringTimeField' is already being materialized as endpoint type 'TIME' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'LONG' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'LONG' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUuidField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUuidField' is already being materialized as endpoint type 'UUID' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"boolean","CharacterMaxLength":0,"HasDefault":false}
@@ -145,13 +145,13 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"stringNumberField","Nullable":false,"Type":"double","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringRegexField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
-{"Name":"stringTimeField","Nullable":false,"Type":"time","CharacterMaxLength":0,"HasDefault":false}
+{"Name":"stringTimeField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUint32Field","Nullable":false,"Type":"long","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUint64Field","Nullable":false,"Type":"long","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriReferenceField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriTemplateField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
-{"Name":"stringUuidField","Nullable":false,"Type":"uuid","CharacterMaxLength":0,"HasDefault":false}
+{"Name":"stringUuidField","Nullable":false,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 
 Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"boolean","CharacterMaxLength":0,"HasDefault":false}
@@ -183,13 +183,13 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"stringNumberField","Nullable":true,"Type":"double","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringRegexField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
-{"Name":"stringTimeField","Nullable":true,"Type":"time","CharacterMaxLength":0,"HasDefault":false}
+{"Name":"stringTimeField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUint32Field","Nullable":true,"Type":"long","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUint64Field","Nullable":true,"Type":"long","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriReferenceField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriTemplateField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
-{"Name":"stringUuidField","Nullable":true,"Type":"uuid","CharacterMaxLength":0,"HasDefault":false}
+{"Name":"stringUuidField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 
 Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -222,13 +222,13 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringTimeField' is already being materialized as endpoint type 'TIME' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'LONG' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'LONG' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUuidField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUuidField' is already being materialized as endpoint type 'UUID' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"boolean","CharacterMaxLength":0,"HasDefault":false}
@@ -261,13 +261,13 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"stringNumberField","Nullable":true,"Type":"double","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringRegexField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
-{"Name":"stringTimeField","Nullable":true,"Type":"time","CharacterMaxLength":0,"HasDefault":false}
+{"Name":"stringTimeField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUint32Field","Nullable":true,"Type":"long","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUint64Field","Nullable":true,"Type":"long","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriReferenceField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 {"Name":"stringUriTemplateField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
-{"Name":"stringUuidField","Nullable":true,"Type":"uuid","CharacterMaxLength":0,"HasDefault":false}
+{"Name":"stringUuidField","Nullable":true,"Type":"string","CharacterMaxLength":0,"HasDefault":false}
 
 add a single field:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"boolean","CharacterMaxLength":0,"HasDefault":false}
