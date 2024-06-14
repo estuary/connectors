@@ -1,6 +1,14 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
 type: object
+required:
+  - segments.ad_network_type
+  - segments.device
+  - segments.date
+  - ad_group.id
+  - customer.id
+  - campaign.id
+  - segments.product_item_id
 properties:
   customer.descriptive_name:
     type:
@@ -18,9 +26,7 @@ properties:
       - "null"
       - string
   segments.ad_network_type:
-    type:
-      - "null"
-      - string
+    type: string
   segments.product_aggregator_id:
     type:
       - "null"
@@ -46,9 +52,7 @@ properties:
       - "null"
       - string
   campaign.id:
-    type:
-      - "null"
-      - integer
+    type: integer
   campaign.name:
     type:
       - "null"
@@ -150,22 +154,16 @@ properties:
       - "null"
       - string
   segments.date:
-    type:
-      - "null"
-      - string
+    type: string
     format: date
   segments.day_of_week:
     type:
       - "null"
       - string
   segments.device:
-    type:
-      - "null"
-      - string
+    type: string
   customer.id:
-    type:
-      - "null"
-      - integer
+    type: integer
   metrics.impressions:
     type:
       - "null"
@@ -183,9 +181,7 @@ properties:
       - "null"
       - string
   segments.product_item_id:
-    type:
-      - "null"
-      - string
+    type: string
   segments.product_condition:
     type:
       - "null"

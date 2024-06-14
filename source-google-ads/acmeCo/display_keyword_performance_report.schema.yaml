@@ -1,6 +1,14 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
 type: object
+required:
+  - segments.ad_network_type
+  - segments.device
+  - segments.date
+  - ad_group.id
+  - customer.id
+  - campaign.id
+  - ad_group_criterion.criterion_id
 properties:
   customer.currency_code:
     type:
@@ -43,8 +51,7 @@ properties:
       - "null"
       - number
   ad_group.id:
-    type:
-      - integer
+    type: integer
   ad_group.name:
     type:
       - "null"
@@ -54,9 +61,7 @@ properties:
       - "null"
       - string
   segments.ad_network_type:
-    type:
-      - "null"
-      - string
+    type: string
   metrics.all_conversions_from_interactions_rate:
     type:
       - "null"
@@ -106,9 +111,7 @@ properties:
       - "null"
       - string
   campaign.id:
-    type:
-      - "null"
-      - integer
+    type: integer
   campaign.name:
     type:
       - "null"
@@ -186,9 +189,7 @@ properties:
       - "null"
       - string
   segments.device:
-    type:
-      - "null"
-      - string
+    type: string
   metrics.engagement_rate:
     type:
       - "null"
@@ -198,9 +199,7 @@ properties:
       - "null"
       - integer
   customer.id:
-    type:
-      - "null"
-      - integer
+    type: integer
   ad_group_criterion.final_mobile_urls:
     type:
       - "null"
@@ -224,9 +223,7 @@ properties:
       - "null"
       - integer
   ad_group_criterion.criterion_id:
-    type:
-      - "null"
-      - integer
+    type: integer
   metrics.impressions:
     type:
       - "null"
@@ -326,9 +323,7 @@ properties:
       - "null"
       - integer
   segments.date:
-    type:
-      - "null"
-      - string
+    type: string
     format: date
   _meta:
     type: object
