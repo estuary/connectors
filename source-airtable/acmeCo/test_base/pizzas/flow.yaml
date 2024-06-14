@@ -1,6 +1,6 @@
 ---
 collections:
-  acmeCo/test_base/pizzas:
+  acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f:
     schema:
       $schema: "https://json-schema.org/draft-07/schema#"
       type: object

@@ -10,14 +10,16 @@ captures:
           - "-m"
           - source_airtable
         config: config.yaml
-    bindings:
-      - resource:
-          stream: test_base/pizzas
-          syncMode: full_refresh
-        target: acmeCo/test_base/pizzas
-      - resource:
-          stream: test_base/soups
-          syncMode: full_refresh
-        target: acmeCo/test_base/soups
     shards:
       logLevel: debug
+    bindings:
+      - resource:
+          stream: test_base/pizzas/tblY71QcPfB7SjY1f
+          syncMode: full_refresh
+        target: acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f
+        disable: false
+      - resource:
+          stream: test_base/soups/tblDi5DS0EjiYi83h
+          syncMode: full_refresh
+        target: acmeCo/test_base/soups/tblDi5DS0EjiYi83h
+        disable: true
