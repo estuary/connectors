@@ -241,6 +241,37 @@ def append_files(
     next_checkpoint: str,
     file_paths: str,
 ):
+    '''
+    Appends files at "file-paths" to the table.
+
+    The "prev-checkpoint" and "next-checkpoint" arguments are used to provide a best-effort
+    avoidance of duplicating data from appending the same files that have previously been appended.
+    A possible scenario is this: Files are successfully appended to Table1 and Table2 but not Table3
+    in response to the connector receiving a StartCommit message, but the connector is restarted
+    before the transaction is fully completed and acknowledged. Upon restart, a re-application of
+    the persisted driver checkpoint is attempted (ref: "Recovery Log with Idempotent Apply"
+    pattern). Table1 and Table2 should not have the same files appended again, but Table3 does still
+    need to have the files appended.
+
+    When a table is updated to append files, its "checkpoint" property is updated to
+    "next-checkpoint", and only tables with "checkpoint" equal to "prev-checkpoint" are appended to.
+    The previously described scenario would then play out like this:
+
+    1) The materialization connector persists values for "prev-checkpoint" and "next-checkpoint" of
+    "0001" and "0002", respectively, in its driver checkpoint via StartedCommit.
+
+    2) During the partial completion of the transaction, Table1 and Table2 are updated to have a
+    "checkpoint" property of "0002" atomically with appending files to them.
+
+    3) The re-application of the checkpoint on connector restart sees that Table1 and Table2 already
+    have "checkpoint" of "0002" and so the files are not appended to them again. Table3 is still
+    at "0001" and so files are appended.
+
+    It is important to note that this is not a 100% guarantee against duplicated data, since there
+    is a possibility of zombie processes racing to append files _between_ the check to see if the
+    table is already at "next-checkpoint" and the actual append operation.
+    '''
+
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
