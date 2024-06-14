@@ -1,6 +1,7 @@
 {
     "type": "object",
     "additionalProperties": true,
+    "required": ["id"],
     "properties": {
         "cause_cancel": {
             "type": ["boolean","null"]

@@ -50,6 +50,7 @@ properties:
       - row_id
 type: object
 required:
+  - id
   - _meta
 additionalProperties: true
 x-infer-schema: true
