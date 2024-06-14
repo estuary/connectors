@@ -11,6 +11,10 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "ad_group_ad.ad.id",
+        "segments.date"
+      ],
       "properties": {
         "ad_group_ad.ad.added_by_google_ads": {
           "type": [
@@ -966,6 +970,9 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "ad_group_ad_label.resource_name"
+      ],
       "properties": {
         "ad_group_ad.ad.resource_name": {
           "type": [
@@ -1020,6 +1027,10 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "ad_group.id",
+        "segments.date"
+      ],
       "properties": {
         "ad_group.ad_rotation_mode": {
           "type": [
@@ -1109,7 +1120,9 @@
           ]
         },
         "ad_group.id": {
-          "type": "integer"
+          "type": [
+            "integer"
+          ]
         },
         "ad_group.labels": {
           "type": [
@@ -1226,6 +1239,9 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "ad_group_label.resource_name"
+      ],
       "properties": {
         "ad_group.resource_name": {
           "type": [
@@ -1280,6 +1296,10 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "customer.id",
+        "segments.date"
+      ],
       "properties": {
         "customer.auto_tagging_enabled": {
           "type": [
@@ -1437,6 +1457,9 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "campaign_label.resource_name"
+      ],
       "properties": {
         "campaign.resource_name": {
           "type": [
@@ -1491,6 +1514,11 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "click_view.gclid",
+        "segments.date",
+        "segments.ad_network_type"
+      ],
       "properties": {
         "ad_group.name": {
           "type": [
@@ -1617,6 +1645,11 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "campaign.id",
+        "segments.date",
+        "segments.hour"
+      ],
       "properties": {
         "campaign.accessible_bidding_strategy": {
           "type": [
@@ -2164,12 +2197,16 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.ad_network_type",
+        "segments.date",
+        "customer.id",
+        "campaign.id",
+        "user_location_view.resource_name"
+      ],
       "properties": {
         "segments.date": {
-          "type": [
-            "null",
-            "string"
-          ],
+          "type": "string",
           "format": "date"
         },
         "segments.day_of_week": {
@@ -2203,10 +2240,7 @@
           ]
         },
         "segments.ad_network_type": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "customer.currency_code": {
           "type": [
@@ -2215,10 +2249,7 @@
           ]
         },
         "customer.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "customer.descriptive_name": {
           "type": [
@@ -2239,10 +2270,7 @@
           ]
         },
         "user_location_view.resource_name": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "campaign.base_campaign": {
           "type": [
@@ -2251,10 +2279,7 @@
           ]
         },
         "campaign.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "campaign.name": {
           "type": [
@@ -2470,6 +2495,12 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "customer.id"
+      ],
       "properties": {
         "customer.currency_code": {
           "type": [
@@ -2846,6 +2877,15 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "ad_group.id",
+        "customer.id",
+        "campaign.id",
+        "ad_group_criterion.criterion_id"
+      ],
       "properties": {
         "customer.currency_code": {
           "type": [
@@ -2925,10 +2965,7 @@
           ]
         },
         "segments.ad_network_type": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "metrics.all_conversions_from_interactions_rate": {
           "type": [
@@ -3009,10 +3046,7 @@
           ]
         },
         "campaign.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "campaign.name": {
           "type": [
@@ -3114,10 +3148,7 @@
           ]
         },
         "segments.date": {
-          "type": [
-            "null",
-            "string"
-          ],
+          "type": "string",
           "format": "date"
         },
         "segments.day_of_week": {
@@ -3127,10 +3158,7 @@
           ]
         },
         "segments.device": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "metrics.engagement_rate": {
           "type": [
@@ -3145,10 +3173,7 @@
           ]
         },
         "customer.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "ad_group_criterion.final_mobile_urls": {
           "type": [
@@ -3183,10 +3208,7 @@
           ]
         },
         "ad_group_criterion.criterion_id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "metrics.impressions": {
           "type": [
@@ -3371,6 +3393,15 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "ad_group.id",
+        "customer.id",
+        "campaign.id",
+        "ad_group_criterion.criterion_id"
+      ],
       "properties": {
         "customer.currency_code": {
           "type": [
@@ -3433,9 +3464,7 @@
           ]
         },
         "ad_group.id": {
-          "type": [
-            "integer"
-          ]
+          "type": "integer"
         },
         "ad_group.name": {
           "type": [
@@ -3450,10 +3479,7 @@
           ]
         },
         "segments.ad_network_type": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "metrics.all_conversions_from_interactions_rate": {
           "type": [
@@ -3528,10 +3554,7 @@
           ]
         },
         "campaign.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "campaign.name": {
           "type": [
@@ -3648,10 +3671,7 @@
           ]
         },
         "segments.device": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "metrics.engagement_rate": {
           "type": [
@@ -3666,10 +3686,7 @@
           ]
         },
         "customer.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "ad_group_criterion.final_mobile_urls": {
           "type": [
@@ -3704,10 +3721,7 @@
           ]
         },
         "ad_group_criterion.criterion_id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "metrics.impressions": {
           "type": [
@@ -3857,10 +3871,7 @@
           ]
         },
         "segments.date": {
-          "type": [
-            "null",
-            "string"
-          ],
+          "type": "string",
           "format": "date"
         },
         "_meta": {
@@ -3899,6 +3910,15 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.ad_network_type",
+        "segments.device",
+        "segments.date",
+        "ad_group.id",
+        "customer.id",
+        "campaign.id",
+        "segments.product_item_id"
+      ],
       "properties": {
         "customer.descriptive_name": {
           "type": [
@@ -3924,10 +3944,7 @@
           ]
         },
         "segments.ad_network_type": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "segments.product_aggregator_id": {
           "type": [
@@ -3966,10 +3983,7 @@
           ]
         },
         "campaign.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "campaign.name": {
           "type": [
@@ -4122,10 +4136,7 @@
           ]
         },
         "segments.date": {
-          "type": [
-            "null",
-            "string"
-          ],
+          "type": "string",
           "format": "date"
         },
         "segments.day_of_week": {
@@ -4135,16 +4146,10 @@
           ]
         },
         "segments.device": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "customer.id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "metrics.impressions": {
           "type": [
@@ -4171,10 +4176,7 @@
           ]
         },
         "segments.product_item_id": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "segments.product_condition": {
           "type": [
@@ -4290,6 +4292,14 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.ad_network_type",
+        "segments.date",
+        "ad_group.id",
+        "campaign.id",
+        "customer.id",
+        "ad_group_ad.ad.id"
+      ],
       "properties": {
         "ad_group_ad.ad.legacy_responsive_display_ad.accent_color": {
           "type": [
@@ -4298,7 +4308,9 @@
           ]
         },
         "ad_group.id": {
-          "type": "integer"
+          "type": [
+            "integer"
+          ]
         },
         "customer.currency_code": {
           "type": [
@@ -5164,18 +5176,18 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.date",
+        "ad_group.id",
+        "geographic_view.country_criterion_id",
+        "customer.descriptive_name"
+      ],
       "properties": {
         "customer.descriptive_name": {
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "geographic_view.country_criterion_id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "geographic_view.location_type": {
           "type": [
@@ -5195,10 +5207,7 @@
           ]
         },
         "segments.date": {
-          "type": [
-            "null",
-            "string"
-          ],
+          "type": "string",
           "format": "date"
         },
         "_meta": {
@@ -5234,6 +5243,11 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
+      "required": [
+        "segments.date",
+        "ad_group.id",
+        "ad_group_criterion.criterion_id"
+      ],
       "properties": {
         "customer.descriptive_name": {
           "type": [
@@ -5327,10 +5341,7 @@
           ]
         },
         "segments.date": {
-          "type": [
-            "null",
-            "string"
-          ],
+          "type": "string",
           "format": "date"
         },
         "campaign.bidding_strategy_type": {
@@ -5358,10 +5369,7 @@
           ]
         },
         "ad_group_criterion.criterion_id": {
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         },
         "_meta": {
           "type": "object",

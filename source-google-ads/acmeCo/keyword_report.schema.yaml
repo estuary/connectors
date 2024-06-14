@@ -1,6 +1,10 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
 type: object
+required:
+  - segments.date
+  - ad_group.id
+  - ad_group_criterion.criterion_id
 properties:
   customer.descriptive_name:
     type:
@@ -76,9 +80,7 @@ properties:
       - "null"
       - number
   segments.date:
-    type:
-      - "null"
-      - string
+    type: string
     format: date
   campaign.bidding_strategy_type:
     type:
@@ -97,9 +99,7 @@ properties:
       - "null"
       - integer
   ad_group_criterion.criterion_id:
-    type:
-      - "null"
-      - integer
+    type: integer
   _meta:
     type: object
     properties:

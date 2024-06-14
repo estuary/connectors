@@ -1,6 +1,9 @@
 ---
 $schema: "http://json-schema.org/draft-07/schema#"
 type: object
+required:
+  - ad_group.id
+  - segments.date
 properties:
   ad_group.ad_rotation_mode:
     type:
@@ -61,7 +64,8 @@ properties:
       - "null"
       - string
   ad_group.id:
-    type: integer
+    type:
+      - integer
   ad_group.labels:
     type:
       - "null"
