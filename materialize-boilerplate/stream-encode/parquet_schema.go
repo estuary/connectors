@@ -160,6 +160,8 @@ type parquetSchemaConfig struct {
 	durationAsString bool
 	arrayAsString    bool
 	objectAsString   bool
+	timeAsString     bool
+	uuidAsString     bool
 }
 
 type ParquetSchemaOption func(*parquetSchemaConfig)
@@ -179,6 +181,18 @@ func WithParquetSchemaArrayAsString() ParquetSchemaOption {
 func WithParquetSchemaObjectAsString() ParquetSchemaOption {
 	return func(cfg *parquetSchemaConfig) {
 		cfg.objectAsString = true
+	}
+}
+
+func WithParquetTimeAsString() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.timeAsString = true
+	}
+}
+
+func WithParquetUUIDAsString() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.uuidAsString = true
 	}
 }
 
@@ -257,9 +271,9 @@ func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOpti
 			case "duration":
 				out.DataType = typeOrString(LogicalTypeInterval, cfg.durationAsString)
 			case "time":
-				out.DataType = LogicalTypeTime
+				out.DataType = typeOrString(LogicalTypeTime, cfg.timeAsString)
 			case "uuid":
-				out.DataType = LogicalTypeUuid
+				out.DataType = typeOrString(LogicalTypeUuid, cfg.uuidAsString)
 			default:
 				out.DataType = LogicalTypeString
 			}
