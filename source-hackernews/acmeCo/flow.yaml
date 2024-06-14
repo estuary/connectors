@@ -1,0 +1,6 @@
+---
+collections:
+  acmeCo/items:
+    schema: items.schema.yaml
+    key:
+      - /id
