@@ -77,6 +77,7 @@ jobs:
           - source-gcs
           - source-google-drive
           - source-google-pubsub
+          - source-hackernews
           - source-hello-world
           - source-http-file
           - source-http-ingest
@@ -132,6 +133,9 @@ jobs:
           - connector: source-shopify
             connector_type: capture
             python: true
+          - connector: source-hackernews
+            python: true
+            connector_type: capture
 
     steps:
       - uses: actions/checkout@v2
