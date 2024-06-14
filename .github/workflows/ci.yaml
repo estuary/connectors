@@ -75,6 +75,7 @@ jobs:
           - source-firestore
           - source-gcs
           - source-google-drive
+          - source-hackernews
           - source-hello-world
           - source-http-file
           - source-http-ingest
