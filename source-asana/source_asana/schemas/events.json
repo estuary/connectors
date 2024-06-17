@@ -1,5 +1,6 @@
 {
   "type": ["object"],
+  "required": ["created_at"],
   "properties": {
     "user": {
       "type": ["null", "object"],
@@ -26,7 +27,7 @@
         "resource_type": { "type": ["null", "string"] }
       }
     },
-    "created_at": { "type": ["null", "string"], "format": "date-time" },
+    "created_at": { "type": "string", "format": "date-time" },
     "change": {
       "type": ["null", "object"],
       "properties": {
