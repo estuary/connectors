@@ -1,7 +1,8 @@
 import abc
 from dataclasses import dataclass
-from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field
-from typing import Any, Literal, TypeVar, Generic, Literal
+from typing import Any, Generic, Literal, TypeVar
+
+from pydantic import BaseModel, Field, NonNegativeInt, PositiveInt
 
 from .pydantic_polyfill import GenericModel
 
@@ -91,8 +92,7 @@ class ConnectorStateUpdate(GenericModel, Generic[ConnectorState]):
 
 class AccessToken(BaseModel):
     credentials_title: Literal["Private App Credentials"] = Field(
-        default="Private App Credentials",
-        json_schema_extra={"type": "string"}
+        default="Private App Credentials", json_schema_extra={"type": "string"}
     )
     access_token: str = Field(
         title="Access Token",
@@ -124,8 +124,7 @@ class ValidationError(Exception):
 
 class BaseOAuth2Credentials(abc.ABC, BaseModel):
     credentials_title: Literal["OAuth Credentials"] = Field(
-        default="OAuth Credentials",
-        json_schema_extra={"type": "string"}
+        default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
     client_id: str = Field(
         title="Client Id",

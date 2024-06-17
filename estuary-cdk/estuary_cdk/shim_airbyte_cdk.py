@@ -1,11 +1,29 @@
-from dataclasses import dataclass
-from logging import Logger
-from pydantic import Field
-from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal
 import logging
 import os
+from dataclasses import dataclass
+from logging import Logger
+from typing import Annotated, Any, Awaitable, Callable, ClassVar, List, Literal
 
+from airbyte_cdk.sources.source import Source as AirbyteSource
+from airbyte_protocol.models import (
+    AirbyteStateMessage,
+    AirbyteStateType,
+    AirbyteStream,
+    ConfiguredAirbyteCatalog,
+    ConfiguredAirbyteStream,
+)
+from airbyte_protocol.models import (
+    Level as AirbyteLevel,
+)
+from airbyte_protocol.models import (
+    Status as AirbyteStatus,
+)
+from airbyte_protocol.models import (
+    SyncMode as AirbyteSyncMode,
+)
+from pydantic import Field
 
+from . import ValidationError
 from .capture import (
     BaseCaptureConnector,
     Request,
@@ -14,21 +32,7 @@ from .capture import (
     request,
     response,
 )
-from .flow import CaptureBinding, OAuth2Spec, ConnectorSpec
-from . import ValidationError
-
-from airbyte_cdk.sources.source import Source as AirbyteSource
-from airbyte_protocol.models import (
-    SyncMode as AirbyteSyncMode,
-    ConfiguredAirbyteCatalog,
-    ConfiguredAirbyteStream,
-    AirbyteStateMessage,
-    AirbyteStateType,
-    AirbyteStream,
-    Status as AirbyteStatus,
-    Level as AirbyteLevel,
-)
-
+from .flow import CaptureBinding, ConnectorSpec, OAuth2Spec
 
 # `logger` has name "flow", and we thread it through the Airbyte APIs,
 # but connectors may still get their own "airbyte" logger.
@@ -80,7 +84,7 @@ class ResourceState(common.BaseResourceState, extra="forbid"):
 
 class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key.
-    
+
     Top-level fields other than bindingStateV1 are ignored, to allow for a lossy migration from
     states that existed prior to adopting this convection. Connectors transitioning in this way will
     effectively start over from the beginning.
@@ -141,7 +145,6 @@ class CaptureShim(BaseCaptureConnector):
         resources: list[common.Resource[Any, ResourceConfig, ResourceState]] = []
 
         for stream in catalog.streams:
-
             resource_config = ResourceConfig(
                 stream=stream.name, syncMode="full_refresh"
             )
@@ -222,7 +225,6 @@ class CaptureShim(BaseCaptureConnector):
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
-
         result = self.delegate.check(log, validate.config)
         if result.status != AirbyteStatus.SUCCEEDED:
             raise ValidationError([f"{result.message}"])
@@ -237,7 +239,6 @@ class CaptureShim(BaseCaptureConnector):
         log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-
         resources = await self._all_resources(log, open.capture.config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
 
@@ -258,7 +259,6 @@ class CaptureShim(BaseCaptureConnector):
         config: EndpointConfig,
         connector_state: ConnectorState,
     ) -> None:
-
         airbyte_streams: list[ConfiguredAirbyteStream] = [
             ConfiguredAirbyteStream(
                 stream=AirbyteStream(
@@ -319,7 +319,6 @@ class CaptureShim(BaseCaptureConnector):
                 task.captured(entry[0], doc)
 
             elif state_msg := message.state:
-
                 if state_msg.type != AirbyteStateType.STREAM:
                     raise RuntimeError(
                         f"Unsupported Airbyte state type {state_msg.type}"

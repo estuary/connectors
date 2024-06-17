@@ -1,15 +1,16 @@
-from dataclasses import dataclass
-from logging import Logger
-from pydantic import BaseModel
-from typing import TypeVar, Callable, AsyncGenerator, Generic
 import abc
 import asyncio
 import signal
 import sys
 import traceback
+from dataclasses import dataclass
+from logging import Logger
+from typing import AsyncGenerator, Callable, Generic, TypeVar
 
-from .logger import init_logger
+from pydantic import BaseModel
+
 from .flow import ValidationError
+from .logger import init_logger
 
 # Request type served by this connector.
 Request = TypeVar("Request", bound=BaseModel)
@@ -50,7 +51,6 @@ class Stopped(Exception):
 
 # BaseConnector from which all Flow Connectors inherit.
 class BaseConnector(Generic[Request], abc.ABC):
-
     # request_class() returns the concrete class instance for Request served
     # by this connector. It's required to implement to enable parsing of
     # Requests prior to their being dispatched by the connector.

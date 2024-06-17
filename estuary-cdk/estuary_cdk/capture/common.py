@@ -10,7 +10,6 @@ from typing import (
     Callable,
     ClassVar,
     Generic,
-    Iterable,
     Literal,
     TypeVar,
     Tuple,
@@ -135,8 +134,7 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
             description="LogCursor at which incremental replication began"
         )
         next_page: PageCursor = Field(
-            description="PageCursor of the next page to fetch",
-            default=None
+            description="PageCursor of the next page to fetch", default=None
         )
 
     class Snapshot(BaseModel, extra="forbid"):
@@ -181,6 +179,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     You might use this if your data model requires you to load "child" documents when capturing a "parent" document,
     instead of independently loading the child data stream.
     """
+
     doc: _BaseDocument
     binding: int
 
@@ -285,7 +284,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
                     CaptureBinding[_ResourceConfig],
                     "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
                 ]
-            ]
+            ],
         ],
         None,
     ]
@@ -331,7 +330,6 @@ def resolve_bindings(
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
     resource_term="Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
-
     resolved: list[
         tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]
     ] = []
@@ -365,7 +363,6 @@ def validated(
         ]
     ],
 ) -> response.Validated:
-
     return response.Validated(
         bindings=[
             response.ValidatedBinding(resourcePath=b[0].resourceConfig.path())
@@ -383,7 +380,6 @@ def open(
         ]
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-
     async def _run(task: Task):
         for index, (binding, resource) in enumerate(resolved_bindings):
             state: _ResourceState | None = open.state.bindingStateV1.get(
@@ -399,13 +395,7 @@ def open(
                 )
                 state = resource.initial_state
 
-            resource.open(
-                binding,
-                index,
-                state,
-                task,
-                resolved_bindings
-            )
+            resource.open(binding, index, state, task, resolved_bindings)
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 
@@ -506,7 +496,7 @@ async def _binding_snapshot_task(
                     task.stopping.event.wait(), timeout=sleep_for.total_seconds()
                 )
 
-            task.log.debug(f"periodic snapshot is idle and is yielding to stop")
+            task.log.debug("periodic snapshot is idle and is yielding to stop")
             return
         except asyncio.TimeoutError:
             # `sleep_for` elapsed.
@@ -517,7 +507,7 @@ async def _binding_snapshot_task(
             if isinstance(doc, dict):
                 doc["meta_"] = {
                     "op": "u" if count < state.last_count else "c",
-                    "row_id": count
+                    "row_id": count,
                 }
             else:
                 doc.meta_ = BaseDocument.Meta(
@@ -563,16 +553,16 @@ async def _binding_backfill_task(
     )
 
     if state.next_page is not None:
-        task.log.info(f"resuming backfill", state)
+        task.log.info("resuming backfill", state)
     else:
-        task.log.info(f"beginning backfill", state)
+        task.log.info("beginning backfill", state)
 
     while True:
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
         if task.stopping.event.is_set():
-            task.log.debug(f"backfill is yielding to stop")
+            task.log.debug("backfill is yielding to stop")
             return
 
         # Track if fetch_page returns without having yielded a PageCursor.
@@ -587,7 +577,7 @@ async def _binding_backfill_task(
                 done = True
             elif item is None:
                 raise RuntimeError(
-                    f"Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
+                    "Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
                 )
             else:
                 state.next_page = item
@@ -601,7 +591,7 @@ async def _binding_backfill_task(
         bindingStateV1={binding.stateKey: ResourceState(backfill=None)}
     )
     task.checkpoint(connector_state)
-    task.log.info(f"completed backfill")
+    task.log.info("completed backfill")
 
 
 async def _binding_incremental_task(
@@ -614,10 +604,14 @@ async def _binding_incremental_task(
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc=state)}
     )
+<<<<<<< HEAD
 
     sleep_for = timedelta()
 
     task.log.info(f"resuming incremental replication", state)
+=======
+    task.log.info("resuming incremental replication", state)
+>>>>>>> 1b66c2a0e22 (estuary-cdk: format and fix linting problems)
 
     if isinstance(state.cursor, datetime):
         lag = datetime.now(tz=UTC) - state.cursor
@@ -680,7 +674,7 @@ async def _binding_incremental_task(
             sleep_for = binding.resourceConfig.interval
 
         elif isinstance(state.cursor, datetime):
-            lag = (datetime.now(tz=UTC) - state.cursor)
+            lag = datetime.now(tz=UTC) - state.cursor
 
             if lag > binding.resourceConfig.interval:
                 # We're not idle. Attempt to fetch the next changes.
@@ -694,4 +688,22 @@ async def _binding_incremental_task(
             sleep_for = timedelta()
             continue
 
+<<<<<<< HEAD
         task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
+=======
+        task.log.debug(
+            "incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor}
+        )
+
+        # At this point we've fully caught up with the log and are idle.
+        try:
+            if not task.stopping.event.is_set():
+                await asyncio.wait_for(
+                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                )
+
+            task.log.debug("incremental replication is idle and is yielding to stop")
+            return
+        except asyncio.TimeoutError:
+            pass  # `interval` elapsed.
+>>>>>>> 1b66c2a0e22 (estuary-cdk: format and fix linting problems)
