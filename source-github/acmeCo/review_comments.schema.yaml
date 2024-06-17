@@ -1,0 +1,255 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - id
+properties:
+  repository:
+    type: string
+  url:
+    type:
+      - "null"
+      - string
+  pull_request_review_id:
+    type:
+      - "null"
+      - integer
+  id:
+    type: integer
+  node_id:
+    type:
+      - "null"
+      - string
+  diff_hunk:
+    type:
+      - "null"
+      - string
+  path:
+    type:
+      - "null"
+      - string
+  position:
+    type:
+      - "null"
+      - integer
+  original_position:
+    type:
+      - "null"
+      - integer
+  commit_id:
+    type:
+      - "null"
+      - string
+  original_commit_id:
+    type:
+      - "null"
+      - string
+  in_reply_to_id:
+    type:
+      - "null"
+      - integer
+  user:
+    type: object
+    properties:
+      login:
+        type:
+          - "null"
+          - string
+      id:
+        type: integer
+      node_id:
+        type:
+          - "null"
+          - string
+      avatar_url:
+        type:
+          - "null"
+          - string
+      gravatar_id:
+        type:
+          - "null"
+          - string
+      url:
+        type:
+          - "null"
+          - string
+      html_url:
+        type:
+          - "null"
+          - string
+      followers_url:
+        type:
+          - "null"
+          - string
+      following_url:
+        type:
+          - "null"
+          - string
+      gists_url:
+        type:
+          - "null"
+          - string
+      starred_url:
+        type:
+          - "null"
+          - string
+      subscriptions_url:
+        type:
+          - "null"
+          - string
+      organizations_url:
+        type:
+          - "null"
+          - string
+      repos_url:
+        type:
+          - "null"
+          - string
+      events_url:
+        type:
+          - "null"
+          - string
+      received_events_url:
+        type:
+          - "null"
+          - string
+      type:
+        type:
+          - "null"
+          - string
+      site_admin:
+        type:
+          - "null"
+          - boolean
+  body:
+    type:
+      - "null"
+      - string
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time
+  html_url:
+    type:
+      - "null"
+      - string
+  pull_request_url:
+    type:
+      - "null"
+      - string
+  author_association:
+    type:
+      - "null"
+      - string
+  _links:
+    type:
+      - "null"
+      - object
+    properties:
+      self:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      html:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+      pull_request:
+        type:
+          - "null"
+          - object
+        properties:
+          href:
+            type:
+              - "null"
+              - string
+  start_line:
+    type:
+      - "null"
+      - integer
+  original_start_line:
+    type:
+      - "null"
+      - integer
+  start_side:
+    type:
+      - "null"
+      - string
+  line:
+    type:
+      - "null"
+      - integer
+  original_line:
+    type:
+      - "null"
+      - integer
+  side:
+    type:
+      - "null"
+      - string
+  subject_type:
+    type:
+      - "null"
+      - string
+  reactions:
+    type: object
+    properties:
+      url:
+        type:
+          - "null"
+          - string
+      total_count:
+        type:
+          - "null"
+          - integer
+      "+1":
+        type:
+          - "null"
+          - integer
+      "-1":
+        type:
+          - "null"
+          - integer
+      laugh:
+        type:
+          - "null"
+          - integer
+      hooray:
+        type:
+          - "null"
+          - integer
+      confused:
+        type:
+          - "null"
+          - integer
+      heart:
+        type:
+          - "null"
+          - integer
+      rocket:
+        type:
+          - "null"
+          - integer
+      eyes:
+        type:
+          - "null"
+          - integer
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
