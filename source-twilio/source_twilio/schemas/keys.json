@@ -1,0 +1,21 @@
+{
+  "properties": {
+    "date_created": {
+      "format": "date-time",
+      "type": ["null", "string"]
+    },
+    "date_updated": {
+      "format": "date-time",
+      "type": ["null", "string"]
+    },
+    "friendly_name": {
+      "type": ["null", "string"]
+    },
+    "sid": {
+      "type": "string"
+    }
+  },
+  "type": "object",
+  "required": ["sid"],
+  "additionalProperties": true
+}

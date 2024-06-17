@@ -15,6 +15,7 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-twilio/**"
   pull_request:
     branches: [main]
     paths:
@@ -29,6 +30,7 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-twilio/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -83,6 +85,10 @@ jobs:
           - name: source-linkedin-pages
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-twilio
+            type: capture
+            version: v2
             usage_rate: "1.0"
 
     steps:

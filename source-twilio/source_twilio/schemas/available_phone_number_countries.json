@@ -1,0 +1,34 @@
+{
+  "properties": {
+    "country_code": {
+      "type": ["null", "string"]
+    },
+    "country": {
+      "type": "string"
+    },
+    "uri": {
+      "type": ["null", "string"]
+    },
+    "beta": {
+      "type": ["null", "boolean"]
+    },
+    "subresource_uris": {
+      "type": ["null", "object"],
+      "additionalProperties": true,
+      "properties": {
+        "local": {
+          "type": ["null", "string"]
+        },
+        "mobile": {
+          "type": ["null", "string"]
+        },
+        "toll_free": {
+          "type": ["null", "string"]
+        }
+      }
+    }
+  },
+  "required": ["country"],
+  "type": "object",
+  "additionalProperties": true
+}

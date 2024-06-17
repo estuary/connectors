@@ -1,0 +1,13 @@
+captures:
+  acmeCo/source-twilio:
+    autoDiscover:
+      addNewBindings: true
+      evolveIncompatibleCollections: true
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_twilio
+        config: config.yaml
+    bindings: []
