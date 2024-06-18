@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "source_oracle"
+name = "source_oracle_flashback"
 version = "0.1.0"
 description = ""
 authors = ["Mahdi <mahdi@estuary.dev>"]

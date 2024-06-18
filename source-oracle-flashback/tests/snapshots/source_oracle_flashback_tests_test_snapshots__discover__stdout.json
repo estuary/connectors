@@ -3,7 +3,7 @@
     "recommendedName": "ADMIN_TEST_ALL_TYPES",
     "resourceConfig": {
       "name": "TEST_ALL_TYPES",
-      "interval": "PT1M",
+      "interval": "PT5M",
       "schema": "ADMIN"
     },
     "documentSchema": {
@@ -338,7 +338,7 @@
     "recommendedName": "ADMIN_TEST_CHANGES",
     "resourceConfig": {
       "name": "TEST_CHANGES",
-      "interval": "PT1M",
+      "interval": "PT5M",
       "schema": "ADMIN"
     },
     "documentSchema": {
@@ -453,7 +453,7 @@
     "recommendedName": "FLOW_CAPTURE_TEST",
     "resourceConfig": {
       "name": "TEST",
-      "interval": "PT1M",
+      "interval": "PT5M",
       "schema": "FLOW_CAPTURE"
     },
     "documentSchema": {
