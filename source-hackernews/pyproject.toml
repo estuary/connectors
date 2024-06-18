@@ -2,7 +2,7 @@
 name = "source_hackernews"
 version = "0.1.0"
 description = ""
-authors = ["Johnny Graettinger <johnny@estuary.dev>"]
+authors = ["Dani Palma <dani@estuary.dev>"]
 
 [tool.poetry.dependencies]
 estuary-cdk = {path="../estuary-cdk", develop = true}
