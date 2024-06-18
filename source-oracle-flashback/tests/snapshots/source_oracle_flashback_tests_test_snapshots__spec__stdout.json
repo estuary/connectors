@@ -12,7 +12,7 @@
               "type": "boolean"
             },
             "default_interval": {
-              "default": "PT1M",
+              "default": "PT5M",
               "description": "Default interval between updates for all resources. Can be overwritten by each resource.",
               "format": "duration",
               "title": "Default Interval",
@@ -54,6 +54,43 @@
             "password"
           ],
           "title": "BasicAuth",
+          "type": "object"
+        },
+        "NetworkTunnel": {
+          "properties": {
+            "sshForwarding": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/SSH"
+                }
+              ],
+              "title": "SSH Forwarding"
+            }
+          },
+          "title": "NetworkTunnel",
+          "type": "object"
+        },
+        "SSH": {
+          "properties": {
+            "sshEndpoint": {
+              "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+              "pattern": "^ssh://.+@.+$",
+              "title": "SSH Endpoint",
+              "type": "string"
+            },
+            "privateKey": {
+              "description": "Private key to connect to the remote SSH server.",
+              "multiline": true,
+              "secret": true,
+              "title": "SSH Private Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "sshEndpoint",
+            "privateKey"
+          ],
+          "title": "SSH",
           "type": "object"
         },
         "Wallet": {
@@ -134,6 +171,19 @@
           ],
           "title": "Authentication"
         },
+        "networkTunnel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NetworkTunnel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Connect to your system through an SSH server that acts as a bastion host for your network.",
+          "title": "Network Tunnel"
+        },
         "advanced": {
           "advanced": true,
           "allOf": [
@@ -180,7 +230,7 @@
       "title": "ResourceConfig",
       "type": "object"
     },
-    "documentationUrl": "https://go.estuary.dev/source-oracle",
+    "documentationUrl": "https://go.estuary.dev/source-oracle-flashback",
     "resourcePathPointers": [
       "/name"
     ]

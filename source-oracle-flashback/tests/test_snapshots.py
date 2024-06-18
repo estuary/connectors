@@ -6,10 +6,13 @@ import subprocess
 import oracledb
 import tempfile
 from pathlib import Path
+from logging import Logger
+
+from source_oracle_flashback.ssh_tunnel import ssh_tunnel
 
 
 def connect(request, user=None, password=None):
-    sops = subprocess.run(['sops', '--decrypt', request.fspath.dirname + "/../config.yaml"], capture_output=True, text=True)
+    sops = subprocess.run(['sops', '--decrypt', request.fspath.dirname + "/../config-rds.yaml"], capture_output=True, text=True)
     config = yaml.safe_load(sops.stdout)
 
     dsn = config['address']
@@ -30,6 +33,25 @@ def connect(request, user=None, password=None):
             'wallet_location': tmpdir.name,
             'wallet_password': creds['wallet_password_sops'],
         }
+
+    if config['networkTunnel'] is not None:
+        ssh_forwarding = config['networkTunnel']['sshForwarding']
+        params = oracledb.ConnectParams()
+        params.parse_connect_string(dsn)
+        host = params.host
+        port = params.port
+
+        dsn = dsn.replace(host, 'localhost')
+
+        log = Logger(name='test_snapshots')
+        ssh_tunnel(
+            log=log,
+            endpoint=ssh_forwarding['sshEndpoint'],
+            key=ssh_forwarding['privateKey_sops'],
+            remote_bind_address=(host, port),
+            local_bind_port=port,
+        )
+
     return oracledb.connect(
         user=user,
         password=password,

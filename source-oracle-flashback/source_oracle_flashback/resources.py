@@ -66,7 +66,11 @@ async def validate_flashback(
             })
 
             if not flashback_on:
-                raise Exception("Flashback must be enabled on the database. See go.estuary.dev/source-oracle for more information.")
+                msg = "Flashback must be enabled on the database. See go.estuary.dev/source-oracle-flashback for more information."
+                if skip_retention_checks:
+                    log.warn(msg)
+                else:
+                    raise Exception(msg)
 
             if undo_retention_seconds < one_week_seconds:
                 msg = f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8

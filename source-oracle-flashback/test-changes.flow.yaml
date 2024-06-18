@@ -8,8 +8,8 @@ captures:
         command:
           - python
           - "-m"
-          - source_oracle
-        config: config.yaml
+          - source_oracle_flashback
+        config: config-rds.yaml
     bindings:
       - resource:
           schema: ADMIN
