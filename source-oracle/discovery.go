@@ -110,21 +110,47 @@ func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*
 	return jsonType, nil
 }
 
-func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
-	return nil
-}
-
-func oversizePlaceholderJSON(orig []byte) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
-}
-
 // translateRecordField "translates" a value from the PostgreSQL driver into
 // an appropriate JSON-encodeable output format. As a concrete example, the
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
 func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+	var columnName = "<unknown>"
+	var dataType interface{}
+	if column != nil {
+		columnName = column.Name
+		dataType = column.DataType
+	}
+
+	logrus.WithField("columnName", columnName).WithField("dataType", dataType).WithField("val", val).Error("translating field")
+
 	return val, nil
+}
+
+func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
+	if f == nil {
+		return nil
+	}
+	for id, val := range f {
+		var columnInfo *sqlcapture.ColumnInfo
+		if table != nil {
+			if info, ok := table.Columns[id]; ok {
+				columnInfo = &info
+			}
+		}
+
+		var translated, err = translateRecordField(columnInfo, val)
+		if err != nil {
+			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
+		}
+		f[id] = translated
+	}
+	return nil
+}
+
+func oversizePlaceholderJSON(orig []byte) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
 }
 
 func formatRFC3339(t time.Time) (any, error) {
@@ -164,53 +190,6 @@ func (s columnSchema) toType() *jsonschema.Schema {
 	return out
 }
 
-var postgresTypeToJSON = map[string]columnSchema{
-	"bool": {jsonType: "boolean"},
-
-	"int2": {jsonType: "integer"},
-	"int4": {jsonType: "integer"},
-	"int8": {jsonType: "integer"},
-
-	"numeric": {jsonType: "string", format: "number"},
-	"float4":  {jsonType: "number"},
-	"float8":  {jsonType: "number"},
-
-	"varchar": {jsonType: "string"},
-	"bpchar":  {jsonType: "string"},
-	"text":    {jsonType: "string"},
-	"bytea":   {jsonType: "string", contentEncoding: "base64"},
-	"xml":     {jsonType: "string"},
-	"bit":     {jsonType: "string"},
-	"varbit":  {jsonType: "string"},
-
-	"json":     {},
-	"jsonb":    {},
-	"jsonpath": {jsonType: "string"},
-
-	// Domain-Specific Types
-	"date":        {jsonType: "string", format: "date-time"},
-	"timestamp":   {jsonType: "string", format: "date-time"},
-	"timestamptz": {jsonType: "string", format: "date-time"},
-	"time":        {jsonType: "integer"},
-	"timetz":      {jsonType: "string", format: "time"},
-	"interval":    {jsonType: "string"},
-	"money":       {jsonType: "string"},
-	"point":       {jsonType: "string"},
-	"line":        {jsonType: "string"},
-	"lseg":        {jsonType: "string"},
-	"box":         {jsonType: "string"},
-	"path":        {jsonType: "string"},
-	"polygon":     {jsonType: "string"},
-	"circle":      {jsonType: "string"},
-	"inet":        {jsonType: "string"},
-	"cidr":        {jsonType: "string"},
-	"macaddr":     {jsonType: "string"},
-	"macaddr8":    {jsonType: "string"},
-	"tsvector":    {jsonType: "string"},
-	"tsquery":     {jsonType: "string"},
-	"uuid":        {jsonType: "string", format: "uuid"},
-}
-
 const queryDiscoverTables = `
   SELECT owner, table_name FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
 ` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
@@ -222,6 +201,7 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 	if err != nil {
 		return nil, fmt.Errorf("fetching tables: %w", err)
 	}
+	defer rows.Close()
 
 	var owner, tableName string
 	for rows.Next() {
@@ -244,11 +224,14 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 			OmitBinding: omitBinding,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return tables, nil
 }
 
 const queryDiscoverColumns = `
-SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type/*, t.data_length, t.data_precision, t.data_scale*/, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
+SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type, t.data_scale, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
     LEFT JOIN (
             SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
                 INNER JOIN all_cons_columns ac ON (
@@ -276,6 +259,7 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	var ownersCondition = " WHERE t.owner IN ('" + strings.Join(owners, "','") + "')"
 
 	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns+ownersCondition)
+	defer rows.Close()
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching columns: %w", err)
@@ -284,12 +268,17 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	for rows.Next() {
 		var isPrimaryKey bool
 		var isNullableStr string
-		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &sc.DataType, &isPrimaryKey); err != nil {
+		var dataScale sql.NullInt64
+		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &sc.DataType, &dataScale, &isPrimaryKey); err != nil {
 			return nil, nil, fmt.Errorf("scanning column: %w", err)
 		}
 
 		if isNullableStr == "Y" {
 			sc.IsNullable = true
+		}
+
+		if dataScale.Valid {
+			sc.DataType = fmt.Sprintf("%s(%d)", sc.DataType, dataScale.Int64)
 		}
 
 		if isPrimaryKey {
@@ -299,6 +288,9 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		}
 
 		columns = append(columns, sc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
 	}
 	return columns, pks, nil
 }

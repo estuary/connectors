@@ -40,24 +40,29 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		}
 	}
 
-	// Find log files, keep a record of them
-	// Add missing log files
 	// Check log files periodically and add them when needed
 	// Start log manager and keep a connection with the active log miner session
 
 	// Map of redo filename to status
 	var redoFiles = make(map[string]string)
-	if rows, err := conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP#"); err != nil {
+	rows, err := conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP#")
+	if err != nil {
 		return nil, fmt.Errorf("fetching log file list: %w", err)
-	} else {
-		for rows.Next() {
-			var status, fileName string
-			if err := rows.Scan(&status, &fileName); err != nil {
-				return nil, fmt.Errorf("scanning log file record: %w", err)
-			}
+	}
 
-			redoFiles[fileName] = status
+	defer rows.Close()
+
+	for rows.Next() {
+		var status, fileName string
+		if err := rows.Scan(&status, &fileName); err != nil {
+			return nil, fmt.Errorf("scanning log file record: %w", err)
 		}
+
+		redoFiles[fileName] = status
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	for fileName, status := range redoFiles {
@@ -81,7 +86,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		redoFiles: redoFiles,
 
 		ackSCN:        uint64(startSCN),
-		lastTxnEndSCN: startSCN,
+		lastTxnEndSCN: startSCN + 1,
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
 	stream.tables.active = make(map[string]struct{})
@@ -94,16 +99,10 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 type oracleSource struct {
 	sqlcapture.SourceCommon
 
-	// This is a compact array to reduce noise in generated JSON outputs,
-	// and because a lexicographic ordering is also a correct event ordering.
-	SCN int `json:"loc" jsonschema:"description=SCN of this event"`
+	// System Change Number, available for incremental changes only
+	SCN int `json:"scn,omitempty" jsonschema:"description=SCN of this event, only present for incremental changes"`
 
-	// Fields which are part of the Debezium Postgres representation but are not included here:
-	// * `lsn` is the log sequence number of this event. It's equal to loc[1].
-	// * `sequence` is a string-serialized JSON array which embeds a lexicographic
-	//    ordering of all events. It's equal to [loc[0], loc[1]].
-
-	TxID uint32 `json:"txid,omitempty" jsonschema:"description=The 32-bit transaction ID assigned by Postgres to the commit which produced this change."`
+	RowID string `json:"row_id" jsonschema:"description=ROWID of the document"`
 }
 
 func (s *oracleSource) Common() sqlcapture.SourceCommon {
@@ -203,6 +202,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// try to do so until/unless the context expires first.
 		if s.eventBuf != nil {
 			for _, ev := range s.eventBuf {
+				logrus.WithField("ev", ev).Error("flushing event")
 				select {
 				case <-ctx.Done():
 					return nil
@@ -221,6 +221,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			return err
 		}
 
+		logrus.WithField("msgs", len(msgs)).Error("decoding messages")
 		s.eventBuf = make([]sqlcapture.DatabaseEvent, len(msgs))
 		for i, msg := range msgs {
 			event, err := s.decodeMessage(msg)
@@ -236,14 +237,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 }
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
-	logrus.Error("decodeMessage")
-	// If this change event is on a table we're not capturing, skip doing any
-	// further processing on it.
 	var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
-	if !s.tableActive(streamID) {
-		return nil, nil
-	}
-
 	/*keyColumns, ok := s.keyColumns(streamID)
 	if !ok {
 		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
@@ -273,7 +267,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var key = sqlparser.String(n.Left)
-				var value = sqlparser.String(n.Right)
+				var value = n.Right.(*sqlparser.Literal).Val
 				doc[key] = value
 			}
 
@@ -282,7 +276,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 
 		for _, expr := range update.Exprs {
 			var key = sqlparser.String(expr.Name.Name)
-			var value = sqlparser.String(expr.Expr)
+			var value = expr.Expr.(*sqlparser.Literal).Val
 			doc[key] = value
 		}
 	case opDelete:
@@ -295,7 +289,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var key = sqlparser.String(n.Left)
-				var value = sqlparser.String(n.Right)
+				var value = n.Right.(*sqlparser.Literal).Val
 				doc[key] = value
 			}
 
@@ -310,23 +304,13 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 	}
 
-	doc["_meta"] = map[string]any{
-		"source": map[string]any{
-			"rowid": doc["ROWID"],
-			"scn":   msg.startSCN,
-		},
-	}
-
-	/*discovery, ok := s.tables.discovery[streamID]
+	discovery, ok := s.tables.discovery[streamID]
 	if !ok {
 		return nil, fmt.Errorf("unknown discovery info for stream %q", streamID)
 	}
-	if err := translateRecordFields(discovery, bf); err != nil {
-		return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
-	}
-	if err := translateRecordFields(discovery, af); err != nil {
+	if err := translateRecordFields(discovery, doc); err != nil {
 		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
-	}*/
+	}
 
 	var sourceInfo = &oracleSource{
 		SourceCommon: sqlcapture.SourceCommon{
@@ -344,6 +328,10 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		Before:    nil,
 		After:     doc,
 	}
+
+	s.lastTxnEndSCN = msg.startSCN + 1
+
+	logrus.WithField("ev", event).Error("got event")
 	return event, nil
 }
 
@@ -367,20 +355,33 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	logrus.WithField("cursor", s.lastTxnEndSCN).Error("receiveMessages")
-	var query = fmt.Sprintf("SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, TABLE_NAME, SEG_OWNER FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= %d", s.lastTxnEndSCN)
-	var rows, err = s.conn.QueryContext(ctx, query)
+	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, TABLE_NAME, SEG_OWNER FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn", s.lastTxnEndSCN)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var msgs []logminerMessage
 	for rows.Next() {
 		var msg logminerMessage
-		if err := rows.Scan(&msg.startSCN, &msg.ts, &msg.op, &msg.sql, &msg.tableName, &msg.owner); err != nil {
+		var ts time.Time
+		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &msg.tableName, &msg.owner); err != nil {
 			return nil, err
 		}
+		msg.ts = ts.UnixMilli()
+
+		// If this change event is on a table we're not capturing, skip doing any
+		// further processing on it.
+		var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
+		if !s.tableActive(streamID) {
+			continue
+		}
+
 		msgs = append(msgs, msg)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return msgs, nil

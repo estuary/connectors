@@ -2,23 +2,162 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	//"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
-	return false, nil
+	logrus.WithField("state", state).Error("ScanChunk")
+	var keyColumns = state.KeyColumns
+	var resumeAfter = state.Scanned
+	var schema, table = info.Schema, info.Name
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+	var logEntry = logrus.WithField("stream", streamID)
+
+	var columnTypes = make(map[string]interface{})
+	for name, column := range info.Columns {
+		columnTypes[name] = column.DataType
+	}
+
+	// Compute backfill query and arguments list
+	var query string
+	var args []any
+	switch state.Mode {
+	case sqlcapture.TableModeKeylessBackfill:
+		var afterRowID = "AAAAAAAAAAAAAAAAAA"
+		if resumeAfter != nil {
+			afterRowID = string(resumeAfter)
+		}
+		logEntry.WithField("rowid", afterRowID).Debug("scanning keyless table chunk")
+		query = db.keylessScanQuery(info, schema, table)
+		args = []any{afterRowID}
+	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
+		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
+		if resumeAfter != nil {
+			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
+			if err != nil {
+				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+			}
+			if len(resumeKey) != len(keyColumns) {
+				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+			}
+			logEntry.WithFields(logrus.Fields{
+				"keyColumns": keyColumns,
+				"resumeKey":  resumeKey,
+			}).Debug("scanning subsequent table chunk")
+			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table)
+			args = resumeKey
+		} else {
+			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
+			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
+		}
+	default:
+		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
+	}
+
+	// TODO: If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
+	// db.explainQuery(ctx, streamID, query, args)
+
+	// Execute the backfill query to fetch rows from the database
+	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
+	rows, err := db.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
+	}
+	defer rows.Close()
+
+	// Process the results into `changeEvent` structs and return them
+	cols, err := rows.Columns()
+	if err != nil {
+		return false, fmt.Errorf("rows.Columns: %w", err)
+	}
+	var resultRows int // Count of rows received within the current backfill chunk
+	var rowOffset = state.BackfilledCount
+	var prevRowID string // Used when processing keyless backfill results to sanity-check ordering
+	logEntry.Debug("translating query rows to change events")
+	for rows.Next() {
+		// Scan the row values and copy into the equivalent map
+		var fieldsSlice = make([]any, len(cols))
+		var fieldsPtr = make([]any, len(cols))
+		for idx, _ := range cols {
+			fieldsPtr[idx] = &fieldsSlice[idx]
+		}
+		if err := rows.Scan(fieldsPtr...); err != nil {
+			return false, fmt.Errorf("scanning row: %w", err)
+		}
+		var fields = make(map[string]any, len(cols))
+		for idx, name := range cols {
+			fields[name] = fieldsSlice[idx]
+		}
+		var rowKey []byte
+		var rowid string
+		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+			rowid = fields["ROWID"].(string)
+			rowKey = []byte(rowid)
+			delete(fields, "ROWID")
+
+			// Sanity check that rows are returned in ascending RowID order within a given backfill chunk
+			if rowid < prevRowID {
+				return false, fmt.Errorf("internal error: ROWID ordering sanity check failed: %v <= %v", rowid, prevRowID)
+			}
+			prevRowID = rowid
+		} else {
+			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
+		}
+		if err := translateRecordFields(info, fields); err != nil {
+			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
+		}
+
+		var event = &sqlcapture.ChangeEvent{
+			Operation: sqlcapture.InsertOp,
+			RowKey:    rowKey,
+			Source: &oracleSource{
+				SourceCommon: sqlcapture.SourceCommon{
+					Millis:   0, // Not known.
+					Schema:   schema,
+					Snapshot: true,
+					Table:    table,
+				},
+				RowID: rowid,
+			},
+			Before: nil,
+			After:  fields,
+		}
+		if err := callback(event); err != nil {
+			return false, fmt.Errorf("error processing change event: %w", err)
+		}
+		resultRows++
+		rowOffset++
+	}
+
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	return backfillComplete, nil
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
 func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) error {
+	logrus.WithField("watermark", watermark).Debug("writing watermark")
+	var query = fmt.Sprintf(`MERGE INTO %s USING dual ON (slot=:slot) WHEN MATCHED THEN UPDATE SET watermark=:watermark WHEN NOT MATCHED THEN INSERT (slot, watermark) VALUES (:slot,:watermark)`, db.config.Advanced.WatermarksTable)
+	var _, err = db.conn.ExecContext(ctx, query, sql.Named("slot", db.config.Advanced.NodeID), sql.Named("watermark", watermark))
+	if err != nil {
+		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.Advanced.NodeID, err)
+	}
 	return nil
 }
 
@@ -36,11 +175,57 @@ var columnBinaryKeyComparison = map[string]bool{
 	"text":    true,
 }
 
+func castColumn(col *sqlcapture.ColumnInfo) string {
+	var dataType = col.DataType.(string)
+	var isDateTime = dataType == "DATE" || strings.HasPrefix(dataType, "TIMESTAMP")
+	var isInterval = dataType == "INTERVAL"
+
+	if !isDateTime && !isInterval {
+		return col.Name
+	}
+
+	if isInterval {
+		return fmt.Sprintf("TO_CHAR(%s) AS %s", col.Name, col.Name)
+	}
+
+	var dataScale int
+	if index := strings.Index(dataType, "("); index > -1 {
+		var endIndex = strings.Index(dataType, ")")
+		var err error
+		dataScale, err = strconv.Atoi(dataType[index+1 : endIndex])
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	var out = fmt.Sprintf("TO_CHAR(%s", col.Name)
+	var format = ""
+	if strings.Contains(dataType, "TIME ZONE") {
+		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"'`
+	} else if dataScale > 0 {
+		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF'`
+	} else {
+		format = `'YYYY-MM-DD"T"HH24:MI:SS'`
+	}
+
+	if strings.Contains(dataType, "TIME ZONE") {
+		out = out + " AT TIME ZONE 'UTC'"
+	}
+
+	out = out + fmt.Sprintf(", %s) AS %s", format, col.Name)
+	return out
+}
+
 func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
-	fmt.Fprintf(query, ` WHERE ctid > $1`)
-	fmt.Fprintf(query, ` LIMIT %d;`, db.config.Advanced.BackfillChunkSize)
+	var columnNames []string
+	for _, col := range info.Columns {
+		columnNames = append(columnNames, col.Name)
+	}
+	fmt.Fprintf(query, `SELECT ROWID, "%s" FROM "%s"."%s"`, strings.Join(columnNames, "\",\""), schemaName, tableName)
+	fmt.Fprintf(query, ` WHERE ROWID > $1`)
+	fmt.Fprintf(query, ` AND ROWNUM <= %d`, db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, ` ORDER BY ROWID ASC;`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 
@@ -56,5 +241,6 @@ func quoteColumnName(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
+// TODO
 func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
 }
