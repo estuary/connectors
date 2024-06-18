@@ -1,6 +1,3 @@
-from datetime import datetime, timedelta
-from decimal import Decimal
-
 from estuary_cdk.capture.common import PageCursor, LogCursor
 from estuary_cdk.http import HTTPSession
 from logging import Logger
@@ -17,8 +14,6 @@ API = "https://hacker-news.firebaseio.com"
 async def fetch_page(http: HTTPSession, log: Logger, start_cursor: PageCursor, log_cutoff: LogCursor):
     url = f"{API}/v0/item/{start_cursor}.json"
 
-    # TODO batch
-    # TODO handle http errors
     req = await http.request(log, url)
 
     item = Item.model_validate_json(req)

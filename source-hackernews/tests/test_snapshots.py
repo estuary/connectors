@@ -22,6 +22,7 @@ def test_capture(request, snapshot):
 
     assert snapshot("stdout.json") == lines
 
+
 def test_discover(request, snapshot):
     result = subprocess.run(
         [
@@ -41,6 +42,7 @@ def test_discover(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     assert snapshot("stdout.json") == lines
+
 
 def test_spec(request, snapshot):
     result = subprocess.run(
