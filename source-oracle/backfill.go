@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -68,7 +69,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	// db.explainQuery(ctx, streamID, query, args)
 
 	// Execute the backfill query to fetch rows from the database
-	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
+	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Error("executing query")
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
@@ -80,28 +81,29 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	if err != nil {
 		return false, fmt.Errorf("rows.Columns: %w", err)
 	}
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return false, fmt.Errorf("rows.ColumnTypes: %w", err)
+	}
 	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
 	var prevRowID string // Used when processing keyless backfill results to sanity-check ordering
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
-		var fieldsSlice = make([]any, len(cols))
+		var fields = make(map[string]any)
 		var fieldsPtr = make([]any, len(cols))
-		for idx, _ := range cols {
-			fieldsPtr[idx] = &fieldsSlice[idx]
+		for idx, col := range cols {
+			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
+			fieldsPtr[idx] = fields[col]
 		}
 		if err := rows.Scan(fieldsPtr...); err != nil {
 			return false, fmt.Errorf("scanning row: %w", err)
 		}
-		var fields = make(map[string]any, len(cols))
-		for idx, name := range cols {
-			fields[name] = fieldsSlice[idx]
-		}
 		var rowKey []byte
 		var rowid string
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
-			rowid = fields["ROWID"].(string)
+			rowid = *fields["ROWID"].(*string)
 			rowKey = []byte(rowid)
 			delete(fields, "ROWID")
 
@@ -175,7 +177,7 @@ var columnBinaryKeyComparison = map[string]bool{
 	"text":    true,
 }
 
-func castColumn(col *sqlcapture.ColumnInfo) string {
+func castColumn(col sqlcapture.ColumnInfo) string {
 	var dataType = col.DataType.(string)
 	var isDateTime = dataType == "DATE" || strings.HasPrefix(dataType, "TIMESTAMP")
 	var isInterval = dataType == "INTERVAL"
@@ -218,14 +220,14 @@ func castColumn(col *sqlcapture.ColumnInfo) string {
 
 func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
-	var columnNames []string
+	var columnSelect []string
 	for _, col := range info.Columns {
-		columnNames = append(columnNames, col.Name)
+		columnSelect = append(columnSelect, castColumn(col))
 	}
-	fmt.Fprintf(query, `SELECT ROWID, "%s" FROM "%s"."%s"`, strings.Join(columnNames, "\",\""), schemaName, tableName)
-	fmt.Fprintf(query, ` WHERE ROWID > $1`)
+	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
+	fmt.Fprintf(query, ` WHERE ROWID > :1`)
 	fmt.Fprintf(query, ` AND ROWNUM <= %d`, db.config.Advanced.BackfillChunkSize)
-	fmt.Fprintf(query, ` ORDER BY ROWID ASC;`, db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, ` ORDER BY ROWID ASC`)
 	return query.String()
 }
 
