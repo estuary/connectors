@@ -54,6 +54,35 @@ class EndpointConfig(BaseModel):
         title="Authentication",
     )
 
+    class NetworkTunnel(BaseModel):
+        class SSH(BaseModel):
+            ssh_endpoint: str = Field(
+                alias="sshEndpoint",
+                title="SSH Endpoint",
+                description="Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                pattern="^ssh://.+@.+$"
+            )
+
+            private_key: str = Field(
+                alias="privateKey",
+                title="SSH Private Key",
+                description="Private key to connect to the remote SSH server.",
+                json_schema_extra={"secret": True, "multiline": True}
+            )
+
+        ssh_forwarding: SSH = Field(
+            alias="sshForwarding",
+            default_factory=SSH,
+            title="SSH Forwarding"
+        )
+
+    network_tunnel: NetworkTunnel | None = Field(
+        alias="networkTunnel",
+        title="Network Tunnel",
+        description="Connect to your system through an SSH server that acts as a bastion host for your network.",
+        default=None,
+    )
+
     class Advanced(BaseModel):
         skip_flashback_retention_checks: bool = Field(
             default=False,

@@ -1,9 +1,9 @@
 CREATE TABLE test_all_types(
 	id integer PRIMARY KEY,
-	nvchar2 NVARCHAR2(4000),
-	vchar2 VARCHAR2(4000),
+	nvchar2 NVARCHAR2(2000),
+	vchar2 VARCHAR2(2000),
 	single_nchar NCHAR,
-	vchar VARCHAR(4000),
+	vchar VARCHAR(2000),
 	num NUMBER (38, 9),
 	small_int SMALLINT,
   integ INTEGER,

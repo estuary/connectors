@@ -1,0 +1,25 @@
+credentials:
+    credentials_title: Username & Password
+    username: ADMIN
+    password_sops: ENC[AES256_GCM,data:3wNpskd21TEnA6peNIp3,iv:i6GpwhzRtMLXwQW6bUoblr8dfHZ7wjpo8DGViL8SeBg=,tag:zZcf5sjgIJo+czfLRbRg4Q==,type:str]
+networkTunnel:
+    sshForwarding:
+        sshEndpoint: ssh://ec2-user@18.221.36.63:22
+        privateKey_sops: ENC[AES256_GCM,data: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,iv:PtDfo0/ojj10JLcZRUoSh4+pBGIdPSn/ltClvWd4EnU=,tag:QgBdYvsN2R2+53FmjxKftw==,type:str]
+address: database-1.chqpmndqvzby.us-east-2.rds.amazonaws.com:1521/ORCL
+advanced:
+    skip_flashback_retention_checks: true
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-06-18T06:50:02Z"
+    mac: ENC[AES256_GCM,data:j3DJVpm9YxFDouFET12Ijgf5fsLICwraypJCn7WANF/lHBLNWYol1nAmI0X5EYN4dbhlX4szsa/Rt6R36q4new8S+SJr672uAYJyudyg0w02DPymTmiCKjhaZ8zrXYV5JOzvhuNtLQopsln77zwLHDAPLggu0H3giQO9JzCvQkw=,iv:K0AkqYY04CvzsfSgY7JhepSR3UZrUjNgt8L4ELAwaog=,tag:hZtTKfh2ARxU3OfJgzFE7w==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1

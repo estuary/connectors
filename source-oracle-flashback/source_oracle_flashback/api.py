@@ -33,7 +33,7 @@ from .models import (
 )
 
 
-def create_pool(config: EndpointConfig) -> oracledb.AsyncConnectionPool:
+def create_pool(log: Logger, config: EndpointConfig) -> oracledb.AsyncConnectionPool:
     # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
     # the pool contains 4 connections, which will allow 4 concurrent users.
     credentials = {}
@@ -72,7 +72,7 @@ async def fetch_tables(
         with conn.cursor() as c:
             sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
 
-            query = f"SELECT {sql_columns} FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')"  # noqa
+            query = f"SELECT {sql_columns} FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS', 'RDSADMIN') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')"  # noqa
             tables = []
             await c.execute(query)
             cols = [col[0] for col in c.description]
