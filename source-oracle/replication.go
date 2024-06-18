@@ -222,7 +222,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		}
 
 		logrus.WithField("msgs", len(msgs)).Error("decoding messages")
-		s.eventBuf = make([]sqlcapture.DatabaseEvent, len(msgs))
+		s.eventBuf = make([]sqlcapture.DatabaseEvent, len(msgs)+1)
 		for i, msg := range msgs {
 			event, err := s.decodeMessage(msg)
 			if err != nil {
@@ -232,6 +232,10 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			// Once a message arrives, decode it and buffer the result until the next
 			// time this function is invoked.
 			s.eventBuf[i] = event
+		}
+
+		s.eventBuf[len(s.eventBuf)-1] = &sqlcapture.FlushEvent{
+			Cursor: strconv.Itoa(s.lastTxnEndSCN),
 		}
 	}
 }

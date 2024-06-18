@@ -549,8 +549,11 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 		// Check for watermark change events and set a flag when the target watermark is reached.
 		// The subsequent FlushEvent will exit the loop.
 		if event, ok := event.(*ChangeEvent); ok {
-			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
+			if event.Operation != DeleteOp && strings.ToLower(event.Source.Common().StreamID()) == watermarksTable {
 				var actual = event.After["watermark"]
+				if actual == nil {
+					actual = event.After["WATERMARK"]
+				}
 				logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
 				if actual == watermark {
 					watermarkReached = true
