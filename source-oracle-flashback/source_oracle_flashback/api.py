@@ -330,7 +330,7 @@ template_env = Environment(loader=DictLoader({
 SELECT ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
 {{ c | cast }}
-{%- endfor %} FROM {{ table.owner }}.{{ table.table_name }}
+{%- endfor %} FROM {{ table.quoted_owner }}.{{ table.quoted_table_name }}
     WHERE ROWID > '{{ rowid }}'
       AND ROWID <= '{{ max_rowid }}'
       AND ROWNUM <= :rownum_end
@@ -340,7 +340,7 @@ SELECT ROWID, {% for c in table.columns -%}
 SELECT /*+parallel */ VERSIONS_STARTSCN, VERSIONS_OPERATION, ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
 {{ c | cast }}
-{%- endfor %} FROM {{ table.owner }}.{{ table.table_name }}
+{%- endfor %} FROM {{ table.quoted_owner }}.{{ table.quoted_table_name }}
     VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
     WHERE VERSIONS_STARTSCN IS NOT NULL
     ORDER BY VERSIONS_STARTSCN ASC

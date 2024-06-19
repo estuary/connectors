@@ -223,6 +223,13 @@ class OracleColumn(BaseModel, extra="forbid"):
     is_pk: bool = Field(default=False, alias="COL_IS_PK", description="Calculated by join on all_constraints and all_cons_columns")
 
 
+def quote_identifier(s: str) -> str:
+    if s.isupper():
+        return s
+    else:
+        return f"\"{s}\""
+
+
 @ dataclass
 class Table:
     """Table is an extracted representation of a table built from its OracleColumns"""
@@ -232,6 +239,14 @@ class Table:
     columns: list[OracleColumn]
     primary_key: list[OracleColumn]
     model_fields: dict[str, Any]
+
+    @computed_field
+    def quoted_owner(self) -> bool:
+        return quote_identifier(self.owner)
+
+    @computed_field
+    def quoted_table_name(self) -> bool:
+        return quote_identifier(self.table_name)
 
     def create_model(self) -> type[Document]:
         return create_model(
