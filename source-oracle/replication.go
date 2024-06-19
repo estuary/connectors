@@ -16,6 +16,13 @@ import (
 	"vitess.io/vitess/go/vt/sqlparser"
 )
 
+type redoFile struct {
+	status   string
+	file     string
+	firstSCN int
+	nextSCN  int
+}
+
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	dbConn, err := sql.Open("oracle", db.config.ToURI())
 	if err != nil {
@@ -44,8 +51,9 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 	// TODO: Check log files periodically and add them when needed
 
 	// Map of redo filename to status
-	var redoFiles = make(map[string]string)
-	rows, err := conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP#")
+	var redoFiles []redoFile
+
+	rows, err := conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, FIRST_CHANGE#, NEXT_CHANGE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP#")
 	if err != nil {
 		return nil, fmt.Errorf("fetching log file list: %w", err)
 	}
@@ -54,11 +62,12 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 
 	for rows.Next() {
 		var status, fileName string
-		if err := rows.Scan(&status, &fileName); err != nil {
+		var f redoFile
+		if err := rows.Scan(&f.status, &f.file, &f.firstSCN, &f.nextSCN); err != nil {
 			return nil, fmt.Errorf("scanning log file record: %w", err)
 		}
 
-		redoFiles[fileName] = status
+		redoFiles = append(redoFiles, f)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -123,7 +132,8 @@ type replicationStream struct {
 	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
 	eventBuf []sqlcapture.DatabaseEvent    // A buffer used in between 'receiveMessage' and the output channel
 
-	redoFiles map[string]string // map of redo file names to status
+	redoFiles         []redoFile // list of redo files
+	currentFileEndSCN int
 
 	ackSCN        uint64 // The most recently Ack'd SCN, passed to startReplication or updated via CommitSCN.
 	lastTxnEndSCN int    // End SCN (record + 1) of the last completed transaction.
