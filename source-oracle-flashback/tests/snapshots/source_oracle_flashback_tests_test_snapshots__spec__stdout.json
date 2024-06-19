@@ -32,6 +32,7 @@
           "properties": {
             "credentials_title": {
               "const": "Username & Password",
+              "default": "Username & Password",
               "enum": [
                 "Username & Password"
               ],
@@ -49,7 +50,6 @@
             }
           },
           "required": [
-            "credentials_title",
             "username",
             "password"
           ],
