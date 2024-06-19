@@ -15,7 +15,7 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
-      - "source-oracle/**"
+      - "source-oracle-flashback/**"
   pull_request:
     branches: [main]
     paths:
@@ -30,7 +30,7 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
-      - "source-oracle/**"
+      - "source-oracle-flashback/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -82,7 +82,7 @@ jobs:
             type: capture
             version: v2
             usage_rate: "1.0"
-          - name: source-oracle
+          - name: source-oracle-flashback
             type: capture
             version: v1
             usage_rate: "1.0"
@@ -93,6 +93,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download flow-network-tunnel and add it to $PATH
+        run: |
+          mkdir ./network-tunnel
+          docker pull ghcr.io/estuary/network-tunnel:dev
+          docker cp $(docker create --name temp ghcr.io/estuary/network-tunnel:dev sh):/flow-network-tunnel ./network-tunnel/flow-network-tunnel
+          docker rm temp
+          echo "${PWD}/network-tunnel" >> $GITHUB_PATH
 
       - name: Common Setup
         id: setup
