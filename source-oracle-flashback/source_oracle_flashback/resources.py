@@ -117,7 +117,7 @@ async def all_resources(
         max_rowid = None
         async with pool.acquire() as conn:
             with conn.cursor() as c:
-                await c.execute(f"SELECT max(ROWID) FROM {t.owner}.{t.table_name}")
+                await c.execute(f"SELECT max(ROWID) FROM {t.quoted_owner}.{t.quoted_table_name}")
                 max_rowid = (await c.fetchone())[0]
         # if max_rowid is None, that maens there are no rows in the table, so we
         # skip backfill

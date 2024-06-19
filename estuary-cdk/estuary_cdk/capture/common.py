@@ -19,11 +19,11 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
     AccessToken,
-    BasicAuth,
     BaseOAuth2Credentials,
     CaptureBinding,
     OAuth2Spec,
     ValidationError,
+    BasicAuth,
 )
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
@@ -459,6 +459,7 @@ def open_binding(
                 binding_index,
                 fetch_snapshot,
                 state.snapshot,
+                task,
                 tombstone,
             )
 
@@ -589,10 +590,8 @@ async def _binding_backfill_task(
                     f"Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
                 )
             else:
-                # Avoid unnecessary checkpointing if the page_cursor has not changed
-                if item != state.next_page:
-                    state.next_page = item
-                    task.checkpoint(connector_state)
+                state.next_page = item
+                task.checkpoint(connector_state)
                 done = False
 
         if done:

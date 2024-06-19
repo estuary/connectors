@@ -152,11 +152,14 @@ class BaseConnector(Generic[Request], abc.ABC):
             for base in reversed(self.__class__.__bases__):
                 if exit := getattr(base, "_mixin_exit", None):
                     await exit(self, log)
-            if exit := getattr(self.__class__, "exit", None):
-                await exit(self, log)
+
+            await self.exit(log)
 
             # Restore the original signal handler
             signal.signal(signal.SIGQUIT, original_sigquit)
 
         if failed:
             raise SystemExit(1)
+
+    async def exit(self, log: Logger):
+        return  # no-op default
