@@ -40,8 +40,8 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		}
 	}
 
-	// Check log files periodically and add them when needed
-	// Start log manager and keep a connection with the active log miner session
+	// TODO: detect when the redo log file has switched, add the new current file
+	// TODO: Check log files periodically and add them when needed
 
 	// Map of redo filename to status
 	var redoFiles = make(map[string]string)
@@ -197,12 +197,10 @@ func (s *replicationStream) run(ctx context.Context) error {
 // sent.
 func (s *replicationStream) poll(ctx context.Context) error {
 	for {
-		logrus.Error("poll loop")
 		// If there's already a change event which needs to be sent to the consumer,
 		// try to do so until/unless the context expires first.
 		if s.eventBuf != nil {
 			for _, ev := range s.eventBuf {
-				logrus.WithField("ev", ev).Error("flushing event")
 				select {
 				case <-ctx.Done():
 					return nil
@@ -221,7 +219,6 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			return err
 		}
 
-		logrus.WithField("msgs", len(msgs)).Error("decoding messages")
 		s.eventBuf = make([]sqlcapture.DatabaseEvent, len(msgs)+1)
 		for i, msg := range msgs {
 			event, err := s.decodeMessage(msg)
@@ -315,6 +312,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	if err := translateRecordFields(discovery, doc); err != nil {
 		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 	}
+	var rowid = doc["ROWID"].(string)
+	delete(doc, "ROWID")
 
 	var sourceInfo = &oracleSource{
 		SourceCommon: sqlcapture.SourceCommon{
@@ -323,7 +322,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			Snapshot: false,
 			Table:    msg.tableName,
 		},
-		SCN: msg.startSCN,
+		SCN:   msg.startSCN,
+		RowID: rowid,
 	}
 	var event = &sqlcapture.ChangeEvent{
 		Operation: op,
@@ -335,7 +335,6 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 
 	s.lastTxnEndSCN = msg.startSCN + 1
 
-	logrus.WithField("ev", event).Error("got event")
 	return event, nil
 }
 
@@ -399,6 +398,7 @@ func (s *replicationStream) tableActive(streamID string) bool {
 }
 
 func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
+	logrus.WithField("streamID", streamID).Error("check active table")
 	s.tables.RLock()
 	defer s.tables.RUnlock()
 	var keyColumns, ok = s.tables.keyColumns[streamID]
@@ -406,6 +406,7 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 }
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+	logrus.WithField("streamID", streamID).Error("activated table")
 	s.tables.Lock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns

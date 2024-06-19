@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 	// the corresponding DiscoveryInfo.
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		var streamID = sqlcapture.JoinStreamID(strings.ToLower(table.Schema), strings.ToLower(table.Name))
 		tableMap[streamID] = table
 	}
 	for _, column := range columns {
@@ -116,16 +117,33 @@ func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
 func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
-	var columnName = "<unknown>"
-	var dataType interface{}
+	var dataType oracleColumnType
 	if column != nil {
-		columnName = column.Name
-		dataType = column.DataType
+		dataType = column.DataType.(oracleColumnType)
+	} else {
+		return val, nil
 	}
 
-	logrus.WithField("columnName", columnName).WithField("dataType", dataType).WithField("val", val).Error("translating field")
+	var out = reflect.New(dataType.t).Interface()
+	switch v := val.(type) {
+	case string:
+		if dataType.t.Name() != "string" {
+			if err := json.Unmarshal([]byte(v), out); err != nil {
+				return nil, err
+			}
+		} else {
+			out = val
+		}
+	default:
+		var rv = reflect.ValueOf(val)
+		if rv.CanConvert(dataType.t) {
+			out = rv.Convert(dataType.t).Interface()
+		} else {
+			out = val
+		}
+	}
 
-	return val, nil
+	return out, nil
 }
 
 func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
@@ -243,6 +261,12 @@ SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_typ
             ) c
     ON (t.owner = c.owner AND t.table_name = c.table_name AND t.column_name = c.column_name)`
 
+type oracleColumnType struct {
+	original string
+	t        reflect.Type
+	format   string
+}
+
 func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
 	var pks = make(map[string][]string)
 	var columns []sqlcapture.ColumnInfo
@@ -269,7 +293,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		var isPrimaryKey bool
 		var isNullableStr string
 		var dataScale sql.NullInt64
-		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &sc.DataType, &dataScale, &isPrimaryKey); err != nil {
+		var dataType string
+		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &dataType, &dataScale, &isPrimaryKey); err != nil {
 			return nil, nil, fmt.Errorf("scanning column: %w", err)
 		}
 
@@ -277,8 +302,40 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			sc.IsNullable = true
 		}
 
-		if dataScale.Valid {
-			sc.DataType = fmt.Sprintf("%s(%d)", sc.DataType, dataScale.Int64)
+		var t reflect.Type
+		var format string
+		if dataType == "NUMBER" && dataScale.Int64 == 0 {
+			t = reflect.TypeFor[int64]()
+		} else if slices.Contains([]string{"NUMBER", "DOUBLE", "FLOAT"}, dataType) {
+			if isPrimaryKey {
+				// float values can't be used as primary key, so use string, format: number
+				t = reflect.TypeFor[string]()
+				format = "number"
+			} else {
+				t = reflect.TypeFor[float64]()
+			}
+		} else if slices.Contains([]string{"INTEGER", "SMALLINT"}, dataType) {
+			t = reflect.TypeFor[int]()
+		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
+			t = reflect.TypeFor[string]()
+		} else if strings.Contains(dataType, "TIME ZONE") {
+			t = reflect.TypeFor[time.Time]()
+		} else if dataType == "DATE" || strings.Contains(dataType, "TIMESTAMP") {
+			t = reflect.TypeFor[string]()
+			// TODO: enable this after we have added local-datetime to flow
+			// format = "local-datetime"
+		} else if strings.Contains(dataType, "INTERVAL") {
+			t = reflect.TypeFor[string]()
+		} else if dataType == "CLOB" {
+			t = reflect.TypeFor[[]byte]()
+		} else {
+			return nil, nil, fmt.Errorf("unsupported data type: %s", dataType)
+		}
+
+		sc.DataType = oracleColumnType{
+			original: dataType,
+			t:        t,
+			format:   format,
 		}
 
 		if isPrimaryKey {

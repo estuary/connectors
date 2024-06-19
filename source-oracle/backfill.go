@@ -178,7 +178,7 @@ var columnBinaryKeyComparison = map[string]bool{
 }
 
 func castColumn(col sqlcapture.ColumnInfo) string {
-	var dataType = col.DataType.(string)
+	var dataType = col.DataType.(oracleColumnType).original
 	var isDateTime = dataType == "DATE" || strings.HasPrefix(dataType, "TIMESTAMP")
 	var isInterval = dataType == "INTERVAL"
 
