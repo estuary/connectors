@@ -10,7 +10,6 @@ import sys
 import tempfile
 import traceback
 import xxhash
-import orjson
 
 from . import request, response
 from .. import BaseConnector, Stopped
@@ -110,13 +109,11 @@ class Task:
         Documents are not actually captured until checkpoint() is called.
         Or, reset() will discard any queued documents."""
 
-        # When using python dictionaries, we don't need
-        # validation, so we use orjson for faster encoding
         if isinstance(document, dict):
             b = orjson.dumps({
-                'captured': {
-                    'binding': binding,
-                    'doc': document,
+                "captured": {
+                    "binding": binding,
+                    "doc": document,
                 }
             })
         else:
