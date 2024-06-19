@@ -1050,6 +1050,18 @@
           "title": "Calculated",
           "type": "boolean"
         },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
         "hubspotObject": {
           "default": "unknown",
           "title": "Hubspotobject",

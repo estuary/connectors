@@ -105,6 +105,7 @@ class Property(BaseDocument, extra="allow"):
 
     name: str = ""
     calculated: bool = False
+    type: str | None = None
     hubspotObject: str = "unknown"  # Added by us.
 
 

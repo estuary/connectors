@@ -137,7 +137,7 @@ async def fetch_page(
 
     for doc in output:
         if doc.updatedAt < cutoff:
-            yield doc
+            yield await _fix_formats(log, http, object_name, doc)
 
     if result.paging:
         yield result.paging.next.after
@@ -267,7 +267,7 @@ async def fetch_changes(
             log, cls, http, object_name, [id for _, id in batch]
         )
         for doc in documents.results:
-            yield doc
+            yield await _fix_formats(log, http, object_name, doc)
 
     if recent:
         yield recent[-1][0]
@@ -483,6 +483,21 @@ async def fetch_recent_email_events(
 
     if yielded_event:
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
+
+async def _fix_formats(
+    log: Logger,
+    http: HTTPSession,
+    object_name: str,
+    doc: CRMObject,
+) -> CRMObject:
+    property_types = {p.name: p.type for p in (await fetch_properties(log, http, object_name)).results}
+
+    for k, v in doc.properties.items():
+        # Emit a `null` value rather than an empty string to allow for format inference.
+        if v == "" and property_types[k] in ["date", "datetime"]:
+            doc.properties[k] = None
+
+    return doc 
 
 
 def _ms_to_dt(ms: int) -> datetime:
