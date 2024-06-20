@@ -1,0 +1,178 @@
+[
+  [
+    "acmeCo/VariousTypes",
+    {
+      "CurrencyOrPercent": "4.25",
+      "DateOrTime": "2015-11-15T14:45:28-05:00",
+      "Name": "Alice",
+      "Number": "3",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/VariousTypes",
+    {
+      "CurrencyOrPercent": "8",
+      "Name": "Todd!",
+      "Number": "5",
+      "_meta": {
+        "op": "c",
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/VariousTypes",
+    {
+      "DateOrTime": "fixed!!",
+      "Name": "S&P",
+      "Number": "5078.12",
+      "_meta": {
+        "op": "c",
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/VariousTypes",
+    {
+      "CurrencyOrPercent": "0.23",
+      "DateOrTime": "2023-12-07",
+      "Name": "APPL",
+      "Number": "182.63",
+      "_meta": {
+        "op": "c",
+        "row_id": 3,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/VariousTypes",
+    {
+      "DateOrTime": "2015-11-26T00:31:15-05:00",
+      "Name": "Added again",
+      "Number": "3124",
+      "_meta": {
+        "op": "c",
+        "row_id": 4,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FA==\",\"pr\":1344,\"pd\":{\"_meta\":{\"uuid\":\"465302cb-d3ba-11ed-8401-05960f97d672\"},\"mapped\":0,\"message\":\"Hello #18220\",\"num\":912},\"nr\":1351,\"nd\":{\"_meta\":{\"uuid\":\"4c4bec91-d3ba-11ed-8401-05960f97d672\"},\"mapped\":0,\"message\":\"Hello #18240\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "0",
+      "message": "Hello #18240",
+      "num": "913"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FQE=\",\"pr\":1344,\"pd\":{\"_meta\":{\"uuid\":\"469f7d36-d3ba-11ed-8401-05960f97d672\"},\"mapped\":1,\"message\":\"Hello #18221\",\"num\":912},\"nr\":1352,\"nd\":{\"_meta\":{\"uuid\":\"4c985608-d3ba-11ed-8401-05960f97d672\"},\"mapped\":1,\"message\":\"Hello #18241\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "1",
+      "message": "Hello #18241",
+      "num": "914"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FQI=\",\"pr\":1345,\"pd\":{\"_meta\":{\"uuid\":\"46ec48bf-d3ba-11ed-8401-05960f97d672\"},\"mapped\":2,\"message\":\"Hello #18222\",\"num\":912},\"nr\":1352,\"nd\":{\"_meta\":{\"uuid\":\"4ce47423-d3ba-11ed-8401-05960f97d672\"},\"mapped\":2,\"message\":\"Hello #18242\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "2",
+      "message": "Hello #18242",
+      "num": "915"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FQM=\",\"pr\":1345,\"pd\":{\"_meta\":{\"uuid\":\"4738cdc2-d3ba-11ed-8401-05960f97d672\"},\"mapped\":3,\"message\":\"Hello #18223\",\"num\":912},\"nr\":1353,\"nd\":{\"_meta\":{\"uuid\":\"4d313c4a-d3ba-11ed-8401-05960f97d672\"},\"mapped\":3,\"message\":\"Hello #18243\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 3,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "3",
+      "message": "Hello #18243",
+      "num": "916"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FQQ=\",\"pr\":1345,\"pd\":{\"_meta\":{\"uuid\":\"4785738d-d3ba-11ed-8401-05960f97d672\"},\"mapped\":4,\"message\":\"Hello #18224\",\"num\":912},\"nr\":1353,\"nd\":{\"_meta\":{\"uuid\":\"4d7ce1fa-d3ba-11ed-8401-05960f97d672\"},\"mapped\":4,\"message\":\"Hello #18244\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 4,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "4",
+      "message": "Hello #18244",
+      "num": "917"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FQU=\",\"pr\":1346,\"pd\":{\"_meta\":{\"uuid\":\"47d1b6e3-d3ba-11ed-8401-05960f97d672\"},\"mapped\":5,\"message\":\"Hello #18225\",\"num\":912},\"nr\":1353,\"nd\":{\"_meta\":{\"uuid\":\"4dc9fd99-d3ba-11ed-8401-05960f97d672\"},\"mapped\":5,\"message\":\"Hello #18245\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 5,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "5",
+      "message": "Hello #18245",
+      "num": "918"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{\"k\":\"FQY=\",\"pr\":1346,\"pd\":{\"_meta\":{\"uuid\":\"481e1346-d3ba-11ed-8401-05960f97d672\"},\"mapped\":6,\"message\":\"Hello #18226\",\"num\":912},\"nr\":1354,\"nd\":{\"_meta\":{\"uuid\":\"4e165c2b-d3ba-11ed-8401-05960f97d672\"},\"mapped\":6,\"message\":\"Hello #18246\",\"num\":913}}",
+      "_meta": {
+        "op": "c",
+        "row_id": 6,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "mapped": "6",
+      "message": "Hello #18246",
+      "num": "919"
+    }
+  ],
+  [
+    "acmeCo/OtherThings",
+    {
+      "A": "{}",
+      "_meta": {
+        "op": "c",
+        "row_id": 7,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ]
+]
