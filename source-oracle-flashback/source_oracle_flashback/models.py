@@ -76,11 +76,11 @@ class EndpointConfig(BaseModel):
             title="SSH Forwarding"
         )
 
-    network_tunnel: NetworkTunnel | None = Field(
+    network_tunnel: NetworkTunnel = Field(
+        default=None,
         alias="networkTunnel",
         title="Network Tunnel",
         description="Connect to your system through an SSH server that acts as a bastion host for your network.",
-        default=None,
     )
 
     class Advanced(BaseModel):

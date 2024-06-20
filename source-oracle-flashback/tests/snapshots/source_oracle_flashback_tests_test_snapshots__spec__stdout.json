@@ -172,12 +172,9 @@
           "title": "Authentication"
         },
         "networkTunnel": {
-          "anyOf": [
+          "allOf": [
             {
               "$ref": "#/$defs/NetworkTunnel"
-            },
-            {
-              "type": "null"
             }
           ],
           "default": null,
