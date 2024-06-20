@@ -27,18 +27,32 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  name:
-    default: ""
-    title: Name
+  id:
+    title: Id
     type: string
-  calculated:
-    default: false
-    title: Calculated
-    type: boolean
-  hubspotObject:
-    default: unknown
-    title: Hubspotobject
+  created:
+    format: date-time
+    title: Created
     type: string
-title: Property
+  type:
+    enum:
+      - SENT
+      - DROPPED
+      - PROCESSED
+      - DELIVERED
+      - DEFERRED
+      - BOUNCE
+      - OPEN
+      - CLICK
+      - STATUSCHANGE
+      - SPAMREPORT
+      - SUPPRESSED
+      - UNBOUNCE
+    title: Type
+    type: string
+required:
+  - id
+  - created
+title: EmailEvent
 type: object
 x-infer-schema: true
