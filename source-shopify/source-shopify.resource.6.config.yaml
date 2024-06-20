@@ -1,0 +1,81 @@
+---
+tap_stream_id: metafields
+replication_key: updated_at
+replication_method: INCREMENTAL
+key_properties:
+  - id
+stream: metafields
+metadata:
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - description
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - key
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - namespace
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - owner_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - owner_resource
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - value
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - type
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - value_type
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id
+      valid-replication-keys:
+        - updated_at

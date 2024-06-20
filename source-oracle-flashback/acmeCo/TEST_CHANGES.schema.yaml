@@ -1,0 +1,68 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      source:
+        anyOf:
+          - $ref: "#/$defs/Source"
+          - type: "null"
+    required:
+      - op
+      - source
+    title: Meta
+    type: object
+  Source:
+    properties:
+      table:
+        description: Database table of the event
+        title: Table
+        type: string
+      row_id:
+        anyOf:
+          - type: string
+          - type: "null"
+        default: ~
+        description: "Row ID of the Document, available for backfilled documents"
+        title: Row Id
+      scn:
+        anyOf:
+          - type: integer
+          - type: "null"
+        default: ~
+        description: "Database System Change Number, available for incremental events"
+        title: Scn
+    required:
+      - table
+    title: Source
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      source: ~
+    description: Document metadata
+  ID:
+    description: Primary Key
+    title: Id
+    type: integer
+  STR:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Str
+required:
+  - ID
+title: TEST_CHANGES
+type: object

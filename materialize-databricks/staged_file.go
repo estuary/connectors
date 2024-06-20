@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 
 	stdsql "database/sql"
+
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
-	sql "github.com/estuary/connectors/materialize-sql"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -82,7 +83,7 @@ type stagedFile struct {
 
 	// References to the current file being written.
 	buf     *fileBuffer
-	encoder *sql.CountingEncoder
+	encoder *enc.JsonEncoder
 
 	// List of file names uploaded during the current transaction for transaction data, not
 	// including the manifest file name itself. These data file names randomly generated UUIDs.
@@ -227,7 +228,7 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.encoder = sql.NewCountingEncoder(f.buf, false, f.fields)
+	f.encoder = enc.NewJsonEncoder(f.buf, f.fields, enc.WithJsonDisableCompression())
 	f.uploaded = append(f.uploaded, fName)
 
 	return nil

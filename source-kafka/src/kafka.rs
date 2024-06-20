@@ -303,7 +303,12 @@ pub fn process_message<'m>(
 
 // TODO: replace with CLI parser?
 fn parse_message<'m>(msg: &'m BorrowedMessage<'m>) -> Result<serde_json::Value, ProcessingError> {
-    let bytes = msg.payload().ok_or(ProcessingError::EmptyMessage)?;
+    let mut bytes = msg.payload().ok_or(ProcessingError::EmptyMessage)?;
+
+    // Strip a Confluent Schema Registry magic byte and schema ID.
+    if bytes.starts_with(&[0]) && bytes.len() >= 5 {
+        bytes = &bytes[5..];
+    }
 
     serde_json::from_slice(bytes).map_err(|serde_error| {
         // TODO: Capturing the raw_payload as a string is handy for

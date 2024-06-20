@@ -150,7 +150,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     @model_validator(mode="after")
     def _post_init(self) -> Self:
         # Clear properties and history which don't have current values.
-        self.properties = {k: v for k, v in self.properties.items() if v is not None}
+        self.properties = {k: v for k, v in self.properties.items() if v}
         self.propertiesWithHistory = {
             k: v for k, v in self.propertiesWithHistory.items() if len(v)
         }
