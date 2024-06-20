@@ -53,7 +53,13 @@ type config struct {
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the instance." jsonschema_extras:"order=3"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network." jsonschema_extras:"order=4"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=5"`
+}
+
+type advancedConfig struct {
+	ExclusiveCollectionFilter bool `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
 }
 
 func (c *config) Validate() error {

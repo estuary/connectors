@@ -1,0 +1,3 @@
+CREATE USER flow_capture IDENTIFIED BY Secret1234ABCDEFG
+GRANT CONNECT TO flow_capture
+GRANT CREATE TABLE TO flow_capture

@@ -58,7 +58,23 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Network Tunnel",
-        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network.",
+        "order": 4
+      },
+      "advanced": {
+        "properties": {
+          "exclusiveCollectionFilter": {
+            "type": "boolean",
+            "title": "Change Stream Exclusive Collection Filter",
+            "description": "Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true,
+        "order": 5
       }
     },
     "type": "object",

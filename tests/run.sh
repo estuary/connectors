@@ -126,16 +126,18 @@ fi
 # Generate the test-specific catalog source.
 cat tests/template.flow.yaml | envsubst >"${CATALOG_SOURCE}"
 
+BUILD_ID=1122334455667788
+
 # Build the catalog.
 flowctl-go api build \
-  --build-id test-build-id \
-  --build-db ${TMPDIR}/builds/test-build-id \
+  --build-id ${BUILD_ID} \
+  --build-db ${TMPDIR}/builds/${BUILD_ID} \
   --source ${CATALOG_SOURCE} \
   --network "flow-test" ||
   bail "Build failed."
 
 # Activate the catalog.
-flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
+flowctl-go api activate --build-id ${BUILD_ID} --all --network "flow-test" --log.level info || bail "Activate failed."
 
 # When we try to read the container name below, we assume that there will only be 1
 # materialize-sqlite container. This sleep makes it more likely that any materialize-sqlite
@@ -166,7 +168,7 @@ while true; do
 done
 
 # Clean up the activated catalog.
-flowctl-go api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
+flowctl-go api delete --build-id ${BUILD_ID} --all --log.level info || bail "Delete failed."
 
 # Will be printed by the shutdown trap *after* any shutdown logging from flowctl
 TEST_STATUS="Test Passed"

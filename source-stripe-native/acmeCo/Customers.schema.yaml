@@ -1,0 +1,160 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: customer
+    enum:
+      - customer
+    title: Object
+    type: string
+  address:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Address
+  balance:
+    title: Balance
+    type: integer
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  default_source:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Source
+  default_currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Currency
+  delinquent:
+    anyOf:
+      - type: boolean
+      - type: "null"
+    default: ~
+    title: Delinquent
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  discount:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Discount
+  email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Email
+  invoice_prefix:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice Prefix
+  invoice_settings:
+    title: Invoice Settings
+    type: object
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    title: Metadata
+    type: object
+  name:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Name
+  next_invoice_sequence:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Next Invoice Sequence
+  phone:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Phone
+  preferred_locales:
+    items:
+      type: string
+    title: Preferred Locales
+    type: array
+  shipping:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping
+  tax_exempt:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Tax Exempt
+  test_clock:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Test Clock
+required:
+  - id
+  - object
+  - balance
+  - created
+  - invoice_settings
+  - livemode
+  - metadata
+  - preferred_locales
+title: Customers
+type: object
+x-infer-schema: true

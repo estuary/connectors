@@ -3,9 +3,10 @@
   "title": "Portfolio Memberships Schema",
   "additionalProperties": true,
   "type": ["object"],
+  "required": ["gid"],
   "properties": {
     "gid": {
-      "type": ["string", "null"]
+      "type": "string"
     },
     "resource_type": {
       "type": ["string", "null"]

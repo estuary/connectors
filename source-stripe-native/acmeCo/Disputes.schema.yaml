@@ -1,0 +1,130 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: dispute
+    enum:
+      - dispute
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  balance_transactions:
+    anyOf:
+      - items:
+          type: object
+        type: array
+      - type: "null"
+    default: ~
+    title: Balance Transactions
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  payment_method_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Details
+  network_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Network Details
+  charge:
+    title: Charge
+    type: string
+  count:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Count
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  evidence:
+    title: Evidence
+    type: object
+  evidence_details:
+    title: Evidence Details
+    type: object
+  is_charge_refundable:
+    title: Is Charge Refundable
+    type: boolean
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  reason:
+    title: Reason
+    type: string
+  status:
+    title: Status
+    type: string
+required:
+  - id
+  - object
+  - amount
+  - charge
+  - created
+  - evidence
+  - evidence_details
+  - is_charge_refundable
+  - livemode
+  - reason
+  - status
+title: Disputes
+type: object
+x-infer-schema: true

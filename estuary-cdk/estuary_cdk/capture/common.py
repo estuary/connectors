@@ -13,8 +13,8 @@ from typing import (
     Iterable,
     Literal,
     TypeVar,
+    Tuple,
 )
-
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..flow import (
@@ -23,17 +23,19 @@ from ..flow import (
     CaptureBinding,
     OAuth2Spec,
     ValidationError,
+    BasicAuth,
 )
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
 
-LogCursor = AwareDatetime | NonNegativeInt
+LogCursor = Tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.
  b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal).
 
-Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
+Note that `str` cannot be added to this type union, as it makes parsing states ambiguous, however
+the tuple type allows for str or integer values to be used
 """
 
 PageCursor = str | int | None
@@ -46,7 +48,6 @@ and "no pages remain" in a response context.
 
 
 class BaseDocument(BaseModel):
-
     class Meta(BaseModel):
         op: Literal["c", "u", "d"] = Field(
             default="u",
@@ -172,6 +173,7 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
 
+
 @dataclass
 class AssociatedDocument(Generic[_BaseDocument]):
     """
@@ -181,6 +183,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     """
     doc: _BaseDocument
     binding: int
+
 
 FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
 """
@@ -432,7 +435,7 @@ def open_binding(
         async def closure(task: Task):
             assert state.inc
             await _binding_incremental_task(
-                binding, binding_index, fetch_changes, state.inc, task
+                binding, binding_index, fetch_changes, state.inc, task,
             )
 
         task.spawn_child(f"{prefix}.incremental", closure)
@@ -442,7 +445,7 @@ def open_binding(
         async def closure(task: Task):
             assert state.backfill
             await _binding_backfill_task(
-                binding, binding_index, fetch_page, state.backfill, task
+                binding, binding_index, fetch_page, state.backfill, task,
             )
 
         task.spawn_child(f"{prefix}.backfill", closure)
@@ -654,7 +657,7 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for : timedelta = binding.resourceConfig.interval
+        sleep_for: timedelta = binding.resourceConfig.interval
 
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.

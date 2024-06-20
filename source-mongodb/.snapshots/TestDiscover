@@ -6,6 +6,23 @@ Binding 0:
       "collection": "collection1"
     },
     "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "lastWriteWins"
+        }
+      },
       "type": "object",
       "required": [
         "_id"
@@ -46,6 +63,23 @@ Binding 1:
       "collection": "collection2"
     },
     "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "lastWriteWins"
+        }
+      },
       "type": "object",
       "required": [
         "_id"
