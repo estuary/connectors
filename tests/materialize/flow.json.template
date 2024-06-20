@@ -152,13 +152,5 @@
       },
       "bindings": ${RESOURCES_CONFIG}
     }
-  },
-
-  "storageMappings": {
-    "": {
-      "stores": [
-        { "provider": "S3", "bucket": "a-bucket" }
-      ]
-    }
   }
 }
