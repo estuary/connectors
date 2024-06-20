@@ -16,7 +16,6 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,19 +53,6 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	}
 
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
-
-	// Check that the slot's `confirmed_flush_lsn` is less than or equal to our resume cursor value.
-	// This is necessary because Postgres deliberately allows clients to specify an older start LSN,
-	// and then ignores that and uses the confirmed LSN instead. Supposedly this simplifies writing
-	// clients in some cases, but in our case it never helps, and instead it causes trouble if/when
-	// the replication slot is dropped and recreated.
-	slotInfo, err := queryReplicationSlotInfo(ctx, db.conn, slot)
-	if err != nil {
-		return nil, err
-	}
-	if startLSN < slotInfo.ConfirmedFlushLSN {
-		return nil, fmt.Errorf("replication slot %q has a confirmed_flush_lsn greater than our start LSN, which means it was probably deleted/recreated and all bindings need to be backfilled", slot)
-	}
 
 	logrus.WithFields(logrus.Fields{
 		"startLSN":    startLSN,
@@ -725,30 +711,4 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil
-}
-
-type replicationSlotInfo struct {
-	SlotName          string
-	Database          string
-	Plugin            string
-	SlotType          string
-	RestartLSN        pglogrepl.LSN
-	ConfirmedFlushLSN pglogrepl.LSN
-	WALStatus         string
-}
-
-// queryReplicationSlotInfo returns information about the named replication slot, if it exists.
-// If the slot doesn't exist then a nil pointer is returned, but without an error. An error is
-// only returned if the query itself fails.
-func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName string) (*replicationSlotInfo, error) {
-	var info replicationSlotInfo
-	var query = `SELECT slot_name, database, plugin, slot_type, restart_lsn, confirmed_flush_lsn, wal_status FROM pg_catalog.pg_replication_slots WHERE slot_name = $1`
-	if err := conn.QueryRow(ctx, query, slotName).Scan(&info.SlotName, &info.Database, &info.Plugin, &info.SlotType, &info.RestartLSN, &info.ConfirmedFlushLSN, &info.WALStatus); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		} else {
-			return nil, fmt.Errorf("error querying replication slots: %w", err)
-		}
-	}
-	return &info, nil
 }
