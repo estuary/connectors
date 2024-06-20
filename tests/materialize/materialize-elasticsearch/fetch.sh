@@ -17,3 +17,4 @@ exportIndexToJsonl index-duplicated-keys-delta
 exportIndexToJsonl index-duplicated-keys-delta-exclude-flow-doc
 exportIndexToJsonl index-multiple-data-types
 exportIndexToJsonl index-formatted-strings
+exportIndexToJsonl index-deletions

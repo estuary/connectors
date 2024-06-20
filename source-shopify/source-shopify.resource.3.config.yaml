@@ -1,0 +1,79 @@
+---
+tap_stream_id: inventory_items
+replication_method: FULL_TABLE
+key_properties:
+  - id
+stream: inventory_items
+metadata:
+  - breadcrumb:
+      - properties
+      - cost
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - country_code_of_origin
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - country_harmonized_system_codes
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - harmonized_system_code
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - province_code_of_origin
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - sku
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tracked
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - requires_shipping
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id

@@ -10,7 +10,8 @@ config_json_template='{
    "address":  "mongodb://materialize-mongodb-mongo-1.flow-test:27017?authSource=admin",
    "database": "test",
    "password": "flow",
-   "user":     "flow"
+   "user":     "flow",
+   "hardDelete": true
 }'
 
 resources_json_template='[
@@ -32,6 +33,12 @@ resources_json_template='[
       "collection": "Simple"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
+  },
+  {
+    "resource": {
+      "collection": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 

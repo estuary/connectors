@@ -100,10 +100,11 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var c = capture{
-		client:              client,
-		output:              stream,
-		state:               prevState,
-		resourceBindingInfo: resourceBindingInfo,
+		client:               client,
+		output:               stream,
+		state:                prevState,
+		resourceBindingInfo:  resourceBindingInfo,
+		lastEventClusterTime: make(map[string]primitive.Timestamp),
 	}
 
 	if err := c.output.Ready(false); err != nil {
@@ -126,7 +127,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
 		// and streamCatchup catches up the streams to the present and closes the cursors out while
 		// the backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, bindings); err != nil {
+		if streams, err := c.initializeStreams(ctx, bindings, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
 		} else if err := c.streamCatchup(ctx, streams); err != nil {
 			return err
@@ -140,7 +141,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, bindings); err != nil {
+	if streams, err := c.initializeStreams(ctx, bindings, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 		return err
 	} else if err := c.streamForever(ctx, streams); err != nil {
 		return fmt.Errorf("streaming changes forever: %w", err)
@@ -160,6 +161,7 @@ type capture struct {
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int
+	lastEventClusterTime  map[string]primitive.Timestamp
 
 	// Controls for starting and stopping the stream progress logger.
 	streamLoggerStop   chan (struct{})

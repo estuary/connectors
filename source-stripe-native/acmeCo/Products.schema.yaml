@@ -1,0 +1,163 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: product
+    enum:
+      - product
+    title: Object
+    type: string
+  active:
+    title: Active
+    type: boolean
+  attributes:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Attributes
+  marketing_features:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Marketing Features
+  type:
+    title: Type
+    type: string
+  created:
+    title: Created
+    type: integer
+  default_price:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Default Price
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  images:
+    items:
+      type: string
+    title: Images
+    type: array
+  features:
+    items: {}
+    title: Features
+    type: array
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  name:
+    title: Name
+    type: string
+  package_dimensions:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Package Dimensions
+  shippable:
+    anyOf:
+      - type: boolean
+      - type: "null"
+    default: ~
+    title: Shippable
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  tax_code:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Tax Code
+  unit_label:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Unit Label
+  updated:
+    title: Updated
+    type: integer
+  caption:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Caption
+  deactivate_on:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Deactivate On
+  url:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Url
+required:
+  - id
+  - object
+  - active
+  - type
+  - created
+  - images
+  - features
+  - livemode
+  - name
+  - updated
+title: Products
+type: object
+x-infer-schema: true

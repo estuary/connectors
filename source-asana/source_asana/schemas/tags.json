@@ -1,8 +1,9 @@
 {
   "type": ["object"],
+  "required": ["gid"],
   "properties": {
     "gid": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "resource_type": {
       "type": ["null", "string"]

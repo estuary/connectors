@@ -1,0 +1,70 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: radar.early_fraud_warning
+    enum:
+      - radar.early_fraud_warning
+    title: Object
+    type: string
+  actionable:
+    title: Actionable
+    type: boolean
+  charge:
+    title: Charge
+    type: string
+  created:
+    title: Created
+    type: integer
+  fraud_type:
+    title: Fraud Type
+    type: string
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  livemode:
+    title: Livemode
+    type: boolean
+required:
+  - id
+  - object
+  - actionable
+  - charge
+  - created
+  - fraud_type
+  - livemode
+title: EarlyFraudWarning
+type: object
+x-infer-schema: true

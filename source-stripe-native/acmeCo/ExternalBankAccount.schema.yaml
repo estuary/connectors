@@ -1,0 +1,123 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: "Child Stream\nParent Stream: Accounts"
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
+  object:
+    const: bank_account
+    enum:
+      - bank_account
+    title: Object
+    type: string
+  account_holder_name:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Holder Name
+  account_holder_type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Holder Type
+  account_type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Type
+  available_payout_methods:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Available Payout Methods
+  bank_name:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Bank Name
+  country:
+    title: Country
+    type: string
+  currency:
+    title: Currency
+    type: string
+  customer:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Customer
+  fingerprint:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Fingerprint
+  last4:
+    title: Last4
+    type: string
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  routing_number:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Routing Number
+  status:
+    title: Status
+    type: string
+required:
+  - id
+  - object
+  - country
+  - currency
+  - last4
+  - status
+title: ExternalBankAccount
+type: object
+x-infer-schema: true

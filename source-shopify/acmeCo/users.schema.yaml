@@ -1,0 +1,65 @@
+---
+properties:
+  id:
+    type:
+      - integer
+  first_name:
+    type:
+      - string
+      - "null"
+  email:
+    type:
+      - string
+      - "null"
+  url:
+    type:
+      - string
+      - "null"
+  im:
+    type: "null"
+  screen_name:
+    type: "null"
+  phone:
+    type: "null"
+  last_name:
+    type:
+      - string
+      - "null"
+  account_owner:
+    type: boolean
+  receive_announcements:
+    type:
+      - integer
+      - "null"
+  bio:
+    type: "null"
+  permissions:
+    items:
+      type: string
+    type: array
+  locale:
+    type:
+      - string
+      - "null"
+  user_type:
+    type:
+      - string
+      - "null"
+  admin_graphql_api_id:
+    type:
+      - string
+      - "null"
+  tfa_enabled?:
+    type: boolean
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type:
+          - integer
+    required:
+      - row_id
+type: object
+required:
+  - _meta
+x-infer-schema: true

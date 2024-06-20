@@ -1,0 +1,111 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+description: "Child Stream\nParent Stream: SetupIntents"
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  parent_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Parent Id
+  object:
+    const: setup_attempt
+    enum:
+      - setup_attempt
+    title: Object
+    type: string
+  application:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application
+  created:
+    title: Created
+    type: integer
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  flow_directions:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Flow Directions
+  livemode:
+    title: Livemode
+    type: boolean
+  on_behalf_of:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: On Behalf Of
+  payment_method:
+    title: Payment Method
+    type: string
+  payment_method_details:
+    title: Payment Method Details
+    type: object
+  setup_error:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Setup Error
+  setup_intent:
+    title: Setup Intent
+    type: string
+  status:
+    title: Status
+    type: string
+  usage:
+    title: Usage
+    type: string
+required:
+  - id
+  - object
+  - created
+  - livemode
+  - payment_method
+  - payment_method_details
+  - setup_intent
+  - status
+  - usage
+title: SetupAttempts
+type: object
+x-infer-schema: true

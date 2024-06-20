@@ -1,0 +1,262 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: payment_intent
+    enum:
+      - payment_intent
+    title: Object
+    type: string
+  amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Amount
+  amount_capturable:
+    title: Amount Capturable
+    type: integer
+  amount_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Amount Details
+  amount_received:
+    title: Amount Received
+    type: integer
+  application:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Application
+  application_fee_amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Application Fee Amount
+  automatic_payment_methods:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Automatic Payment Methods
+  canceled_at:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Canceled At
+  cancellation_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Cancellation Reason
+  capture_method:
+    title: Capture Method
+    type: string
+  charges:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Charges
+  confirmation_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Confirmation Method
+  created:
+    title: Created
+    type: integer
+  currency:
+    title: Currency
+    type: string
+  customer:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Customer
+  description:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Description
+  invoice:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Invoice
+  last_payment_error:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Last Payment Error
+  latest_charge:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Latest Charge
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  next_action:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Next Action
+  on_behalf_of:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: On Behalf Of
+  payment_method:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Method
+  payment_method_options:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Options
+  payment_method_configuration_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Payment Method Configuration Details
+  payment_method_types:
+    anyOf:
+      - items:
+          type: string
+        type: array
+      - type: "null"
+    default: ~
+    title: Payment Method Types
+  processing:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Processing
+  receipt_email:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Receipt Email
+  review:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Review
+  setup_future_usage:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Setup Future Usage
+  shipping:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Shipping
+  source:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Source
+  statement_descriptor:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor
+  statement_descriptor_suffix:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Statement Descriptor Suffix
+  status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Status
+  transfer_data:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Transfer Data
+  transfer_group:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Transfer Group
+required:
+  - id
+  - object
+  - amount_capturable
+  - amount_received
+  - capture_method
+  - created
+  - currency
+  - livemode
+title: PaymentIntent
+type: object
+x-infer-schema: true

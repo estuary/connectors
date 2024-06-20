@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "create table \"flow_materializations_v2\"\ncreate table \"simple\"\ncreate table \"duplicated-keys-standard\"\ncreate table \"duplicated-keys-delta\"\ncreate table \"duplicated-keys-delta-exclude-flow-doc\"\ncreate table \"multiple-types\"\ncreate table \"formatted-strings\"\nupdate stored materialization spec and set version = localbuild"
+  "create table \"flow_materializations_v2\"\ncreate table \"simple\"\ncreate table \"duplicated-keys-standard\"\ncreate table \"duplicated-keys-delta\"\ncreate table \"duplicated-keys-delta-exclude-flow-doc\"\ncreate table \"multiple-types\"\ncreate table \"formatted-strings\"\nupdate stored materialization spec and set version = 0101010101010101"
 ]
 [
   "connectorState",
@@ -1971,7 +1971,7 @@
 }
 [
   "applied.actionDescription",
-  "create table \"flow_materializations_v2\"\nupdate stored materialization spec and set version = localbuild"
+  "create table \"flow_materializations_v2\"\nupdate stored materialization spec and set version = 0101010101010101"
 ]
 [
   "connectorState",

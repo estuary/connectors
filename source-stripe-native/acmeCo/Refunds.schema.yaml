@@ -1,0 +1,136 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: refund
+    enum:
+      - refund
+    title: Object
+    type: string
+  amount:
+    title: Amount
+    type: integer
+  balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Balance Transaction
+  charge:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Charge
+  count:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Count
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  destination_details:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Destination Details
+  failure_balance_transaction:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Balance Transaction
+  failure_reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Failure Reason
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  payment_intent:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Payment Intent
+  reason:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Reason
+  receipt_number:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Receipt Number
+  source_transfer_reversal:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Source Transfer Reversal
+  status:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Status
+  transfer_reversal:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Transfer Reversal
+required:
+  - id
+  - object
+  - amount
+  - created
+title: Refunds
+type: object
+x-infer-schema: true

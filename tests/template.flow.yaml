@@ -29,6 +29,3 @@ materializations:
       - resource:
           table: test_results
         source: tests/${CONNECTOR}/data
-
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }

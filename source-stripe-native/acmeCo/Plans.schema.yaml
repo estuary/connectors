@@ -1,0 +1,142 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: false
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  object:
+    const: plan
+    enum:
+      - plan
+    title: Object
+    type: string
+  active:
+    title: Active
+    type: boolean
+  aggregate_usage:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Aggregate Usage
+  amount:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Amount
+  amount_decimal:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Amount Decimal
+  billing_scheme:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Billing Scheme
+  meter:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Meter
+  created:
+    title: Created
+    type: integer
+  currency:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Currency
+  interval:
+    title: Interval
+    type: string
+  interval_count:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Interval Count
+  livemode:
+    title: Livemode
+    type: boolean
+  metadata:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Metadata
+  nickname:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Nickname
+  product:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Product
+  tiers_mode:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Tiers Mode
+  transform_usage:
+    anyOf:
+      - type: object
+      - type: "null"
+    default: ~
+    title: Transform Usage
+  trial_period_days:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Trial Period Days
+  usage_type:
+    title: Usage Type
+    type: string
+required:
+  - id
+  - object
+  - active
+  - created
+  - interval
+  - livemode
+  - usage_type
+title: Plans
+type: object
+x-infer-schema: true
