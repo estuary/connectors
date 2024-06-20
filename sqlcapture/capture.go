@@ -128,9 +128,9 @@ type Capture struct {
 }
 
 const (
-	heartbeatWatermarkInterval = 60 * time.Second // When streaming indefinitely, write a heartbeat watermark this often
-	streamIdleWarning          = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
-	streamProgressInterval     = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
+	watermarkDiagnosticsTimeout = 60 * time.Second // How long to wait *after the point where the watermark write should have occurred* before triggering automated diagnostics.
+	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
+	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
 var (
@@ -471,7 +471,7 @@ func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStrea
 			case <-workerCtx.Done():
 				logrus.WithField("watermark", watermark).Warn("not writing watermark due to context cancellation")
 				return workerCtx.Err()
-			case <-time.After(heartbeatWatermarkInterval):
+			case <-time.After(c.Database.HeartbeatWatermarkInterval()):
 				if err := c.Database.WriteWatermark(workerCtx, watermark); err != nil {
 					logrus.WithField("watermark", watermark).Error("failed to write watermark")
 					return fmt.Errorf("error writing next watermark: %w", err)
@@ -515,7 +515,7 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	var watermarkReached = false
 
 	// Log a warning and perform replication diagnostics if we don't observe the watermark within a few minutes
-	var diagnosticsTimeout = time.AfterFunc(2*heartbeatWatermarkInterval, func() {
+	var diagnosticsTimeout = time.AfterFunc(c.Database.HeartbeatWatermarkInterval()+watermarkDiagnosticsTimeout, func() {
 		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
 		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 			logrus.WithField("err", err).Error("replication diagnostics error")

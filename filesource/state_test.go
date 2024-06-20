@@ -18,7 +18,7 @@ func TestNoFiles(t *testing.T) {
 	// File is too new.
 	var skip, reason = s.shouldSkip("aaa", *ts(11))
 	require.True(t, skip)
-	require.Equal(t, "!MaxBound.After(modTime)", reason)
+	require.Equal(t, "!MaxBound.After(modTime): MaxBound 1970-01-01 00:00:10 +0000 UTC vs. modTime 1970-01-01 00:00:11 +0000 UTC", reason)
 
 	s.finishSweep(true)
 	verify(t, State{}, s)
@@ -98,7 +98,7 @@ func TestSuccessfulSweeps(t *testing.T) {
 	// Non-monotonic: This time, aaa @8 is too old to be processed.
 	skip, reason := s1.shouldSkip("aaa", *ts(8))
 	require.True(t, skip)
-	require.Equal(t, reason, "!modTime.After(MinBound)")
+	require.Equal(t, reason, "!modTime.After(MinBound): modTime 1970-01-01 00:00:08 +0000 UTC vs. MinBound 1970-01-01 00:00:08 +0000 UTC")
 
 	// bbb @9 has been modified, and should be.
 	// We detect this even though it's before our previous sweep start,
@@ -207,7 +207,7 @@ func TestSuccessfulSweeps(t *testing.T) {
 	// It skips a modTime that's < 50, but > the recovered MaxBound.
 	skip, reason = s1.shouldSkip("zzz", *ts(45))
 	require.True(t, skip)
-	require.Equal(t, reason, "!MaxBound.After(modTime)")
+	require.Equal(t, reason, "!MaxBound.After(modTime): MaxBound 1970-01-01 00:00:40 +0000 UTC vs. modTime 1970-01-01 00:00:45 +0000 UTC")
 
 	// s1 recovers by re-reading ddd @ 35.
 	require.True(t, s1.startPath("ddd", *ts(35)))
@@ -322,13 +322,13 @@ func TestMonotonicChanges(t *testing.T) {
 	// Still does not re-process files, but now its based on the MinBound.
 	skip, reason = s.shouldSkip("aaa", *ts(5))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:05 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 	skip, reason = s.shouldSkip("ccc", *ts(12))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:12 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 	skip, reason = s.shouldSkip("eee", *ts(23))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:23 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 
 	// Will process newer files.
 	skip, _ = s.shouldSkip("fff", *ts(33))
@@ -362,7 +362,7 @@ func TestMonotonicChanges(t *testing.T) {
 	// since MinBound is retained, even though it is not incremented.
 	skip, reason = s.shouldSkip("ggg", *ts(1))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:01 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 }
 
 func ts(i int64) *time.Time {

@@ -1,0 +1,21 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-oracle:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_oracle_flashback
+        config: config-rds.yaml
+    bindings:
+      - resource:
+          schema: ADMIN
+          name: TEST_CHANGES
+          interval: PT0S
+        target: acmeCo/TEST_CHANGES
+    interval: 3m
+    shards:
+      logLevel: debug

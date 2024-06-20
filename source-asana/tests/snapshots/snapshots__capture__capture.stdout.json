@@ -253,7 +253,7 @@
         "gid": "1205846102972015"
       },
       "gid": "1205846052317288",
-      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> assigned to David Yaffe",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> assigned to <b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b>",
       "is_editable": false,
       "resource_subtype": "assigned",
       "resource_type": "story",
@@ -295,7 +295,7 @@
         "gid": "1205846102972015"
       },
       "gid": "1205846052317292",
-      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> assigned to David Yaffe",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> assigned to <b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b>",
       "is_editable": false,
       "resource_subtype": "assigned",
       "resource_type": "story",

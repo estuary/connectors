@@ -1,7 +1,8 @@
 {
   "type": ["object"],
+  "required": ["gid"],
   "properties": {
-    "gid": { "type": ["null", "string"] },
+    "gid": { "type": "string" },
     "resource_type": { "type": ["null", "string"] },
     "name": { "type": ["null", "string"] },
     "color": { "type": ["null", "string"] },

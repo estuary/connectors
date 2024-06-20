@@ -1,0 +1,110 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/config",
+    "properties": {
+      "bucket": {
+        "type": "string",
+        "title": "Bucket",
+        "description": "Bucket to store materialized objects.",
+        "order": 0
+      },
+      "awsAccessKeyId": {
+        "type": "string",
+        "title": "AWS Access Key ID",
+        "description": "Access Key ID for writing data to the bucket.",
+        "order": 1
+      },
+      "awsSecretAccessKey": {
+        "type": "string",
+        "title": "AWS Secret Access key",
+        "description": "Secret Access Key for writing data to the bucket.",
+        "order": 2
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Region of the bucket to write to.",
+        "order": 3
+      },
+      "uploadInterval": {
+        "type": "string",
+        "enum": [
+          "5m",
+          "15m",
+          "30m",
+          "1h"
+        ],
+        "title": "Upload Interval",
+        "description": "Frequency at which files will be uploaded. Must be a valid Go duration string.",
+        "default": "5m",
+        "order": 4
+      },
+      "prefix": {
+        "type": "string",
+        "title": "Prefix",
+        "description": "Optional prefix that will be used to store objects.",
+        "order": 5
+      },
+      "fileSizeLimit": {
+        "type": "integer",
+        "title": "File Size Limit",
+        "description": "Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.",
+        "order": 6
+      },
+      "endpoint": {
+        "type": "string",
+        "title": "Custom S3 Endpoint",
+        "description": "The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank.",
+        "order": 7
+      },
+      "parquetConfig": {
+        "properties": {
+          "rowGroupRowLimit": {
+            "type": "integer",
+            "title": "Row Group Row Limit",
+            "description": "Maximum number of rows in a row group. Defaults to 1000000 if blank.",
+            "order": 0
+          },
+          "rowGroupByteLimit": {
+            "type": "integer",
+            "title": "Row Group Byte Limit",
+            "description": "Approximate maximum number of bytes in a row group. Defaults to 536870912 (512 MiB) if blank.",
+            "order": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Parquet Configuration",
+        "description": "Configuration specific to materializing parquet files."
+      }
+    },
+    "type": "object",
+    "required": [
+      "bucket",
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "region",
+      "uploadInterval"
+    ],
+    "title": "EndpointConfig"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/filesink/resource",
+    "properties": {
+      "path": {
+        "type": "string",
+        "title": "Path",
+        "description": "The path that objects will be materialized to.",
+        "x-collection-name": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "path"
+    ],
+    "title": "ResourceConfig"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-s3-parquet"
+}
