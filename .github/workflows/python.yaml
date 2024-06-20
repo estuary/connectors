@@ -15,6 +15,7 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-linkedin-ads-v2/**"
       - "source-oracle-flashback/**"
   pull_request:
     branches: [main]
@@ -30,6 +31,7 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-linkedin-ads-v2/**"
       - "source-oracle-flashback/**"
 
 concurrency:
@@ -87,6 +89,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-linkedin-pages
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-linkedin-ads-v2
             type: capture
             version: v1
             usage_rate: "1.0"
