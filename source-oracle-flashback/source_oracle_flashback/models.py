@@ -47,7 +47,7 @@ class Wallet(BaseModel):
 class EndpointConfig(BaseModel):
     address: str = Field(
         title="Address",
-        description="The connection string for connecting to the database",
+        description="The connection string for connecting to the database, either in the format of host:port/SID or a connect descriptor such as (address=(protocol=tcps)(host=...)...)",
     )
     credentials: BasicAuth | Wallet = Field(
         discriminator="credentials_title",
