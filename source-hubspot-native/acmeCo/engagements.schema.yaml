@@ -9,7 +9,6 @@ $defs:
         default:
           op: u
           row_id: -1
-          uuid: 00000000-0000-0000-0000-000000000000
         description: Document metadata
       timestamp:
         format: date-time
@@ -27,6 +26,12 @@ $defs:
           - type: "null"
         default: ~
         title: Sourceid
+      sourceLabel:
+        anyOf:
+          - type: string
+          - type: "null"
+        default: ~
+        title: Sourcelabel
       updatedByUserId:
         anyOf:
           - type: integer
@@ -42,6 +47,7 @@ $defs:
   Meta:
     properties:
       op:
+        default: u
         description: "Operation type (c: Create, u: Update, d: Delete)"
         enum:
           - c
@@ -54,14 +60,6 @@ $defs:
         description: "Row ID of the Document, counting up from zero, or -1 if not known"
         title: Row Id
         type: integer
-      uuid:
-        default: 00000000-0000-0000-0000-000000000000
-        description: UUID of the Document
-        format: uuid
-        title: Uuid
-        type: string
-    required:
-      - op
     title: Meta
     type: object
 additionalProperties: false
@@ -72,7 +70,6 @@ properties:
     default:
       op: u
       row_id: -1
-      uuid: 00000000-0000-0000-0000-000000000000
     description: Document metadata
   id:
     title: Id
