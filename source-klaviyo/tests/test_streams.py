@@ -156,7 +156,7 @@ class TestKlaviyoStream:
 class TestIncrementalKlaviyoStream:
     def test_cursor_field_is_required(self):
         with pytest.raises(
-            TypeError, match="Can't instantiate abstract class IncrementalKlaviyoStream with abstract methods cursor_field, path"
+            TypeError, match="Can't instantiate abstract class IncrementalKlaviyoStream without an implementation for abstract methods 'cursor_field', 'path'"
         ):
             IncrementalKlaviyoStream(api_key=API_KEY, start_date=START_DATE.isoformat())
 
@@ -237,7 +237,7 @@ class TestIncrementalKlaviyoStream:
 class TestSemiIncrementalKlaviyoStream:
     def test_cursor_field_is_required(self):
         with pytest.raises(
-            TypeError, match="Can't instantiate abstract class SemiIncrementalKlaviyoStream with abstract methods cursor_field, path"
+            TypeError, match="Can't instantiate abstract class SemiIncrementalKlaviyoStream without an implementation for abstract methods 'cursor_field', 'path'"
         ):
             SemiIncrementalKlaviyoStream(api_key=API_KEY, start_date=START_DATE.isoformat())
 
