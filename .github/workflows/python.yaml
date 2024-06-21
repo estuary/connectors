@@ -132,20 +132,21 @@ jobs:
           cd ..
           pytest ${{ matrix.connector.name }}
 
-      - name: Find Dockerfile for ${{ matrix.connector.name }}
-        id: dockerfile
-        run: |
-          DOCKERFILE_PATH="${PWD}/estuary-cdk/common.Dockerfile"
-          if [ -f "${{ matrix.connector.name }}/Dockerfile" ]; then
-            DOCKERFILE_PATH="${PWD}/${{ matrix.connector.name }}/Dockerfile"
-          fi
-          echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
+      # Uncomment to allow each connector to have its own Dockerfile
+      #- name: Find Dockerfile for ${{ matrix.connector.name }}
+      #  id: dockerfile
+      #  run: |
+      #    DOCKERFILE_PATH="${PWD}/estuary-cdk/common.Dockerfile"
+      #    if [ -f "${{ matrix.connector.name }}/Dockerfile" ]; then
+      #      DOCKERFILE_PATH="${PWD}/${{ matrix.connector.name }}/Dockerfile"
+      #    fi
+      #    echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Build ${{ matrix.connector.name }} Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ steps.dockerfile.outputs.path }}
+          file: estuary-cdk/common.Dockerfile
           load: true
           build-args: |
             CONNECTOR_NAME=${{ matrix.connector.name }}
