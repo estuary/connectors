@@ -19,8 +19,7 @@ import (
 type redoFile struct {
 	status   string
 	file     string
-	firstSCN int
-	nextSCN  int
+	sequence int
 }
 
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
@@ -47,43 +46,6 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		}
 	}
 
-	// TODO: detect when the redo log file has switched, add the new current file
-	// TODO: Check log files periodically and add them when needed
-
-	// Map of redo filename to status
-	var redoFiles []redoFile
-
-	rows, err := conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, FIRST_CHANGE#, NEXT_CHANGE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP#")
-	if err != nil {
-		return nil, fmt.Errorf("fetching log file list: %w", err)
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-		var status, fileName string
-		var f redoFile
-		if err := rows.Scan(&f.status, &f.file, &f.firstSCN, &f.nextSCN); err != nil {
-			return nil, fmt.Errorf("scanning log file record: %w", err)
-		}
-
-		redoFiles = append(redoFiles, f)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	for fileName, status := range redoFiles {
-		if _, err := conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", fileName); err != nil {
-			return nil, fmt.Errorf("adding logfile %q (%s) to logminer: %w", fileName, status, err)
-		}
-	}
-
-	if _, err := conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>SYS.DBMS_LOGMNR.COMMITTED_DATA_ONLY + SYS.DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG); END;", startSCN); err != nil {
-		return nil, fmt.Errorf("starting logminer: %w", err)
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
 	}).Info("starting replication")
@@ -92,16 +54,70 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		db:   db,
 		conn: conn,
 
-		redoFiles: redoFiles,
-
 		ackSCN:        uint64(startSCN),
 		lastTxnEndSCN: startSCN + 1,
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
+
+	err = stream.startLogminer(ctx, startSCN)
+	if err != nil {
+		return nil, fmt.Errorf("starting logminer: %w", err)
+	}
+
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.keyColumns = make(map[string][]string)
 	stream.tables.discovery = make(map[string]*sqlcapture.DiscoveryInfo)
 	return stream, nil
+}
+
+func (s *replicationStream) endLogminer(ctx context.Context) error {
+	if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR.END_LOGMNR; END;"); err != nil {
+		return fmt.Errorf("ending logminer session: %w", err)
+	}
+
+	return nil
+}
+
+func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) error {
+	rows, err := s.conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, SEQUENCE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP# AND V$LOG.STATUS NOT IN ('INACTIVE') AND NEXT_CHANGE# >= :1", startSCN)
+	if err != nil {
+		return fmt.Errorf("fetching log file list: %w", err)
+	}
+	defer rows.Close()
+
+	var redoSequence int
+	var redoFiles []redoFile
+	for rows.Next() {
+		var f redoFile
+		if err := rows.Scan(&f.status, &f.file, &f.sequence); err != nil {
+			return fmt.Errorf("scanning log file record: %w", err)
+		}
+
+		if f.sequence > redoSequence {
+			redoSequence = f.sequence
+		}
+
+		redoFiles = append(redoFiles, f)
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, f := range redoFiles {
+		if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.file); err != nil {
+			return fmt.Errorf("adding logfile %q (%s) to logminer: %w", f.file, f.status, err)
+		}
+	}
+
+	if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>SYS.DBMS_LOGMNR.COMMITTED_DATA_ONLY + SYS.DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG); END;", startSCN); err != nil {
+		return fmt.Errorf("starting logminer: %w", err)
+	}
+
+	s.redoFiles = redoFiles
+	s.redoSequence = redoSequence
+
+	return nil
 }
 
 // oracleSource is source metadata for data capture events.
@@ -132,8 +148,8 @@ type replicationStream struct {
 	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
 	eventBuf []sqlcapture.DatabaseEvent    // A buffer used in between 'receiveMessage' and the output channel
 
-	redoFiles         []redoFile // list of redo files
-	currentFileEndSCN int
+	redoFiles    []redoFile // list of redo files
+	redoSequence int
 
 	ackSCN        uint64 // The most recently Ack'd SCN, passed to startReplication or updated via CommitSCN.
 	lastTxnEndSCN int    // End SCN (record + 1) of the last completed transaction.
@@ -222,9 +238,22 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			s.eventBuf = nil
 		}
 
+		switched, err := s.redoFileSwitched(ctx)
+		if err != nil {
+			return err
+		}
+
+		if switched {
+			if err := s.endLogminer(ctx); err != nil {
+				return err
+			} else if err := s.startLogminer(ctx, s.lastTxnEndSCN); err != nil {
+				return fmt.Errorf("starting logminer: %w", err)
+			}
+		}
+
 		// In the absence of a buffered message, go try to receive another from
 		// the database.
-		var msgs, err = s.receiveMessages(ctx)
+		msgs, err := s.receiveMessages(ctx)
 		if err != nil {
 			return err
 		}
@@ -268,6 +297,48 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	switch msg.op {
 	case opInsert:
 		op = sqlcapture.InsertOp
+		insert, ok := ast.(*sqlparser.Insert)
+		if !ok {
+			return nil, fmt.Errorf("expected INSERT sql statement, instead got: %v", ast)
+		}
+
+		values, ok := insert.Rows.(sqlparser.Values)
+		if !ok {
+			return nil, fmt.Errorf("expected VALUES in INSERT statement, instead got: %v", insert.Rows)
+		}
+
+		for i, col := range insert.Columns {
+			var key = col.String()
+
+			// sql_redo field of logminer will have a single values for each insertion
+			var value = values[0][i].(*sqlparser.Literal).Val
+			doc[key] = value
+		}
+		// sql_redo of insert statements do not include a ROWID, but their SQL_UNDO which
+		// is a delete statement does include a ROWID, so we extract the ROWID from the undo SQL
+		undoAST, err := parser.Parse(msg.undoSql)
+		if err != nil {
+			return nil, fmt.Errorf("parsing undo sql query %q: %w", msg.undoSql, err)
+		}
+		del, ok := undoAST.(*sqlparser.Delete)
+		if !ok {
+			return nil, fmt.Errorf("expected DELETE undo sql statement, instead got: %v", undoAST)
+		}
+
+		sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
+			switch n := node.(type) {
+			case *sqlparser.ComparisonExpr:
+				var key = sqlparser.String(n.Left)
+				if key == "ROWID" {
+					var value = n.Right.(*sqlparser.Literal).Val
+					doc[key] = value
+
+					return false, nil
+				}
+			}
+
+			return true, nil
+		})
 	case opUpdate:
 		op = sqlcapture.UpdateOp
 		update, ok := ast.(*sqlparser.Update)
@@ -294,7 +365,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		op = sqlcapture.DeleteOp
 		del, ok := ast.(*sqlparser.Delete)
 		if !ok {
-			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
+			return nil, fmt.Errorf("expected DELETE sql statement, instead got: %v", ast)
 		}
 		sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
@@ -353,6 +424,7 @@ type logminerMessage struct {
 	endSCN    int
 	op        int
 	sql       string
+	undoSql   string
 	tableName string
 	owner     string
 	ts        int64
@@ -368,7 +440,7 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, TABLE_NAME, SEG_OWNER FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn", s.lastTxnEndSCN)
+	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn", s.lastTxnEndSCN)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +450,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 	for rows.Next() {
 		var msg logminerMessage
 		var ts time.Time
-		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &msg.tableName, &msg.owner); err != nil {
+		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &msg.undoSql, &msg.tableName, &msg.owner); err != nil {
 			return nil, err
 		}
 		msg.ts = ts.UnixMilli()
@@ -460,6 +532,17 @@ func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
 	s.cancel()
 	return <-s.errCh
+}
+
+func (s *replicationStream) redoFileSwitched(ctx context.Context) (bool, error) {
+	row := s.conn.QueryRowContext(ctx, "SELECT SEQUENCE# FROM V$LOG WHERE STATUS = 'CURRENT' ORDER BY SEQUENCE#")
+
+	var newSequence int
+	if err := row.Scan(&newSequence); err != nil {
+		return false, fmt.Errorf("fetching latest redo log sequence number: %w", err)
+	}
+
+	return newSequence > s.redoSequence, nil
 }
 
 func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
