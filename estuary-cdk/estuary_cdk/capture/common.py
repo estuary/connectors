@@ -622,7 +622,16 @@ async def _binding_incremental_task(
             task.log.info("incremental task ran recently, sleeping until `interval` has fully elapsed", {"sleep_for": sleep_for})
 
     while True:
-        await asyncio.sleep(sleep_for.total_seconds())
+        try:
+            if not task.stopping.event.is_set():
+                await asyncio.wait_for(
+                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                )
+
+            task.log.debug(f"incremental replication is idle and is yielding to stop")
+            return
+        except asyncio.TimeoutError:
+            pass  # `interval` elapsed.
 
         checkpoints = 0
         pending = False
@@ -684,15 +693,3 @@ async def _binding_incremental_task(
             continue
 
         task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
-
-        # At this point we've fully caught up with the log and are idle.
-        try:
-            if not task.stopping.event.is_set():
-                await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
-                )
-
-            task.log.debug(f"incremental replication is idle and is yielding to stop")
-            return
-        except asyncio.TimeoutError:
-            pass  # `interval` elapsed.
