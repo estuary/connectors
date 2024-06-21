@@ -41,6 +41,8 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		logEntry.WithField("rowid", afterRowID).Debug("scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterRowID}
+
+		// TODO:
 	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
 		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
 		if resumeAfter != nil {

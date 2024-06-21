@@ -314,6 +314,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			var value = values[0][i].(*sqlparser.Literal).Val
 			doc[key] = value
 		}
+
 		// sql_redo of insert statements do not include a ROWID, but their SQL_UNDO which
 		// is a delete statement does include a ROWID, so we extract the ROWID from the undo SQL
 		undoAST, err := parser.Parse(msg.undoSql)
@@ -498,21 +499,7 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 }
 
 // Acknowledge informs the ReplicationStream that all messages up to the specified
-// LSN [1] have been persisted, and that a future restart will never need to return
-// to older portions of the transaction log. This fact will be communicated to the
-// database in a periodic status update, whereupon the replication slot's "Restart
-// LSN" may be advanced accordingly.
-//
-// [1] The handling of LSNs and replication slot advancement is complicated, but
-// luckily most of the complexity is handled within PostgreSQL. Just be aware that
-// we're not necessarily receiving messages in the literal order that they appear
-// in the WAL, and that PostgreSQL is doing a lot of Magic behind the scenes in
-// order to present the illusion that these changes occurred in order without any
-// interleaving between transactions.
-//
-// Thus you shouldn't expect that a specific "Committed LSN" value will necessarily
-// advance the "Restart LSN" to the same point, but so long as you ignore the details
-// things will work out in the end.
+// SCN have been persisted
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
 	logrus.WithField("cursor", cursor).Debug("advancing acknowledged LSN")
 	var scn, err = strconv.Atoi(cursor)
@@ -520,11 +507,6 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) erro
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
 	}
 	atomic.StoreUint64(&s.ackSCN, uint64(scn))
-	return nil
-}
-
-func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
-	//var ackSCN = atomic.LoadUint64(&s.ackSCN)
 	return nil
 }
 
