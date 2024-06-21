@@ -1,0 +1,81 @@
+---
+collections:
+  acmeCo/account_users:
+    schema: account_users.schema.yaml
+    key:
+      - /account
+  acmeCo/accounts:
+    schema: accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/ad_campaign_analytics:
+    schema: ad_campaign_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_creative_analytics:
+    schema: ad_creative_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_impression_device_analytics:
+    schema: ad_impression_device_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_company_analytics:
+    schema: ad_member_company_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_company_size_analytics:
+    schema: ad_member_company_size_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_country_analytics:
+    schema: ad_member_country_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_industry_analytics:
+    schema: ad_member_industry_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_job_function_analytics:
+    schema: ad_member_job_function_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_job_title_analytics:
+    schema: ad_member_job_title_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_region_analytics:
+    schema: ad_member_region_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_seniority_analytics:
+    schema: ad_member_seniority_analytics.schema.yaml
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/campaign_groups:
+    schema: campaign_groups.schema.yaml
+    key:
+      - /id
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/conversions:
+    schema: conversions.schema.yaml
+    key:
+      - /id
+  acmeCo/creatives:
+    schema: creatives.schema.yaml
+    key:
+      - /id

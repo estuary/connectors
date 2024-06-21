@@ -27,7 +27,8 @@
         "source": {
           "row_id": "<row_id>",
           "table": "TEST_ALL_TYPES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ]
