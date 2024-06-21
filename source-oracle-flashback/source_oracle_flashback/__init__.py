@@ -78,6 +78,12 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
+        flashback_on_test = True
+        # RDS instances report flashback=OFF because it is not enabled on a database level
+        # but it is available on a table level, so we disable that check for RDS instances
+        if 'amazonaws.com' in validate.config.address:
+            flashback_on_test = False
+
         if validate.config.network_tunnel:
             ssh_forwarding = validate.config.network_tunnel.ssh_forwarding
             params = oracledb.ConnectParams()
@@ -95,7 +101,7 @@ class Connector(
                 local_bind_port=port,
             )
         self.pool = create_pool(log, validate.config)
-        await validate_flashback(log, validate.config, self.pool)
+        await validate_flashback(log, validate.config, flashback_on_test, self.pool)
         resources = await all_resources(log, self, validate.config, self.pool)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
@@ -105,6 +111,11 @@ class Connector(
         log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
+        flashback_on_test = True
+        # RDS instances report flashback=OFF because it is not enabled on a database level
+        # but it is available on a table level, so we disable that check for RDS instances
+        if 'amazonaws.com' in open.capture.config.address:
+            flashback_on_test = False
         if open.capture.config.network_tunnel:
             ssh_forwarding = open.capture.config.network_tunnel.ssh_forwarding
             params = oracledb.ConnectParams()
@@ -121,7 +132,7 @@ class Connector(
                 local_bind_port=port,
             )
         self.pool = create_pool(log, open.capture.config)
-        await validate_flashback(log, open.capture.config, self.pool)
+        await validate_flashback(log, open.capture.config, flashback_on_test, self.pool)
         resources = await all_resources(log, self, open.capture.config, self.pool)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
