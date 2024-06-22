@@ -42,9 +42,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterRowID}
 
-		// TODO:
-	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
-		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
+	case sqlcapture.TableModePreciseBackfill:
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -57,11 +55,11 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
 			}).Debug("scanning subsequent table chunk")
-			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
 			args = resumeKey
 		} else {
 			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
 		}
 	default:
 		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -174,9 +172,11 @@ func (db *oracleDatabase) WatermarksTable() string {
 // proper ordering and comparison. Represented as a map[string]bool so that it can be
 // combined with the "is the column typename a string" check into one if statement.
 var columnBinaryKeyComparison = map[string]bool{
-	"varchar": true,
-	"bpchar":  true,
-	"text":    true,
+	"varchar2": true,
+	"char":     true,
+	"nvarchar": true,
+	"nchar":    true,
+	"long":     true,
 }
 
 func castColumn(col sqlcapture.ColumnInfo) string {
@@ -233,8 +233,31 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	return query.String()
 }
 
-func (db *oracleDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
-	return ""
+func (db *oracleDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
+	var pkey []string
+	var args []string
+	for idx, colName := range keyColumns {
+		var quotedName = quoteColumnName(colName)
+		// If a precise backfill is requested *and* the column type requires binary ordering for precise
+		// backfill comparisons to work, add the 'COLLATE BINARY' qualifier to the column name.
+		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
+			pkey = append(pkey, quotedName+" COLLATE BINARY")
+		} else {
+			pkey = append(pkey, quotedName)
+		}
+		args = append(args, fmt.Sprintf(":%d", idx+1))
+	}
+
+	// Construct the query itself
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+	fmt.Fprintf(query, " WHERE ROWNUM <= %d", db.config.Advanced.BackfillChunkSize)
+	if !start {
+		fmt.Fprintf(query, " AND (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
+	}
+	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
+	return query.String()
 }
 
 func quoteColumnName(name string) string {
