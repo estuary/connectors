@@ -222,7 +222,17 @@ func (db *oracleDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/row_id"}
 }
 
+// TODO: handle numeric types encoding (float64 for example)
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
+	colType, ok := ktype.(oracleColumnType)
+	if ok && colType.original == "NUMBER" {
+		if colType.scale == 0 {
+			return int64(*key.(*float64)), nil
+		} else {
+			return nil, fmt.Errorf("unsupported %q primary key with precision %d", colType.original, colType.scale)
+		}
+	}
+
 	switch key := key.(type) {
 	case [16]uint8:
 		var id, err = uuid.FromBytes(key[:])

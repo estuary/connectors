@@ -17,7 +17,7 @@ var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to stat
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
-	logrus.WithField("state", state).Error("ScanChunk")
+	logrus.WithField("state", state).Debug("ScanChunk")
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -55,11 +55,11 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
 			}).Debug("scanning subsequent table chunk")
-			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(false, info, keyColumns, columnTypes, schema, table)
 			args = resumeKey
 		} else {
 			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(true, info, keyColumns, columnTypes, schema, table)
 		}
 	default:
 		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -69,7 +69,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	// db.explainQuery(ctx, streamID, query, args)
 
 	// Execute the backfill query to fetch rows from the database
-	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Error("executing query")
+	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
@@ -101,11 +101,10 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			return false, fmt.Errorf("scanning row: %w", err)
 		}
 		var rowKey []byte
-		var rowid string
+		var rowid = *fields["ROWID"].(*string)
+		delete(fields, "ROWID")
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
-			rowid = *fields["ROWID"].(*string)
 			rowKey = []byte(rowid)
-			delete(fields, "ROWID")
 
 			// Sanity check that rows are returned in ascending RowID order within a given backfill chunk
 			if rowid < prevRowID {
@@ -118,6 +117,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
+
 		if err := translateRecordFields(info, fields); err != nil {
 			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
@@ -233,7 +233,7 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	return query.String()
 }
 
-func (db *oracleDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryInfo, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	var args []string
@@ -251,12 +251,16 @@ func (db *oracleDatabase) buildScanQuery(start bool, keyColumns []string, column
 
 	// Construct the query itself
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+	var columnSelect []string
+	for _, col := range info.Columns {
+		columnSelect = append(columnSelect, castColumn(col))
+	}
+	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
 	fmt.Fprintf(query, " WHERE ROWNUM <= %d", db.config.Advanced.BackfillChunkSize)
 	if !start {
 		fmt.Fprintf(query, " AND (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
 	}
-	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
+	fmt.Fprintf(query, " ORDER BY %s ASC", strings.Join(pkey, ", "))
 	return query.String()
 }
 

@@ -79,6 +79,7 @@ func (s *replicationStream) endLogminer(ctx context.Context) error {
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) error {
+	logrus.WithField("startSCN", startSCN).Debug("starting logminer")
 	rows, err := s.conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, SEQUENCE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP# AND V$LOG.STATUS NOT IN ('INACTIVE') AND NEXT_CHANGE# >= :1", startSCN)
 	if err != nil {
 		return fmt.Errorf("fetching log file list: %w", err)
@@ -255,7 +256,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// the database.
 		msgs, err := s.receiveMessages(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("receive messages: %w", err)
 		}
 
 		s.eventBuf = make([]sqlcapture.DatabaseEvent, len(msgs)+1)
@@ -443,7 +444,7 @@ const (
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
 	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn", s.lastTxnEndSCN)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("logminer query: %w", err)
 	}
 	defer rows.Close()
 
@@ -451,8 +452,12 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 	for rows.Next() {
 		var msg logminerMessage
 		var ts time.Time
-		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &msg.undoSql, &msg.tableName, &msg.owner); err != nil {
+		var undoSql sql.NullString
+		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &undoSql, &msg.tableName, &msg.owner); err != nil {
 			return nil, err
+		}
+		if undoSql.Valid {
+			msg.undoSql = undoSql.String
 		}
 		msg.ts = ts.UnixMilli()
 
@@ -481,7 +486,6 @@ func (s *replicationStream) tableActive(streamID string) bool {
 }
 
 func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
-	logrus.WithField("streamID", streamID).Error("check active table")
 	s.tables.RLock()
 	defer s.tables.RUnlock()
 	var keyColumns, ok = s.tables.keyColumns[streamID]
@@ -489,7 +493,6 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 }
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
-	logrus.WithField("streamID", streamID).Error("activated table")
 	s.tables.Lock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns
@@ -517,7 +520,7 @@ func (s *replicationStream) Close(ctx context.Context) error {
 }
 
 func (s *replicationStream) redoFileSwitched(ctx context.Context) (bool, error) {
-	row := s.conn.QueryRowContext(ctx, "SELECT SEQUENCE# FROM V$LOG WHERE STATUS = 'CURRENT' ORDER BY SEQUENCE#")
+	row := s.conn.QueryRowContext(ctx, "SELECT SEQUENCE# FROM V$LOG WHERE STATUS = 'CURRENT' AND ROWNUM=1 ORDER BY SEQUENCE#")
 
 	var newSequence int
 	if err := row.Scan(&newSequence); err != nil {

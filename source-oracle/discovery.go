@@ -249,7 +249,7 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 }
 
 const queryDiscoverColumns = `
-SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type, t.data_scale, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
+SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type, t.data_scale, t.data_length, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
     LEFT JOIN (
             SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
                 INNER JOIN all_cons_columns ac ON (
@@ -263,6 +263,8 @@ SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_typ
 
 type oracleColumnType struct {
 	original string
+	length   int
+	scale    int16
 	t        reflect.Type
 	format   string
 }
@@ -292,9 +294,10 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	for rows.Next() {
 		var isPrimaryKey bool
 		var isNullableStr string
-		var dataScale sql.NullInt64
+		var dataScale sql.NullInt16
+		var dataLength int
 		var dataType string
-		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &dataType, &dataScale, &isPrimaryKey); err != nil {
+		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &dataType, &dataScale, &dataLength, &isPrimaryKey); err != nil {
 			return nil, nil, fmt.Errorf("scanning column: %w", err)
 		}
 
@@ -304,7 +307,7 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		var t reflect.Type
 		var format string
-		if dataType == "NUMBER" && dataScale.Int64 == 0 {
+		if dataType == "NUMBER" && dataScale.Int16 == 0 {
 			t = reflect.TypeFor[int64]()
 		} else if slices.Contains([]string{"NUMBER", "DOUBLE", "FLOAT"}, dataType) {
 			if isPrimaryKey {
@@ -334,6 +337,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		sc.DataType = oracleColumnType{
 			original: dataType,
+			scale:    dataScale.Int16,
+			length:   dataLength,
 			t:        t,
 			format:   format,
 		}
