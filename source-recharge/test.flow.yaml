@@ -1,8 +1,11 @@
 captures:
   acmeCo/source-recharge:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-recharge:dev"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_recharge
         config:
           access_token: ""
           start_date: "2020-01-01T00:00:00Z"
