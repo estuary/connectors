@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -214,6 +215,12 @@ func (s *replicationStream) run(ctx context.Context) error {
 
 		var err = s.poll(ctx)
 		if err != nil {
+			// ORA-01013: user requested cancel of current operation
+			// this means a cancellation of context happened, which we don't consider an error
+			// since it should only happen in tests
+			if strings.Contains(err.Error(), "ORA-01013") {
+				continue
+			}
 			return fmt.Errorf("failed to poll messages: %w", err)
 		}
 	}
@@ -231,7 +238,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			for _, ev := range s.eventBuf {
 				select {
 				case <-ctx.Done():
-					return nil
+					return ctx.Err()
 				case s.events <- ev:
 					continue
 				}
@@ -422,7 +429,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		}
 	}
 
-	// TODO: if keyless backfill
+	// TODO: if keyless backfill ... else if precise backfill ...
 	rowKey, err := sqlcapture.EncodeRowKey([]string{"ROWID"}, map[string]any{"ROWID": rowid}, nil, encodeKeyFDB)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
@@ -537,7 +544,7 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // Acknowledge informs the ReplicationStream that all messages up to the specified
 // SCN have been persisted
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	logrus.WithField("cursor", cursor).Debug("advancing acknowledged LSN")
+	logrus.WithField("cursor", cursor).Debug("advancing acknowledged SCN")
 	var scn, err = strconv.Atoi(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)

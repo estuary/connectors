@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/admin_generic_emptytable_91431165": 3 Documents
+# ================================
+{"DATA":"more","ID":1000,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"GENERIC_EMPTYTABLE_91431165","scn":11111111,"row_id":"AAAGrHAAAAAAAMmAAB"}}}
+{"DATA":"rows","ID":1001,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"GENERIC_EMPTYTABLE_91431165","scn":11111111,"row_id":"AAAGrHAAAAAAAMmAAC"}}}
+{"DATA":"some","ID":1002,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"ADMIN","table":"GENERIC_EMPTYTABLE_91431165","scn":11111111,"row_id":"AAAGrHAAAAAAAMmAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FGENERIC_EMPTYTABLE_91431165":{"backfilled":0,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+

@@ -310,7 +310,9 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query stri
 	colTypes, err := rows.ColumnTypes()
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
-		var fields = make(map[string]any)
+		var fields = logrus.Fields{
+			"streamID": streamID,
+		}
 		var fieldsPtr = make([]any, len(cols))
 		for idx, col := range cols {
 			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
@@ -324,9 +326,6 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query stri
 			return
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"id":       streamID,
-			"response": fields,
-		}).Info("explain backfill query")
+		logrus.WithFields(fields).Info("explain backfill query")
 	}
 }

@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test/admin_generic_replicationdeletes_65713151": 5 Documents
+# ================================
+{"DATA":"5","ID":4,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONDELETES_65713151","row_id":"AAAGrFAAAAAAAMmAAE"}}}
+{"DATA":"A","ID":0,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONDELETES_65713151","row_id":"AAAGrFAAAAAAAMmAAA"}}}
+{"DATA":"CDEFGHIJKLMNOP","ID":2,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONDELETES_65713151","row_id":"AAAGrFAAAAAAAMmAAC"}}}
+{"DATA":"Four","ID":3,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONDELETES_65713151","row_id":"AAAGrFAAAAAAAMmAAD"}}}
+{"DATA":"bbb","ID":1,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_REPLICATIONDELETES_65713151","row_id":"AAAGrFAAAAAAAMmAAB"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FGENERIC_REPLICATIONDELETES_65713151":{"backfilled":5,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+

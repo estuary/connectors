@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/admin_generic_multiplestreams_14930049": 3 Documents
+# ================================
+{"DATA":"one","ID":1,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_MULTIPLESTREAMS_14930049","row_id":"AAAGrdAAAAAAAMmAAB"}}}
+{"DATA":"two","ID":2,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_MULTIPLESTREAMS_14930049","row_id":"AAAGrdAAAAAAAMmAAC"}}}
+{"DATA":"zero","ID":0,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"GENERIC_MULTIPLESTREAMS_14930049","row_id":"AAAGrdAAAAAAAMmAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2FGENERIC_MULTIPLESTREAMS_14930049":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+
