@@ -65,8 +65,8 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
-	// TODO: If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
-	// db.explainQuery(ctx, streamID, query, args)
+	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
+	db.explainQuery(ctx, streamID, query, args)
 
 	// Execute the backfill query to fetch rows from the database
 	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
@@ -274,4 +274,59 @@ func quoteColumnName(name string) string {
 
 // TODO
 func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
+	// Only EXPLAIN the backfill query once per connector invocation
+	if db.explained == nil {
+		db.explained = make(map[sqlcapture.StreamID]struct{})
+	}
+	if _, ok := db.explained[streamID]; ok {
+		return
+	}
+	db.explained[streamID] = struct{}{}
+
+	// Ask the database to EXPLAIN the backfill query
+	var explainQuery = "EXPLAIN PLAN FOR " + query
+	logrus.WithFields(logrus.Fields{
+		"id":    streamID,
+		"query": explainQuery,
+	}).Info("explain backfill query")
+	_, err := db.conn.ExecContext(ctx, explainQuery, args...)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
+		return
+	}
+	rows, err := db.conn.QueryContext(ctx, "SELECT * FROM table(dbms_xplan.display)")
+	if err != nil {
+		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
+		return
+	}
+	defer rows.Close()
+
+	// Log the response, doing a bit of extra work to make it readable
+	cols, err := rows.Columns()
+	if err != nil {
+		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
+		return
+	}
+	colTypes, err := rows.ColumnTypes()
+	for rows.Next() {
+		// Scan the row values and copy into the equivalent map
+		var fields = make(map[string]any)
+		var fieldsPtr = make([]any, len(cols))
+		for idx, col := range cols {
+			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
+			fieldsPtr[idx] = fields[col]
+		}
+		if err := rows.Scan(fieldsPtr...); err != nil {
+			logrus.WithFields(logrus.Fields{
+				"id":  streamID,
+				"err": err,
+			}).Error("error getting row value")
+			return
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"id":       streamID,
+			"response": fields,
+		}).Info("explain backfill query")
+	}
 }

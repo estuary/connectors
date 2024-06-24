@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -279,10 +280,6 @@ func (s *replicationStream) poll(ctx context.Context) error {
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
 	var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
-	/*keyColumns, ok := s.keyColumns(streamID)
-	if !ok {
-		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
-	}*/
 	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return nil, err
@@ -291,12 +288,16 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	if err != nil {
 		return nil, fmt.Errorf("parsing sql query %q: %w", msg.sql, err)
 	}
-
-	var doc = make(map[string]any)
+	undoAST, err := parser.Parse(msg.undoSql)
+	if err != nil {
+		return nil, fmt.Errorf("parsing undo sql query %q: %w", msg.undoSql, err)
+	}
+	var after, before map[string]any
 
 	var op sqlcapture.ChangeOp
 	switch msg.op {
 	case opInsert:
+		after = make(map[string]any)
 		op = sqlcapture.InsertOp
 		insert, ok := ast.(*sqlparser.Insert)
 		if !ok {
@@ -313,15 +314,11 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 
 			// sql_redo field of logminer will have a single values for each insertion
 			var value = values[0][i].(*sqlparser.Literal).Val
-			doc[key] = value
+			after[key] = value
 		}
 
 		// sql_redo of insert statements do not include a ROWID, but their SQL_UNDO which
 		// is a delete statement does include a ROWID, so we extract the ROWID from the undo SQL
-		undoAST, err := parser.Parse(msg.undoSql)
-		if err != nil {
-			return nil, fmt.Errorf("parsing undo sql query %q: %w", msg.undoSql, err)
-		}
 		del, ok := undoAST.(*sqlparser.Delete)
 		if !ok {
 			return nil, fmt.Errorf("expected DELETE undo sql statement, instead got: %v", undoAST)
@@ -333,7 +330,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 				var key = sqlparser.String(n.Left)
 				if key == "ROWID" {
 					var value = n.Right.(*sqlparser.Literal).Val
-					doc[key] = value
+					after[key] = value
 
 					return false, nil
 				}
@@ -342,6 +339,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			return true, nil
 		})
 	case opUpdate:
+		before = make(map[string]any)
+		after = make(map[string]any)
 		op = sqlcapture.UpdateOp
 		update, ok := ast.(*sqlparser.Update)
 		if !ok {
@@ -352,7 +351,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			case *sqlparser.ComparisonExpr:
 				var key = sqlparser.String(n.Left)
 				var value = n.Right.(*sqlparser.Literal).Val
-				doc[key] = value
+				after[key] = value
 			}
 
 			return true, nil
@@ -361,9 +360,31 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		for _, expr := range update.Exprs {
 			var key = sqlparser.String(expr.Name.Name)
 			var value = expr.Expr.(*sqlparser.Literal).Val
-			doc[key] = value
+			after[key] = value
+		}
+
+		undo, ok := undoAST.(*sqlparser.Update)
+		if !ok {
+			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
+		}
+		sqlparser.VisitExpr(undo.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
+			switch n := node.(type) {
+			case *sqlparser.ComparisonExpr:
+				var key = sqlparser.String(n.Left)
+				var value = n.Right.(*sqlparser.Literal).Val
+				before[key] = value
+			}
+
+			return true, nil
+		})
+
+		for _, expr := range undo.Exprs {
+			var key = sqlparser.String(expr.Name.Name)
+			var value = expr.Expr.(*sqlparser.Literal).Val
+			before[key] = value
 		}
 	case opDelete:
+		before = make(map[string]any)
 		op = sqlcapture.DeleteOp
 		del, ok := ast.(*sqlparser.Delete)
 		if !ok {
@@ -374,7 +395,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			case *sqlparser.ComparisonExpr:
 				var key = sqlparser.String(n.Left)
 				var value = n.Right.(*sqlparser.Literal).Val
-				doc[key] = value
+				before[key] = value
 			}
 
 			return true, nil
@@ -383,20 +404,31 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		return nil, fmt.Errorf("unexpected operation code %d", msg.op)
 	}
 
-	rowKey, err := sqlcapture.EncodeRowKey([]string{"ROWID"}, doc, nil, encodeKeyFDB)
-	if err != nil {
-		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-	}
-
 	discovery, ok := s.tables.discovery[streamID]
 	if !ok {
 		return nil, fmt.Errorf("unknown discovery info for stream %q", streamID)
 	}
-	if err := translateRecordFields(discovery, doc); err != nil {
-		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
+
+	var rowid string
+	if after != nil {
+		rowid = after["ROWID"].(string)
+		if err := translateRecordFields(discovery, after); err != nil {
+			return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
+		}
+	} else if before != nil {
+		rowid = before["ROWID"].(string)
+		if err := translateRecordFields(discovery, before); err != nil {
+			return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
+		}
 	}
-	var rowid = doc["ROWID"].(string)
-	delete(doc, "ROWID")
+
+	// TODO: if keyless backfill
+	rowKey, err := sqlcapture.EncodeRowKey([]string{"ROWID"}, map[string]any{"ROWID": rowid}, nil, encodeKeyFDB)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+	}
+	delete(after, "ROWID")
+	delete(before, "ROWID")
 
 	var sourceInfo = &oracleSource{
 		SourceCommon: sqlcapture.SourceCommon{
@@ -408,12 +440,13 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		SCN:   msg.startSCN,
 		RowID: rowid,
 	}
+
 	var event = &sqlcapture.ChangeEvent{
 		Operation: op,
 		RowKey:    rowKey,
 		Source:    sourceInfo,
-		Before:    nil,
-		After:     doc,
+		Before:    before,
+		After:     after,
 	}
 
 	s.lastTxnEndSCN = msg.startSCN + 1
@@ -531,9 +564,9 @@ func (s *replicationStream) redoFileSwitched(ctx context.Context) (bool, error) 
 }
 
 func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
-	/*var query = func(q string) {
+	var query = func(q string) {
 		logrus.WithField("query", q).Info("running diagnostics query")
-		var result, err = db.conn.QueryContext(ctx, q)
+		var rows, err = db.conn.QueryContext(ctx, q)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"query": q,
@@ -541,31 +574,47 @@ func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
 			}).Error("unable to execute diagnostics query")
 			return
 		}
-		defer result.Close()
+		defer rows.Close()
 
 		var numResults int
-		var keys = result.FieldDescriptions()
-		for result.Next() {
+		cols, err := rows.Columns()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"query": q,
+				"err":   err,
+			}).Error("unable to execute diagnostics query")
+		}
+		colTypes, err := rows.ColumnTypes()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"query": q,
+				"err":   err,
+			}).Error("unable to execute diagnostics query")
+		}
+		for rows.Next() {
 			numResults++
-			var row, err = result.Values()
-			if err != nil {
-				logrus.WithField("err", err).Error("unable to process result row")
-				continue
+			// Scan the row values and copy into the equivalent map
+			var fields = make(map[string]any)
+			var fieldsPtr = make([]any, len(cols))
+			for idx, col := range cols {
+				fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
+				fieldsPtr[idx] = fields[col]
+			}
+			if err := rows.Scan(fieldsPtr...); err != nil {
+				logrus.WithFields(logrus.Fields{
+					"query": q,
+					"err":   err,
+				}).Error("unable to scan diagnostics query")
 			}
 
-			var logFields = logrus.Fields{}
-			for idx, val := range row {
-				logFields[string(keys[idx].Name)] = val
-			}
-			logrus.WithFields(logFields).Info("got diagnostic row")
+			logrus.WithField("result", fields).Info("got diagnostic row")
 		}
 		if numResults == 0 {
 			logrus.WithField("query", q).Info("no results")
 		}
 	}
 
-	query("SELECT * FROM public.flow_watermarks;")
-	query("SELECT * FROM pg_replication_slots;")
-	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")*/
+	query("SELECT * FROM " + db.config.Advanced.WatermarksTable)
+	query("SELECT current_scn from V$DATABASE")
 	return nil
 }
