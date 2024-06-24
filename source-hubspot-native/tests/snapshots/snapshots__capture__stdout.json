@@ -2,6 +2,9 @@
   [
     "acmeCo/companies",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "createdAt": "2024-02-08T02:37:20.547000Z",
       "id": 19015508755,
@@ -460,6 +463,9 @@
   [
     "acmeCo/companies",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "contacts": [
         151,
@@ -1119,6 +1125,9 @@
   [
     "acmeCo/companies",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "contacts": [
         51,
@@ -2128,6 +2137,9 @@
   [
     "acmeCo/companies",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "createdAt": "2024-02-08T17:09:41.623000Z",
       "id": 19021320226,
@@ -2435,6 +2447,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "createdAt": "2024-02-08T02:34:10.399000Z",
       "id": 1,
@@ -2963,6 +2978,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "companies": [
         19015593502,
@@ -3497,6 +3515,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "companies": [
         19015508766,
@@ -3988,6 +4009,9 @@
   [
     "acmeCo/contacts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "companies": [
         19015593502,
@@ -4599,6 +4623,9 @@
   [
     "acmeCo/deals",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "contacts": [
         1
@@ -4962,6 +4989,9 @@
   [
     "acmeCo/engagements",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "createdAt": "2024-02-15T17:25:55.752000Z",
       "id": 47494434080,
@@ -5333,6 +5363,9 @@
   [
     "acmeCo/tickets",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "archived": false,
       "contacts": [
         151
