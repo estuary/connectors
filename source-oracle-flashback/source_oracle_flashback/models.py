@@ -47,7 +47,7 @@ class Wallet(BaseModel):
 class EndpointConfig(BaseModel):
     address: str = Field(
         title="Address",
-        description="The connection string for connecting to the database",
+        description="The connection string for connecting to the database, either in the format of host:port/SID or a connect descriptor such as (address=(protocol=tcps)(host=...)...)",
     )
     credentials: BasicAuth | Wallet = Field(
         discriminator="credentials_title",
@@ -76,11 +76,11 @@ class EndpointConfig(BaseModel):
             title="SSH Forwarding"
         )
 
-    network_tunnel: NetworkTunnel | None = Field(
+    network_tunnel: NetworkTunnel = Field(
+        default=None,
         alias="networkTunnel",
         title="Network Tunnel",
         description="Connect to your system through an SSH server that acts as a bastion host for your network.",
-        default=None,
     )
 
     class Advanced(BaseModel):
