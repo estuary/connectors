@@ -265,11 +265,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 }
 
 func quoteColumnName(name string) string {
-	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
-	//
-	//     Quoted identifiers can contain any character, except the character with code zero.
-	//     (To include a double quote, write two double quotes.)
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+	return `"` + name + `"`
 }
 
 // TODO

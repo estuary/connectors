@@ -14,10 +14,11 @@ import (
 )
 
 func TestViewDiscovery(t *testing.T) {
+	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data VARCHAR(2000))")
+	var tableName = tb.CreateTable(ctx, t, unique, "(id INTEGER PRIMARY KEY, grp INTEGER, data VARCHAR(2000))")
 
-	var view = tableName + "_simpleview"
+	var view = fmt.Sprintf(`"t%s"`, unique+"_simpleview")
 	tb.Query(ctx, t, false, fmt.Sprintf(`DROP VIEW %s`, view))
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1`, view, tableName))
 	t.Cleanup(func() {
@@ -92,7 +93,7 @@ func TestTrickyColumnNames(t *testing.T) {
 	// name, and one containing special characters which also happens to be the primary key).
 	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueA, uniqueB = "39256824", "42531495"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
+	var tableA = tb.CreateTable(ctx, t, uniqueA, `("Meta/wtf~ID" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	var tableB = tb.CreateTable(ctx, t, uniqueB, `("table" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	tb.Insert(ctx, t, tableA, [][]any{{1, "aaa"}, {2, "bbb"}})
 	tb.Insert(ctx, t, tableB, [][]any{{3, "ccc"}, {4, "ddd"}})

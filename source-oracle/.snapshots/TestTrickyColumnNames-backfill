@@ -1,0 +1,10 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"ADMIN%2Ft39256824":{"backfilled":0,"key_columns":["Meta/wtf~ID"],"mode":"Pending","scanned":null},"ADMIN%2Ft42531495":{"backfilled":0,"key_columns":["table"],"mode":"Pending","scanned":null}},"cursor":"11111111"}
+# ================================
+# Captures Terminated With Errors
+# ================================
+error performing backfill: error scanning table "admin.t39256824": unable to execute query "SELECT ROWID, Meta/wtf~ID,DATA FROM \"ADMIN\".\"t39256824\" WHERE ROWNUM <= 16 ORDER BY \"Meta/wtf~ID\" ASC": ORA-00911: invalid character
+
+

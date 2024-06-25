@@ -1,18 +1,18 @@
 Binding 0:
 {
-    "recommended_name": "admin_generic_simplediscovery_49210954",
+    "recommended_name": "admin_t49210954",
     "resource_config_json": {
       "namespace": "ADMIN",
-      "stream": "GENERIC_SIMPLEDISCOVERY_49210954"
+      "stream": "t49210954"
     },
     "document_schema_json": {
       "$defs": {
-        "ADMINGENERIC_SIMPLEDISCOVERY_49210954": {
+        "ADMINT49210954": {
           "type": "object",
           "required": [
             "A"
           ],
-          "$anchor": "ADMINGENERIC_SIMPLEDISCOVERY_49210954",
+          "$anchor": "ADMINT49210954",
           "properties": {
             "A": null,
             "B": null,
@@ -57,7 +57,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#ADMINGENERIC_SIMPLEDISCOVERY_49210954",
+                  "$ref": "#ADMINT49210954",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -114,7 +114,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#ADMINGENERIC_SIMPLEDISCOVERY_49210954"
+          "$ref": "#ADMINT49210954"
         }
       ]
     },
