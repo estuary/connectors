@@ -1,9 +1,9 @@
 # ================================
 # Final State Checkpoint
 # ================================
-
+{"cursor":"","bindingStateV1":{"t14026504%2FADMIN":{"mode":"Pending","key_columns":null,"scanned":null,"backfilled":0}}}
 # ================================
 # Captures Terminated With Errors
 # ================================
-error updating capture state: table "FLOW_TEST_LOGMINER.T27607177" is a configured binding of this capture, but doesn't exist or isn't visible with current permissions
+watermarks table "admin.flow_watermarks" does not exist
 

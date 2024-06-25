@@ -1,5 +1,11 @@
 # ================================
+# Collection "acmeCo/test/flow_test_logminer_t58418982": 3 Documents
+# ================================
+{"DATA":"more","ID":1000,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T58418982","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"rows","ID":1001,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T58418982","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"some","ID":1002,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T58418982","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"ADMIN%2FGENERIC_REPLICATIONINSERTS_58418982":{"backfilled":5,"key_columns":["ID"],"mode":"Active"}},"cursor":11111111}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT58418982":{"backfilled":5,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
 

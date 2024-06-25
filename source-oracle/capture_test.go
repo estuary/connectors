@@ -8,16 +8,16 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/sirupsen/logrus"
 )
 
 func TestViewDiscovery(t *testing.T) {
+	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data VARCHAR(2000))")
+	var tableName = tb.CreateTable(ctx, t, unique, "(id INTEGER PRIMARY KEY, grp INTEGER, data VARCHAR(2000))")
 
-	var view = tableName + "_simpleview"
+	var view = fmt.Sprintf(`"t%s"`, unique+"_simpleview")
 	tb.Query(ctx, t, false, fmt.Sprintf(`DROP VIEW %s`, view))
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1`, view, tableName))
 	t.Cleanup(func() {
@@ -46,7 +46,8 @@ func TestSkipBackfills(t *testing.T) {
 	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var tableC = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
-	tb.config.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
+
+	tb.config.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", strings.ReplaceAll(tableA, "\"", ""), strings.ReplaceAll(tableC, "\"", ""))
 	tb.Insert(ctx, t, tableA, [][]any{{1, "one"}, {2, "two"}, {3, "three"}})
 	tb.Insert(ctx, t, tableB, [][]any{{4, "four"}, {5, "five"}, {6, "six"}})
 	tb.Insert(ctx, t, tableC, [][]any{{7, "seven"}, {8, "eight"}, {9, "nine"}})
@@ -92,7 +93,7 @@ func TestTrickyColumnNames(t *testing.T) {
 	// name, and one containing special characters which also happens to be the primary key).
 	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueA, uniqueB = "39256824", "42531495"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
+	var tableA = tb.CreateTable(ctx, t, uniqueA, `("`+"`"+`Meta/'wtf'~ID`+"`"+`" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	var tableB = tb.CreateTable(ctx, t, uniqueB, `("table" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	tb.Insert(ctx, t, tableA, [][]any{{1, "aaa"}, {2, "bbb"}})
 	tb.Insert(ctx, t, tableB, [][]any{{3, "ccc"}, {4, "ddd"}})
@@ -122,7 +123,7 @@ func TestCursorResume(t *testing.T) {
 		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
 		{"bbb", 2, "ajgp"}, {"bbb", 333, "zljj"}, {"bbb", 4096, "lhnw"}, {"bbb", 800000, "iask"},
 		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
-		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
+		{"z", 1, "qmjp"}, {".", 0, "xakg"}, {".", -1, "kvxr"}, {"   ", 3, "gboj"},
 	})
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
@@ -174,8 +175,6 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
 	})
 
-	tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL", tableName))
-
 	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
 	// and creations for N% state records after that date which reflect the update.
 	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY')", tableName))
@@ -194,52 +193,64 @@ func TestCaptureCapitalization(t *testing.T) {
 	var uniqueA, uniqueB = "69943814", "73423348"
 	var tablePrefix = strings.TrimPrefix(t.Name(), "Test")
 	var tableA = tablePrefix + "_AaAaA_" + uniqueA                  // Name containing capital letters
-	var tableB = strings.ToLower(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all lowercase (like all our other test table names)
+	var tableB = strings.ToUpper(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all uppercase (like all our other test table names)
 
 	var cleanup = func() {
-		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, testSchemaName, tableA))
-		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, testSchemaName, tableB))
+		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableA))
+		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableB))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, testSchemaName, tableA))
-	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, testSchemaName, tableB))
+	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, tb.config.User, tableA))
+	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, tb.config.User, tableB))
 
-	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf')`, testSchemaName, tableA))
-	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa')`, testSchemaName, tableB))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf')`, tb.config.User, tableA))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa')`, tb.config.User, tableB))
 
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
 }
 
-func TestCaptureOversizedFields(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-
+func TestSchemaChanges(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t), context.Background()
-	var uniqueID = "64819605"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, tdata VARCHAR(2000), bdata BYTEA, jdata JSON, jbdata JSONB)")
+	var uniqueID = "83287013"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
+	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = new(st.ChecksumValidator)
 
-	var largeText = strings.Repeat("data", 4194304)         // 16MiB string
-	var largeJSON = fmt.Sprintf(`{"text":"%s"}`, largeText) // ~16MiB JSON object
-	tb.Insert(ctx, t, tableName, [][]any{
-		{0, largeText, []byte(largeText), largeJSON, largeJSON},
-		{1, largeText, []byte(largeText), largeJSON, largeJSON},
-		{2, largeText, []byte(largeText), largeJSON, largeJSON},
-		{3, largeText, []byte(largeText), largeJSON, largeJSON},
-	})
-	tests.VerifiedCapture(ctx, t, cs)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	t.Run("Replication", func(t *testing.T) {
-		tb.Insert(ctx, t, tableName, [][]any{
-			{4, largeText, []byte(largeText), largeJSON, largeJSON},
-			{5, largeText, []byte(largeText), largeJSON, largeJSON},
-			{6, largeText, []byte(largeText), largeJSON, largeJSON},
-			{7, largeText, []byte(largeText), largeJSON, largeJSON},
-		})
-		tests.VerifiedCapture(ctx, t, cs)
-	})
+	tb.Insert(ctx, t, tableName, [][]any{{1930, "BB", "No Such State", 10000}})
+
+	tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName))
+
+	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY')", tableName))
+	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970", tableName))
+
+	tb.Insert(ctx, t, tableName, [][]any{{1940, "CC", "No Such State"}})
+
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestSchemaChangesOnlineDictionary(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var uniqueID = "83287013"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
+	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	cs.EndpointSpec.(*Config).Advanced.DictionaryMode = "online"
+
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Insert(ctx, t, tableName, [][]any{{1930, "BB", "No Such State", 10000}})
+
+	tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName))
+
+	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY')", tableName))
+	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970", tableName))
+
+	tb.Insert(ctx, t, tableName, [][]any{{1940, "CC", "No Such State"}})
+
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
