@@ -285,11 +285,10 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	var ownersCondition = " WHERE t.owner IN ('" + strings.Join(owners, "','") + "')"
 
 	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns+ownersCondition)
-	defer rows.Close()
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching columns: %w", err)
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var isPrimaryKey bool
