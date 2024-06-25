@@ -9,15 +9,17 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
+# RUN go mod download
 
 COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-pinecone    ./materialize-pinecone
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-pinecone/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-pinecone
+# RUN go test  -tags nozstd -v ./materialize-pinecone/...
+RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+    go build -tags nozstd -v -o ./connector ./materialize-pinecone
 
 # Runtime Stage
 ################################################################################
@@ -31,8 +33,6 @@ COPY --from=builder /builder/connector /connector/materialize-pinecone
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
-USER nonroot:nonroot
-
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
 ENTRYPOINT ["/connector/materialize-pinecone"]

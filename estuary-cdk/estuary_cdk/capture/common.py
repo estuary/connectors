@@ -604,14 +604,10 @@ async def _binding_incremental_task(
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc=state)}
     )
-<<<<<<< HEAD
 
     sleep_for = timedelta()
 
     task.log.info(f"resuming incremental replication", state)
-=======
-    task.log.info("resuming incremental replication", state)
->>>>>>> 1b66c2a0e22 (estuary-cdk: format and fix linting problems)
 
     if isinstance(state.cursor, datetime):
         lag = datetime.now(tz=UTC) - state.cursor
@@ -688,22 +684,4 @@ async def _binding_incremental_task(
             sleep_for = timedelta()
             continue
 
-<<<<<<< HEAD
         task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
-=======
-        task.log.debug(
-            "incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor}
-        )
-
-        # At this point we've fully caught up with the log and are idle.
-        try:
-            if not task.stopping.event.is_set():
-                await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
-                )
-
-            task.log.debug("incremental replication is idle and is yielding to stop")
-            return
-        except asyncio.TimeoutError:
-            pass  # `interval` elapsed.
->>>>>>> 1b66c2a0e22 (estuary-cdk: format and fix linting problems)

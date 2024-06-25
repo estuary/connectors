@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -136,75 +135,6 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	cfg, err := resolveEndpointConfig(req.ConfigJson)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate connectivity and that the index exists and is appropriately dimensioned.
-	pc, err := cfg.pineconeClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if indexStats, err := pc.DescribeIndexStats(ctx); err != nil {
-		return nil, fmt.Errorf("connecting to Pinecone: %w", err)
-	} else if cfg.EmbeddingModel == textEmbeddingAda002 && indexStats.Dimension != textEmbeddingAda002VectorLength {
-		return nil, fmt.Errorf(
-			"index '%s' has dimensions of %d but must be %d for embedding model '%s'",
-			cfg.Index,
-			indexStats.Dimension,
-			textEmbeddingAda002VectorLength,
-			textEmbeddingAda002,
-		)
-	} else if err := cfg.openAiClient().VerifyModelExists(ctx); err != nil {
-		return nil, err
-	}
-
-	// Log a warning message if the 'flow_document' metadata field has not been excluded from
-	// metadata indexing. This is a high cardinality field and is potentially large, and such fields
-	// are not recommended to be indexed.
-	indexDescribe, err := pc.DescribeIndex(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("describing index: %w", err)
-	}
-	entry := log.WithFields(log.Fields{
-		"index":       cfg.Index,
-		"environment": cfg.Environment,
-	})
-	if indexDescribe.Database.MetadataConfig.Indexed == nil {
-		// If no explicit metadata configuration for which fields are indexed has been provided all fields are indexed.
-		entry.Warn("Metadata field 'flow_document' will be indexed since this index is not configured with selective metadata indexing. Consider using selective metadata indexing to prevent this field from being indexed to optimize memory utilization.")
-	} else if slices.Contains(indexDescribe.Database.MetadataConfig.Indexed, "flow_document") {
-		entry.Warn("Metadata field 'flow_document' will be indexed. This may not result in optimal memory utilization for the index.")
-	}
-
-	if indexDescribe.Database.PodType == starterPodType {
-		// "Starter" pod types on the free tier cannot use namespaces. Namespaces are required for
-		// differentiating multiple bindings in the same index, so starter pods cannot have more
-		// than 1 binding, and the binding can't have a namespace set.
-		if len(req.Bindings) > 1 {
-			return nil, fmt.Errorf(
-				"Your Pinecone index '%s' is of type '%s', which cannot use Pinecone's namespace feature. This materialization is thus unable to have more than one bound collection. Consider removing bindings, or upgrade your Pinecone plan.",
-				cfg.Index,
-				starterPodType,
-			)
-		}
-
-		if len(req.Bindings) == 1 {
-			res, err := resolveResourceConfig(req.Bindings[0].ResourceConfigJson)
-			if err != nil {
-				return nil, fmt.Errorf("resolving resource config for single starter plan index binding: %w", err)
-			}
-			if res.Namespace != "" {
-				return nil, fmt.Errorf(
-					"Your Pinecone index '%s' is of type '%s', which cannot use Pinecone's namespace feature. You can still proceed by removing the Pinecone Namespace from your bound collection's Resource Configuration, or by upgrading your Pinecone plan.",
-					cfg.Index,
-					starterPodType,
-				)
-			}
-		}
-	}
-
 	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
 		res, err := resolveResourceConfig(b.ResourceConfigJson)

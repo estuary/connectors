@@ -15,10 +15,7 @@ from ..pydantic_polyfill import GenericModel
 
 
 class Spec(BaseModel):
-    # TODO(johnny): This shouldn't have a default.
-    # This is a temporary accommodation while this fix circulates:
-    # https://github.com/estuary/flow/pull/1400
-    connectorType: ConnectorType = "IMAGE"
+    connectorType: ConnectorType
 
 
 class Discover(GenericModel, Generic[EndpointConfig]):

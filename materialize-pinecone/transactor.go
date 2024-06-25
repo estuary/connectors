@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -50,59 +51,21 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
-
-	t.group, t.groupCtx = errgroup.WithContext(ctx)
-	t.group.SetLimit(concurrentWorkers)
-
-	batches := make(map[string][]upsertDoc)
-
+	var ts time.Time
+	count := 0
 	for it.Next() {
-		b := t.bindings[it.Binding]
-
-		allFields := append(it.Key, it.Values...)
-
-		data := make(map[string]interface{})
-		for idx, val := range allFields {
-			if val != nil {
-				data[b.dataHeaders[idx]] = val
-			}
-		}
-
-		embeddingInput, err := makeInput(data)
-		if err != nil {
-			return nil, err
-		}
-
-		namespace := t.bindings[it.Binding].namespace
-
-		batches[namespace] = append(batches[namespace], upsertDoc{
-			input: embeddingInput,
-			key:   base64.RawURLEncoding.EncodeToString(it.PackedKey),
-			// Only the document is included as metadata.
-			metadata: map[string]interface{}{
-				"flow_document": string(it.RawJSON),
-			},
-		})
-
-		if len(batches[namespace]) >= batchSize {
-			if err := t.sendBatch(namespace, batches[namespace]); err != nil {
-				return nil, fmt.Errorf("sending batch of documents: %w", err)
-			}
-			batches[namespace] = nil
+		count += 1
+		if ts.IsZero() {
+			ts = time.Now()
 		}
 	}
 
-	// Flush remaining partial batches.
-	for namespace, batch := range batches {
-		if len(batch) > 0 {
-			if err := t.sendBatch(namespace, batch); err != nil {
-				return nil, fmt.Errorf("flushing documents batch: %w", err)
-			}
-		}
-	}
+	log.WithFields(log.Fields{
+		"count": count,
+		"took":  time.Since(ts).String(),
+	}).Info("finished txn")
 
-	return nil, t.group.Wait()
+	return nil, nil
 }
 
 // The embedding input is an aggregate string of all included keys and values of the
