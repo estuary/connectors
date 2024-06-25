@@ -24,6 +24,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.31.0
 	github.com/aws/smithy-go v1.13.5
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
+	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/databricks/databricks-sdk-go v0.41.0
 	github.com/databricks/databricks-sql-go v1.5.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
@@ -113,7 +114,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.7 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.5.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect

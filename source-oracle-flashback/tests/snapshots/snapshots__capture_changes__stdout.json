@@ -9,7 +9,8 @@
         "source": {
           "row_id": "<row_id>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ],
@@ -23,7 +24,8 @@
         "source": {
           "row_id": "<row_id>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ],
@@ -37,7 +39,8 @@
         "source": {
           "row_id": "<row_id>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ],
@@ -52,7 +55,8 @@
           "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ],
@@ -67,7 +71,8 @@
           "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ],
@@ -82,7 +87,8 @@
           "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ],
@@ -97,7 +103,8 @@
           "row_id": "<row_id>",
           "scn": "<scn>",
           "table": "TEST_CHANGES"
-        }
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       }
     }
   ]

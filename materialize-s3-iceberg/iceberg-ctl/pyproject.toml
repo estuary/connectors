@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "iceberg_ctl"
+version = "0.1.0"
+description = ""
+authors = ["Will Baker <wbaker@gmail.com>"]
+
+[tool.poetry.dependencies]
+pydantic = "^2"
+python = "^3.11"
+pyiceberg = {git = "https://github.com/apache/iceberg-python.git", rev = "0155405d7da141efba60ba502f6c6c1cbc97bdf9", extras = ["s3fs", "glue", "pyarrow"]}
+click = "^8.1.7"
+setuptools = "^70.0.0"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+pytest = "^7.4.3"
+pytest-insta = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

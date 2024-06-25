@@ -12,6 +12,10 @@ collections:
     schema: deals.schema.yaml
     key:
       - /id
+  acmeCo/email_events:
+    schema: email_events.schema.yaml
+    key:
+      - /id
   acmeCo/engagements:
     schema: engagements.schema.yaml
     key:
