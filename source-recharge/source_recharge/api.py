@@ -222,6 +222,24 @@ class OrdersDeprecatedApi(RechargeStreamDeprecatedAPI, IncrementalRechargeStream
 
     name = "orders"
 
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        response_data = response.json()
+        stream_data = self.get_stream_data(response_data)
+
+        for item in stream_data:
+            if item.get("created_at"):
+                item["created_at"] =  item["created_at"] + "+00:00"
+            if item.get("updated_at"):
+                item["updated_at"] =  item["updated_at"] + "+00:00"
+            if item.get("processed_at"):
+                item["processed_at"] =  item["processed_at"] + "+00:00"
+            if item.get("scheduled_at"):
+                item["scheduled_at"] =  item["scheduled_at"] + "+00:00"
+            if item.get("shipped_date"):
+                item["shipped_date"] =  item["shipped_date"] + "+00:00"
+
+        yield from stream_data
+
 
 class OrdersModernApi(RechargeStreamModernAPI, IncrementalRechargeStream):
     """
@@ -237,6 +255,17 @@ class Products(RechargeStreamDeprecatedAPI):
     Products Stream: https://developer.rechargepayments.com/v1-shopify?python#list-products
     Products endpoint has 422 error with 2021-11 API version
     """
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        response_data = response.json()
+        stream_data = self.get_stream_data(response_data)
+
+        for item in stream_data:
+            if item.get("created_at"):
+                item["created_at"] =  item["created_at"] + "+00:00"
+            if item.get("updated_at"):
+                item["updated_at"] =  item["updated_at"] + "+00:00"
+
+        yield from stream_data
 
 
 class Shop(RechargeStreamDeprecatedAPI):
@@ -245,7 +274,7 @@ class Shop(RechargeStreamDeprecatedAPI):
     Shop endpoint is not available in 2021-11 API version
     """
 
-    primary_key = ["shop", "store"]
+    primary_key = "store_id"
     data_path = None
 
     def stream_slices(
@@ -257,6 +286,17 @@ class Shop(RechargeStreamDeprecatedAPI):
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
     ) -> MutableMapping[str, Any]:
         return {}
+    
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        response_data = response.json()
+        stream_data = self.get_stream_data(response_data)
+
+        for item in stream_data:
+            if item.get("store"):
+                item["store_id"] =  item["store"]["id"]
+
+        yield from stream_data
+
 
 
 class Subscriptions(RechargeStreamModernAPI, IncrementalRechargeStream):

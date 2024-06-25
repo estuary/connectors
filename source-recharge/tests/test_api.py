@@ -49,7 +49,7 @@ class TestCommon:
             (OrdersDeprecatedApi, "id"),
             (OrdersModernApi, "id"),
             (Products, "id"),
-            (Shop, ["shop", "store"]),
+            (Shop, "store_id"),
             (Subscriptions, "id"),
         ],
     )
