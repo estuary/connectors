@@ -1,18 +1,16 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_t49210954",
+    "recommended_name": "flow_test_logminer_tt32386",
     "resource_config_json": {
+      "mode": "Without Primary Key",
       "namespace": "FLOW_TEST_LOGMINER",
-      "stream": "T49210954"
+      "stream": "TT32386"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT49210954": {
+        "FLOW_TEST_LOGMINERTT32386": {
           "type": "object",
-          "required": [
-            "A"
-          ],
-          "$anchor": "FLOW_TEST_LOGMINERT49210954",
+          "$anchor": "FLOW_TEST_LOGMINERTT32386",
           "properties": {
             "A": null,
             "B": null,
@@ -57,7 +55,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT49210954",
+                  "$ref": "#FLOW_TEST_LOGMINERTT32386",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -114,12 +112,12 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT49210954"
+          "$ref": "#FLOW_TEST_LOGMINERTT32386"
         }
       ]
     },
     "key": [
-      "/A"
+      "/_meta/source/row_id"
     ]
   }
 
