@@ -54,6 +54,7 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
 	config.SetDefaults(name)
+	var db = &oracleDatabase{config: &config}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
@@ -69,16 +70,13 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 			ForwardPort: port,
 			LocalPort:   "1521",
 		}
-		var tunnel = sshConfig.CreateTunnel()
+		db.tunnel = sshConfig.CreateTunnel()
 
-		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
-		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-		if err := tunnel.Start(); err != nil {
+		if err := db.tunnel.Start(); err != nil {
 			return nil, fmt.Errorf("error starting network tunnel: %w", err)
 		}
 	}
 
-	var db = &oracleDatabase{config: &config}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -183,6 +181,7 @@ func configSchema() json.RawMessage {
 type oracleDatabase struct {
 	config          *Config
 	conn            *sql.DB
+	tunnel          *networkTunnel.SshTunnel
 	explained       map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
@@ -208,9 +207,12 @@ func (db *oracleDatabase) connect(ctx context.Context) error {
 }
 
 func (db *oracleDatabase) Close(ctx context.Context) error {
+	defer db.tunnel.Stop()
+
 	if err := db.conn.Close(); err != nil {
 		return fmt.Errorf("error closing database connection: %w", err)
 	}
+
 	return nil
 }
 
