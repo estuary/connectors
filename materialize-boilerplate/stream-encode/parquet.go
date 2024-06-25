@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/apache/arrow/go/v17/parquet"
@@ -544,6 +545,12 @@ func getIntVal(val any) (got int64, err error) {
 		got = v
 	case int:
 		got = int64(v)
+	case string:
+		if p, parseErr := strconv.Atoi(v); parseErr != nil {
+			err = fmt.Errorf("unable to parse string %q as integer: %w", v, parseErr)
+		} else {
+			got = int64(p)
+		}
 	default:
 		err = fmt.Errorf("getIntVal unhandled type: %T", v)
 	}
@@ -557,6 +564,12 @@ func getNumberVal(val any) (got float64, err error) {
 		got = v
 	case float32:
 		got = float64(v)
+	case string:
+		if p, parseErr := strconv.ParseFloat(v, 64); parseErr != nil {
+			err = fmt.Errorf("unable to parse string %q as float64: %w", v, parseErr)
+		} else {
+			got = p
+		}
 	default:
 		err = fmt.Errorf("getNumberVal unhandled type: %T", v)
 	}
