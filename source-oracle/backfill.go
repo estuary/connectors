@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -56,7 +58,9 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 				"resumeKey":  resumeKey,
 			}).Debug("scanning subsequent table chunk")
 			query = db.buildScanQuery(false, info, keyColumns, columnTypes, schema, table)
-			args = resumeKey
+			for idx, k := range resumeKey {
+				args = append(args, sql.Named(fmt.Sprintf("p%d", idx+1), k))
+			}
 		} else {
 			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
 			query = db.buildScanQuery(true, info, keyColumns, columnTypes, schema, table)
@@ -107,7 +111,11 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			rowKey = []byte(rowid)
 
 			// Sanity check that rows are returned in ascending RowID order within a given backfill chunk
-			if rowid < prevRowID {
+			// Note that base64 strings are not lexicographically ordered and have a different ordering, hence
+			// the custom function
+			if result, err := compareBase64(rowid, prevRowID); err != nil {
+				return false, err
+			} else if result == -1 {
 				return false, fmt.Errorf("internal error: ROWID ordering sanity check failed: %v <= %v", rowid, prevRowID)
 			}
 			prevRowID = rowid
@@ -152,6 +160,19 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	return backfillComplete, nil
 }
 
+// -1 means a < b
+// 0 means a == b
+// 1 means a > b
+func compareBase64(a, b string) (int, error) {
+	if abytes, err := base64.RawStdEncoding.DecodeString(a); err != nil {
+		return 0, fmt.Errorf("base64 decoding: %w", err)
+	} else if bbytes, err := base64.RawStdEncoding.DecodeString(b); err != nil {
+		return 0, fmt.Errorf("base64 decoding: %w", err)
+	} else {
+		return bytes.Compare(abytes, bbytes), nil
+	}
+}
+
 // WriteWatermark writes the provided string into the 'watermarks' table.
 func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
@@ -185,11 +206,11 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 	var isInterval = dataType == "INTERVAL"
 
 	if !isDateTime && !isInterval {
-		return col.Name
+		return quoteColumnName(col.Name)
 	}
 
 	if isInterval {
-		return fmt.Sprintf("TO_CHAR(%s) AS %s", col.Name, col.Name)
+		return fmt.Sprintf("TO_CHAR(%s) AS %s", quoteColumnName(col.Name), quoteColumnName(col.Name))
 	}
 
 	var dataScale int
@@ -202,7 +223,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 		}
 	}
 
-	var out = fmt.Sprintf("TO_CHAR(%s", col.Name)
+	var out = fmt.Sprintf("TO_CHAR(%s", quoteColumnName(col.Name))
 	var format = ""
 	if strings.Contains(dataType, "TIME ZONE") {
 		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"'`
@@ -216,7 +237,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 		out = out + " AT TIME ZONE 'UTC'"
 	}
 
-	out = out + fmt.Sprintf(", %s) AS %s", format, col.Name)
+	out = out + fmt.Sprintf(", %s) AS %s", format, quoteColumnName(col.Name))
 	return out
 }
 
@@ -246,7 +267,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 		} else {
 			pkey = append(pkey, quotedName)
 		}
-		args = append(args, fmt.Sprintf(":%d", idx+1))
+		args = append(args, fmt.Sprintf(":p%d", idx+1))
 	}
 
 	// Construct the query itself
@@ -258,21 +279,24 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
 	fmt.Fprintf(query, " WHERE ROWNUM <= %d", db.config.Advanced.BackfillChunkSize)
 	if !start {
-		fmt.Fprintf(query, " AND (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
+		for i := 0; i != len(pkey); i++ {
+			if i == 0 {
+				fmt.Fprintf(query, " AND (")
+			} else {
+				fmt.Fprintf(query, ") OR (")
+			}
+
+			for j := 0; j != i; j++ {
+				fmt.Fprintf(query, "%s = %s AND ", pkey[j], args[j])
+			}
+			fmt.Fprintf(query, "%s > %s", pkey[i], args[i])
+		}
+		fmt.Fprintf(query, ")")
 	}
 	fmt.Fprintf(query, " ORDER BY %s ASC", strings.Join(pkey, ", "))
 	return query.String()
 }
 
-func quoteColumnName(name string) string {
-	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
-	//
-	//     Quoted identifiers can contain any character, except the character with code zero.
-	//     (To include a double quote, write two double quotes.)
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
-}
-
-// TODO
 func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {
@@ -310,20 +334,27 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query stri
 	colTypes, err := rows.ColumnTypes()
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
-		var fields = logrus.Fields{
-			"streamID": streamID,
-		}
+		var fields = logrus.Fields{"streamID": streamID}
 		var fieldsPtr = make([]any, len(cols))
 		for idx, col := range cols {
 			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
 			fieldsPtr[idx] = fields[col]
 		}
+
 		if err := rows.Scan(fieldsPtr...); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"id":  streamID,
 				"err": err,
 			}).Error("error getting row value")
 			return
+		}
+
+		for key, v := range fields {
+			val := reflect.ValueOf(v)
+			if val.Kind() == reflect.Ptr {
+				val = val.Elem()
+			}
+			fields[key] = val
 		}
 
 		logrus.WithFields(fields).Info("explain backfill query")

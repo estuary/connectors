@@ -24,6 +24,10 @@ type redoFile struct {
 	sequence int
 }
 
+func (db *oracleDatabase) HeartbeatWatermarkInterval() time.Duration {
+	return 60 * time.Second
+}
+
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	dbConn, err := sql.Open("oracle", db.config.ToURI())
 	if err != nil {
@@ -80,9 +84,16 @@ func (s *replicationStream) endLogminer(ctx context.Context) error {
 	return nil
 }
 
-func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) error {
-	logrus.WithField("startSCN", startSCN).Debug("starting logminer")
-	rows, err := s.conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, SEQUENCE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP# AND V$LOG.STATUS NOT IN ('INACTIVE') AND NEXT_CHANGE# >= :1", startSCN)
+func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error {
+	logrus.WithField("startSCN", startSCN).Debug("adding log files")
+
+	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
+		if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
+			return fmt.Errorf("creating logfile with dictionary: %w", err)
+		}
+	}
+
+	rows, err := s.conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, SEQUENCE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP# AND NEXT_CHANGE# >= :1 AND MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) ORDER BY SEQUENCE#", startSCN)
 	if err != nil {
 		return fmt.Errorf("fetching log file list: %w", err)
 	}
@@ -95,6 +106,12 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) err
 		if err := rows.Scan(&f.status, &f.file, &f.sequence); err != nil {
 			return fmt.Errorf("scanning log file record: %w", err)
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"status":   f.status,
+			"file":     f.file,
+			"sequence": f.sequence,
+		}).Debug("log file")
 
 		if f.sequence > redoSequence {
 			redoSequence = f.sequence
@@ -113,12 +130,30 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) err
 		}
 	}
 
-	if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>SYS.DBMS_LOGMNR.COMMITTED_DATA_ONLY + SYS.DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG); END;", startSCN); err != nil {
-		return fmt.Errorf("starting logminer: %w", err)
-	}
-
 	s.redoFiles = redoFiles
 	s.redoSequence = redoSequence
+
+	return nil
+}
+
+func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) error {
+	logrus.WithField("startSCN", startSCN).Debug("starting logminer")
+
+	var dictionaryOption = ""
+	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
+		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
+	} else if s.db.config.Advanced.DictionaryMode == DictionaryModeOnline {
+		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG"
+	}
+
+	if err := s.addLogFiles(ctx, startSCN); err != nil {
+		return err
+	}
+
+	var startQuery = fmt.Sprintf("BEGIN DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY %s); END;", dictionaryOption)
+	if _, err := s.conn.ExecContext(ctx, startQuery, startSCN); err != nil {
+		return fmt.Errorf("starting logminer: %w", err)
+	}
 
 	return nil
 }
@@ -253,10 +288,8 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		}
 
 		if switched {
-			if err := s.endLogminer(ctx); err != nil {
+			if err := s.addLogFiles(ctx, s.lastTxnEndSCN); err != nil {
 				return err
-			} else if err := s.startLogminer(ctx, s.lastTxnEndSCN); err != nil {
-				return fmt.Errorf("starting logminer: %w", err)
 			}
 		}
 
@@ -334,7 +367,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = sqlparser.String(n.Left)
+				var key = unquote(sqlparser.String(n.Left))
 				if key == "ROWID" {
 					var value = n.Right.(*sqlparser.Literal).Val
 					after[key] = value
@@ -356,7 +389,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		sqlparser.VisitExpr(update.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = sqlparser.String(n.Left)
+				var key = unquote(sqlparser.String(n.Left))
 				var value = n.Right.(*sqlparser.Literal).Val
 				after[key] = value
 			}
@@ -365,7 +398,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		})
 
 		for _, expr := range update.Exprs {
-			var key = sqlparser.String(expr.Name.Name)
+			var key = unquote(sqlparser.String(expr.Name.Name))
 			var value = expr.Expr.(*sqlparser.Literal).Val
 			after[key] = value
 		}
@@ -377,7 +410,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		sqlparser.VisitExpr(undo.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = sqlparser.String(n.Left)
+				var key = unquote(sqlparser.String(n.Left))
 				var value = n.Right.(*sqlparser.Literal).Val
 				before[key] = value
 			}
@@ -386,7 +419,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		})
 
 		for _, expr := range undo.Exprs {
-			var key = sqlparser.String(expr.Name.Name)
+			var key = unquote(sqlparser.String(expr.Name.Name))
 			var value = expr.Expr.(*sqlparser.Literal).Val
 			before[key] = value
 		}
@@ -400,7 +433,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = sqlparser.String(n.Left)
+				var key = unquote(sqlparser.String(n.Left))
 				var value = n.Right.(*sqlparser.Literal).Val
 				before[key] = value
 			}
@@ -429,11 +462,21 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		}
 	}
 
-	// TODO: if keyless backfill ... else if precise backfill ...
-	rowKey, err := sqlcapture.EncodeRowKey([]string{"ROWID"}, map[string]any{"ROWID": rowid}, nil, encodeKeyFDB)
+	keyColumns, ok := s.keyColumns(streamID)
+	if !ok {
+		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
+	}
+
+	var rowKey []byte
+	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, after, nil, encodeKeyFDB)
+	} else {
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, before, nil, encodeKeyFDB)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 	}
+	logrus.WithField("columns", keyColumns).WithField("rowKey", string(rowKey)).Debug("replicate")
 	delete(after, "ROWID")
 	delete(before, "ROWID")
 
@@ -461,6 +504,12 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	return event, nil
 }
 
+// in WHERE AST, columns are quoted with backticks for some reason. This function
+// removes backtick quotes from a string
+func unquote(s string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(s, "`"), "`")
+}
+
 type logminerMessage struct {
 	startSCN  int
 	endSCN    int
@@ -470,6 +519,8 @@ type logminerMessage struct {
 	tableName string
 	owner     string
 	ts        int64
+	status    int
+	info      string
 }
 
 const (
@@ -482,7 +533,7 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn", s.lastTxnEndSCN)
+	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')", s.lastTxnEndSCN)
 	if err != nil {
 		return nil, fmt.Errorf("logminer query: %w", err)
 	}
@@ -493,19 +544,47 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 		var msg logminerMessage
 		var ts time.Time
 		var undoSql sql.NullString
-		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &undoSql, &msg.tableName, &msg.owner); err != nil {
+		var info sql.NullString
+		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &undoSql, &msg.tableName, &msg.owner, &msg.status, &info); err != nil {
 			return nil, err
 		}
 		if undoSql.Valid {
 			msg.undoSql = undoSql.String
 		}
+		if info.Valid {
+			msg.info = info.String
+		}
 		msg.ts = ts.UnixMilli()
+
+		logrus.WithFields(logrus.Fields{
+			"sql":       msg.sql,
+			"undoSql":   msg.undoSql,
+			"op":        msg.op,
+			"tableName": msg.tableName,
+			"owner":     msg.owner,
+			"ts":        msg.ts,
+			"status":    msg.status,
+			"info":      msg.info,
+			"startSCN":  msg.startSCN,
+			"endSCN":    msg.endSCN,
+		}).Trace("received message")
 
 		// If this change event is on a table we're not capturing, skip doing any
 		// further processing on it.
 		var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
 		if !s.tableActive(streamID) {
 			continue
+		}
+
+		// If logminer can't find the dictionary for a SQL statement (e.g. if using online mode and a schema change has occurred)
+		// then we get SQL statements like this:
+		// insert into "UNKNOWN"."OBJ# 45522"("COL 1","COL 2","COL 3","COL 4") values (HEXTORAW('45465f4748'),HEXTORAW('546563686e6963616c20577269746572'), HEXTORAW('c229'),HEXTORAW('c3020b'));
+		// we additionally get status=2 for these records. Status 2 means the SQL statement is not valid for redoing.
+		// Some versions of Oracle report STATUS=2 for LONG column types, but have an empty info column, whereas when
+		// status=2 and there is some reason for the error in the info column (usually "Dictionary Mismatch") we consider
+		// the case to be one of dictionary mismatch
+		if msg.status == 2 && msg.info != "" {
+			return nil, fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.info, msg.tableName, msg.sql)
 		}
 
 		msgs = append(msgs, msg)

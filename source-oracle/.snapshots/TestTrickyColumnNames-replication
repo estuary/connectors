@@ -1,0 +1,15 @@
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t39256824": 2 Documents
+# ================================
+{"DATA":"eee","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T39256824","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}},"`Meta/'wtf'~ID`":5}
+{"DATA":"fff","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T39256824","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}},"`Meta/'wtf'~ID`":6}
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t42531495": 2 Documents
+# ================================
+{"DATA":"ggg","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T42531495","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}},"table":7}
+{"DATA":"hhh","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T42531495","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}},"table":8}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT39256824":{"backfilled":2,"key_columns":["`Meta/'wtf'~ID`"],"mode":"Active"},"FLOW_TEST_LOGMINER%2FT42531495":{"backfilled":2,"key_columns":["table"],"mode":"Active"}},"cursor":"11111111"}
+
