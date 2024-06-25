@@ -2,7 +2,6 @@ import abc
 import asyncio
 import base64
 import sys
-import fdb.tuple # type: ignore
 from logging import Logger
 from typing import (
     Any,
@@ -12,6 +11,7 @@ from typing import (
     Generic,
 )
 
+import fdb.tuple  # type: ignore
 import orjson
 from pydantic import BaseModel, Field, NonNegativeInt
 
@@ -63,12 +63,16 @@ class LoadIterator(Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     def __init__(
         self,
         first: request.Load,
-        reqs: AsyncGenerator[Request[EndpointConfig, ResourceConfig, ConnectorState], None],
+        reqs: AsyncGenerator[
+            Request[EndpointConfig, ResourceConfig, ConnectorState], None
+        ],
     ):
         self.reqs = reqs
         self.first = first
 
-    def __aiter__(self) -> "LoadIterator[EndpointConfig, ResourceConfig, ConnectorState]":
+    def __aiter__(
+        self,
+    ) -> "LoadIterator[EndpointConfig, ResourceConfig, ConnectorState]":
         return self
 
     async def __anext__(self) -> request.Load:
@@ -98,11 +102,15 @@ class StoreIterator(Generic[EndpointConfig, ResourceConfig, ConnectorState]):
 
     def __init__(
         self,
-        reqs: AsyncGenerator[Request[EndpointConfig, ResourceConfig, ConnectorState], None],
+        reqs: AsyncGenerator[
+            Request[EndpointConfig, ResourceConfig, ConnectorState], None
+        ],
     ):
         self.reqs = reqs
 
-    def __aiter__(self) -> "StoreIterator[EndpointConfig, ResourceConfig, ConnectorState]":
+    def __aiter__(
+        self,
+    ) -> "StoreIterator[EndpointConfig, ResourceConfig, ConnectorState]":
         return self
 
     async def __anext__(self) -> request.Store:
@@ -128,15 +136,20 @@ class StoreIterator(Generic[EndpointConfig, ResourceConfig, ConnectorState]):
         if not s.valuesJson:
             s.valuesJson = _tuples_to_values(s.valuesPacked)
 
+
 def _base64_encoded(inp: Any) -> Any:
     if isinstance(inp, bytes):
         return base64.standard_b64encode(inp).decode()
     else:
         return inp
 
+
 def _tuples_to_values(packed: str | None) -> tuple[Any, ...]:
     assert packed is not None
-    return tuple(map(_base64_encoded, fdb.tuple.unpack(base64.standard_b64decode(packed))))  # type: ignore
+    return tuple(
+        map(_base64_encoded, fdb.tuple.unpack(base64.standard_b64decode(packed)))
+    )  # type: ignore
+
 
 class BaseMaterializationConnector(
     BaseConnector[Request[EndpointConfig, ResourceConfig, ConnectorState]],
@@ -161,11 +174,17 @@ class BaseMaterializationConnector(
     ) -> response.Applied: ...
 
     @abc.abstractmethod
-    async def load(self, log: Logger, loads: LoadIterator[EndpointConfig, ResourceConfig, ConnectorState]) -> ConnectorState | None: ...
+    async def load(
+        self,
+        log: Logger,
+        loads: LoadIterator[EndpointConfig, ResourceConfig, ConnectorState],
+    ) -> ConnectorState | None: ...
 
     @abc.abstractmethod
     async def store(
-        self, log: Logger, stores: StoreIterator[EndpointConfig, ResourceConfig, ConnectorState]
+        self,
+        log: Logger,
+        stores: StoreIterator[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[ConnectorState | None, Coroutine[None, None, None] | None]: ...
 
     @abc.abstractmethod
@@ -211,12 +230,16 @@ class BaseMaterializationConnector(
                     "binding": binding,
                     "docJson": doc_json,
                 },
-                option=orjson.OPT_APPEND_NEWLINE
+                option=orjson.OPT_APPEND_NEWLINE,
             )
         )
 
     async def _run_transactions(
-        self, log: Logger, requests: AsyncGenerator[Request[EndpointConfig, ResourceConfig, ConnectorState], None]
+        self,
+        log: Logger,
+        requests: AsyncGenerator[
+            Request[EndpointConfig, ResourceConfig, ConnectorState], None
+        ],
     ):
         commit_task: asyncio.Task[None] | None = None
         acknowledge_task: asyncio.Task[None] | None = None
@@ -249,7 +272,6 @@ class BaseMaterializationConnector(
             if self.loads_wait_for_acknowledge():
                 await acknowledge_task
 
-
             # Next we'll usually get one or more load requests, or a flush
             # message with no load requests if there are no loads necessary.
             # `self.load` will not be called unless there are loads to evaluate.
@@ -260,10 +282,10 @@ class BaseMaterializationConnector(
             except StopAsyncIteration:
                 # Clean exit on stdin EOF.
                 log.info("EOF signal received")
-                return 
+                return
             except Exception as e:
                 raise e
-            
+
             load_state_update = None
             if load := flush_or_load.load:
                 load_state_update = await self.load(log, LoadIterator(load, requests))

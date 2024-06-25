@@ -2,13 +2,21 @@ import abc
 from logging import Logger
 from typing import Coroutine, Generic, TypeVar
 
+from pydantic import BaseModel
+
 from estuary_cdk.flow import ConnectorSpec
 from estuary_cdk.materialize import response
 from estuary_cdk.materialize.request import Apply, Open, Spec, Validate
-from estuary_cdk.materialize.response import Applied, Opened, Validated, ValidatedBinding
-from ..flow import EndpointConfig, ResourceConfig, ConnectorState as _BaseConnectorState
+from estuary_cdk.materialize.response import (
+    Applied,
+    Opened,
+    Validated,
+    ValidatedBinding,
+)
+
+from ..flow import ConnectorState as _BaseConnectorState
+from ..flow import EndpointConfig, ResourceConfig
 from . import BaseMaterializationConnector, LoadIterator, StoreIterator
-from pydantic import BaseModel
 
 
 class BaseResourceState(abc.ABC, BaseModel, extra="forbid"):
@@ -27,15 +35,14 @@ class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
 
 
 class DocumentStream(
-    BaseMaterializationConnector[
-        EndpointConfig, ResourceConfig, _BaseConnectorState
-    ]
+    BaseMaterializationConnector[EndpointConfig, ResourceConfig, _BaseConnectorState]
 ):
-    
     def loads_wait_for_acknowledge(self) -> bool:
         return False
 
-    async def validate(self, log: Logger, validate: Validate[EndpointConfig, ResourceConfig]) -> Validated:
+    async def validate(
+        self, log: Logger, validate: Validate[EndpointConfig, ResourceConfig]
+    ) -> Validated:
         validated: list[ValidatedBinding] = []
 
         for binding in validate.bindings:
@@ -58,20 +65,28 @@ class DocumentStream(
                         reason="Only the root document and collection keys may be materialized",
                     )
 
-            validated.append(response.ValidatedBinding(
-                constraints=constraints,
-                resourcePath=[],
-                deltaUpdates=True
-            ))
+            validated.append(
+                response.ValidatedBinding(
+                    constraints=constraints, resourcePath=[], deltaUpdates=True
+                )
+            )
 
         return response.Validated(bindings=validated)
-    
-    async def apply(self, log: Logger, apply: Apply[EndpointConfig, ResourceConfig]) -> Applied:
+
+    async def apply(
+        self, log: Logger, apply: Apply[EndpointConfig, ResourceConfig]
+    ) -> Applied:
         return Applied()
-    
-    async def load(self, log: Logger, loads: LoadIterator[EndpointConfig, ResourceConfig, _BaseConnectorState]) -> _BaseConnectorState | None:
-        raise RuntimeError("document stream materialization should not receive load requests")
-    
+
+    async def load(
+        self,
+        log: Logger,
+        loads: LoadIterator[EndpointConfig, ResourceConfig, _BaseConnectorState],
+    ) -> _BaseConnectorState | None:
+        raise RuntimeError(
+            "document stream materialization should not receive load requests"
+        )
+
     async def acknowledge(self, log: Logger) -> _BaseConnectorState | None:
         return None
 
@@ -79,7 +94,15 @@ class DocumentStream(
     async def spec(self, log: Logger, _: Spec) -> ConnectorSpec: ...
 
     @abc.abstractmethod
-    async def open(self, log: Logger, open: Open[EndpointConfig, ResourceConfig, _BaseConnectorState]) -> Opened: ...
+    async def open(
+        self,
+        log: Logger,
+        open: Open[EndpointConfig, ResourceConfig, _BaseConnectorState],
+    ) -> Opened: ...
 
     @abc.abstractmethod
-    async def store(self, log: Logger, stores: StoreIterator[EndpointConfig, ResourceConfig, _BaseConnectorState]) -> tuple[_BaseConnectorState | None, Coroutine[None, None, None] | None]: ...
+    async def store(
+        self,
+        log: Logger,
+        stores: StoreIterator[EndpointConfig, ResourceConfig, _BaseConnectorState],
+    ) -> tuple[_BaseConnectorState | None, Coroutine[None, None, None] | None]: ...
