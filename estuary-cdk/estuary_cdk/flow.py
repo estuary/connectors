@@ -1,7 +1,8 @@
 import abc
 from dataclasses import dataclass
+from enum import Enum
 from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field
-from typing import Any, Literal, TypeVar, Generic, Literal
+from typing import Any, Literal, TypeVar, Generic
 
 from .pydantic_polyfill import GenericModel
 
@@ -21,11 +22,47 @@ ResourceConfig = TypeVar("ResourceConfig", bound=BaseModel)
 ConnectorState = TypeVar("ConnectorState", bound=BaseModel)
 
 
+class InferenceExists(Enum):
+    INVALID = "INVALID"
+    MUST = "MUST"
+    MAY = "MAY"
+    IMPLICIT = "IMPLICIT"
+    CANNOT = "CANNOT"
+
+
+class InferenceString(BaseModel):
+    content_type: str | None = None
+    format: str | None = None
+    content_encoding: str | None = None
+    max_length: int | None = None
+
+
+class Inference(BaseModel):
+    types: list[str] | None = None
+    string: InferenceString | None = None
+    title: str | None = None
+    description: str | None = None
+    defaultJson: Any | None = None
+    exists: InferenceExists
+
+
+class Projection(BaseModel):
+    ptr: str | None = None
+    field: str
+    explicit: bool | None = False
+    isPrimarykey: bool | None = False
+    inference: Inference
+
+    def is_root_document_projection(self) -> bool:
+        return self.ptr == ""
+
+
 class CollectionSpec(BaseModel):
     name: str
     key: list[str]
     writeSchema: dict[str, Any]
     readSchema: dict[str, Any] | None = None
+    projections: list[Projection]
 
 
 class CaptureBinding(GenericModel, Generic[ResourceConfig]):
@@ -42,6 +79,44 @@ class CaptureSpec(GenericModel, Generic[EndpointConfig, ResourceConfig]):
     config: EndpointConfig
     intervalSeconds: NonNegativeInt
     bindings: list[CaptureBinding[ResourceConfig]] = []
+
+
+class FieldSelection(BaseModel):
+    keys: list[str] | None = None
+    values: list[str] | None = None
+    document: str | None = None
+    fieldConfigJsonMap: dict[str, Any] | None = None
+
+    def all_fields(self) -> tuple[str, ...]:
+        out: list[str] = []
+
+        if self.keys is not None:
+            out.extend(self.keys)
+
+        if self.values is not None:
+            out.extend(self.values)
+
+        if self.document is not None:
+            out.append(self.document)
+
+        return tuple(out)
+
+
+class MaterializationBinding(BaseModel, Generic[ResourceConfig]):
+    collection: CollectionSpec
+    resourceConfig: ResourceConfig
+    resourcePath: list[str]
+    fieldSelection: FieldSelection
+    deltaUpdates: bool
+    stateKey: str
+    backfill: NonNegativeInt = 0
+
+
+class MaterializationSpec(BaseModel, Generic[EndpointConfig, ResourceConfig]):
+    name: str
+    connectorType: ConnectorType
+    config: EndpointConfig
+    bindings: list[MaterializationBinding[ResourceConfig]] = []
 
 
 class RangeSpec(BaseModel):
@@ -76,10 +151,10 @@ class OAuth2Spec(BaseModel):
 
 
 class ConnectorSpec(BaseModel):
-    configSchema: dict
-    resourceConfigSchema: dict
+    configSchema: dict[str, Any]
+    resourceConfigSchema: dict[str, Any]
     documentationUrl: str
-    resourcePathPointers: list[str]
+    resourcePathPointers: list[str] | None = None
     oauth2: OAuth2Spec | None = None
     protocol: int = 0
 

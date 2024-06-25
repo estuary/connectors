@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import decimal
 from pydantic import Field
-from typing import Generic, Awaitable, Any, BinaryIO, Callable
+from typing import AsyncGenerator, Coroutine, Generic, Awaitable, Any, BinaryIO, Callable
 import orjson
 from logging import Logger
 import abc
@@ -246,11 +246,14 @@ class BaseCaptureConnector(
     async def acknowledge(self, acknowledge: request.Acknowledge) -> None:
         return None  # No-op.
 
-    async def handle(
+    async def handle_requests(
         self,
         log: Logger,
         request: Request[EndpointConfig, ResourceConfig, ConnectorState],
-    ) -> None:
+        requests: AsyncGenerator[
+            Request[EndpointConfig, ResourceConfig, ConnectorState], None
+        ],
+    ) -> Coroutine[None, None, None] | None:
 
         if spec := request.spec:
             response = await self.spec(log, spec)
@@ -267,38 +270,40 @@ class BaseCaptureConnector(
             self._emit(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
-            opened, capture = await self.open(log, open)
-            self._emit(Response(opened=opened))
+            async def _open():
+                opened, capture = await self.open(log, open)
+                self._emit(Response(opened=opened))
 
-            stopping = Task.Stopping(asyncio.Event())
+                stopping = Task.Stopping(asyncio.Event())
 
-            async def periodic_stop() -> None:
-                await asyncio.sleep(24 * 60 * 60)  # 24 hours
-                stopping.event.set()
+                async def periodic_stop() -> None:
+                    await asyncio.sleep(24 * 60 * 60)  # 24 hours
+                    stopping.event.set()
 
-            # Gracefully exit after a moderate period of time.
-            # We don't do this within the TaskGroup because we don't
-            # want to block on it.
-            asyncio.create_task(periodic_stop())
+                # Gracefully exit after a moderate period of time.
+                # We don't do this within the TaskGroup because we don't
+                # want to block on it.
+                asyncio.create_task(periodic_stop())
 
-            async with asyncio.TaskGroup() as tg:
+                async with asyncio.TaskGroup() as tg:
+                    task = Task(
+                        log.getChild("capture"),
+                        "capture",
+                        self.output,
+                        stopping,
+                        tg,
+                    )
+                    await capture(task)
 
-                task = Task(
-                    log.getChild("capture"),
-                    "capture",
-                    self.output,
-                    stopping,
-                    tg,
-                )
-                await capture(task)
+                # When capture() completes, the connector exits.
+                if stopping.first_error:
+                    raise Stopped(
+                        f"Task {stopping.first_error_task}: {stopping.first_error}"
+                    )
+                else:
+                    raise Stopped(None)
 
-            # When capture() completes, the connector exits.
-            if stopping.first_error:
-                raise Stopped(
-                    f"Task {stopping.first_error_task}: {stopping.first_error}"
-                )
-            else:
-                raise Stopped(None)
+            return _open()
 
         elif acknowledge := request.acknowledge:
             await self.acknowledge(acknowledge)

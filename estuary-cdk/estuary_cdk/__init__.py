@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
-from typing import TypeVar, Callable, AsyncGenerator, Generic
+from typing import Coroutine, TypeVar, Callable, AsyncGenerator, Generic
 import abc
 import asyncio
 import signal
@@ -62,8 +62,12 @@ class BaseConnector(Generic[Request], abc.ABC):
     def request_class(cls) -> type[Request]:
         raise NotImplementedError()
 
+    # Handle `request` and possibly additional `requests` if desired. A returned
+    # coroutine will be scheduled to run concurrently with further requests.
     @abc.abstractmethod
-    async def handle(self, log: Logger, request: Request) -> None:
+    async def handle_requests(
+        self, log: Logger, request: Request, requests: AsyncGenerator[Request, None]
+    ) -> Coroutine[None, None, None] | None:
         raise NotImplementedError()
 
     # Serve this connector by invoking `handle()` for all incoming instances of
@@ -125,8 +129,10 @@ class BaseConnector(Generic[Request], abc.ABC):
         failed = False
         try:
             async with asyncio.TaskGroup() as group:
-                async for request in requests(self.request_class()):
-                    group.create_task(self.handle(log, request))
+                _requests = requests(self.request_class())
+                async for request in _requests:
+                    if coro := await self.handle_requests(log, request, _requests):
+                        group.create_task(coro)
 
         except ExceptionGroup as exc_group:
             for exc in exc_group.exceptions:
