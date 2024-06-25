@@ -328,11 +328,13 @@ func (t *transactor) commit(ctx context.Context) error {
 	`)
 
 	// Build the bigquery query of the combined subqueries.
-	query := t.client.newQuery(strings.Join(subqueries, "\n"))
+	queryString := strings.Join(subqueries, "\n")
+	query := t.client.newQuery(queryString)
 	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
 
 	// This returns a single row with the error status of the query.
 	if _, err := t.client.runQuery(ctx, query); err != nil {
+		log.WithField("query", queryString).Error("query failed")
 		return fmt.Errorf("commit query: %w", err)
 	}
 	log.Info("store: finished commit")

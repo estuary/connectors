@@ -17,6 +17,7 @@ on:
       - "source-linkedin-pages/**"
       - "source-linkedin-ads-v2/**"
       - "source-oracle-flashback/**"
+      - "source-klaviyo/**"
       - "source-recharge/**"
   pull_request:
     branches: [main]
@@ -34,6 +35,8 @@ on:
       - "source-linkedin-pages/**"
       - "source-linkedin-ads-v2/**"
       - "source-oracle-flashback/**"
+      - "source-recharge/**"
+      - "source-klaviyo/**"
       - "source-recharge/**"
 
 concurrency:
@@ -98,6 +101,10 @@ jobs:
             type: capture
             version: v1
             usage_rate: "1.0"
+          - name: source-klaviyo
+            type: capture
+            version: v1
+            usage_rate: "1.0"
           - name: source-recharge
             type: capture
             version: v1
@@ -138,8 +145,18 @@ jobs:
           cd ..
           pytest ${{ matrix.connector.name }}
 
+      # Uncomment to allow each connector to have its own Dockerfile
+      #- name: Find Dockerfile for ${{ matrix.connector.name }}
+      #  id: dockerfile
+      #  run: |
+      #    DOCKERFILE_PATH="${PWD}/estuary-cdk/common.Dockerfile"
+      #    if [ -f "${{ matrix.connector.name }}/Dockerfile" ]; then
+      #      DOCKERFILE_PATH="${PWD}/${{ matrix.connector.name }}/Dockerfile"
+      #    fi
+      #    echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
+
       - name: Build ${{ matrix.connector.name }} Docker Image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: estuary-cdk/common.Dockerfile
