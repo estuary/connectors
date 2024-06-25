@@ -549,7 +549,7 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 		// Check for watermark change events and set a flag when the target watermark is reached.
 		// The subsequent FlushEvent will exit the loop.
 		if event, ok := event.(*ChangeEvent); ok {
-			if event.Operation != DeleteOp && strings.ToLower(event.Source.Common().StreamID()) == watermarksTable {
+			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
 				var actual = event.After["watermark"]
 				if actual == nil {
 					actual = event.After["WATERMARK"]
@@ -838,5 +838,5 @@ type StreamID = string
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) StreamID {
-	return strings.ToLower(namespace + "." + stream)
+	return namespace + "." + stream
 }

@@ -1,7 +1,10 @@
-user: ADMIN
-password: Fw32y^$eMiyVenk
+user: FLOW_TEST_LOGMINER
+password: flow_test123
 address: database-1.chqpmndqvzby.us-east-2.rds.amazonaws.com:1521
 database: ORCL
+advanced:
+    discover_schemas:
+        - FLOW_TEST_LOGMINER
 networkTunnel:
     sshForwarding:
         sshEndpoint: ssh://ec2-user@18.221.36.63:22
@@ -42,8 +45,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-06-17T10:21:53Z"
-    mac: ENC[AES256_GCM,data:0IyJWi51smeBJn6dNQ2NNe8R/JCc1rSYZLqLFpZsRaoK1P9Imf6QY8fAiMYjSObFR1bpGZhsIA+mqhFF/6L/+57moPg3UvmQZjwja/PNYeAlVNk3IrFmY4tZPmQig+1jXyQTPWm81Ou1ApIYmNPaHc73f1850+RtPxmLMPz0gM4=,iv:S0h/WgKTOTQWGRGlBFiX+y6lrxYAI4aUEy3Arwh748c=,tag:wqazOyZr9E3f0I9jUblamQ==,type:str]
+    lastmodified: "2024-07-08T15:32:33Z"
+    mac: ENC[AES256_GCM,data:0N2iwi8xQGNQLRcMeJ3ousRqWXVyC+u5twFmZDMz12oBk4LVI+mw23UdG4iPu0igbN+sdbxEiTJzv/ROsxJzqR9hdpds4qcsiUabytVl6cZMm282YCdTvZj5a4fqMTHHsJ5zPwkyW2KAKa2CqPaAtJlBmqbzQUsuOdFdgggCyOg=,iv:aT+M91TXQjGn/MEs9r/M+MgzUWGX+F1Bwl1F8pyI9Js=,tag:it1hCM2PQ3T1A5kwVhdUgw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

@@ -501,7 +501,7 @@ func testReplicationOnly(ctx context.Context, t *testing.T, tb TestBackend) {
 func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 	const uniqueString = "t32386"
 	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))")
-	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile("(?i)"+regexp.QuoteMeta(uniqueString)))
 }
 
 func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
