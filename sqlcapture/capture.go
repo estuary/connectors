@@ -173,10 +173,10 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 	var watermarks = c.Database.WatermarksTable()
 	if c.discovery[watermarks] == nil {
-		return fmt.Errorf("watermarks table %q does not exist", watermarks)
+		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
 	}
 	if err := replStream.ActivateTable(ctx, watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil); err != nil {
-		return fmt.Errorf("error activating table %q: %w", watermarks, err)
+		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
 	}
 	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
@@ -245,7 +245,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		c.State.Streams[stateKey] = state
 
 		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
-			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
+			return fmt.Errorf("error activating replication for table %q: %w", streamID, err)
 		}
 	}
 
