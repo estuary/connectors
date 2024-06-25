@@ -58,39 +58,38 @@ class ExceptEOF(Exception):
 
 class LoadIterator(Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     reqs: AsyncGenerator[Request[EndpointConfig, ResourceConfig, ConnectorState], None]
+    first: request.Load | None
 
     def __init__(
         self,
+        first: request.Load,
         reqs: AsyncGenerator[Request[EndpointConfig, ResourceConfig, ConnectorState], None],
     ):
         self.reqs = reqs
+        self.first = first
 
     def __aiter__(self) -> "LoadIterator[EndpointConfig, ResourceConfig, ConnectorState]":
         return self
 
     async def __anext__(self) -> request.Load:
-        try:
-            n = await anext(self.reqs)
-        except StopAsyncIteration:
-            raise ExceptEOF
-        except Exception as e:
-            raise e
+        if self.first:
+            _first = self.first
+            self.first = None
+            return _first
 
+        n = await anext(self.reqs)
         if load := n.load:
             self._decode_tuples(load)
             return load
         elif _ := n.flush:
             raise StopAsyncIteration
         else:
-            raise Exception(f"expected either load or flush but got {n}")
+            raise RuntimeError(f"expected flush or load but got {n}")
 
     def _decode_tuples(self, s: request.Load):
-        # TODO: The stdlib base64 library is pretty slow, but long-term we should strive to not have
-        # to do this tuple conversion in the connector, since fdb tuple decoding is also slow.
-
+        # TODO: Remove this once JSON protocol messages already include JSON values.
         if not s.keyJson:
-            assert s.keyPacked is not None
-            s.keyJson = fdb.tuple.unpack(base64.standard_b64decode(s.keyPacked))  # type: ignore
+            s.keyJson = _tuples_to_values(s.keyPacked)
 
 
 class StoreIterator(Generic[EndpointConfig, ResourceConfig, ConnectorState]):
@@ -115,34 +114,35 @@ class StoreIterator(Generic[EndpointConfig, ResourceConfig, ConnectorState]):
             self.runtime_checkpoint = start_commit.runtimeCheckpoint
             raise StopAsyncIteration
         else:
-            raise Exception(f"expected either store or startCommit but got {req}")
+            raise RuntimeError(f"expected store or startCommit but got {req}")
 
-    # TODO: Other useful aggregated properties, like total documents iterated etc.
     def get_runtime_checkpoint(self) -> dict[Any, Any]:
         assert self.runtime_checkpoint is not None
         return self.runtime_checkpoint
 
     def _decode_tuples(self, s: request.Store):
-        # TODO: The stdlib base64 library is pretty slow, but long-term we should strive to not have
-        # to do this tuple conversion in the connector, since fdb tuple decoding is also slow.
-
+        # TODO: Remove this once JSON protocol messages already include JSON values.
         if not s.keyJson:
-            assert s.keyPacked is not None
-            s.keyJson = fdb.tuple.unpack(base64.standard_b64decode(s.keyPacked))  # type: ignore
+            s.keyJson = _tuples_to_values(s.keyPacked)
 
         if not s.valuesJson:
-            assert s.valuesPacked is not None
-            s.valuesJson = fdb.tuple.unpack(  # type: ignore
-                base64.standard_b64decode(s.valuesPacked)
-            )
+            s.valuesJson = _tuples_to_values(s.valuesPacked)
+
+def _base64_encoded(inp: Any) -> Any:
+    if isinstance(inp, bytes):
+        return base64.standard_b64encode(inp).decode()
+    else:
+        return inp
+
+def _tuples_to_values(packed: str | None) -> tuple[Any, ...]:
+    assert packed is not None
+    return tuple(map(_base64_encoded, fdb.tuple.unpack(base64.standard_b64decode(packed))))  # type: ignore
 
 class BaseMaterializationConnector(
     BaseConnector[Request[EndpointConfig, ResourceConfig, ConnectorState]],
     Generic[EndpointConfig, ResourceConfig, ConnectorState],
 ):
     output: BinaryIO = sys.stdout.buffer
-
-    # TODO: Ack delay
 
     @abc.abstractmethod
     def loads_wait_for_acknowledge(self) -> bool: ...
@@ -201,7 +201,8 @@ class BaseMaterializationConnector(
             self._emit_model(Response(opened=await self.open(log, open)))
             await self._run_transactions(log, requests)
 
-        return None
+        else:
+            raise RuntimeError("malformed request", request)
 
     def loaded(self, binding: NonNegativeInt, doc_json: str):
         self.output.write(
@@ -220,7 +221,7 @@ class BaseMaterializationConnector(
         commit_task: asyncio.Task[None] | None = None
         acknowledge_task: asyncio.Task[None] | None = None
 
-        async def run_ack():
+        async def _acknowledge():
             nonlocal commit_task
 
             if commit_task is not None:
@@ -241,30 +242,40 @@ class BaseMaterializationConnector(
 
         while True:
             if req := (await anext(requests)).acknowledge:
-                acknowledge_task = asyncio.create_task(run_ack())
+                acknowledge_task = asyncio.create_task(_acknowledge())
             else:
-                raise Exception(f"expected acknowledge but got {req}")
+                raise RuntimeError(f"expected acknowledge but got {req}")
 
             if self.loads_wait_for_acknowledge():
                 await acknowledge_task
 
-            load_task = asyncio.create_task(
-                self.load(log, LoadIterator(requests))
-            )
+
+            # Next we'll usually get one or more load requests, or a flush
+            # message with no load requests if there are no loads necessary.
+            # `self.load` will not be called unless there are loads to evaluate.
+            # If the requests iterator is complete, it means we should do a
+            # clean exit.
+            try:
+                flush_or_load = await anext(requests)
+            except StopAsyncIteration:
+                # Clean exit on stdin EOF.
+                log.info("EOF signal received")
+                return 
+            except Exception as e:
+                raise e
+            
+            load_state_update = None
+            if load := flush_or_load.load:
+                load_state_update = await self.load(log, LoadIterator(load, requests))
+            elif _ := flush_or_load.flush:
+                pass
+            else:
+                raise RuntimeError(f"expected flush or load but got {flush_or_load}")
 
             if not acknowledge_task.done():
                 await acknowledge_task
 
             flushed_res = Response(flushed=response.Flushed[ConnectorState]())
-            try:
-                load_state_update = await load_task
-            except ExceptEOF:
-                # Clean exist on stdin EOF.
-                log.info("EOF signal received")
-                return
-            except Exception as e:
-                raise e
-
             if load_state_update:
                 flushed_res.flushed = response.Flushed[ConnectorState](
                     state=ConnectorStateUpdate(
@@ -275,6 +286,8 @@ class BaseMaterializationConnector(
 
             self._emit_model(flushed_res)
 
+            # There will always be store requests, otherwise this transaction
+            # wouldn't even be happening.
             store_state_update, start_commit = await self.store(
                 log, StoreIterator(requests)
             )

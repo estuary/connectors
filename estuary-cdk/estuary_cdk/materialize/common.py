@@ -70,8 +70,7 @@ class DocumentStream(
         return Applied()
     
     async def load(self, log: Logger, loads: LoadIterator[EndpointConfig, ResourceConfig, _BaseConnectorState]) -> _BaseConnectorState | None:
-        async for _ in loads:
-            raise Exception("document stream materialization should not receive load requests")
+        raise RuntimeError("document stream materialization should not receive load requests")
     
     async def acknowledge(self, log: Logger) -> _BaseConnectorState | None:
         return None
