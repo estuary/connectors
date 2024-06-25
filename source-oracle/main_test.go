@@ -84,8 +84,8 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"scn":11111111`] = regexp.MustCompile(`"scn":([0-9]+)`)
-	sanitizers[`"cursor":11111111`] = regexp.MustCompile(`"cursor":"([0-9]+)"`)
-	sanitizers[`"rowid":"AAAAAAAAAA"`] = regexp.MustCompile(`"rowid":"[^"]+"`)
+	sanitizers[`"cursor":"11111111"`] = regexp.MustCompile(`"cursor":"([0-9]+)"`)
+	sanitizers[`"row_id":"AAAAAAAAAAAAAAAAAA"`] = regexp.MustCompile(`"row_id":"[^"]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 
 	var cfg = tb.config
@@ -107,9 +107,11 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = testSchemaName + "." + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = testSchemaName + "."
 	if suffix != "" {
-		tableName += "_" + suffix
+		tableName += fmt.Sprintf(`"t%s"`, suffix)
+	} else {
+		tableName += fmt.Sprintf(`"%s"`, strings.TrimPrefix(t.Name(), "Test"))
 	}
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
