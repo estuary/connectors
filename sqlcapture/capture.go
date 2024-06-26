@@ -139,6 +139,14 @@ var (
 
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
+	// Always run the automated diagnostics once at capture startup. Sometimes
+	// things can be wrong in ways that will cause the capture to fail, and that
+	// means we'll never hit the diagnostics timeout but we'd still like the info
+	// to potentially be available.
+	if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
+		logrus.WithField("err", err).Error("error running automated diagnostics")
+	}
+
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
@@ -516,9 +524,9 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 
 	// Log a warning and perform replication diagnostics if we don't observe the watermark within a few minutes
 	var diagnosticsTimeout = time.AfterFunc(c.Database.HeartbeatWatermarkInterval()+watermarkDiagnosticsTimeout, func() {
-		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running automated diagnostics")
 		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
-			logrus.WithField("err", err).Error("replication diagnostics error")
+			logrus.WithField("err", err).Error("error running automated diagnostics")
 		}
 	})
 	defer diagnosticsTimeout.Stop()
