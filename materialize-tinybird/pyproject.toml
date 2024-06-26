@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "materialize-tinybird"
+version = "0.1.0"
+description = ""
+authors = ["Will Baker <wbaker@gmail.com>"]
+
+[tool.poetry.dependencies]
+estuary-cdk = { path = "../estuary-cdk", develop = true }
+pydantic = "^2"
+python = "^3.12"
+orjson = "^3.10.5"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+pytest = "^7.4.3"
+pytest-insta = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
