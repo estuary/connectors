@@ -9,13 +9,23 @@ captures:
           - python
           - "-m"
           - source_oracle_flashback
-        config: config-rds.yaml
+        config: config.yaml
     bindings:
       - resource:
-          schema: ADMIN
           name: TEST_ALL_TYPES
-          interval: PT0S
-        target: acmeCo/TEST_ALL_TYPES
+          interval: PT5M
+          schema: FLOW_TEST
+        target: acmeCo/FLOW_TEST_TEST_ALL_TYPES
+      - resource:
+          name: TEST_CHANGES
+          interval: PT5M
+          schema: FLOW_TEST
+        target: acmeCo/FLOW_TEST_TEST_CHANGES
+      - resource:
+          name: TEST
+          interval: PT5M
+          schema: FLOW_CAPTURE
+        target: acmeCo/FLOW_CAPTURE_TEST
     interval: 3m
     shards:
       logLevel: debug
