@@ -41,7 +41,7 @@ func NewColumnValidator(validations ...ColValidation) ColumnValidator {
 func (cv ColumnValidator) ValidateColumn(existing boilerplate.EndpointField, p pf.Projection) (bool, error) {
 	v, ok := cv.validationStrategies[strings.ToLower(existing.Type)]
 	if !ok {
-		return false, fmt.Errorf("no column validator found for endpoint column %q [type %q]", existing.Name, existing.Type)
+		return false, fmt.Errorf("connector does not support materializing to columns of type %q (column %q)", existing.Type, existing.Name)
 	}
 
 	return v(p), nil
