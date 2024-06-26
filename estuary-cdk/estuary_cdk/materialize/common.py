@@ -25,7 +25,6 @@ from estuary_cdk.materialize.response import (
 )
 
 
-# TODO: Backfill increment, uhg
 class DocumentStream(
     BaseMaterializationConnector[EndpointConfig, ResourceConfig, ConnectorState],
     Generic[EndpointConfig, ResourceConfig, ConnectorState],
