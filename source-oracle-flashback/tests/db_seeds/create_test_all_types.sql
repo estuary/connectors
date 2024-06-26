@@ -18,5 +18,6 @@ CREATE TABLE flow_test.test_all_types(
 	ts_local_tz TIMESTAMP WITH LOCAL TIME ZONE,
 	ts_local_tz_nine TIMESTAMP(9) WITH LOCAL TIME ZONE,
 	interval_year INTERVAL YEAR(4) TO MONTH,
-	interval_day INTERVAL DAY TO SECOND
+	interval_day INTERVAL DAY TO SECOND,
+	r RAW(1000)
 )

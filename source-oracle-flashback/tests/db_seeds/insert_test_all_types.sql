@@ -18,7 +18,8 @@ INSERT INTO flow_test.test_all_types(
 	ts_local_tz,
 	ts_local_tz_nine,
 	interval_year,
-	interval_day
+	interval_day,
+	r
 ) VALUES (
 	1,
 	'nvarchar2 value with unicode characters ❤️ 🔥️',
@@ -39,5 +40,6 @@ INSERT INTO flow_test.test_all_types(
 	TIMESTAMP '2022-01-01 15:00:00 +02:00',
 	TIMESTAMP '2022-01-01 15:00:00.123456789 +02:00',
 	INTERVAL '1234-5' YEAR(4) TO MONTH,
-	INTERVAL '1 2:3:4.567' DAY TO SECOND(3)
+	INTERVAL '1 2:3:4.567' DAY TO SECOND(3),
+	UTL_RAW.CAST_TO_RAW('testing raw value')
 )

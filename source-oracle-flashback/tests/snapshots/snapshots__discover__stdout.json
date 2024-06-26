@@ -187,6 +187,18 @@
           "default": null,
           "title": "Nvchar2"
         },
+        "R": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "R"
+        },
         "REAL_NUM": {
           "anyOf": [
             {

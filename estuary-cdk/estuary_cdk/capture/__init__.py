@@ -3,6 +3,7 @@ import decimal
 from pydantic import Field
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
 import orjson
+import base64
 from logging import Logger
 import abc
 import asyncio
@@ -44,13 +45,17 @@ class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSt
     captured: response.Captured | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
 
+
 def orjson_default(obj):
     # Pydantic automatically serializes Decimals as strings, but orjson doesn't
-    # know about that. In order to handle this, we must provide this as 
+    # know about that. In order to handle this, we must provide this as
     # the default= kwarg to orjson.dumps
     if isinstance(obj, decimal.Decimal):
         return str(obj)
+    if isinstance(obj, (bytes, bytearray)):
+        return base64.b64encode(obj).decode('utf-8')
     raise TypeError
+
 
 @dataclass
 class Task:
@@ -190,7 +195,7 @@ class Task:
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)
         return task
-    
+
     def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
         self._buffer.write(
             response.model_dump_json(by_alias=True, exclude_unset=True).encode()

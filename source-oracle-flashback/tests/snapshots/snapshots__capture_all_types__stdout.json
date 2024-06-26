@@ -11,6 +11,7 @@
       "INTERVAL_YEAR": "+1234-05",
       "NUM": 123456789.12345679,
       "NVCHAR2": "nvarchar2 value with unicode characters \u2764\ufe0f \ud83d\udd25\ufe0f",
+      "R": "dGVzdGluZyByYXcgdmFsdWU=",
       "REAL_NUM": 123456789.12345679,
       "SINGLE_NCHAR": "a",
       "SMALL_INT": 123456789,

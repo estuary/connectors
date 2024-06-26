@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC, date
 from decimal import Decimal
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt, computed_field
+from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt, computed_field, Base64Str
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any, List
 import urllib.parse
 
@@ -182,6 +182,7 @@ class OracleColumn(BaseModel, extra="forbid"):
         BFILE = "BFILE"
         FLOAT = "FLOAT"
         REAL = "REAL"
+        RAW = "RAW"
         DOUBLE = "DOUBLE PRECISION"
         INTEGER = "INTEGER"
         NUMBER = "NUMBER"
@@ -304,6 +305,9 @@ def build_table(
             # TODO: enable this after we have added local-datetime to flow
             # field_schema_extra = {"format": "local-datetime"}
         elif col.data_type.startswith(col.Type.INTERVAL):
+            field_type = str
+        elif col.data_type == col.Type.RAW:
+            # we write RAW values as base64 encoded strings
             field_type = str
         else:
             raise NotImplementedError(f"unsupported type {col}")
