@@ -3,7 +3,7 @@ from decimal import Decimal
 from dataclasses import dataclass
 from enum import StrEnum, auto
 from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt, computed_field
-from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any
+from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any, List
 import urllib.parse
 
 import estuary_cdk.capture.common
@@ -97,6 +97,11 @@ class EndpointConfig(BaseModel):
         backfill_chunk_size: int = Field(
             default=50000,
             description="How many rows should be fetched in a single query during backfill. Defaults to 1,000,000."
+        )
+
+        schemas: List[str] = Field(
+            default=[],
+            description="List of schemas to be discovered. By default discovers any accessible tables."
         )
 
     advanced: Advanced = Field(

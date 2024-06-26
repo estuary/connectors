@@ -26,21 +26,19 @@ $defs:
         title: Table
         type: string
       row_id:
-        anyOf:
-          - type: string
-          - type: "null"
-        default: ~
-        description: "Row ID of the Document, available for backfilled documents"
-        title: Row Id
+        description: Row ID of the Document
+        title: Row ID
+        type: string
       scn:
         anyOf:
           - type: integer
           - type: "null"
         default: ~
         description: "Database System Change Number, available for incremental events"
-        title: Scn
+        title: SCN
     required:
       - table
+      - row_id
     title: Source
     type: object
 additionalProperties: false
@@ -74,6 +72,12 @@ properties:
       - type: "null"
     default: ~
     title: Float 126
+  INTEG:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Integ
   INTERVAL_DAY:
     anyOf:
       - type: string
@@ -116,12 +120,6 @@ properties:
       - type: "null"
     default: ~
     title: Small Int
-  INTEG:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Integ
   TS:
     anyOf:
       - type: string

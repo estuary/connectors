@@ -23,6 +23,15 @@
               "description": "How many rows should be fetched in a single query during backfill. Defaults to 1,000,000.",
               "title": "Backfill Chunk Size",
               "type": "integer"
+            },
+            "schemas": {
+              "default": [],
+              "description": "List of schemas to be discovered. By default discovers any accessible tables.",
+              "items": {
+                "type": "string"
+              },
+              "title": "Schemas",
+              "type": "array"
             }
           },
           "title": "Advanced",

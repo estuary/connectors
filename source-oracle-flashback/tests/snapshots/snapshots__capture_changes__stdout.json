@@ -1,6 +1,39 @@
 [
   [
-    "acmeCo/TEST_CHANGES",
+    "acmeCo/FLOW_TEST_TEST_ALL_TYPES",
+    {
+      "DATETIME": "2022-01-01T00:00:00",
+      "DOUBLE_PRECISION": 123456789.12345679,
+      "FLOAT_126": 123456789.12345679,
+      "ID": 1,
+      "INTEG": 18446744073709551615,
+      "INTERVAL_DAY": "+01 02:03:04.567000",
+      "INTERVAL_YEAR": "+1234-05",
+      "NUM": 123456789.12345679,
+      "NVCHAR2": "nvarchar2 value with unicode characters \u2764\ufe0f \ud83d\udd25\ufe0f",
+      "REAL_NUM": 123456789.12345679,
+      "SINGLE_NCHAR": "a",
+      "SMALL_INT": 123456789,
+      "TS": "2022-01-01T13:00:00.000000",
+      "TS_LOCAL_TZ": "2022-01-01T13:00:00.000000Z",
+      "TS_LOCAL_TZ_NINE": "2022-01-01T13:00:00.123456789Z",
+      "TS_NINE": "2022-01-01T13:00:00.123456789",
+      "TS_TZ": "2022-01-01T13:00:00.000000Z",
+      "TS_TZ_NINE": "2022-01-01T13:00:00.123456789Z",
+      "VCHAR": "varchar value",
+      "VCHAR2": "varchar2 value",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "row_id": "<row_id>",
+          "table": "TEST_ALL_TYPES"
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
       "ID": 1,
       "STR": "record 1",
@@ -15,7 +48,7 @@
     }
   ],
   [
-    "acmeCo/TEST_CHANGES",
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
       "ID": 2,
       "STR": "record 2",
@@ -30,7 +63,7 @@
     }
   ],
   [
-    "acmeCo/TEST_CHANGES",
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
       "ID": 3,
       "STR": "record 3",
@@ -45,7 +78,7 @@
     }
   ],
   [
-    "acmeCo/TEST_CHANGES",
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
       "ID": 1,
       "STR": "updated str",
@@ -61,7 +94,7 @@
     }
   ],
   [
-    "acmeCo/TEST_CHANGES",
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
       "ID": 2,
       "STR": "record 2",
@@ -77,26 +110,10 @@
     }
   ],
   [
-    "acmeCo/TEST_CHANGES",
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
       "ID": 3,
       "STR": "updated str",
-      "_meta": {
-        "op": "u",
-        "source": {
-          "row_id": "<row_id>",
-          "scn": "<scn>",
-          "table": "TEST_CHANGES"
-        },
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      }
-    }
-  ],
-  [
-    "acmeCo/TEST_CHANGES",
-    {
-      "ID": 3,
-      "STR": "updated str 2",
       "_meta": {
         "op": "u",
         "source": {

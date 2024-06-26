@@ -1,10 +1,14 @@
 ---
 collections:
-  acmeCo/TEST_ALL_TYPES:
-    schema: TEST_ALL_TYPES.schema.yaml
+  acmeCo/FLOW_CAPTURE_TEST:
+    schema: FLOW_CAPTURE_TEST.schema.yaml
+    key:
+      - /_meta/source/row_id
+  acmeCo/FLOW_TEST_TEST_ALL_TYPES:
+    schema: FLOW_TEST_TEST_ALL_TYPES.schema.yaml
     key:
       - /ID
-  acmeCo/TEST_CHANGES:
-    schema: TEST_CHANGES.schema.yaml
+  acmeCo/FLOW_TEST_TEST_CHANGES:
+    schema: FLOW_TEST_TEST_CHANGES.schema.yaml
     key:
       - /ID

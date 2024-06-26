@@ -1,4 +1,4 @@
-CREATE TABLE test_all_types(
+CREATE TABLE flow_test.test_all_types(
 	id integer PRIMARY KEY,
 	nvchar2 NVARCHAR2(2000),
 	vchar2 VARCHAR2(2000),

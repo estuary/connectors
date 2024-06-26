@@ -1,4 +1,4 @@
-INSERT INTO test_all_types(
+INSERT INTO flow_test.test_all_types(
 	id,
 	nvchar2,
 	vchar2,

@@ -26,21 +26,19 @@ $defs:
         title: Table
         type: string
       row_id:
-        anyOf:
-          - type: string
-          - type: "null"
-        default: ~
-        description: "Row ID of the Document, available for backfilled documents"
-        title: Row Id
+        description: Row ID of the Document
+        title: Row ID
+        type: string
       scn:
         anyOf:
           - type: integer
           - type: "null"
         default: ~
         description: "Database System Change Number, available for incremental events"
-        title: Scn
+        title: SCN
     required:
       - table
+      - row_id
     title: Source
     type: object
 additionalProperties: false
@@ -53,16 +51,10 @@ properties:
       source: ~
     description: Document metadata
   ID:
-    description: Primary Key
-    title: Id
-    type: integer
-  STR:
     anyOf:
-      - type: string
+      - type: integer
       - type: "null"
     default: ~
-    title: Str
-required:
-  - ID
-title: TEST_CHANGES
+    title: Id
+title: TEST
 type: object
