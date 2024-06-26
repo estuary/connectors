@@ -111,6 +111,8 @@ async def all_resources(
     log.debug("current scn", current_scn)
 
     for ot in oracle_tables:
+        if len(config.advanced.schemas) > 0 and ot.owner not in config.advanced.schemas:
+            continue
         columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
         t = build_table(config, ot.owner, ot.table_name, columns)
 

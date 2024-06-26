@@ -1,6 +1,6 @@
 [
   [
-    "acmeCo/TEST_ALL_TYPES",
+    "acmeCo/FLOW_TEST_TEST_ALL_TYPES",
     {
       "DATETIME": "2022-01-01T00:00:00",
       "DOUBLE_PRECISION": 123456789.12345679,

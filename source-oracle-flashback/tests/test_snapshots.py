@@ -12,7 +12,7 @@ from source_oracle_flashback.ssh_tunnel import ssh_tunnel
 
 
 def connect(request, user=None, password=None):
-    sops = subprocess.run(['sops', '--decrypt', request.fspath.dirname + "/../config-rds.yaml"], capture_output=True, text=True)
+    sops = subprocess.run(['sops', '--decrypt', request.fspath.dirname + "/../config.yaml"], capture_output=True, text=True)
     config = yaml.safe_load(sops.stdout)
 
     dsn = config['address']
