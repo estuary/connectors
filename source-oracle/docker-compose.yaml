@@ -1,0 +1,26 @@
+services:
+  db:
+    image: 'container-registry.oracle.com/database/enterprise:21.3.0'
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      {
+        "ORACLE_SID": "ORCL",
+        "ORACLE_PWD": "adminpassword",
+        "ENABLE_ARCHIVELOG": "true",
+        "ORACLE_CHARACTERSET": "AL32UTF8",
+      }
+    healthcheck:
+      test: "true"
+      interval: 3s
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  postgres_data: {}
