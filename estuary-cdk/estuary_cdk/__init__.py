@@ -58,7 +58,7 @@ class BaseConnector(Generic[Request], abc.ABC):
     # Python classes are type-erased, so it's not possible to determine the
     # concrete class at runtime using only type annotations.
     @classmethod
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def request_class(cls) -> type[Request]:
         raise NotImplementedError()
 

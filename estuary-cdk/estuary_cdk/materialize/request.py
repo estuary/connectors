@@ -1,6 +1,6 @@
 from typing import Any, Generic
 
-from pydantic import BaseModel, NonNegativeInt, SkipValidation
+from pydantic import BaseModel, NonNegativeInt
 
 from ..flow import (
     CollectionSpec,
@@ -52,8 +52,8 @@ class Open(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
 
 class Load(BaseModel):
     keyPacked: str
-    binding: int | None
-    keyJson: tuple[Any, ...] | None = None  # calculated in the connector, for now
+    binding: int | None = 0
+    keyJson: tuple[Any, ...] | None = None
 
 
 class Flush(BaseModel):
@@ -64,11 +64,11 @@ class Store(BaseModel):
     binding: int | None = 0
     keyPacked: str
     valuesPacked: str
-    doc: dict[Any, Any] | None = None  # TODO: Can we this as bytes instead?
+    doc: dict[Any, Any] | None = None
     exists: bool | None = False
     delete: bool | None = False
-    valuesJson: tuple[Any, ...] | None = None  # calculated in the connector, for now
-    keyJson: tuple[Any, ...] | None = None  # calculated in the connector, for now
+    valuesJson: tuple[Any, ...] | None = None
+    keyJson: tuple[Any, ...] | None = None
 
 
 class StartCommit(BaseModel):

@@ -147,8 +147,8 @@ def _base64_encoded(inp: Any) -> Any:
 def _tuples_to_values(packed: str | None) -> tuple[Any, ...]:
     assert packed is not None
     return tuple(
-        map(_base64_encoded, fdb.tuple.unpack(base64.standard_b64decode(packed)))
-    )  # type: ignore
+        map(_base64_encoded, fdb.tuple.unpack(base64.standard_b64decode(packed)))  # type: ignore
+    )
 
 
 class BaseMaterializationConnector(
@@ -157,11 +157,16 @@ class BaseMaterializationConnector(
 ):
     output: BinaryIO = sys.stdout.buffer
 
+    @classmethod
     @abc.abstractmethod
-    def loads_wait_for_acknowledge(self) -> bool: ...
+    def loads_wait_for_acknowledge(cls) -> bool: ...
+
+    @classmethod
+    @abc.abstractmethod
+    def spec(cls) -> ConnectorSpec: ...
 
     @abc.abstractmethod
-    async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec: ...
+    async def connect(cls, endpoint_config: EndpointConfig) -> None: ...
 
     @abc.abstractmethod
     async def validate(
@@ -205,18 +210,21 @@ class BaseMaterializationConnector(
             Request[EndpointConfig, ResourceConfig, ConnectorState], None
         ],
     ) -> Coroutine[None, None, None] | None:
-        if spec := request.spec:
-            res = await self.spec(log, spec)
+        if _ := request.spec:
+            res = self.spec()
             res.protocol = 3032023
             self._emit_model(Response(spec=res))
 
         elif validate := request.validate_:
+            await self.connect(validate.config)
             self._emit_model(Response(validated=await self.validate(log, validate)))
 
         elif apply := request.apply:
+            await self.connect(apply.materialization.config)
             self._emit_model(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
+            await self.connect(open.materialization.config)
             self._emit_model(Response(opened=await self.open(log, open)))
             await self._run_transactions(log, requests)
 

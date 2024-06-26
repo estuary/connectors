@@ -1,12 +1,22 @@
 import abc
 from logging import Logger
-from typing import Coroutine, Generic, TypeVar
+from typing import AsyncGenerator, Coroutine, Generic
 
-from pydantic import BaseModel
-
-from estuary_cdk.flow import ConnectorSpec
-from estuary_cdk.materialize import response
-from estuary_cdk.materialize.request import Apply, Open, Spec, Validate
+from estuary_cdk.flow import (
+    EndpointConfig,
+    MaterializationBinding,
+    ResourceConfig,
+)
+from estuary_cdk.flow import (
+    ConnectorState,
+)
+from estuary_cdk.materialize import (
+    BaseMaterializationConnector,
+    LoadIterator,
+    StoreIterator,
+    response,
+)
+from estuary_cdk.materialize.request import Apply, Open, Store, Validate
 from estuary_cdk.materialize.response import (
     Applied,
     Opened,
@@ -14,31 +24,34 @@ from estuary_cdk.materialize.response import (
     ValidatedBinding,
 )
 
-from ..flow import ConnectorState as _BaseConnectorState
-from ..flow import EndpointConfig, ResourceConfig
-from . import BaseMaterializationConnector, LoadIterator, StoreIterator
 
-
-class BaseResourceState(abc.ABC, BaseModel, extra="forbid"):
-    """
-    BaseResourceState is a base class for ResourceState classes.
-    """
-
-    pass
-
-
-_BaseResourceState = TypeVar("_BaseResourceState", bound=BaseResourceState)
-
-
-class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
-    bindings: dict[str, _BaseResourceState] = {}
-
-
+# TODO: Backfill increment, uhg
 class DocumentStream(
-    BaseMaterializationConnector[EndpointConfig, ResourceConfig, _BaseConnectorState]
+    BaseMaterializationConnector[EndpointConfig, ResourceConfig, ConnectorState],
+    Generic[EndpointConfig, ResourceConfig, ConnectorState],
 ):
-    def loads_wait_for_acknowledge(self) -> bool:
+    bindings: list[MaterializationBinding[ResourceConfig]] = []
+
+    @abc.abstractmethod
+    async def store_transaction(
+        self,
+        log: Logger,
+        binding_stores: AsyncGenerator[
+            tuple[MaterializationBinding[ResourceConfig], AsyncGenerator[Store, None]], None
+        ],
+    ) -> None: ...
+
+    @classmethod
+    def loads_wait_for_acknowledge(cls) -> bool:
         return False
+
+    async def open(
+        self,
+        log: Logger,
+        open: Open[EndpointConfig, ResourceConfig, ConnectorState],
+    ) -> Opened:
+        self.bindings = open.materialization.bindings
+        return Opened()
 
     async def validate(
         self, log: Logger, validate: Validate[EndpointConfig, ResourceConfig]
@@ -67,7 +80,7 @@ class DocumentStream(
 
             validated.append(
                 response.ValidatedBinding(
-                    constraints=constraints, resourcePath=[], deltaUpdates=True
+                    constraints=constraints, resourcePath=[binding.collection.name], deltaUpdates=True
                 )
             )
 
@@ -81,28 +94,47 @@ class DocumentStream(
     async def load(
         self,
         log: Logger,
-        loads: LoadIterator[EndpointConfig, ResourceConfig, _BaseConnectorState],
-    ) -> _BaseConnectorState | None:
+        loads: LoadIterator[EndpointConfig, ResourceConfig, ConnectorState],
+    ) -> ConnectorState | None:
         raise RuntimeError(
             "document stream materialization should not receive load requests"
         )
-
-    async def acknowledge(self, log: Logger) -> _BaseConnectorState | None:
-        return None
-
-    @abc.abstractmethod
-    async def spec(self, log: Logger, _: Spec) -> ConnectorSpec: ...
-
-    @abc.abstractmethod
-    async def open(
-        self,
-        log: Logger,
-        open: Open[EndpointConfig, ResourceConfig, _BaseConnectorState],
-    ) -> Opened: ...
-
-    @abc.abstractmethod
+    
     async def store(
         self,
         log: Logger,
-        stores: StoreIterator[EndpointConfig, ResourceConfig, _BaseConnectorState],
-    ) -> tuple[_BaseConnectorState | None, Coroutine[None, None, None] | None]: ...
+        stores: StoreIterator[EndpointConfig, ResourceConfig, ConnectorState],
+    ) -> tuple[ConnectorState | None, Coroutine[None, None, None] | None]:
+        await self.store_transaction(log, stores_by_binding(self.bindings, stores))
+
+        return None, None
+
+    async def acknowledge(self, log: Logger) -> ConnectorState | None:
+        return None
+
+
+async def stores_by_binding(
+    bindings: list[MaterializationBinding[ResourceConfig]],
+    stores: StoreIterator[EndpointConfig, ResourceConfig, ConnectorState],
+) -> AsyncGenerator[
+    tuple[MaterializationBinding[ResourceConfig], AsyncGenerator[Store, None]], None
+]:
+    ref_store = await anext(stores)
+    finished = False
+
+    async def gen() -> AsyncGenerator[Store, None]:
+        nonlocal ref_store
+        nonlocal finished
+        yield ref_store
+
+        async for store in stores:
+            if store.binding != ref_store.binding:
+                ref_store = store
+                return
+
+            yield store
+
+        finished = True
+
+    while not finished:
+        yield bindings[ref_store.binding or 0], gen()

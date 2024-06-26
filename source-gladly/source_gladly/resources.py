@@ -22,7 +22,6 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     http.token_source = TokenSource(
-        oauth_spec=None,
         credentials=BasicAuth(
             username=config.agentEmail,
             password=config.apiToken,

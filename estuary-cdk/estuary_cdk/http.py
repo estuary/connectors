@@ -16,17 +16,19 @@ class HTTPSession(abc.ABC):
     """
     HTTPSession is an abstract base class for an HTTP client implementation.
     Implementations should manage retries, authorization, and other details.
-    Only "success" responses are returned: failures throw an Exception if
-    they cannot be retried.
+    Only "success" responses are returned: failures throw an Exception if they
+    cannot be retried.
 
     HTTPSession is implemented by HTTPMixin.
 
     Common parameters of request methods:
      * `url` to request.
      * `method` to use (GET, POST, DELETE, etc)
+     * `headers` is an object containing additional headers to add to the request
      * `params` are encoded as URL parameters of the query
      * `json` is a JSON-encoded request body (if set, `form` cannot be)
-     * `form` is a form URL-encoded request body (if set, `json` cannot be)
+     * `data` is a form URL-encoded request body if provided as a `dict`, or can
+       provided per the types in aiohttp/payload.py (if set, `json` cannot be)
     """
 
     async def request(
@@ -34,16 +36,17 @@ class HTTPSession(abc.ABC):
         log: Logger,
         url: str,
         method: str = "GET",
+        headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
-        form: dict[str, Any] | None = None,
+        data: Any = None,
         _with_token: bool = True,  # Unstable internal API.
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
         chunks: list[bytes] = []
         async for chunk in self._request_stream(
-            log, url, method, params, json, form, _with_token
+            log, url, method, headers, params, json, data, _with_token
         ):
             chunks.append(chunk)
 
@@ -59,16 +62,17 @@ class HTTPSession(abc.ABC):
         log: Logger,
         url: str,
         method: str = "GET",
+        headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
-        form: dict[str, Any] | None = None,
+        data: Any = None,
         delim: bytes = b"\n",
     ) -> AsyncGenerator[bytes, None]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
         buffer = b""
         async for chunk in self._request_stream(
-            log, url, method, params, json, form, True
+            log, url, method, headers, params, json, data, True
         ):
             buffer += chunk
             while delim in buffer:
@@ -86,9 +90,10 @@ class HTTPSession(abc.ABC):
         log: Logger,
         url: str,
         method: str,
+        headers: dict[str, str] | None,
         params: dict[str, Any] | None,
         json: dict[str, Any] | None,
-        form: dict[str, Any] | None,
+        data: Any | None,
         _with_token: bool,
     ) -> AsyncGenerator[bytes, None]: ...
 
@@ -107,8 +112,8 @@ class TokenSource:
         refresh_token: str = ""
         scope: str = ""
 
-    oauth_spec: OAuth2Spec | None
     credentials: BaseOAuth2Credentials | AccessToken | BasicAuth
+    oauth_spec: OAuth2Spec | None = None
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
 
@@ -152,7 +157,7 @@ class TokenSource:
             log,
             self.oauth_spec.accessTokenUrlTemplate,
             method="POST",
-            form={
+            data={
                 "grant_type": "refresh_token",
                 "client_id": credentials.client_id,
                 "client_secret": credentials.client_secret,
@@ -226,9 +231,10 @@ class HTTPMixin(Mixin, HTTPSession):
         log: Logger,
         url: str,
         method: str,
+        headers: dict[str, str] | None,
         params: dict[str, Any] | None,
         json: dict[str, Any] | None,
-        form: dict[str, Any] | None,
+        data: Any | None,
         _with_token: bool,
     ) -> AsyncGenerator[bytes, None]:
         while True:
@@ -236,7 +242,7 @@ class HTTPMixin(Mixin, HTTPSession):
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
 
-            headers = {}
+            headers = headers or {}
             if _with_token and self.token_source is not None:
                 token_type, token = await self.token_source.fetch_token(log, self)
                 headers["Authorization"] = f"{token_type} {token}"
@@ -244,7 +250,7 @@ class HTTPMixin(Mixin, HTTPSession):
             async with self.inner.request(
                 headers=headers,
                 json=json,
-                data=form,
+                data=data,
                 method=method,
                 params=params,
                 url=url,
