@@ -742,7 +742,12 @@ type replicationSlotInfo struct {
 // only returned if the query itself fails.
 func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName string) (*replicationSlotInfo, error) {
 	var info replicationSlotInfo
-	var query = `SELECT slot_name, database, plugin, slot_type, restart_lsn, confirmed_flush_lsn, wal_status FROM pg_catalog.pg_replication_slots WHERE slot_name = $1`
+	// This query employs a somewhat ugly hack in which row_to_json(), JSON indexing, and the
+	// COALESCE() function are combined to implement a "select column if it exists" behavior.
+	// This is necessary because the 'wal_status' column was only added in Postgres 13, and
+	// while we definitely want it if it's available we also need to support older versions
+	// where the column doesn't exist.
+	var query = `SELECT slot_name, database, plugin, slot_type, restart_lsn, confirmed_flush_lsn, coalesce(row_to_json(s)->>'wal_status'::text, 'unknown') as wal_status FROM pg_catalog.pg_replication_slots s WHERE slot_name = $1`
 	if err := conn.QueryRow(ctx, query, slotName).Scan(&info.SlotName, &info.Database, &info.Plugin, &info.SlotType, &info.RestartLSN, &info.ConfirmedFlushLSN, &info.WALStatus); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

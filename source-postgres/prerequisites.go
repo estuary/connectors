@@ -147,6 +147,10 @@ func (db *postgresDatabase) prerequisiteReplicationSlot(ctx context.Context) err
 		return fmt.Errorf("replication slot %q was incorrectly created, consider using a different slot name or removing the existing slot", slotName)
 	}
 	if slotInfo.WALStatus == "lost" {
+		// TODO(wgd): Consider whether to automatically drop the replication slot? This would never break
+		// anything worse than it already is, it would reduce the number of required user actions to just
+		// one (clicking the 'backfill' button in our UI), and if we eventually implement an option to go
+		// re-backfill automatically then the whole thing could be handled without the user caring.
 		return fmt.Errorf("replication slot %q was invalidated by the server, it must be deleted and all bindings backfilled", slotName)
 	}
 	return nil
