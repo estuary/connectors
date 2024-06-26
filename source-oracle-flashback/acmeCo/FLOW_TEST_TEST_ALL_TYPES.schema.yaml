@@ -102,6 +102,12 @@ properties:
       - type: "null"
     default: ~
     title: Nvchar2
+  R:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: R
   REAL_NUM:
     anyOf:
       - type: number
