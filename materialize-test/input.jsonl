@@ -1,0 +1,233 @@
+{
+    "apply": {
+        "materialization": {
+            "bindings": [
+                {
+                    "collection": {
+                        "ackTemplate": {
+                            "_meta": {
+                                "ack": true,
+                                "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+                            }
+                        },
+                        "key": ["/ts"],
+                        "name": "bobCo/hw/events",
+                        "partitionTemplate": {
+                            "flags": 4,
+                            "fragment": {
+                                "compressionCodec": "GZIP",
+                                "flushInterval": "0s",
+                                "length": "536870912",
+                                "pathPostfixTemplate": "utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}",
+                                "refreshInterval": "300s",
+                                "retention": "0s",
+                                "stores": ["gs://estuary-trial/collection-data/"]
+                            },
+                            "labels": {
+                                "labels": [
+                                    {
+                                        "name": "app.gazette.dev/managed-by",
+                                        "value": "estuary.dev/flow"
+                                    },
+                                    {
+                                        "name": "content-type",
+                                        "value": "application/x-ndjson"
+                                    },
+                                    {
+                                        "name": "estuary.dev/build",
+                                        "value": "0dd05b5fe8000271"
+                                    },
+                                    {
+                                        "name": "estuary.dev/collection",
+                                        "value": "bobCo/hw/events"
+                                    }
+                                ]
+                            },
+                            "maxAppendRate": "4194304",
+                            "name": "bobCo/hw/events/0dd05b5fe5016000",
+                            "replication": 3
+                        },
+                        "projections": [
+                            {
+                                "field": "_meta/flow_truncated",
+                                "inference": {
+                                    "description": "Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system.",
+                                    "exists": "MUST",
+                                    "title": "Flow truncation indicator",
+                                    "types": ["boolean"]
+                                },
+                                "ptr": "/_meta/flow_truncated"
+                            },
+                            {
+                                "field": "flow_document",
+                                "inference": {
+                                    "exists": "MUST",
+                                    "title": "Example Output Record",
+                                    "types": ["object"]
+                                }
+                            },
+                            {
+                                "field": "flow_published_at",
+                                "inference": {
+                                    "description": "Flow publication date-time of this document",
+                                    "exists": "MUST",
+                                    "string": {
+                                        "contentEncoding": "uuid",
+                                        "format": "date-time"
+                                    },
+                                    "title": "Flow Publication Time",
+                                    "types": ["string"]
+                                },
+                                "ptr": "/_meta/uuid"
+                            },
+                            {
+                                "field": "message",
+                                "inference": {
+                                    "description": "A human-readable message",
+                                    "exists": "MUST",
+                                    "string": {},
+                                    "title": "Message",
+                                    "types": ["string"]
+                                },
+                                "ptr": "/message"
+                            },
+                            {
+                                "field": "ts",
+                                "inference": {
+                                    "description": "The time at which this message was generated",
+                                    "exists": "MUST",
+                                    "string": {
+                                        "format": "date-time"
+                                    },
+                                    "title": "Timestamp",
+                                    "types": ["string"]
+                                },
+                                "isPrimaryKey": true,
+                                "ptr": "/ts"
+                            }
+                        ],
+                        "uuidPtr": "/_meta/uuid",
+                        "writeSchema": {
+                            "$schema": "http://json-schema.org/draft/2020-12/schema",
+                            "properties": {
+                                "message": {
+                                    "description": "A human-readable message",
+                                    "title": "Message",
+                                    "type": "string"
+                                },
+                                "ts": {
+                                    "description": "The time at which this message was generated",
+                                    "format": "date-time",
+                                    "title": "Timestamp",
+                                    "type": "string"
+                                }
+                            },
+                            "required": ["ts", "message"],
+                            "title": "Example Output Record",
+                            "type": "object"
+                        }
+                    },
+                    "deltaUpdates": true,
+                    "fieldSelection": {
+                        "document": "flow_document",
+                        "keys": ["ts"],
+                        "values": ["_meta/flow_truncated", "flow_published_at", "message"]
+                    },
+                    "journalReadSuffix": "materialize/bobCo/test/materialize-test/bobCo%2Fhw%2Fevents",
+                    "partitionSelector": {
+                        "exclude": {},
+                        "include": {
+                            "labels": [
+                                {
+                                    "name": "estuary.dev/collection",
+                                    "value": "bobCo/hw/events"
+                                }
+                            ]
+                        }
+                    },
+                    "resourceConfig": {
+                        "path": "events"
+                    },
+                    "resourcePath": ["bobCo/hw/events"],
+                    "stateKey": "bobCo%2Fhw%2Fevents"
+                }
+            ],
+            "config": {},
+            "connectorType": "IMAGE",
+            "name": "bobCo/test/materialize-test",
+            "recoveryLogTemplate": {
+                "flags": 4,
+                "fragment": {
+                    "compressionCodec": "SNAPPY",
+                    "flushInterval": "0s",
+                    "length": "268435456",
+                    "refreshInterval": "300s",
+                    "retention": "0s",
+                    "stores": ["gs://estuary-trial/"]
+                },
+                "labels": {
+                    "labels": [
+                        {
+                            "name": "app.gazette.dev/managed-by",
+                            "value": "estuary.dev/flow"
+                        },
+                        {
+                            "name": "content-type",
+                            "value": "application/x-gazette-recoverylog"
+                        },
+                        {
+                            "name": "estuary.dev/build",
+                            "value": "0dd229415a000271"
+                        },
+                        {
+                            "name": "estuary.dev/task-name",
+                            "value": "bobCo/test/materialize-test"
+                        },
+                        {
+                            "name": "estuary.dev/task-type",
+                            "value": "materialization"
+                        }
+                    ]
+                },
+                "maxAppendRate": "4194304",
+                "name": "recovery/materialize/bobCo/test/materialize-test/0dd229415201c800",
+                "replication": 3
+            },
+            "shardTemplate": {
+                "hintBackups": 2,
+                "hintPrefix": "/estuary/flow/hints",
+                "id": "materialize/bobCo/test/materialize-test/0dd229415201c800",
+                "labels": {
+                    "labels": [
+                        {
+                            "name": "app.gazette.dev/managed-by",
+                            "value": "estuary.dev/flow"
+                        },
+                        {
+                            "name": "estuary.dev/build",
+                            "value": "0dd229415a000271"
+                        },
+                        {
+                            "name": "estuary.dev/log-level",
+                            "value": "info"
+                        },
+                        {
+                            "name": "estuary.dev/task-name",
+                            "value": "bobCo/test/materialize-test"
+                        },
+                        {
+                            "name": "estuary.dev/task-type",
+                            "value": "materialization"
+                        }
+                    ]
+                },
+                "maxTxnDuration": "300s",
+                "minTxnDuration": "0s",
+                "readChannelSize": 4096,
+                "recoveryLogPrefix": "recovery",
+                "ringBufferSize": 65536
+            }
+        },
+        "version": "0dd229415a000271"
+    }
+}
