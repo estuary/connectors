@@ -302,10 +302,7 @@ func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
 	// And as the final resort we'll check 'expire_logs_days' if 'seconds' was zero or nonexistent.
 	expireLogsDays, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'expire_logs_days';`)
 	logrus.WithFields(logrus.Fields{"days": expireLogsDays, "err": err}).Debug("queried MySQL variable 'expire_logs_days'")
-	if err != nil {
-		return 0, err
-	}
-	if expireLogsDays > 0 {
+	if err == nil && expireLogsDays > 0 {
 		return time.Duration(expireLogsDays) * 24 * time.Hour, nil
 	}
 
