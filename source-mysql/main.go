@@ -306,7 +306,9 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
 
-	db.queryDatabaseVersion()
+	if err := db.queryDatabaseVersion(); err != nil {
+		logrus.WithField("err", err).Warn("failed to query database version")
+	}
 
 	return nil
 }

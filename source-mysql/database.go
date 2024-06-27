@@ -12,7 +12,6 @@ import (
 // queryDatabaseVersion examines the server version string to figure out what product
 // and release version we're talking to, and saves the results for later use.
 func (db *mysqlDatabase) queryDatabaseVersion() error {
-	var version string
 	var results, err = db.conn.Execute(`SELECT @@GLOBAL.version;`)
 	if err != nil {
 		return fmt.Errorf("unable to query database version: %w", err)
@@ -26,9 +25,9 @@ func (db *mysqlDatabase) queryDatabaseVersion() error {
 	if strings.Contains(strings.ToLower(db.versionString), "mariadb") {
 		db.versionProduct = "MariaDB"
 	}
-	major, minor, err := sqlcapture.ParseVersion(version)
+	major, minor, err := sqlcapture.ParseVersion(db.versionString)
 	if err != nil {
-		return fmt.Errorf("unable to parse database version from %q: %w", version, err)
+		return fmt.Errorf("unable to parse database version from %q: %w", db.versionString, err)
 	}
 	db.versionMajor = major
 	db.versionMinor = minor
