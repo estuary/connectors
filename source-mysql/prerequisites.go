@@ -19,7 +19,7 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	// Our version checking may have been overly conservative, so let's err in the
 	// other direction for a while and disengage the check entirely.
 	if err := db.prerequisiteVersion(ctx); err != nil {
-		logrus.WithField("err", err).Debug("database version may be insufficient")
+		logrus.WithField("err", err).Warn("database version may be insufficient")
 	}
 
 	for _, prereq := range []func(ctx context.Context) error{
@@ -47,61 +47,19 @@ const (
 )
 
 func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
-	// This connector works for both MySQL and MariaDB. If the queried version indicates that we're
-	// connecting to a MariaDB instance, the version requirements will be set accordingly further
-	// down.
-	database := "MySQL"
-	minMajor := mysqlReqMajorVersion
-	minMinor := mysqlReqMinorVersion
-
-	var version string
-	results, err := db.conn.Execute(`SELECT @@GLOBAL.version;`)
-	if err != nil {
-		logrus.Warn(fmt.Errorf("unable to query 'version' system variable: %w", err))
-	} else if len(results.Values) != 1 || len(results.Values[0]) != 1 {
-		logrus.Warn(fmt.Errorf("unable to query 'version' system variable: malformed response"))
-	} else {
-		version = string(results.Values[0][0].AsString())
-		// This check may not be perfect, but it should be conservative: Since MariaDB has a higher
-		// minimum version requirement, only increase the version requirements corresponding to
-		// MariaDB if we can conclusively prove that this is a MariaDB instance.
-		if strings.Contains(strings.ToLower(version), "mariadb") {
-			database = "MariaDB"
-			minMajor = mariadbReqMajorVersion
-			minMinor = mariadbReqMinorVersion
-		}
-
-		if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
-			logrus.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
-		} else if !sqlcapture.ValidVersion(major, minor, minMajor, minMinor) {
-			// Return an error only if the actual version could be definitively determined to be
-			// less than required.
-			return fmt.Errorf(
-				"minimum supported %s version is %d.%d: attempted to capture from database version %d.%d",
-				database,
-				minMajor,
-				minMinor,
-				major,
-				minor,
-			)
-		} else {
-			logrus.WithFields(logrus.Fields{
-				"version": version,
-				"major":   major,
-				"minor":   minor,
-			}).Info("queried database version")
-			return nil
-		}
+	var minMajor, minMinor = mysqlReqMajorVersion, mysqlReqMinorVersion
+	if db.versionProduct == "MariaDB" {
+		minMajor, minMinor = mariadbReqMajorVersion, mariadbReqMinorVersion
 	}
 
-	// Catch-all trailing log message for cases where the server version could not be determined.
-	logrus.Warn(fmt.Sprintf(
-		"attempting to capture from unknown database version: minimum supported %s version is %d.%d",
-		database,
-		minMajor,
-		minMinor,
-	))
-
+	if !sqlcapture.ValidVersion(db.versionMajor, db.versionMinor, minMajor, minMinor) {
+		return fmt.Errorf(
+			"minimum supported %s version is %d.%d: attempted to capture from database version %d.%d",
+			db.versionProduct,
+			minMajor, minMinor,
+			db.versionMajor, db.versionMinor,
+		)
+	}
 	return nil
 }
 
