@@ -116,6 +116,8 @@ async def all_resources(
         columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
         t = build_table(log, config, ot.owner, ot.table_name, columns)
 
+        log.debug("discovering table", f"{t.quoted_owner}.{t.quoted_table_name}")
+
         max_rowid = None
         async with pool.acquire() as conn:
             with conn.cursor() as c:
