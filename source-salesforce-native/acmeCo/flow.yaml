@@ -1,0 +1,86 @@
+---
+collections:
+  acmeCo/Account:
+    schema: Account.schema.yaml
+    key:
+      - /Id
+  acmeCo/Campaign:
+    schema: Campaign.schema.yaml
+    key:
+      - /Id
+  acmeCo/Case:
+    schema: Case.schema.yaml
+    key:
+      - /Id
+  acmeCo/Contact:
+    schema: Contact.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactLineItem:
+    schema: ContactLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/Entitlement:
+    schema: Entitlement.schema.yaml
+    key:
+      - /Id
+  acmeCo/Lead:
+    schema: Lead.schema.yaml
+    key:
+      - /Id
+  acmeCo/LeadHistory:
+    schema: LeadHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/LiveChatTranscript:
+    schema: LiveChatTranscript.schema.yaml
+    key:
+      - /Id
+  acmeCo/MessagingSession:
+    schema: MessagingSession.schema.yaml
+    key:
+      - /Id
+  acmeCo/Opportunity:
+    schema: Opportunity.schema.yaml
+    key:
+      - /Id
+  acmeCo/OpportunityFilledHistory:
+    schema: OpportunityFilledHistory.schema.yaml
+    key:
+      - /Id
+  acmeCo/Quote:
+    schema: Quote.schema.yaml
+    key:
+      - /Id
+  acmeCo/QuoteLineItem:
+    schema: QuoteLineItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceAppointment:
+    schema: ServiceAppointment.schema.yaml
+    key:
+      - /Id
+  acmeCo/ServiceContract:
+    schema: ServiceContract.schema.yaml
+    key:
+      - /Id
+  acmeCo/Task:
+    schema: Task.schema.yaml
+    key:
+      - /Id
+  acmeCo/User:
+    schema: User.schema.yaml
+    key:
+      - /Id
+  acmeCo/UserServicePresence:
+    schema: UserServicePresence.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrder:
+    schema: WorkOrder.schema.yaml
+    key:
+      - /Id
+  acmeCo/WorkOrderLineItem:
+    schema: WorkOrderLineItem.schema.yaml
+    key:
+      - /Id

@@ -1,0 +1,76 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-salesforce-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_salesforce_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: Account
+        target: acmeCo/Account
+      - resource:
+          name: Contact
+        target: acmeCo/Contact
+      - resource:
+          name: User
+        target: acmeCo/User
+      - resource:
+          name: OpportunityFilledHistory
+        target: acmeCo/OpportunityFilledHistory
+      - resource:
+          name: LeadHistory
+        target: acmeCo/LeadHistory
+      - resource:
+          name: Opportunity
+        target: acmeCo/Opportunity
+      - resource:
+          name: Campaign
+        target: acmeCo/Campaign
+      - resource:
+          name: Case
+        target: acmeCo/Case
+      - resource:
+          name: ContactLineItem
+        target: acmeCo/ContactLineItem
+      - resource:
+          name: Entitlement
+        target: acmeCo/Entitlement
+      - resource:
+          name: Lead
+        target: acmeCo/Lead
+      - resource:
+          name: LiveChatTranscript
+        target: acmeCo/LiveChatTranscript
+      - resource:
+          name: MessagingSession
+        target: acmeCo/MessagingSession
+      - resource:
+          name: Quote
+        target: acmeCo/Quote
+      - resource:
+          name: QuoteLineItem
+        target: acmeCo/QuoteLineItem
+      - resource:
+          name: ServiceAppointment
+        target: acmeCo/ServiceAppointment
+      - resource:
+          name: ServiceContract
+        target: acmeCo/ServiceContract
+      - resource:
+          name: Task
+        target: acmeCo/Task
+      - resource:
+          name: UserServicePresence
+        target: acmeCo/UserServicePresence
+      - resource:
+          name: WorkOrder
+        target: acmeCo/WorkOrder
+      - resource:
+          name: WorkOrderLineItem
+        target: acmeCo/WorkOrderLineItem
