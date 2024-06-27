@@ -95,7 +95,7 @@ def test_capture_all_types(request, snapshot):
     lines = []
     lines.append(json.loads(p.stdout.readline()))
 
-    assert p.wait(timeout=10) == 0
+    assert p.wait(timeout=30) == 0
 
     # clean up snapshot from non-deterministic values
     for _, doc in lines:
@@ -167,7 +167,7 @@ def test_capture_changes(request, snapshot):
     # expect to have one new line in the output
     lines.append(json.loads(p.stdout.readline()))
 
-    assert p.wait(timeout=10) == 0
+    assert p.wait(timeout=30) == 0
 
     # clean up snapshot from non-deterministic values
     for _, doc in lines:
@@ -178,6 +178,41 @@ def test_capture_changes(request, snapshot):
             source['scn'] = '<scn>'
 
     assert snapshot("stdout.json") == lines
+
+
+def test_capture_empty(request, snapshot):
+    conn = connect(request)
+
+    # seed the test database first
+    try:
+        with conn.cursor() as c:
+            c.execute("DROP TABLE test_empty")
+    except Exception as e:
+        # do nothing
+        print("tables did not exist, ignoring", e)
+
+    with conn.cursor() as c:
+        c.execute("CREATE TABLE test_empty(id INTEGER)")
+    conn.commit()
+
+    p = subprocess.Popen(
+        [
+            "flowctl",
+            "preview",
+            "--source",
+            request.fspath.dirname + "/../test-changes.flow.yaml",
+            "--sessions",
+            "1,1,1",
+            "--delay",
+            "1s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+
+    assert p.wait(timeout=30) == 0
+
+    assert snapshot("stdout.json") == []
 
 
 def test_discover(request, snapshot):

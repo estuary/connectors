@@ -567,5 +567,112 @@
     "key": [
       "/_meta/source/row_id"
     ]
+  },
+  {
+    "recommendedName": "FLOW_TEST_TEST_EMPTY",
+    "resourceConfig": {
+      "name": "TEST_EMPTY",
+      "interval": "PT5M",
+      "schema": "FLOW_TEST"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Source"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "source"
+          ],
+          "title": "Meta",
+          "type": "object"
+        },
+        "Source": {
+          "properties": {
+            "table": {
+              "description": "Database table of the event",
+              "title": "Table",
+              "type": "string"
+            },
+            "row_id": {
+              "description": "Row ID of the Document",
+              "title": "Row ID",
+              "type": "string"
+            },
+            "scn": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Database System Change Number, available for incremental events",
+              "title": "SCN"
+            }
+          },
+          "required": [
+            "table",
+            "row_id"
+          ],
+          "title": "Source",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "source": null
+          },
+          "description": "Document metadata"
+        },
+        "ID": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        }
+      },
+      "title": "TEST_EMPTY",
+      "type": "object"
+    },
+    "key": [
+      "/_meta/source/row_id"
+    ]
   }
 ]
