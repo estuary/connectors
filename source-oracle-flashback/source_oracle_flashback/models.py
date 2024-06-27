@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeVal
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any, List
 import urllib.parse
 
+from .reserved_words import RESERVED_WORDS
+
 import estuary_cdk.capture.common
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
@@ -231,7 +233,9 @@ class OracleColumn(BaseModel, extra="forbid"):
 
 
 def quote_identifier(s: str) -> str:
-    if s.isupper():
+    if s in RESERVED_WORDS:
+        return f"\"{s}\""
+    elif s.isupper():
         return s
     else:
         return f"\"{s}\""
