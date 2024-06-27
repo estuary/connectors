@@ -110,38 +110,64 @@ async def all_resources(
 
     log.debug("current scn", current_scn)
 
+    tables = []
     for ot in oracle_tables:
         if len(config.advanced.schemas) > 0 and ot.owner not in config.advanced.schemas:
             continue
         columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
         t = build_table(log, config, ot.owner, ot.table_name, columns)
+        tables.append(t)
 
-        log.debug("discovering table", f"{t.quoted_owner}.{t.quoted_table_name}")
+    max_rowids = []
 
-        max_rowid = None
-        async with pool.acquire() as conn:
-            with conn.cursor() as c:
-                try:
-                    await c.execute(f"SELECT max(ROWID) FROM {t.quoted_owner}.{t.quoted_table_name}")
-                except Exception as e:
-                    # ORA-01031: insufficient permissions, just skip this table
-                    if "ORA-01031" in str(e):
-                        continue
+    async with pool.acquire() as conn:
+        with conn.cursor() as c:
+            table_list = ""
+            for (i, t) in enumerate(tables):
+                table_list += f"v_tables({i+1}) := '{t.quoted_owner}.{t.quoted_table_name}';\n"
+
+            await c.callproc("dbms_output.enable")
+
+            await c.execute(f"""DECLARE
+                TYPE t_table_array IS TABLE OF VARCHAR2(50) INDEX BY PLS_INTEGER;
+                v_tables t_table_array;
+                v_max_rowid ROWID;
+            BEGIN
+                {table_list}
+
+                -- Loop through the collection to get the maximum ROWID for each table
+                FOR i IN 1 .. v_tables.COUNT LOOP
+                    BEGIN
+                        EXECUTE IMMEDIATE 'SELECT MAX(ROWID) FROM ' || v_tables(i) INTO v_max_rowid;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            v_max_rowid := NULL;
+                    END;
+                    DBMS_OUTPUT.PUT_LINE(v_max_rowid);
+                END LOOP;
+            END;""")
+
+            chunk_size = 50
+            lines_var = c.arrayvar(str, chunk_size)
+            num_lines_var = c.var(int)
+            num_lines_var.setvalue(0, chunk_size)
+            while True:
+                await c.callproc("dbms_output.get_lines", (lines_var, num_lines_var))
+                num_lines = num_lines_var.getvalue()
+                lines = lines_var.getvalue()[:num_lines]
+                for line in lines:
+                    if line == "":
+                        max_rowids.append(None)
                     else:
-                        raise e
+                        max_rowids.append(line)
+                if num_lines < chunk_size:
+                    break
 
-                # if table is empty then use the initial rowid as max_rowid (we essentially don't need to backfill)
-                try:
-                    max_rowid = (await c.fetchone())[0]
-                except Exception as e:
-                    # empty results table
-                    if "DPY-1003" in str(e):
-                        max_rowid = 'AAAAAAAAAAAAAAAAAA'
-                    else:
-                        raise e
+    for (i, t) in enumerate(tables):
         # if max_rowid is None, that maens there are no rows in the table, so we
         # skip backfill
-        backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
+
+        backfill = ResourceState.Backfill(cutoff=(max_rowids[i],)) if max_rowids[i] is not None else None
 
         def open(
             table: Table,
