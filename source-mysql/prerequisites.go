@@ -149,6 +149,7 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 	// authorized for CDC.
 	var status, err = db.queryBinlogStatus()
 	if err != nil {
+		logrus.WithField("err", err).Info("failed to query binlog status")
 		return fmt.Errorf("user %q needs the REPLICATION CLIENT permission", db.config.User)
 	}
 
