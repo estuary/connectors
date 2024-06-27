@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	_ "github.com/go-mysql-org/go-mysql/driver"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
@@ -591,10 +593,18 @@ func TestComplexDataset(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
 
 	t.Run("init", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
-		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 130
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0x94, 0x01, 0x4e, 0x56, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
@@ -603,9 +613,18 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
 	})
 	t.Run("restart1", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 230
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0xbc, 0x01, 0x4e, 0x48, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
