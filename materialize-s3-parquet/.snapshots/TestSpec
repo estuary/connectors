@@ -19,7 +19,8 @@
         "type": "string",
         "title": "AWS Secret Access key",
         "description": "Secret Access Key for writing data to the bucket.",
-        "order": 2
+        "order": 2,
+        "secret": true
       },
       "region": {
         "type": "string",
