@@ -212,6 +212,10 @@ func configSchema() json.RawMessage {
 }
 
 type mysqlDatabase struct {
+	versionString              string // The raw contents of the 'version' system variable
+	versionProduct             string // Usually either "MySQL" or "MariaDB"
+	versionMajor, versionMinor int    // The major/minor version the server is running
+
 	config           *Config
 	conn             *client.Conn
 	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
@@ -301,6 +305,8 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	if _, err := db.conn.Execute("SET SESSION time_zone = '+00:00';"); err != nil {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
+
+	db.queryDatabaseVersion()
 
 	return nil
 }
