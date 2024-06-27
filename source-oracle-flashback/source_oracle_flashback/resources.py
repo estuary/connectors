@@ -127,9 +127,6 @@ async def all_resources(
                     # ORA-01031: insufficient permissions, just skip this table
                     if "ORA-01031" in str(e):
                         continue
-                    # invalid table name, skip this table
-                    elif "ORA-00903" in str(e):
-                        continue
                     else:
                         raise e
 
