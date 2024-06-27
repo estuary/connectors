@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, UTC, date
 from decimal import Decimal
 from dataclasses import dataclass
 from enum import StrEnum, auto
+from logging import Logger
 from pydantic import BaseModel, Field, AwareDatetime, model_validator, BeforeValidator, create_model, StringConstraints, constr, NonNegativeInt, computed_field, Base64Str
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Any, List
 import urllib.parse
@@ -264,6 +265,7 @@ class Table:
 
 
 def build_table(
+    log: Logger,
     config: EndpointConfig,
     owner: str,
     table_name: str,
@@ -310,7 +312,8 @@ def build_table(
             # we write RAW values as base64 encoded strings
             field_type = str
         else:
-            raise NotImplementedError(f"unsupported type {col}")
+            log.warn(f"skipping column {col}: type {col.data_type} is not supported")
+            continue
 
         if col.is_pk:
             primary_key.append(col)
