@@ -127,12 +127,21 @@ async def all_resources(
                     # ORA-01031: insufficient permissions, just skip this table
                     if "ORA-01031" in str(e):
                         continue
+                    # invalid table name, skip this table
+                    elif "ORA-00903" in str(e):
+                        continue
+                    else:
+                        raise e
 
-                # table is empty, max_rowid is the same as starting rowid
-                if c.rowcount < 1:
-                    max_rowid = 'AAAAAAAAAAAAAAAAAA'
-                else:
+                # if table is empty then use the initial rowid as max_rowid (we essentially don't need to backfill)
+                try:
                     max_rowid = (await c.fetchone())[0]
+                except Exception as e:
+                    # empty results table
+                    if "DPY-1003" in str(e):
+                        max_rowid = 'AAAAAAAAAAAAAAAAAA'
+                    else:
+                        raise e
         # if max_rowid is None, that maens there are no rows in the table, so we
         # skip backfill
         backfill = ResourceState.Backfill(cutoff=(max_rowid,)) if max_rowid is not None else None
