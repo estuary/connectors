@@ -51,17 +51,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		pos.Name = binlogName
 		pos.Pos = uint32(binlogPos)
 	} else {
-		// Get the initial binlog cursor from the source database's latest binlog position
-		var results, err = db.conn.Execute("SHOW MASTER STATUS;")
+		var status, err = db.queryBinlogStatus()
 		if err != nil {
-			return nil, fmt.Errorf("error getting latest binlog position: %w", err)
+			return nil, err
 		}
-		if len(results.Values) == 0 {
-			return nil, fmt.Errorf("failed to query latest binlog position (is binary logging enabled on %q?)", host)
-		}
-		var row = results.Values[0]
-		pos.Name = string(row[0].AsString())
-		pos.Pos = uint32(row[1].AsInt64())
+		pos = status.Position
 		logrus.WithField("pos", pos).Debug("initialized binlog position")
 	}
 
@@ -914,9 +908,15 @@ func (db *mysqlDatabase) ReplicationDiagnostics(ctx context.Context) error {
 
 	query("SELECT @@GLOBAL.log_bin;")
 	query("SELECT @@GLOBAL.binlog_format;")
-	query("SHOW MASTER STATUS;")
-	query("SHOW SLAVE HOSTS;")
 	query("SHOW PROCESSLIST;")
 	query("SHOW BINARY LOGS;")
+	var newspeakQueries = db.versionProduct == "MySQL" && ((db.versionMajor == 8 && db.versionMinor >= 4) || db.versionMajor > 8)
+	if newspeakQueries {
+		query("SHOW BINARY LOG STATUS;")
+		query("SHOW REPLICAS;")
+	} else {
+		query("SHOW MASTER STATUS;")
+		query("SHOW SLAVE HOSTS;")
+	}
 	return nil
 }
