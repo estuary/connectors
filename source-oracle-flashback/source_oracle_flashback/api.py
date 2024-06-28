@@ -304,10 +304,10 @@ async def fetch_changes(
 # this helper function takes care of formatting datetimes as RFC3339 strings
 def cast_column(c: OracleColumn) -> str:
     if not c.is_datetime and not c.cast_to_string:
-        return c.column_name
+        return c.quoted_column_name
 
     if c.cast_to_string and not c.is_datetime:
-        return f"TO_CHAR({c.column_name}) AS {c.column_name}"
+        return f"TO_CHAR({c.quoted_column_name}) AS {c.quoted_column_name}"
 
     out = "TO_CHAR(" + c.column_name
     fmt = ""
@@ -321,7 +321,7 @@ def cast_column(c: OracleColumn) -> str:
     if c.has_timezone:
         out = out + " AT TIME ZONE 'UTC'"
 
-    out = out + f", {fmt}) AS {c.column_name}"
+    out = out + f", {fmt}) AS {c.quoted_column_name}"
 
     return out
 

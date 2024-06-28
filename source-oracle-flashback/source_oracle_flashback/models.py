@@ -179,9 +179,6 @@ class OracleColumn(BaseModel, extra="forbid"):
 
     class Type(StrEnum):
         CHAR = "CHAR"
-        CLOB = "CLOB"
-        BLOB = "BLOB"
-        NCLOB = "NCLOB"
         BFILE = "BFILE"
         FLOAT = "FLOAT"
         REAL = "REAL"
@@ -216,6 +213,10 @@ class OracleColumn(BaseModel, extra="forbid"):
         description="Number of digits to the right of the decimal point that are significant.",
     )
     nullable: bool = Field(default=True, alias="NULLABLE")
+
+    @computed_field
+    def quoted_column_name(self) -> bool:
+        return quote_identifier(self.column_name)
 
     @computed_field
     def is_datetime(self) -> bool:
@@ -302,7 +303,7 @@ def build_table(
 
         elif col.data_type in (col.Type.INTEGER, col.Type.SMALLINT):
             field_type = int
-        elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.CLOB, col.Type.NCHAR, col.Type.NVARCHAR2):
+        elif col.data_type in (col.Type.CHAR, col.Type.VARCHAR, col.Type.VARCHAR2, col.Type.NCHAR, col.Type.NVARCHAR2):
             field_type = str
         elif col.is_datetime and col.has_timezone:
             field_type = datetime
