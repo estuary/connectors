@@ -123,6 +123,7 @@ async def fetch_columns(
                 row = {k: v for (k, v) in row.items() if v is not None}
                 columns.append(OracleColumn(**row))
 
+            log.debug("fetch_columns", columns)
             return columns
 
 # Backfills operate on ROWID, which is a unique identifier for each row based on its
