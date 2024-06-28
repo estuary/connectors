@@ -102,7 +102,7 @@ func newResource(cfg config) resource {
 }
 
 func (r resource) path() []string {
-	return []string{r.Namespace, r.Table}
+	return []string{strings.ToLower(r.Namespace), strings.ToLower(r.Table)}
 }
 
 func pathToFQN(p []string) string {
