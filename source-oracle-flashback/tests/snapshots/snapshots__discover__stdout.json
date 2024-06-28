@@ -88,8 +88,9 @@
         },
         "ID": {
           "description": "Primary Key",
+          "format": "number",
           "title": "Id",
-          "type": "integer"
+          "type": "string"
         },
         "DATETIME": {
           "anyOf": [
@@ -106,37 +107,40 @@
         "DOUBLE_PRECISION": {
           "anyOf": [
             {
-              "type": "number"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Double Precision"
         },
         "FLOAT_126": {
           "anyOf": [
             {
-              "type": "number"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Float 126"
         },
         "INTEG": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Integ"
         },
         "INTERVAL_DAY": {
@@ -166,14 +170,40 @@
         "NUM": {
           "anyOf": [
             {
-              "type": "number"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Num"
+        },
+        "NUM15": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Num15"
+        },
+        "NUM19": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "format": "number",
+          "title": "Num19"
         },
         "NVCHAR2": {
           "anyOf": [
@@ -202,13 +232,14 @@
         "REAL_NUM": {
           "anyOf": [
             {
-              "type": "number"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Real Num"
         },
         "SINGLE_NCHAR": {
@@ -226,13 +257,14 @@
         "SMALL_INT": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Small Int"
         },
         "TS": {
@@ -435,8 +467,9 @@
         },
         "ID": {
           "description": "Primary Key",
+          "format": "number",
           "title": "Id",
-          "type": "integer"
+          "type": "string"
         },
         "STR": {
           "anyOf": [
@@ -551,13 +584,14 @@
         "ID": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Id"
         }
       },
@@ -658,13 +692,14 @@
         "ID": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
+          "format": "number",
           "title": "Id"
         }
       },

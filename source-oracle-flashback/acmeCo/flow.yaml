@@ -12,3 +12,7 @@ collections:
     schema: FLOW_TEST_TEST_CHANGES.schema.yaml
     key:
       - /ID
+  acmeCo/FLOW_TEST_TEST_EMPTY:
+    schema: FLOW_TEST_TEST_EMPTY.schema.yaml
+    key:
+      - /ID
