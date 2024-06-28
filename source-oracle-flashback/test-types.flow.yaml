@@ -16,21 +16,6 @@ captures:
           interval: PT5M
           schema: FLOW_TEST
         target: acmeCo/FLOW_TEST_TEST_ALL_TYPES
-      - resource:
-          name: TEST_CHANGES
-          interval: PT5M
-          schema: FLOW_TEST
-        target: acmeCo/FLOW_TEST_TEST_CHANGES
-      - resource:
-          name: TEST
-          interval: PT5M
-          schema: FLOW_CAPTURE
-        target: acmeCo/FLOW_CAPTURE_TEST
-      - resource:
-          name: TEST_EMPTY
-          interval: PT5M
-          schema: FLOW_TEST
-        target: acmeCo/FLOW_TEST_TEST_EMPTY
     interval: 3m
     shards:
       logLevel: debug
