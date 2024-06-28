@@ -15,4 +15,4 @@ collections:
   acmeCo/FLOW_TEST_TEST_EMPTY:
     schema: FLOW_TEST_TEST_EMPTY.schema.yaml
     key:
-      - /ID
+      - /_meta/source/row_id

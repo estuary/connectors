@@ -89,6 +89,7 @@ async def fetch_tables(
                     OracleTable(**row)
                 )
 
+            log.debug("fetch_tables", tables)
             return tables
 
 
@@ -305,7 +306,7 @@ async def fetch_changes(
 
 
 def number_to_decimal(cursor, metadata):
-    if metadata.type_code is oracledb.DB_TYPE_NUMBER and (metadata.precision is None or metadata.precision > 18):
+    if metadata.type_code is oracledb.DB_TYPE_NUMBER and (metadata.precision is None or metadata.precision > 18 or metadata.precision == 0):
         return cursor.var(decimal.Decimal, arraysize=cursor.arraysize)
 
 # datetime and some other data types must be cast to string
