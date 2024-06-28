@@ -34,8 +34,6 @@ from .models import (
 
 
 def create_pool(log: Logger, config: EndpointConfig) -> oracledb.AsyncConnectionPool:
-    oracledb.defaults.fetch_decimals = True
-
     # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
     # the pool contains 4 connections, which will allow 4 concurrent users.
     credentials = {}
@@ -208,9 +206,6 @@ async def fetch_page(
                         if i % CHECKPOINT_EVERY == 0:
                             yield last_rowid
 
-                        if table.table_name == 'CANNSERVICEHISTORY':
-                            log.debug("fetch_page", row)
-
                     if c.rowcount < backfill_chunk_size:
                         break
 
@@ -248,7 +243,7 @@ async def fetch_changes(
     lock: asyncio.Lock,
     # Remainder is common.FetchPageFn:
     log: Logger,
-    scn: LogCursor,
+    scn: (int,),
 ) -> AsyncGenerator[Document | LogCursor, None]:
     async with lock:
         query = template_env.get_template("inc").render(table=table, cursor=scn)
