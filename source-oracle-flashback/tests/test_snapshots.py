@@ -228,7 +228,7 @@ def test_discover(request, snapshot):
     conn = connect(request)
 
     # seed the test database first
-    for query in ["DROP TABLE test_changes", "DROP TABLE test_all_types", "DROP TABLE flow_capture.test", "DROP USER flow_capture"]:
+    for query in ["DROP TABLE test_changes", "DROP TABLE test_all_types", "DROP TABLE test_empty", "DROP TABLE flow_capture.test", "DROP USER flow_capture"]:
         try:
             with conn.cursor() as c:
                 c.execute(query)
@@ -243,6 +243,7 @@ def test_discover(request, snapshot):
         qs = Path(request.fspath.dirname + "/db_seeds/create_flow_capture_user.sql").read_text().split('\n')
         for q in qs:
             c.execute(q)
+        c.execute("CREATE TABLE test_empty(id INTEGER)")
     conn.commit()
 
     conn_flow_capture = connect(request, user='flow_capture', password='Secret1234ABCDEFG')

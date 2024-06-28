@@ -1,5 +1,7 @@
+import sys
 from datetime import datetime, UTC, timedelta
 import functools
+import decimal
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from pydantic import TypeAdapter
@@ -194,6 +196,7 @@ async def fetch_page(
                 while datetime.now() < end_time:
                     c.arraysize = backfill_chunk_size
                     c.prefetchrows = backfill_chunk_size + 1
+                    c.outputtypehandler = number_to_decimal
                     await c.execute(query, rownum_end=backfill_chunk_size)
                     cols = [col[0] for col in c.description]
                     c.rowfactory = functools.partial(backfill_rowfactory, table.table_name, cols)
@@ -228,7 +231,7 @@ def changes_rowfactory(table_name, cols, scn, op, rowid, *args):
         'op': op_mapping[op],
         'source': {
             'table': table_name,
-            'scn': scn,
+            'scn': int(scn),
             'row_id': rowid,
         }
     }
@@ -268,6 +271,7 @@ async def fetch_changes(
             with conn.cursor() as c:
                 c.arraysize = CHECKPOINT_EVERY
                 c.prefetchrows = CHECKPOINT_EVERY + 1
+                c.outputtypehandler = number_to_decimal
                 await c.execute(query)
                 cols = [col[0] for col in c.description]
                 c.rowfactory = functools.partial(changes_rowfactory, table.table_name, cols)
@@ -300,8 +304,14 @@ async def fetch_changes(
                 yield current_scn
 
 
+def number_to_decimal(cursor, metadata):
+    if metadata.type_code is oracledb.DB_TYPE_NUMBER and (metadata.precision is None or metadata.precision > 18):
+        return cursor.var(decimal.Decimal, arraysize=cursor.arraysize)
+
 # datetime and some other data types must be cast to string
 # this helper function takes care of formatting datetimes as RFC3339 strings
+
+
 def cast_column(c: OracleColumn) -> str:
     if not c.is_datetime and not c.cast_to_string:
         return c.quoted_column_name

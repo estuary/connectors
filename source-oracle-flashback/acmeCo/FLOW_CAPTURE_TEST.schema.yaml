@@ -52,9 +52,10 @@ properties:
     description: Document metadata
   ID:
     anyOf:
-      - type: integer
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Id
 title: TEST
 type: object

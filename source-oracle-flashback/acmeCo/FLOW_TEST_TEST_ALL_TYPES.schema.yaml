@@ -52,8 +52,9 @@ properties:
     description: Document metadata
   ID:
     description: Primary Key
+    format: number
     title: Id
-    type: integer
+    type: string
   DATETIME:
     anyOf:
       - type: string
@@ -62,21 +63,24 @@ properties:
     title: Datetime
   DOUBLE_PRECISION:
     anyOf:
-      - type: number
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Double Precision
   FLOAT_126:
     anyOf:
-      - type: number
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Float 126
   INTEG:
     anyOf:
-      - type: integer
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Integ
   INTERVAL_DAY:
     anyOf:
@@ -92,10 +96,24 @@ properties:
     title: Interval Year
   NUM:
     anyOf:
-      - type: number
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Num
+  NUM15:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Num15
+  NUM19:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: Num19
   NVCHAR2:
     anyOf:
       - type: string
@@ -110,9 +128,10 @@ properties:
     title: R
   REAL_NUM:
     anyOf:
-      - type: number
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Real Num
   SINGLE_NCHAR:
     anyOf:
@@ -122,9 +141,10 @@ properties:
     title: Single Nchar
   SMALL_INT:
     anyOf:
-      - type: integer
+      - type: string
       - type: "null"
     default: ~
+    format: number
     title: Small Int
   TS:
     anyOf:
