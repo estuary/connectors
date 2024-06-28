@@ -34,6 +34,8 @@ from .models import (
 
 
 def create_pool(log: Logger, config: EndpointConfig) -> oracledb.AsyncConnectionPool:
+    oracledb.defaults.fetch_decimals = True
+
     # Generally a fixed-size pool is recommended, i.e. pool_min=pool_max.  Here
     # the pool contains 4 connections, which will allow 4 concurrent users.
     credentials = {}

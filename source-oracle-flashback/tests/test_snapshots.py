@@ -77,6 +77,8 @@ def test_capture_all_types(request, snapshot):
             c.execute(q)
     conn.commit()
 
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
     p = subprocess.Popen(
         [
             "flowctl",
@@ -90,6 +92,7 @@ def test_capture_all_types(request, snapshot):
         ],
         stdout=subprocess.PIPE,
         text=True,
+        env=env,
     )
 
     lines = []
@@ -123,6 +126,8 @@ def test_capture_changes(request, snapshot):
         c.execute(Path(request.fspath.dirname + "/db_seeds/create_test_changes.sql").read_text())
     conn.commit()
 
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
     p = subprocess.Popen(
         [
             "flowctl",
@@ -136,6 +141,7 @@ def test_capture_changes(request, snapshot):
         ],
         stdout=subprocess.PIPE,
         text=True,
+        env=env,
     )
 
     with conn.cursor() as c:
@@ -195,6 +201,8 @@ def test_capture_empty(request, snapshot):
         c.execute("CREATE TABLE test_empty(id INTEGER)")
     conn.commit()
 
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
     p = subprocess.Popen(
         [
             "flowctl",
@@ -208,6 +216,7 @@ def test_capture_empty(request, snapshot):
         ],
         stdout=subprocess.PIPE,
         text=True,
+        env=env,
     )
 
     assert p.wait(timeout=30) == 0
@@ -242,6 +251,8 @@ def test_discover(request, snapshot):
         c.execute(q)
     conn_flow_capture.commit()
 
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
     result = subprocess.run(
         [
             "flowctl",
@@ -255,6 +266,7 @@ def test_discover(request, snapshot):
         ],
         stdout=subprocess.PIPE,
         text=True,
+        env=env,
     )
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
@@ -263,6 +275,8 @@ def test_discover(request, snapshot):
 
 
 def test_spec(request, snapshot):
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
     result = subprocess.run(
         [
             "flowctl",
@@ -273,6 +287,7 @@ def test_spec(request, snapshot):
         ],
         stdout=subprocess.PIPE,
         text=True,
+        env=env,
     )
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
