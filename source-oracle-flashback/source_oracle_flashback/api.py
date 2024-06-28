@@ -206,6 +206,9 @@ async def fetch_page(
                         if i % CHECKPOINT_EVERY == 0:
                             yield last_rowid
 
+                        if table.table_name == 'CANNSERVICEHISTORY':
+                            log.debug("fetch_page", row)
+
                     if c.rowcount < backfill_chunk_size:
                         break
 
