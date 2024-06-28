@@ -51,17 +51,11 @@ properties:
       source: ~
     description: Document metadata
   ID:
-    description: Primary Key
-    format: number
-    title: Id
-    type: string
-  STR:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Str
-required:
-  - ID
-title: TEST_CHANGES
+    format: number
+    title: Id
+title: TEST_EMPTY
 type: object

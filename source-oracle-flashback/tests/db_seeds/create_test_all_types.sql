@@ -5,6 +5,8 @@ CREATE TABLE flow_test.test_all_types(
 	single_nchar NCHAR,
 	vchar VARCHAR(2000),
 	num NUMBER (38, 9),
+	num19 NUMBER (19, 0),
+	num15 NUMBER (15, 0),
 	small_int SMALLINT,
   integ INTEGER,
 	double_precision DOUBLE PRECISION,

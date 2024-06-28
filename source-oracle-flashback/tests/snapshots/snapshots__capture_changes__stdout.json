@@ -3,18 +3,20 @@
     "acmeCo/FLOW_TEST_TEST_ALL_TYPES",
     {
       "DATETIME": "2022-01-01T00:00:00",
-      "DOUBLE_PRECISION": 123456789.12345679,
-      "FLOAT_126": 123456789.12345679,
-      "ID": 1,
-      "INTEG": 18446744073709551615,
+      "DOUBLE_PRECISION": "123456789.123456789",
+      "FLOAT_126": "123456789.123456789",
+      "ID": "1",
+      "INTEG": "18446744073709551615",
       "INTERVAL_DAY": "+01 02:03:04.567000",
       "INTERVAL_YEAR": "+1234-05",
-      "NUM": 123456789.12345679,
+      "NUM": "123456789.123456789",
+      "NUM15": 123456789123456,
+      "NUM19": "1234567891234567891",
       "NVCHAR2": "nvarchar2 value with unicode characters \u2764\ufe0f \ud83d\udd25\ufe0f",
       "R": "dGVzdGluZyByYXcgdmFsdWU=",
-      "REAL_NUM": 123456789.12345679,
+      "REAL_NUM": "123456789.123456789",
       "SINGLE_NCHAR": "a",
-      "SMALL_INT": 123456789,
+      "SMALL_INT": "123456789",
       "TS": "2022-01-01T13:00:00.000000",
       "TS_LOCAL_TZ": "2022-01-01T13:00:00.000000Z",
       "TS_LOCAL_TZ_NINE": "2022-01-01T13:00:00.123456789Z",
@@ -36,7 +38,7 @@
   [
     "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
-      "ID": 1,
+      "ID": "1",
       "STR": "record 1",
       "_meta": {
         "op": "c",
@@ -51,7 +53,7 @@
   [
     "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
-      "ID": 2,
+      "ID": "2",
       "STR": "record 2",
       "_meta": {
         "op": "c",
@@ -66,7 +68,7 @@
   [
     "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
-      "ID": 3,
+      "ID": "3",
       "STR": "record 3",
       "_meta": {
         "op": "c",
@@ -81,7 +83,7 @@
   [
     "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
-      "ID": 1,
+      "ID": "1",
       "STR": "updated str",
       "_meta": {
         "op": "u",
@@ -97,7 +99,7 @@
   [
     "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
-      "ID": 2,
+      "ID": "2",
       "STR": "record 2",
       "_meta": {
         "op": "d",
@@ -113,7 +115,7 @@
   [
     "acmeCo/FLOW_TEST_TEST_CHANGES",
     {
-      "ID": 3,
+      "ID": "3",
       "STR": "updated str",
       "_meta": {
         "op": "u",

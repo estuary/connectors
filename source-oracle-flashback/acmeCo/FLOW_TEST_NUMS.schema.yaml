@@ -50,18 +50,47 @@ properties:
       op: u
       source: ~
     description: Document metadata
-  ID:
-    description: Primary Key
-    format: number
-    title: Id
-    type: string
-  STR:
+  I:
     anyOf:
       - type: string
       - type: "null"
     default: ~
-    title: Str
-required:
-  - ID
-title: TEST_CHANGES
+    format: number
+    title: I
+  N1:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: N1
+  N2:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: N2
+  N3:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: N3
+  N4:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: N4
+  SM:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: Sm
+title: NUMS
 type: object
