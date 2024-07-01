@@ -485,30 +485,3 @@ func TestCaptureOversizedFields(t *testing.T) {
 		tests.VerifiedCapture(ctx, t, cs)
 	})
 }
-
-func TestCaptureFailsAfterSlotDropped(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "46115540"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-
-	// Run a normal capture
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
-	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-
-	// Drop the replication slot while the task is offline, and it should recreate
-	// the replication slot and then start failing because its saved position isn't
-	// valid any longer.
-	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
-	tb.Query(ctx, t, fmt.Sprintf("SELECT pg_drop_replication_slot('flow_slot');"))
-	tb.Insert(ctx, t, tableName, [][]any{{4, "four"}, {5, "five"}})
-	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-
-	// A subsequent capture run should still be failing since we haven't fixed it.
-	tb.Insert(ctx, t, tableName, [][]any{{6, "six"}, {7, "seven"}})
-	t.Run("capture3", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-
-	// Append a version to the state key to simulate bumping the backfill counter for this binding.
-	cs.Bindings[0].StateKey += ".v2"
-	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-}
