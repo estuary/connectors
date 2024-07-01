@@ -24,6 +24,10 @@ type redoFile struct {
 	sequence int
 }
 
+func (db *oracleDatabase) HeartbeatWatermarkInterval() time.Duration {
+	return 60 * time.Second
+}
+
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	dbConn, err := sql.Open("oracle", db.config.ToURI())
 	if err != nil {

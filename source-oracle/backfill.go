@@ -185,11 +185,11 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 	var isInterval = dataType == "INTERVAL"
 
 	if !isDateTime && !isInterval {
-		return col.Name
+		return quoteColumnName(col.Name)
 	}
 
 	if isInterval {
-		return fmt.Sprintf("TO_CHAR(%s) AS %s", col.Name, col.Name)
+		return fmt.Sprintf("TO_CHAR(%s) AS %s", quoteColumnName(col.Name), quoteColumnName(col.Name))
 	}
 
 	var dataScale int
@@ -202,7 +202,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 		}
 	}
 
-	var out = fmt.Sprintf("TO_CHAR(%s", col.Name)
+	var out = fmt.Sprintf("TO_CHAR(%s", quoteColumnName(col.Name))
 	var format = ""
 	if strings.Contains(dataType, "TIME ZONE") {
 		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"'`
@@ -216,7 +216,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 		out = out + " AT TIME ZONE 'UTC'"
 	}
 
-	out = out + fmt.Sprintf(", %s) AS %s", format, col.Name)
+	out = out + fmt.Sprintf(", %s) AS %s", format, quoteColumnName(col.Name))
 	return out
 }
 
@@ -264,11 +264,6 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	return query.String()
 }
 
-func quoteColumnName(name string) string {
-	return `"` + name + `"`
-}
-
-// TODO
 func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {

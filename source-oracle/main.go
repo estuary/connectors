@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -97,7 +98,7 @@ type Config struct {
 
 type advancedConfig struct {
 	SkipBackfills     string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	WatermarksTable   string   `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	WatermarksTable   string   `json:"watermarksTable,omitempty" jsonschema:"default=USER.FLOW_WATERMARKS,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID            uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
@@ -126,7 +127,7 @@ func (c *Config) Validate() error {
 // SetDefaults fills in the default values for unset optional parameters.
 func (c *Config) SetDefaults(name string) {
 	if c.Advanced.WatermarksTable == "" {
-		c.Advanced.WatermarksTable = strings.ToLower(c.User) + ".flow_watermarks"
+		c.Advanced.WatermarksTable = strings.ToUpper(c.User) + ".FLOW_WATERMARKS"
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
@@ -270,4 +271,15 @@ func (db *oracleDatabase) RequestTxIDs(schema, table string) {
 		db.includeTxIDs = make(map[sqlcapture.StreamID]bool)
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
+}
+
+func quoteColumnName(name string) string {
+	var u = strings.ToUpper(name)
+	if slices.Contains(reservedWords, u) {
+		return `"` + name + `"`
+	}
+	if name == u {
+		return name
+	}
+	return `"` + name + `"`
 }

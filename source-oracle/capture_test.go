@@ -88,6 +88,21 @@ func TestTruncatedTables(t *testing.T) {
 	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestEmptyTables(t *testing.T) {
+	// Set up an empty table
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var uniqueA = "14026504"
+	tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueA))
+	})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA))
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).

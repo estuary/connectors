@@ -209,7 +209,7 @@ func (s columnSchema) toType() *jsonschema.Schema {
 }
 
 const queryDiscoverTables = `
-  SELECT owner, table_name FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
+  SELECT DISTINCT(NVL(IOT_NAME, TABLE_NAME)) AS table_name, owner FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
 ` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
 
 func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
@@ -249,7 +249,7 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 }
 
 const queryDiscoverColumns = `
-SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type, t.data_scale, t.data_length, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
+SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type, t.data_precision, t.data_scale, t.data_length, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
     LEFT JOIN (
             SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
                 INNER JOIN all_cons_columns ac ON (
@@ -295,8 +295,9 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		var isNullableStr string
 		var dataScale sql.NullInt16
 		var dataLength int
+		var dataPrecision sql.NullInt16
 		var dataType string
-		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &dataType, &dataScale, &dataLength, &isPrimaryKey); err != nil {
+		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &dataType, &dataPrecision, &dataScale, &dataLength, &isPrimaryKey); err != nil {
 			return nil, nil, fmt.Errorf("scanning column: %w", err)
 		}
 
@@ -309,15 +310,15 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		if dataType == "NUMBER" && dataScale.Int16 == 0 {
 			t = reflect.TypeFor[int64]()
 		} else if slices.Contains([]string{"NUMBER", "DOUBLE", "FLOAT"}, dataType) {
-			if isPrimaryKey {
-				// float values can't be used as primary key, so use string, format: number
+			if isPrimaryKey || dataPrecision.Int16 == 0 || dataPrecision.Int16 > 18 {
 				t = reflect.TypeFor[string]()
 				format = "number"
 			} else {
 				t = reflect.TypeFor[float64]()
 			}
 		} else if slices.Contains([]string{"INTEGER", "SMALLINT"}, dataType) {
-			t = reflect.TypeFor[int]()
+			t = reflect.TypeFor[string]()
+			format = "number"
 		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
 			t = reflect.TypeFor[string]()
 		} else if strings.Contains(dataType, "TIME ZONE") {
@@ -328,7 +329,7 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			// format = "local-datetime"
 		} else if strings.Contains(dataType, "INTERVAL") {
 			t = reflect.TypeFor[string]()
-		} else if dataType == "CLOB" {
+		} else if slices.Contains([]string{"CLOB", "RAW"}, dataType) {
 			t = reflect.TypeFor[[]byte]()
 		} else {
 			return nil, nil, fmt.Errorf("unsupported data type: %s", dataType)
