@@ -29,7 +29,7 @@ one_week_seconds = 60 * 60 * 24 * 7
 
 
 async def validate_flashback(
-    log: Logger, config: EndpointConfig, pool: oracledb.AsyncConnectionPool,
+    log: Logger, config: EndpointConfig, pool: oracledb.AsyncConnectionPool, is_rds: bool,
 ):
     skip_retention_checks = config.advanced.skip_flashback_retention_checks
     async with pool.acquire() as conn:
@@ -65,7 +65,10 @@ async def validate_flashback(
                 "avg_retention_seconds": avg_retention_seconds,
             })
 
-            if not flashback_on:
+            # rds instances report flashback as OFF because it cannot be enabled
+            # on the whole database, but it works on tables, so we skip this check
+            # on RDS instances
+            if not flashback_on and not is_rds:
                 msg = "Flashback must be enabled on the database. See go.estuary.dev/source-oracle-flashback for more information."
                 if skip_retention_checks:
                     log.warn(msg)
