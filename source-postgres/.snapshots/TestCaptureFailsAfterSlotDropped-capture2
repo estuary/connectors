@@ -1,9 +1,0 @@
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fcapturefailsafterslotdropped_46115540":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
-# ================================
-# Captures Terminated With Errors
-# ================================
-error creating replication stream: replication slot "flow_slot" has a confirmed_flush_lsn greater than our start LSN, which means it was probably deleted/recreated and all bindings need to be backfilled
-
