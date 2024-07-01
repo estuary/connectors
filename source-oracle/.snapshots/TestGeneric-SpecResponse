@@ -44,7 +44,7 @@
           "watermarksTable": {
             "type": "string",
             "description": "The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
-            "default": "public.flow_watermarks"
+            "default": "USER.FLOW_WATERMARKS"
           },
           "backfill_chunk_size": {
             "type": "integer",

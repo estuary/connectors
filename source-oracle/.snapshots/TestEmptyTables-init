@@ -1,7 +1,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"t14026504%2FADMIN":{"backfilled":0,"key_columns":null,"mode":"Pending","scanned":null}},"cursor":""}
+{"cursor":"","bindingStateV1":{"t14026504%2FADMIN":{"mode":"Pending","key_columns":null,"scanned":null,"backfilled":0}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

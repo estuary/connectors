@@ -1,23 +1,23 @@
 # ================================
-# Collection "acmeCo/test/admin_t18110541": 3 Documents
+# Collection "acmeCo/test/flow_test_logminer_t18110541": 3 Documents
 # ================================
-{"DATA":"one","ID":1,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t18110541","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"three","ID":3,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t18110541","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"two","ID":2,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t18110541","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"one","ID":1,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T18110541","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"three","ID":3,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T18110541","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"two","ID":2,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T18110541","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
-# Collection "acmeCo/test/admin_t24310805": 3 Documents
+# Collection "acmeCo/test/flow_test_logminer_t24310805": 3 Documents
 # ================================
-{"DATA":"five","ID":5,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t24310805","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"four","ID":4,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t24310805","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"six","ID":6,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t24310805","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"five","ID":5,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T24310805","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"four","ID":4,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T24310805","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"six","ID":6,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T24310805","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
-# Collection "acmeCo/test/admin_t38410024": 3 Documents
+# Collection "acmeCo/test/flow_test_logminer_t38410024": 3 Documents
 # ================================
-{"DATA":"eight","ID":8,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t38410024","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"nine","ID":9,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t38410024","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"seven","ID":7,"_meta":{"op":"c","source":{"schema":"ADMIN","snapshot":true,"table":"t38410024","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"eight","ID":8,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T38410024","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"nine","ID":9,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T38410024","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"seven","ID":7,"_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T38410024","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"ADMIN%2Ft18110541":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"ADMIN%2Ft24310805":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"ADMIN%2Ft38410024":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT18110541":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"FLOW_TEST_LOGMINER%2FT24310805":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"FLOW_TEST_LOGMINER%2FT38410024":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
 

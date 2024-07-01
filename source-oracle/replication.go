@@ -117,7 +117,7 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) err
 		}
 	}
 
-	if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>SYS.DBMS_LOGMNR.COMMITTED_DATA_ONLY + SYS.DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG); END;", startSCN); err != nil {
+	if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY + DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG); END;", startSCN); err != nil {
 		return fmt.Errorf("starting logminer: %w", err)
 	}
 

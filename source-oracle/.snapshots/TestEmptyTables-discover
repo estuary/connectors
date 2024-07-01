@@ -1,21 +1,21 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_t39256824",
+    "recommended_name": "flow_test_logminer_t14026504",
     "resource_config_json": {
       "namespace": "FLOW_TEST_LOGMINER",
-      "stream": "T39256824"
+      "stream": "t14026504"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT39256824": {
+        "FLOW_TEST_LOGMINERT14026504": {
           "type": "object",
           "required": [
-            "Meta/wtf~ID"
+            "ID"
           ],
-          "$anchor": "FLOW_TEST_LOGMINERT39256824",
+          "$anchor": "FLOW_TEST_LOGMINERT14026504",
           "properties": {
             "DATA": null,
-            "Meta/wtf~ID": null
+            "ID": null
           }
         }
       },
@@ -55,7 +55,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT39256824",
+                  "$ref": "#FLOW_TEST_LOGMINERT14026504",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -112,32 +112,32 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT39256824"
+          "$ref": "#FLOW_TEST_LOGMINERT14026504"
         }
       ]
     },
     "key": [
-      "/Meta~1wtf~0ID"
+      "/ID"
     ]
   }
 Binding 1:
 {
-    "recommended_name": "flow_test_logminer_t42531495",
+    "recommended_name": "flow_test_logminer_t14026504",
     "resource_config_json": {
       "namespace": "FLOW_TEST_LOGMINER",
-      "stream": "T42531495"
+      "stream": "t14026504"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT42531495": {
+        "FLOW_TEST_LOGMINERT14026504": {
           "type": "object",
           "required": [
-            "table"
+            "ID"
           ],
-          "$anchor": "FLOW_TEST_LOGMINERT42531495",
+          "$anchor": "FLOW_TEST_LOGMINERT14026504",
           "properties": {
             "DATA": null,
-            "table": null
+            "ID": null
           }
         }
       },
@@ -177,7 +177,7 @@ Binding 1:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT42531495",
+                  "$ref": "#FLOW_TEST_LOGMINERT14026504",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -234,12 +234,12 @@ Binding 1:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT42531495"
+          "$ref": "#FLOW_TEST_LOGMINERT14026504"
         }
       ]
     },
     "key": [
-      "/table"
+      "/ID"
     ]
   }
 

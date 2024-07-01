@@ -88,21 +88,6 @@ func TestTruncatedTables(t *testing.T) {
 	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestEmptyTables(t *testing.T) {
-	// Set up an empty table
-	var tb, ctx = oracleTestBackend(t), context.Background()
-	var uniqueA = "14026504"
-	tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
-
-	// Discover the catalog and verify that the table schemas looks correct
-	t.Run("discover", func(t *testing.T) {
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueA))
-	})
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA))
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-}
-
 func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).
@@ -138,7 +123,7 @@ func TestCursorResume(t *testing.T) {
 		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
 		{"bbb", 2, "ajgp"}, {"bbb", 333, "zljj"}, {"bbb", 4096, "lhnw"}, {"bbb", 800000, "iask"},
 		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
-		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
+		{"z", 1, "qmjp"}, {".", 0, "xakg"}, {".", -1, "kvxr"}, {"   ", 3, "gboj"},
 	})
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
@@ -210,20 +195,20 @@ func TestCaptureCapitalization(t *testing.T) {
 	var uniqueA, uniqueB = "69943814", "73423348"
 	var tablePrefix = strings.TrimPrefix(t.Name(), "Test")
 	var tableA = tablePrefix + "_AaAaA_" + uniqueA                  // Name containing capital letters
-	var tableB = strings.ToLower(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all lowercase (like all our other test table names)
+	var tableB = strings.ToUpper(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all uppercase (like all our other test table names)
 
 	var cleanup = func() {
-		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, testSchemaName, tableA))
-		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, testSchemaName, tableB))
+		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableA))
+		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableB))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, testSchemaName, tableA))
-	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, testSchemaName, tableB))
+	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, tb.config.User, tableA))
+	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, tb.config.User, tableB))
 
-	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf')`, testSchemaName, tableA))
-	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa')`, testSchemaName, tableB))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf')`, tb.config.User, tableA))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa')`, tb.config.User, tableB))
 
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
 }

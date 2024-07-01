@@ -23,8 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testSchemaName = "admin"
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 
@@ -107,7 +105,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = testSchemaName + "."
+	var tableName = tb.config.User + "."
 	if suffix != "" {
 		tableName += fmt.Sprintf(`"t%s"`, suffix)
 	} else {
@@ -116,7 +114,7 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
-	tableName = strings.ToLower(tableName)
+	tableName = strings.ToUpper(tableName)
 
 	log.WithFields(log.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
 	tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE %s`, tableName))
@@ -205,6 +203,8 @@ func argsTuple(row []any) string {
 			tuple += fmt.Sprintf("'%s'", v)
 		case int:
 			tuple += fmt.Sprintf("%d", v)
+		case float64:
+			tuple += fmt.Sprintf("%f", v)
 		}
 	}
 	return tuple + ")"
@@ -218,14 +218,14 @@ func TestGeneric(t *testing.T) {
 
 func TestCapitalizedTables(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t), context.Background()
-	tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."USERS"`, testSchemaName))
-	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data VARCHAR(2000) NOT NULL)`, testSchemaName))
+	tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."USERS"`, tb.config.User))
+	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data VARCHAR(2000) NOT NULL)`, tb.config.User))
 	var cs = tb.CaptureSpec(ctx, t)
 	t.Run("Discover", func(t *testing.T) {
 		cs.VerifyDiscover(ctx, t, regexp.MustCompile(`(?i:users)`))
 	})
 	var resourceSpecJSON, err = json.Marshal(sqlcapture.Resource{
-		Namespace: testSchemaName,
+		Namespace: tb.config.User,
 		Stream:    "USERS",
 	})
 	require.NoError(t, err)
@@ -235,18 +235,18 @@ func TestCapitalizedTables(t *testing.T) {
 		// may as well leave it like that.
 		Collection:         flow.CollectionSpec{Name: flow.Collection("acmeCo/test/users")},
 		ResourceConfigJson: resourceSpecJSON,
-		ResourcePath:       []string{testSchemaName, "USERS"},
-		StateKey:           tests.StateKey([]string{testSchemaName, "USERS"}),
+		ResourcePath:       []string{tb.config.User, "USERS"},
+		StateKey:           tests.StateKey([]string{tb.config.User, "USERS"}),
 	}}
 	t.Run("Validate", func(t *testing.T) {
 		var _, err = cs.Validate(ctx, t)
 		require.NoError(t, err)
 	})
 	t.Run("Capture", func(t *testing.T) {
-		tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (1, 'Alice'), (2, 'Bob')`, testSchemaName))
+		tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (1, 'Alice'), (2, 'Bob')`, tb.config.User))
 		tests.VerifiedCapture(ctx, t, cs)
 		t.Run("Replication", func(t *testing.T) {
-			tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (3, 'Carol'), (4, 'Dave')`, testSchemaName))
+			tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (3, 'Carol'), (4, 'Dave')`, tb.config.User))
 			tests.VerifiedCapture(ctx, t, cs)
 		})
 	})

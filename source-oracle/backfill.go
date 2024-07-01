@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -107,11 +109,16 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			rowKey = []byte(rowid)
 
 			// Sanity check that rows are returned in ascending RowID order within a given backfill chunk
-			if rowid < prevRowID {
+			// Note that base64 strings are not lexicographically ordered and have a different ordering, hence
+			// the custom function
+			if result, err := compareBase64(rowid, prevRowID); err != nil {
+				return false, err
+			} else if result == -1 {
 				return false, fmt.Errorf("internal error: ROWID ordering sanity check failed: %v <= %v", rowid, prevRowID)
 			}
 			prevRowID = rowid
 		} else {
+			logEntry.WithField("f", fields).Debug("encoding rowkey")
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
 				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
@@ -150,6 +157,19 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
 	return backfillComplete, nil
+}
+
+// -1 means a < b
+// 0 means a == b
+// 1 means a > b
+func compareBase64(a, b string) (int, error) {
+	if abytes, err := base64.RawStdEncoding.DecodeString(a); err != nil {
+		return 0, fmt.Errorf("base64 decoding: %w", err)
+	} else if bbytes, err := base64.RawStdEncoding.DecodeString(b); err != nil {
+		return 0, fmt.Errorf("base64 decoding: %w", err)
+	} else {
+		return bytes.Compare(abytes, bbytes), nil
+	}
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
@@ -258,7 +278,9 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
 	fmt.Fprintf(query, " WHERE ROWNUM <= %d", db.config.Advanced.BackfillChunkSize)
 	if !start {
-		fmt.Fprintf(query, " AND (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
+		for i, k := range pkey {
+			fmt.Fprintf(query, " AND %s > %s", k, args[i])
+		}
 	}
 	fmt.Fprintf(query, " ORDER BY %s ASC", strings.Join(pkey, ", "))
 	return query.String()

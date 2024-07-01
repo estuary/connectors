@@ -188,6 +188,10 @@ type oracleDatabase struct {
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
 }
 
+func (db *oracleDatabase) isRDS() bool {
+	return strings.Contains(db.config.Address, "rds.amazonaws.com")
+}
+
 func (db *oracleDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
@@ -236,14 +240,16 @@ func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	}
 
 	switch key := key.(type) {
-	case [16]uint8:
+	case *[16]uint8:
 		var id, err = uuid.FromBytes(key[:])
 		if err != nil {
 			return nil, fmt.Errorf("error parsing uuid: %w", err)
 		}
 		return id.String(), nil
-	case time.Time:
+	case *time.Time:
 		return key.Format(sortableRFC3339Nano), nil
+	case *string:
+		return *key, nil
 	default:
 		return key, nil
 	}
@@ -258,7 +264,7 @@ func (db *oracleDatabase) ShouldBackfill(streamID string) bool {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
 		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
-			if streamID == strings.ToLower(skipStreamID) {
+			if streamID == skipStreamID {
 				return false
 			}
 		}

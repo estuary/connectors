@@ -39,7 +39,7 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 	// the corresponding DiscoveryInfo.
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(strings.ToLower(table.Schema), strings.ToLower(table.Name))
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
 		tableMap[streamID] = table
 	}
 	for _, column := range columns {
@@ -223,7 +223,7 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 
 	var owner, tableName string
 	for rows.Next() {
-		if err := rows.Scan(&owner, &tableName); err != nil {
+		if err := rows.Scan(&tableName, &owner); err != nil {
 			return nil, fmt.Errorf("scanning table row: %w", err)
 		}
 

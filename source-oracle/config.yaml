@@ -1,5 +1,5 @@
-user: ADMIN
-password: Fw32y^$eMiyVenk
+user: FLOW_TEST_LOGMINER
+password: flow_test123
 address: database-1.chqpmndqvzby.us-east-2.rds.amazonaws.com:1521
 database: ORCL
 networkTunnel:
@@ -42,8 +42,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-06-17T10:21:53Z"
-    mac: ENC[AES256_GCM,data:0IyJWi51smeBJn6dNQ2NNe8R/JCc1rSYZLqLFpZsRaoK1P9Imf6QY8fAiMYjSObFR1bpGZhsIA+mqhFF/6L/+57moPg3UvmQZjwja/PNYeAlVNk3IrFmY4tZPmQig+1jXyQTPWm81Ou1ApIYmNPaHc73f1850+RtPxmLMPz0gM4=,iv:S0h/WgKTOTQWGRGlBFiX+y6lrxYAI4aUEy3Arwh748c=,tag:wqazOyZr9E3f0I9jUblamQ==,type:str]
+    lastmodified: "2024-07-01T10:43:35Z"
+    mac: ENC[AES256_GCM,data:8CIzPS2+8QRoKi/kGO6WF+SUANZ0ik4Hc4dzKp7AenVOTmHYDKeyBCChlMGansdPlL1EV7d2T5T4oG8tY5TqxJglDf7iouXJiESZcauVMpuhaDAwMrp3I7wIwNFMbYPZw2e4BxDn4i3PlwDCUiP2AX4GB3AKxTAMzGpIqhmYJTY=,iv:A0Oz3qcNTT1SabTZO+WfPHh2Gs1/9/4CW3/qHlRZLjE=,tag:vG+WimpPxhczD87fqN+kGA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
