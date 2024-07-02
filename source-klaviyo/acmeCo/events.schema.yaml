@@ -12,6 +12,10 @@ properties:
   datetime:
     type: string
     format: date-time
+  event_name:
+    type:
+      - string
+      - "null"
   attributes:
     type:
       - "null"

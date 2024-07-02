@@ -334,6 +334,13 @@ class Events(IncrementalKlaviyoStream):
                 continue
             record['datetime'] = record['datetime'].replace(" ","T")
             record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
+
+            try:
+                link = record['relationships']['metric']['links']['related']
+                response2 = requests.get(link, headers=self.request_headers())
+                record["event_name"] = response2.json()['data']["attributes"]['name']
+            except:
+                record["event_name"] = None
             yield record
 
 
