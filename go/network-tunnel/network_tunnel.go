@@ -62,6 +62,13 @@ func (t SshTunnel) Start() error {
 		"local-port":   t.Config.LocalPort,
 	}).Info("starting network-tunnel")
 
+	logLevel := log.GetLevel().String()
+	if logLevel == "warning" {
+		// Adapt the logrus level to a compatible `env_filter` level of the
+		// network-tunnel `tracing_subscriber`.
+		logLevel = "warn"
+	}
+
 	t.Cmd = exec.CommandContext(
 		t.ctx,
 		"flow-network-tunnel",
@@ -71,6 +78,7 @@ func (t SshTunnel) Start() error {
 		"--forward-host", t.Config.ForwardHost,
 		"--forward-port", t.Config.ForwardPort,
 		"--local-port", t.Config.LocalPort,
+		"--log.level", logLevel,
 	)
 
 	stdout, err := t.Cmd.StdoutPipe()
