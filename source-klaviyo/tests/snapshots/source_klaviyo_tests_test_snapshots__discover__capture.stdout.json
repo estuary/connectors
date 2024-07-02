@@ -366,6 +366,12 @@
           "format": "date-time",
           "type": "string"
         },
+        "event_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "type": "string"
         },
