@@ -186,10 +186,6 @@ async def fetch_page(
             # ROWID is a base64 encoded string, so this string is the minimum value possible
             page = 'AAAAAAAAAAAAAAAAAA'
 
-        query = template_env.get_template("backfill").render(table=table, rowid=page, max_rowid=cutoff[0])
-
-        log.debug("fetch_page", query, page)
-
         last_rowid = None
         i = 0
         async with pool.acquire() as conn:
@@ -198,6 +194,8 @@ async def fetch_page(
                     c.arraysize = backfill_chunk_size
                     c.prefetchrows = backfill_chunk_size + 1
                     c.outputtypehandler = number_to_decimal
+                    query = template_env.get_template("backfill").render(table=table, rowid=last_rowid or page, max_rowid=cutoff[0])
+                    log.debug("fetch_page", query, "page", last_rowid or page, "cutoff", cutoff)
                     await c.execute(query, rownum_end=backfill_chunk_size)
                     cols = [col[0] for col in c.description]
                     c.rowfactory = functools.partial(backfill_rowfactory, table.table_name, cols)
@@ -206,7 +204,7 @@ async def fetch_page(
                         last_rowid = row['_meta']['source']['row_id']
                         yield row
 
-                        i = i + 1
+                        i += 1
                         if i % CHECKPOINT_EVERY == 0:
                             yield last_rowid
 
@@ -288,15 +286,15 @@ async def fetch_changes(
                     if first_transaction is None:
                         first_transaction = scn
                     elif current_transaction is None and scn > first_transaction:
+                        yield first_transaction + 1
                         current_transaction = scn
-                        yield scn + 1
                     elif current_transaction is not None and scn > current_transaction:
                         yield current_transaction + 1
                         current_transaction = scn
 
         if first_transaction is not None and current_transaction is None:
             yield first_transaction + 1
-        elif current_transaction is not None and current_transaction > scn:
+        elif current_transaction is not None:
             yield current_transaction + 1
         elif first_transaction is None and current_transaction is None:
             # over a long enough time with no events, the scn we hold will expire and be no longer
