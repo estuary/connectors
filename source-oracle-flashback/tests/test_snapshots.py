@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import yaml
 import json
@@ -111,6 +112,79 @@ def test_capture_all_types(request, snapshot):
     assert snapshot("stdout.json") == lines
 
 
+# larger than backfill_chunk_size backfills
+def test_capture_large_backfill(request, snapshot):
+    conn = connect(request)
+
+    # seed the test database first
+    try:
+        with conn.cursor() as c:
+            c.execute("DROP TABLE test_changes")
+    except Exception as e:
+        # do nothing
+        print("tables did not exist, ignoring", e)
+
+    with conn.cursor() as c:
+        c.execute(Path(request.fspath.dirname + "/db_seeds/create_test_changes.sql").read_text())
+    conn.commit()
+
+    backfill_n = 128
+    with conn.cursor() as c:
+        for i in range(backfill_n):
+            c.execute(f"INSERT INTO test_changes(id, str) VALUES ({i}, 'record {i}')")
+    conn.commit()
+
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
+    p = subprocess.Popen(
+        [
+            "flowctl",
+            "preview",
+            "--source",
+            request.fspath.dirname + "/../test-changes.flow.yaml",
+            "--sessions",
+            "2",
+            "--delay",
+            "1s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
+    inc_n = 32
+    with conn.cursor() as c:
+        for i in range(backfill_n, backfill_n + inc_n):
+            c.execute(f"INSERT INTO test_changes(id, str) VALUES ({i}, 'record {i}')")
+    conn.commit()
+
+    lines = []
+    rowids = []
+    for i in range(backfill_n + inc_n):
+        line = p.stdout.readline()
+        try:
+            lines.append(json.loads(line))
+        except Exception:
+            print("invalid JSON output", line, file=sys.stderr)
+            raise
+        rowids.append(lines[i][1]['_meta']['source']['row_id'])
+
+    # expect all rowids to be unique
+    assert len(rowids) == len(set(rowids))
+
+    assert p.wait(timeout=30) == 0
+
+    # clean up snapshot from non-deterministic values
+    for _, doc in lines:
+        source = doc['_meta']['source']
+        if 'row_id' in source:
+            source['row_id'] = '<row_id>'
+        if 'scn' in source:
+            source['scn'] = '<scn>'
+
+    assert snapshot("stdout.json") == lines
+
+
 def test_capture_changes(request, snapshot):
     conn = connect(request)
 
@@ -186,6 +260,66 @@ def test_capture_changes(request, snapshot):
     assert snapshot("stdout.json") == lines
 
 
+def test_capture_incremental_multiple_transactions(request, snapshot):
+    conn = connect(request)
+
+    # seed the test database first
+    try:
+        with conn.cursor() as c:
+            c.execute("DROP TABLE test_changes")
+    except Exception as e:
+        # do nothing
+        print("tables did not exist, ignoring", e)
+
+    with conn.cursor() as c:
+        c.execute(Path(request.fspath.dirname + "/db_seeds/create_test_changes.sql").read_text())
+    conn.commit()
+
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
+    p = subprocess.Popen(
+        [
+            "flowctl",
+            "preview",
+            "--source",
+            request.fspath.dirname + "/../test-changes.flow.yaml",
+            "--sessions",
+            "1",
+            "--delay",
+            "1s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
+    # how many transactions
+    t = 3
+    # how many documents per transaction
+    n = 10
+    with conn.cursor() as c:
+        for i in range(t):
+            for j in range(i*n, (i+1)*n):
+                c.execute(f"INSERT INTO test_changes(id, str) VALUES ({j}, 'record {j}')")
+            conn.commit()
+
+    lines = []
+    for i in range(t*n):
+        lines.append(json.loads(p.stdout.readline()))
+
+    assert p.wait(timeout=30) == 0
+
+    # clean up snapshot from non-deterministic values
+    for _, doc in lines:
+        source = doc['_meta']['source']
+        if 'row_id' in source:
+            source['row_id'] = '<row_id>'
+        if 'scn' in source:
+            source['scn'] = '<scn>'
+
+    assert snapshot("stdout.json") == lines
+
+
 def test_capture_empty(request, snapshot):
     conn = connect(request)
 
@@ -210,7 +344,7 @@ def test_capture_empty(request, snapshot):
             "--source",
             request.fspath.dirname + "/../test-changes.flow.yaml",
             "--sessions",
-            "1,1,1",
+            "1",
             "--delay",
             "1s",
         ],
