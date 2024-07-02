@@ -1,0 +1,2 @@
+oracle://will:secret1234@example.com:1521/somedb
+config valid
