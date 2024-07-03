@@ -26,7 +26,7 @@ func Validate(desc string) error {
 // Parse turns a textual schedule description into an object with the Schedule interface.
 func Parse(desc string) (Schedule, error) {
 	if pollInterval, err := time.ParseDuration(desc); err == nil {
-		return &periodicSchedule{Period: pollInterval}, nil
+		return NewPeriodicSchedule(pollInterval), nil
 	}
 	if strings.HasPrefix(desc, "daily at ") {
 		var timeOfDay, err = time.Parse("15:04Z", strings.TrimPrefix(desc, "daily at "))
@@ -40,6 +40,12 @@ func Parse(desc string) (Schedule, error) {
 
 type periodicSchedule struct {
 	Period time.Duration
+}
+
+// NewPeriodicSchedule is used to directly construct a periodic schedule from a
+// parsed duration.
+func NewPeriodicSchedule(period time.Duration) Schedule {
+	return &periodicSchedule{Period: period}
 }
 
 func (s *periodicSchedule) Next(after time.Time) time.Time {

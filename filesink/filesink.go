@@ -11,6 +11,7 @@ import (
 	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -213,10 +214,10 @@ func (t *transactor) nextFileKey(b binding) string {
 	)
 }
 
-// AckDelay implements the DelayedCommitter interface, which is used to upload files at the desired
-// interval.
-func (t *transactor) AckDelay() time.Duration {
-	return t.common.UploadInterval
+// Schedule implements the DelayedCommitter interface, which is used to upload
+// files at the desired interval.
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	return schedule.NewPeriodicSchedule(t.common.UploadInterval), true
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {

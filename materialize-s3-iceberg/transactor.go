@@ -11,6 +11,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/filesink"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -69,8 +70,8 @@ type transactor struct {
 	uploadInterval time.Duration
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.uploadInterval
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	return schedule.NewPeriodicSchedule(t.uploadInterval), true
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
