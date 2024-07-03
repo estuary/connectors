@@ -9,7 +9,7 @@ import time
 import tempfile
 import json
 import pytz
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict, Tuple
+from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Dict, Tuple, List
 import asyncio
 import itertools
 from copy import deepcopy
@@ -71,13 +71,18 @@ DISCOVERY_PAGE_SIZE = 1000
 
 
 async def fetch_tables(
-    log: Logger, pool: oracledb.AsyncConnectionPool,
+    log: Logger, pool: oracledb.AsyncConnectionPool, schemas: List[str]
 ) -> list[OracleTable]:
     async with pool.acquire() as conn:
         with conn.cursor() as c:
             sql_columns = ','.join([f.alias for (k, f) in OracleTable.model_fields.items()])
 
             query = "SELECT DISTINCT(NVL(IOT_NAME, TABLE_NAME)) AS table_name, owner FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS', 'RDSADMIN') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')"  # noqa
+
+            if len(schemas) > 0:
+                owners_comma = "'" + "','".join(schemas) + "'"
+                query = query + f" AND owner IN ({owners_comma})"
+
             tables = []
             c.arraysize = DISCOVERY_PAGE_SIZE
             c.prefetchrows = DISCOVERY_PAGE_SIZE + 1
@@ -89,12 +94,12 @@ async def fetch_tables(
                     OracleTable(**row)
                 )
 
-            log.debug("fetch_tables", tables)
+            log.debug("fetch_tables", tables, schemas)
             return tables
 
 
 async def fetch_columns(
-    log: Logger, pool: oracledb.AsyncConnectionPool, owners: [str]
+    log: Logger, pool: oracledb.AsyncConnectionPool, owners: List[str]
 ) -> list[OracleColumn]:
     async with pool.acquire() as conn:
         with conn.cursor() as c:
