@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -28,8 +29,8 @@ type transactor struct {
 	bucketPath string
 	bucket     string
 
-	bindings    []*binding
-	updateDelay time.Duration
+	bindings []*binding
+	sched    schedule.Schedule
 }
 
 func newTransactor(
@@ -54,8 +55,10 @@ func newTransactor(
 		bucket:     cfg.Bucket,
 	}
 
-	if t.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.ProjectID+cfg.Dataset), cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
+	} else if useSched {
+		t.sched = sched
 	}
 
 	for _, binding := range bindings {
@@ -154,8 +157,11 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	return s, nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
