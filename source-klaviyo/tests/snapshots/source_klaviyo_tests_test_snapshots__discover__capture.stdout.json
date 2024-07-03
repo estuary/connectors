@@ -368,8 +368,8 @@
         },
         "event_name": {
           "type": [
-            "string",
-            "null"
+            "null",
+            "string"
           ]
         },
         "id": {

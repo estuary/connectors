@@ -7,7 +7,7 @@
     "type": { "type": "string" },
     "id": { "type": "string" },
     "datetime": { "type": "string", "format": "date-time" },
-    "event_name": {"type":["string","null"]},
+    "event_name": {"type":["null", "string"]},
     "attributes": {
       "type": ["null", "object"],
       "properties": {
