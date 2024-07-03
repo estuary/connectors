@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	storage "cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	m "github.com/estuary/connectors/go/protocols/materialize"
 	"google.golang.org/api/option"
 )
 
@@ -52,8 +52,8 @@ func (c S3StoreConfig) Validate() error {
 		}
 	}
 
-	if _, err := m.ParseDelay(c.UploadInterval); err != nil {
-		return err
+	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
+		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
 		if strings.HasPrefix(c.Prefix, "/") {
 			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
@@ -141,8 +141,8 @@ func (c GCSStoreConfig) Validate() error {
 
 	if !json.Valid([]byte(c.CredentialsJSON)) {
 		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
-	} else if _, err := m.ParseDelay(c.UploadInterval); err != nil {
-		return err
+	} else if _, err := time.ParseDuration(c.UploadInterval); err != nil {
+		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
 		if strings.HasPrefix(c.Prefix, "/") {
 			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
