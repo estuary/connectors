@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 // A Schedule represents a sequence of points in time when an action should be performed.
@@ -57,6 +59,57 @@ func (s *dailySchedule) Next(after time.Time) time.Time {
 		t = t.AddDate(0, 0, 1)
 	}
 	return t
+}
+
+type fixedSchedule struct {
+	period time.Duration
+	jitter time.Duration
+}
+
+// NewFixedSchedule creates a schedule having "Next" values that occur at
+// predictable points in time. For example, with a 30 minute period they will
+// always be at times like X:00 and X:30. Periods larger than an hour work
+// similarly, and they are predictable with respect to the start of a 24-hour
+// day, so a 3 hour period would have "Next" values at 00:00, 03:00, 06:00, etc.
+// An optional value for `seed` can be provided, from which a jitter will be
+// calculated as a random offset (max 24 hrs) from the Unix epoch.
+func NewFixedSchedule(duration string, seed []byte) (Schedule, error) {
+	return newFixedSchedule(duration, seed)
+}
+
+// Internal constructor used by alternatingSchedule to directly get a typed
+// fixedSchedule rather than a Schedule interface.
+func newFixedSchedule(duration string, seed []byte) (*fixedSchedule, error) {
+	period, err := time.ParseDuration(duration)
+	if err != nil {
+		return nil, fmt.Errorf("parsing interval %q: %w", duration, err)
+	}
+
+	// Hash the seed bytes and scale the result to a positive 64-bit integer.
+	// This is used to come up with an offset within the range of a 24 hour day,
+	// which should work for just about any reasonable duration.
+	jitter := time.Duration(int64(xxhash.Sum64(seed)>>1)) % (time.Hour * 24)
+	if seed == nil {
+		// Convenience for no jitter - useful for tests.
+		jitter = 0
+	}
+
+	return &fixedSchedule{period: period, jitter: jitter}, nil
+}
+
+func (s *fixedSchedule) Next(after time.Time) time.Time {
+	if s.period == 0 {
+		return after
+	}
+
+	// How many periods have fully elapsed since the epoch, offset by the jitter?
+	elapsedPeriods := (after.UnixNano() - s.jitter.Nanoseconds()) / s.period.Nanoseconds()
+
+	// The next time should happen after one additional period, again taking into
+	// account the jitter.
+	nextTime := (elapsedPeriods+1)*s.period.Nanoseconds() + s.jitter.Nanoseconds()
+
+	return time.Unix(0, nextTime)
 }
 
 // WaitForNext sleeps until the next scheduled execution time, or until the
