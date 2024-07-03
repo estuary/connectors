@@ -340,7 +340,7 @@ class Events(IncrementalKlaviyoStream):
                 response2 = requests.get(link, headers=self.request_headers())
                 record["event_name"] = response2.json()['data']["attributes"]['name']
             except:
-                self.logger.warning(f"Name not found for Event {record["id"]}")
+                self.logger.warning(f"Name not found for Event {record['id']}")
             yield record
 
 
