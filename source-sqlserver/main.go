@@ -13,6 +13,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
@@ -78,7 +79,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Timezone != "" {
-		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
+		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
 			return err
 		}
 	}
@@ -222,7 +223,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	}
 	db.conn = conn
 
-	loc, err := sqlcapture.ParseTimezone(db.config.Timezone)
+	loc, err := schedule.ParseTimezone(db.config.Timezone)
 	if err != nil {
 		return fmt.Errorf("invalid config timezone: %w", err)
 	}

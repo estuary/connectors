@@ -15,6 +15,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
@@ -148,7 +149,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("passwords used as part of replication cannot exceed 32 characters in length due to an internal limitation in MySQL: password length of %d characters is too long, please use a shorter password", len(c.Password))
 	}
 	if c.Timezone != "" {
-		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
+		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
 			return err
 		}
 	}
@@ -265,7 +266,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	if db.config.Timezone != "" {
 		// The user-entered timezone value is verified to parse without error in (*Config).Validate,
 		// so this parsing is not expected to fail.
-		loc, err := sqlcapture.ParseTimezone(db.config.Timezone)
+		loc, err := schedule.ParseTimezone(db.config.Timezone)
 		if err != nil {
 			return fmt.Errorf("invalid config timezone: %w", err)
 		}
@@ -280,7 +281,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		var tzName string
 		if tzName, err = queryTimeZone(conn); err == nil {
 			var loc *time.Location
-			if loc, err = sqlcapture.ParseTimezone(tzName); err == nil {
+			if loc, err = schedule.ParseTimezone(tzName); err == nil {
 				logrus.WithFields(logrus.Fields{
 					"tzName": tzName,
 					"loc":    loc.String(),
