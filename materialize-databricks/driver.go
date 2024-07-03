@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -114,7 +114,7 @@ type transactor struct {
 	wsClient         *databricks.WorkspaceClient
 	localStagingPath string
 	bindings         []*binding
-	updateDelay      time.Duration
+	sched            schedule.Schedule
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -147,20 +147,22 @@ func newTransactor(
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient}
 
-	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
+	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
+
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId), cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
+	} else if useSched {
+		d.sched = sched
 	}
 
 	// If the warehouse has auto-stop configured to be longer than 15 minutes, disable update delay
-	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
-	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
 		return nil, fmt.Errorf("get warehouse %q details: %w", warehouseId, err)
 	} else {
-		if res.AutoStopMins >= 15 && d.updateDelay.Minutes() > 0 {
+		if res.AutoStopMins >= 15 {
 			log.Info(fmt.Sprintf("Auto-stop is configured to be %d minutes for this warehouse, disabling update delay. To save costs you can reduce the auto-stop idle configuration and tune the update delay config of this connector. See docs for more information: https://go.estuary.dev/materialize-databricks", res.AutoStopMins))
-
-			d.updateDelay, _ = time.ParseDuration("0s")
+			d.sched = nil
 		}
 	}
 
@@ -236,8 +238,11 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 	return nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {

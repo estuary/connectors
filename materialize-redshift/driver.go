@@ -11,13 +11,13 @@ import (
 	"slices"
 	"strings"
 	"text/template"
-	"time"
 
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -76,7 +76,8 @@ type config struct {
 
 	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=10"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
 }
@@ -107,7 +108,7 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
 		return err
 	}
 
@@ -271,12 +272,12 @@ func newRedshiftDriver() *sql.Driver {
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
-	templates   templates
-	dialect     sql.Dialect
-	fence       sql.Fence
-	bindings    []*binding
-	cfg         *config
-	updateDelay time.Duration
+	templates templates
+	dialect   sql.Dialect
+	fence     sql.Fence
+	bindings  []*binding
+	cfg       *config
+	sched     schedule.Schedule
 }
 
 func prepareNewTransactor(
@@ -299,8 +300,10 @@ func prepareNewTransactor(
 			cfg:       cfg,
 		}
 
-		if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+		if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Address), cfg.Advanced.UpdateDelay); err != nil {
 			return nil, err
+		} else if useSched {
+			d.sched = sched
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx)
@@ -476,8 +479,11 @@ func (t *transactor) addBinding(
 	return nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }

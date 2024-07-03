@@ -41,7 +41,7 @@
     "fastSyncEnabledDays": {
       "type": "string",
       "title": "Fast Sync Enabled Days",
-      "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Thursday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
+      "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
       "order": 4
     }
   },

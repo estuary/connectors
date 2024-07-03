@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/iancoleman/orderedmap"
 	"github.com/invopop/jsonschema"
 )
@@ -21,7 +21,8 @@ type config struct {
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true" jsonschema_extras:"order=6"`
+	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true" jsonschema_extras:"order=6"`
 }
 
 type advancedConfig struct {
@@ -107,7 +108,7 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
 		return err
 	}
 
