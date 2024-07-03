@@ -16,6 +16,7 @@ import (
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -71,7 +72,7 @@ func (c *config) Validate() error {
 	}
 
 	if c.Timezone != "" {
-		if _, err := sql.ParseTimezone(c.Timezone); err != nil {
+		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
 			return err
 		}
 	}
@@ -274,7 +275,7 @@ func newMysqlDriver() *sql.Driver {
 				// The user-entered timezone value is verified to parse without error in (*Config).Validate,
 				// so this parsing is not expected to fail.
 				var err error
-				tzLocation, err = sql.ParseTimezone(cfg.Timezone)
+				tzLocation, err = schedule.ParseTimezone(cfg.Timezone)
 				if err != nil {
 					return nil, fmt.Errorf("invalid config timezone: %w", err)
 				}
@@ -287,7 +288,7 @@ func newMysqlDriver() *sql.Driver {
 				// variable 'time_zone' if it is set on the database.
 				var tzName string
 				if tzName, err = queryTimeZone(ctx, conn); err == nil {
-					if tzLocation, err = sql.ParseTimezone(tzName); err == nil {
+					if tzLocation, err = schedule.ParseTimezone(tzName); err == nil {
 						log.WithFields(log.Fields{
 							"tzName": tzName,
 							"loc":    tzLocation.String(),

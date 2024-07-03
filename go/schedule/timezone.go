@@ -1,4 +1,4 @@
-package sql
+package schedule
 
 import (
 	"errors"
