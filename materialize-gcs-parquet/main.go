@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/estuary/connectors/filesink"
-	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -30,7 +30,7 @@ func (c config) Validate() error {
 }
 
 func (c config) CommonConfig() filesink.CommonConfig {
-	interval, err := m.ParseDelay(c.UploadInterval)
+	interval, err := time.ParseDuration(c.UploadInterval)
 	if err != nil {
 		// Validated to parse in (config).Validate, so this should never fail.
 		panic(fmt.Errorf("failed to parse UploadInterval: %w", err))
