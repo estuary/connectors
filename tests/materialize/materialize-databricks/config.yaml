@@ -3,8 +3,8 @@ http_path: /sql/1.0/warehouses/85a6b3eeeb0af4ca
 catalog_name: main
 schema_name: some-schema
 hardDelete: true
-advanced:
-    updateDelay: 0s
+syncSchedule:
+    syncFrequency: 0s
 credentials:
     auth_type: PAT
     personal_access_token_sops: ENC[AES256_GCM,data:LBaw6Ry6tXhZ4sWfENJ2It8PzERVVysVyqghFleppL1Fjcb/,iv:fx2I8YpHNZL/mqHvdP08cnGdfNtmm2oCA2QCmtxpgMU=,tag:5CIlCwbb2gv8BP/l+SuMWw==,type:str]
@@ -17,8 +17,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-05-22T10:39:26Z"
-    mac: ENC[AES256_GCM,data:3sP7xPEVUqK+p4c/w8xr+GMnaGL3kAXkJFHNTHMtw6f5BkvseLBDMxNXQWgY+mgXeXpxjc+fVoBbMoO4b5ZY84Pxqt4o9hWAFOiA5FRKPbCHD18+g/AvkdNjY1IFgOx1Il82iQeiWuQ3WEtJVbLr3dSzht+g9KQEwyOC6/WeFTg=,iv:FVFkuhJjdYjbWYqW7IpBWP/qPWSJ73d6R52AyeR4weU=,tag:2wMO7h8yP9AtsGJFeRwptA==,type:str]
+    lastmodified: "2024-07-03T16:41:43Z"
+    mac: ENC[AES256_GCM,data:iQWcd4Afi5lWsW1ZLu0CP1RRqTm/pGtkHhBGkBlHnF3zUT1JW1Y7WvolGuoMqx6JrOX6Cyj4aTEFbr6dD/kI//NY7OziMxLnstuWFUn6Yu7uYrkql+fVvHX6mJO4LnsVI8ULKODvGRxNCw7AMLc9nbu6CJtzwscn06i7nGcejAk=,iv:FvKuCfZrHHikJVltDB/fBdiKfo90leO+c+wUAbwTznM=,tag:UVH23+rEyRZv69Bq7OSF6A==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

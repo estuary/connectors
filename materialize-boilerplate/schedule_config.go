@@ -32,7 +32,7 @@ func (ScheduleConfig) GetFieldDocString(fieldName string) string {
 	case "FastSyncStopTime":
 		return "Time of day that transactions stop executing at the configured Sync Frequency. After this time transactions will be executed more slowly. Must be in the form of '17:00'."
 	case "FastSyncEnabledDays":
-		return "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Thursday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset."
+		return "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset."
 	default:
 		return ""
 	}

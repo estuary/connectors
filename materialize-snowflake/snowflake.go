@@ -13,6 +13,7 @@ import (
 	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -139,18 +140,21 @@ type transactor struct {
 		conn  *stdsql.Conn
 		fence *sql.Fence
 	}
-	templates   templates
-	bindings    []*binding
-	updateDelay time.Duration
-	cp          checkpoint
+	templates templates
+	bindings  []*binding
+	sched     schedule.Schedule
+	cp        checkpoint
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -199,8 +203,10 @@ func newTransactor(
 		version:    open.Version,
 	}
 
-	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Host+cfg.Warehouse), cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
+	} else if useSched {
+		d.sched = sched
 	}
 
 	d.store.fence = &fence

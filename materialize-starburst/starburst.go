@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -32,7 +32,8 @@ type config struct {
 	Bucket             string `json:"bucket" jsonschema:"title=Bucket" jsonschema_extras:"order=8"`
 	BucketPath         string `json:"bucketPath" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
@@ -148,9 +149,9 @@ type transactor struct {
 	store struct {
 		conn *stdsql.Conn
 	}
-	bindings    []*binding
-	s3Operator  *S3Operator
-	updateDelay time.Duration
+	bindings   []*binding
+	s3Operator *S3Operator
+	sched      schedule.Schedule
 }
 
 func newTransactor(
@@ -166,8 +167,10 @@ func newTransactor(
 	var transactor = &transactor{
 		cfg: cfg,
 	}
-	if transactor.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Account), cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
+	} else if useSched {
+		transactor.sched = sched
 	}
 
 	// Establish connections.
@@ -265,8 +268,11 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {

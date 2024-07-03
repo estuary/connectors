@@ -9,7 +9,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +28,8 @@ type config struct {
 
 	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=7"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
@@ -62,7 +63,7 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
 		return err
 	}
 
