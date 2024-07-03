@@ -14,8 +14,8 @@ properties:
     format: date-time
   event_name:
     type:
-      - string
       - "null"
+      - string
   attributes:
     type:
       - "null"
