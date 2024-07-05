@@ -1,0 +1,17 @@
+[
+  [
+    "acmeCo/FLOW_TEST_TEST_CHANGES",
+    {
+      "ID": "1",
+      "STR": "record 1",
+      "_meta": {
+        "op": "c",
+        "source": {
+          "row_id": "<row_id>",
+          "table": "TEST_CHANGES"
+        },
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ]
+]

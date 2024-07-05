@@ -22,6 +22,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     BasicAuth,
     Task,
+    Triggers,
 )
 
 from .models import (
@@ -276,7 +277,14 @@ async def fetch_changes(
                 c.arraysize = CHECKPOINT_EVERY
                 c.prefetchrows = CHECKPOINT_EVERY + 1
                 c.outputtypehandler = number_to_decimal
-                await c.execute(query)
+                try:
+                    await c.execute(query)
+                except Exception as e:
+                    if await automatic_backfill(log, e, c, scn, table):
+                        yield Triggers.BACKFILL
+                    else:
+                        raise e
+
                 cols = [col[0] for col in c.description]
                 c.rowfactory = functools.partial(changes_rowfactory, table.table_name, cols)
 
@@ -314,6 +322,21 @@ def number_to_decimal(cursor, metadata):
 
 # datetime and some other data types must be cast to string
 # this helper function takes care of formatting datetimes as RFC3339 strings
+
+
+async def automatic_backfill(log: Logger, e: Exception, c: oracledb.Cursor, scn: int, table: Table):
+    # table definition has changed, this can happen if table has been TRUNCATED
+    # or the schema has changed.
+    if "ORA-01466" in str(e):
+        # has the table been truncated since the last SCN?
+        await c.execute(f"SELECT truncated FROM all_tab_modifications WHERE TABLE_NAME='{table.table_name}' AND TABLE_OWNER='{table.owner}' AND TIMESTAMP>=SCN_TO_TIMESTAMP(:scn) AND TRUNCATED='YES'", scn=scn)
+        _ = await c.fetchone()
+        # if there has been a truncation, trigger automatic backfill
+        if c.rowcount > 0:
+            log.info(f"detected a TRUNCATE on table {table.owner}.{table.table_name}, triggering a backfill")
+            return True
+        else:
+            return False
 
 
 def cast_column(c: OracleColumn) -> str:

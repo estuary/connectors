@@ -1,4 +1,5 @@
 import abc
+from enum import Enum, auto
 import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -45,6 +46,10 @@ These cursors are predominantly an opaque string or an internal offset integer.
 None means "begin a new iteration" in a request context,
 and "no pages remain" in a response context.
 """
+
+
+class Triggers(Enum):
+    BACKFILL = auto()
 
 
 class BaseDocument(BaseModel):
@@ -168,7 +173,7 @@ _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
-    bindingStateV1: dict[str, _BaseResourceState] = {}
+    bindingStateV1: dict[str, _BaseResourceState | None] = {}
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
@@ -648,6 +653,12 @@ async def _binding_incremental_task(
             elif isinstance(item, AssociatedDocument):
                 task.captured(item.binding, item.doc)
                 pending = True
+            elif isinstance(item, Triggers) and item == Triggers.BACKFILL:
+                task.log.info("triggering an automatic backfill")
+                task.checkpoint(ConnectorState(
+                    bindingStateV1={binding.stateKey: None}
+                ))
+                return
             else:
                 # Ensure LogCursor types match and that they're strictly increasing.
                 is_larger = False

@@ -428,3 +428,134 @@ def test_spec(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     assert snapshot("stdout.json") == lines
+
+
+def test_capture_truncate(request, snapshot):
+    conn = connect(request)
+
+    # seed the test database first
+    try:
+        with conn.cursor() as c:
+            c.execute("DROP TABLE test_changes")
+    except Exception as e:
+        # do nothing
+        print("tables did not exist, ignoring", e)
+
+    with conn.cursor() as c:
+        c.execute(Path(request.fspath.dirname + "/db_seeds/create_test_changes.sql").read_text())
+    conn.commit()
+
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
+    p = subprocess.Popen(
+        [
+            "flowctl",
+            "preview",
+            "--source",
+            request.fspath.dirname + "/../test-changes.flow.yaml",
+            "--sessions",
+            "1,1,1,1",
+            "--delay",
+            "1s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
+    with conn.cursor() as c:
+        c.execute("INSERT INTO test_changes(id, str) VALUES (1, 'record 1')")
+    conn.commit()
+
+    lines = []
+    # expect to have three lines in the output
+    lines.append(json.loads(p.stdout.readline()))
+
+    with conn.cursor() as c:
+        c.execute("TRUNCATE TABLE test_changes")
+    conn.commit()
+
+    with conn.cursor() as c:
+        c.execute("INSERT INTO test_changes(id, str) VALUES(2, 'record 2')")
+    conn.commit()
+
+    # expect to have three lines in the output
+    lines.append(json.loads(p.stdout.readline()))
+
+    assert p.wait(timeout=30) == 0
+
+    # clean up snapshot from non-deterministic values
+    for _, doc in lines:
+        source = doc['_meta']['source']
+        if 'row_id' in source:
+            source['row_id'] = '<row_id>'
+        if 'scn' in source:
+            source['scn'] = '<scn>'
+
+    assert snapshot("stdout.json") == lines
+
+
+def test_capture_schema_change(request, snapshot):
+    conn = connect(request)
+
+    # seed the test database first
+    try:
+        with conn.cursor() as c:
+            c.execute("DROP TABLE test_changes")
+    except Exception as e:
+        # do nothing
+        print("tables did not exist, ignoring", e)
+
+    with conn.cursor() as c:
+        c.execute(Path(request.fspath.dirname + "/db_seeds/create_test_changes.sql").read_text())
+    conn.commit()
+
+    env = os.environ
+    env['RUST_LOG'] = 'debug'
+    p = subprocess.Popen(
+        [
+            "flowctl",
+            "preview",
+            "--source",
+            request.fspath.dirname + "/../test-changes.flow.yaml",
+            "--sessions",
+            "1,1,1",
+            "--delay",
+            "1s",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+
+    with conn.cursor() as c:
+        c.execute("INSERT INTO test_changes(id, str) VALUES (1, 'record 1')")
+    conn.commit()
+
+    lines = []
+    # expect to have three lines in the output
+    lines.append(json.loads(p.stdout.readline()))
+
+    with conn.cursor() as c:
+        c.execute("ALTER TABLE test_changes DROP column str")
+    conn.commit()
+
+    with conn.cursor() as c:
+        c.execute("INSERT INTO test_changes(id) VALUES(2)")
+    conn.commit()
+
+    # expect to have table definition changed error
+    assert "ORA-01466" in p.stderr.read()
+
+    assert p.wait(timeout=30) == 1
+
+    # clean up snapshot from non-deterministic values
+    for _, doc in lines:
+        source = doc['_meta']['source']
+        if 'row_id' in source:
+            source['row_id'] = '<row_id>'
+        if 'scn' in source:
+            source['scn'] = '<scn>'
+
+    assert snapshot("stdout.json") == lines
