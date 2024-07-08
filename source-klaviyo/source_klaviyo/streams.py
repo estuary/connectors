@@ -35,6 +35,25 @@ class KlaviyoStream(HttpStream, ABC):
     def availability_strategy(self) -> Optional[AvailabilityStrategy]:
         return KlaviyoAvailabilityStrategy()
 
+
+    @property
+    def raise_on_http_errors(self) -> bool:
+        # Profiles and Global Exclusions Stream
+        # raise a 503 response when paginating. Ignoring 
+        # raises and retries on both
+        if self.name == "profiles" or self.name == "global_exclusions":
+            return False
+        else:
+            return True
+
+    
+    def should_retry(self, response) -> bool:
+        if self.name == "profiles" or self.name == "global_exclusions":
+            return response.status_code == 429 or response.status_code == 500 or 503 < response.status_code < 600
+        else:
+            return response.status_code == 429 or 500 <= response.status_code < 600
+    
+
     def request_headers(self, **kwargs) -> Mapping[str, Any]:
         return {
             "Accept": "application/json",
