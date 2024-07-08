@@ -78,7 +78,7 @@ var duckDialect = func() sql.Dialect {
 	}
 }()
 
-type storeParams struct {
+type queryParams struct {
 	sql.Table
 	Files []string
 }
@@ -96,7 +96,58 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 );
 {{ end }}
 
+{{ define "loadQuery" }}
+{{ if $.Document -}}
+SELECT {{ $.Binding }} AS binding, l.{{ $.Document.Identifier }} AS doc
+FROM {{ $.Identifier }} AS l
+JOIN read_json(
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$key.Identifier}}: '{{$key.DDL}}'
+	{{- end }}
+	}
+) AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end -}}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+{{- end }}
+{{ end }}
+
 -- Templated query for merging documents from S3 into the target table.
+
+{{ define "storeDeleteQuery" }}
+DELETE FROM {{$.Identifier}} AS l
+USING read_json(
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}: '{{$col.DDL}}'
+	{{- end }}
+	}
+) AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} WHERE {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }};
+{{ end }}
 
 {{ define "storeQuery" }}
 INSERT INTO {{$.Identifier}} BY NAME
@@ -114,7 +165,7 @@ SELECT * FROM read_json(
 		{{$col.Identifier}}: '{{$col.DDL}}'
 	{{- end }}
 	}
-);
+){{ if $.Document }} WHERE {{ $.Document.Identifier }} != '"delete"'{{- end }};
 {{ end }}
 
 -- Templated update of a fence checkpoint.
@@ -130,5 +181,7 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplStoreQuery        = tplAll.Lookup("storeQuery")
+	tplStoreDeleteQuery  = tplAll.Lookup("storeDeleteQuery")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )

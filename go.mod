@@ -44,7 +44,7 @@ require (
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/jmoiron/sqlx v1.3.3
 	github.com/klauspost/compress v1.17.8
-	github.com/marcboeker/go-duckdb v1.6.5
+	github.com/marcboeker/go-duckdb v1.7.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v0.19.0
 	github.com/minio/highwayhash v1.0.2

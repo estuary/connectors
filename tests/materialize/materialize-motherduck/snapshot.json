@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE IF NOT EXISTS test_db.main.simple_delta (\n\tid BIGINT NOT NULL,\n\tcanary VARCHAR NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta_exclude_flow_doc (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.multiple_types_delta (\n\tid BIGINT NOT NULL,\n\tarray_int JSON,\n\tbinary_field VARCHAR,\n\tbool_field BOOLEAN,\n\tfloat_field DOUBLE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tmultiple JSON,\n\tnested JSON,\n\tnullable_int BIGINT,\n\tstr_field VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.formatted_strings_delta (\n\tid BIGINT NOT NULL,\n\tdate DATE,\n\tdatetime TIMESTAMP WITH TIME ZONE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint_and_str HUGEINT,\n\tint_str HUGEINT,\n\tnum_and_str DOUBLE,\n\tnum_str DOUBLE,\n\ttime TIME,\n\tflow_document JSON NOT NULL\n);\n\nINSERT INTO test_db.main.flow_materializations_v2 (version, spec, materialization) VALUES ('0101010101010101', '(a-base64-encoded-value)', 'tests/materialize-motherduck/materialize');"
+  "\nCREATE TABLE IF NOT EXISTS test_db.main.simple (\n\tid BIGINT NOT NULL,\n\tcanary VARCHAR NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_standard (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta_exclude_flow_doc (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.multiple_types (\n\tid BIGINT NOT NULL,\n\tarray_int JSON,\n\tbinary_field VARCHAR,\n\tbool_field BOOLEAN,\n\tfloat_field DOUBLE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tmultiple JSON,\n\tnested JSON,\n\tnullable_int BIGINT,\n\tstr_field VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.formatted_strings (\n\tid BIGINT NOT NULL,\n\tdate DATE,\n\tdatetime TIMESTAMP WITH TIME ZONE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint_and_str HUGEINT,\n\tint_str HUGEINT,\n\tnum_and_str DOUBLE,\n\tnum_str DOUBLE,\n\ttime TIME,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.deletions (\n\tid BIGINT NOT NULL,\n\t\"_meta/op\" VARCHAR,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\nINSERT INTO test_db.main.flow_materializations_v2 (version, spec, materialization) VALUES ('0101010101010101', '(a-base64-encoded-value)', 'tests/materialize-motherduck/materialize');"
 ]
 [
   "connectorState",
@@ -17,7 +17,7 @@
   }
 ]
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "amputation's",
     "flow_document": {
@@ -32,7 +32,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "armament's",
     "flow_document": {
@@ -47,7 +47,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "splatters",
     "flow_document": {
@@ -62,7 +62,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "strengthen",
     "flow_document": {
@@ -77,7 +77,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "Kringle's",
     "flow_document": {
@@ -92,7 +92,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "grosbeak's",
     "flow_document": {
@@ -107,7 +107,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "pieced",
     "flow_document": {
@@ -122,7 +122,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "roaches",
     "flow_document": {
@@ -137,7 +137,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "devilish",
     "flow_document": {
@@ -152,7 +152,7 @@
   }
 }
 {
-  "_table": "simple_delta",
+  "_table": "simple",
   "rows": {
     "canary": "glucose's",
     "flow_document": {
@@ -164,6 +164,91 @@
     },
     "flow_published_at": "1970-01-01 01:00:03+00",
     "id": 10
+  }
+}
+{
+  "_table": "duplicate_keys_standard",
+  "rows": {
+    "flow_document": {
+      "_meta": {
+        "uuid": "77a80200-1dda-11b2-8000-071353030311"
+      },
+      "id": 1,
+      "int": 7,
+      "str": "str 6"
+    },
+    "flow_published_at": "1970-01-01 01:00:04+00",
+    "id": 1,
+    "int": 7,
+    "str": "str 6"
+  }
+}
+{
+  "_table": "duplicate_keys_standard",
+  "rows": {
+    "flow_document": {
+      "_meta": {
+        "uuid": "78409880-1dda-11b2-8000-071353030311"
+      },
+      "id": 2,
+      "int": 9,
+      "str": "str 7"
+    },
+    "flow_published_at": "1970-01-01 01:00:05+00",
+    "id": 2,
+    "int": 9,
+    "str": "str 7"
+  }
+}
+{
+  "_table": "duplicate_keys_standard",
+  "rows": {
+    "flow_document": {
+      "_meta": {
+        "uuid": "78d92f00-1dda-11b2-8000-071353030311"
+      },
+      "id": 3,
+      "int": 11,
+      "str": "str 8"
+    },
+    "flow_published_at": "1970-01-01 01:00:06+00",
+    "id": 3,
+    "int": 11,
+    "str": "str 8"
+  }
+}
+{
+  "_table": "duplicate_keys_standard",
+  "rows": {
+    "flow_document": {
+      "_meta": {
+        "uuid": "7971c580-1dda-11b2-8000-071353030311"
+      },
+      "id": 4,
+      "int": 13,
+      "str": "str 9"
+    },
+    "flow_published_at": "1970-01-01 01:00:07+00",
+    "id": 4,
+    "int": 13,
+    "str": "str 9"
+  }
+}
+{
+  "_table": "duplicate_keys_standard",
+  "rows": {
+    "flow_document": {
+      "_meta": {
+        "uuid": "7a0a5c00-1dda-11b2-8000-071353030311"
+      },
+      "id": 5,
+      "int": 15,
+      "str": "str 10"
+    },
+    "flow_published_at": "1970-01-01 01:00:08+00",
+    "id": 5,
+    "int": 15,
+    "str": "str 10"
   }
 }
 {
@@ -427,7 +512,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       11,
@@ -465,7 +550,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       21,
@@ -503,7 +588,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       31,
@@ -541,7 +626,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       41,
@@ -579,7 +664,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       51,
@@ -617,53 +702,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
-  "rows": {
-    "array_int": [
-      61,
-      62
-    ],
-    "binary_field": null,
-    "bool_field": true,
-    "float_field": 6.6,
-    "flow_document": {
-      "_meta": {
-        "uuid": "1e3bd500-1dd2-11b2-8000-071353030311"
-      },
-      "array_int": [
-        61,
-        62
-      ],
-      "bool_field": true,
-      "float_field": 6.6,
-      "id": 6,
-      "multiple": [
-        "one",
-        2,
-        true
-      ],
-      "nested": {
-        "id": "i6"
-      },
-      "nullable_int": 6,
-      "str_field": "str6"
-    },
-    "flow_published_at": "1970-01-01 00:00:18+00",
-    "id": 6,
-    "multiple": [
-      "one",
-      2,
-      true
-    ],
-    "nested": {
-      "id": "i6"
-    },
-    "nullable_int": 6,
-    "str_field": "str6"
-  }
-}
-{
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       61,
@@ -709,49 +748,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
-  "rows": {
-    "array_int": [
-      71,
-      72
-    ],
-    "binary_field": null,
-    "bool_field": false,
-    "float_field": 7.7,
-    "flow_document": {
-      "_meta": {
-        "uuid": "1ed46b80-1dd2-11b2-8000-071353030311"
-      },
-      "array_int": [
-        71,
-        72
-      ],
-      "bool_field": false,
-      "float_field": 7.7,
-      "id": 7,
-      "multiple": {
-        "object": "seven"
-      },
-      "nested": {
-        "id": "i7"
-      },
-      "nullable_int": null,
-      "str_field": "str7"
-    },
-    "flow_published_at": "1970-01-01 00:00:19+00",
-    "id": 7,
-    "multiple": {
-      "object": "seven"
-    },
-    "nested": {
-      "id": "i7"
-    },
-    "nullable_int": null,
-    "str_field": "str7"
-  }
-}
-{
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       71,
@@ -793,45 +790,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
-  "rows": {
-    "array_int": [
-      81,
-      82
-    ],
-    "binary_field": null,
-    "bool_field": true,
-    "float_field": 8.8,
-    "flow_document": {
-      "_meta": {
-        "uuid": "1f6d0200-1dd2-11b2-8000-071353030311"
-      },
-      "array_int": [
-        81,
-        82
-      ],
-      "bool_field": true,
-      "float_field": 8.8,
-      "id": 8,
-      "multiple": null,
-      "nested": {
-        "id": "i8"
-      },
-      "nullable_int": 8,
-      "str_field": "str8"
-    },
-    "flow_published_at": "1970-01-01 00:00:20+00",
-    "id": 8,
-    "multiple": null,
-    "nested": {
-      "id": "i8"
-    },
-    "nullable_int": 8,
-    "str_field": "str8"
-  }
-}
-{
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       81,
@@ -869,45 +828,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
-  "rows": {
-    "array_int": [
-      91,
-      92
-    ],
-    "binary_field": "aGVsbG8K",
-    "bool_field": false,
-    "float_field": 9.9,
-    "flow_document": {
-      "_meta": {
-        "uuid": "20059880-1dd2-11b2-8000-071353030311"
-      },
-      "array_int": [
-        91,
-        92
-      ],
-      "binary_field": "aGVsbG8K",
-      "bool_field": false,
-      "float_field": 9.9,
-      "id": 9,
-      "nested": {
-        "id": "i9"
-      },
-      "nullable_int": null,
-      "str_field": "str9"
-    },
-    "flow_published_at": "1970-01-01 00:00:21+00",
-    "id": 9,
-    "multiple": null,
-    "nested": {
-      "id": "i9"
-    },
-    "nullable_int": null,
-    "str_field": "str9"
-  }
-}
-{
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       91,
@@ -945,45 +866,7 @@
   }
 }
 {
-  "_table": "multiple_types_delta",
-  "rows": {
-    "array_int": [
-      1,
-      2
-    ],
-    "binary_field": "Z29vZGJ5ZQo=",
-    "bool_field": true,
-    "float_field": 10.1,
-    "flow_document": {
-      "_meta": {
-        "uuid": "209e2f00-1dd2-11b2-8000-071353030311"
-      },
-      "array_int": [
-        1,
-        2
-      ],
-      "binary_field": "Z29vZGJ5ZQo=",
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
-    },
-    "flow_published_at": "1970-01-01 00:00:22+00",
-    "id": 10,
-    "multiple": null,
-    "nested": {
-      "id": "i10"
-    },
-    "nullable_int": 10,
-    "str_field": "str10"
-  }
-}
-{
-  "_table": "multiple_types_delta",
+  "_table": "multiple_types",
   "rows": {
     "array_int": [
       1,
@@ -1021,7 +904,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": "0001-01-01 (BC)",
     "datetime": "0001-01-01 (BC) 00:00:00+00",
@@ -1048,7 +931,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": "1999-02-02",
     "datetime": "1999-02-02 14:20:12.33+00",
@@ -1075,7 +958,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": "1000-03-03",
     "datetime": "1000-03-03 23:59:38.1+00",
@@ -1102,7 +985,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": "2023-08-29",
     "datetime": "2023-08-29 23:59:38+00",
@@ -1129,7 +1012,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": "9999-12-31",
     "datetime": "9999-12-31 23:59:59+00",
@@ -1156,7 +1039,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": null,
     "datetime": null,
@@ -1177,7 +1060,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": null,
     "datetime": null,
@@ -1198,7 +1081,7 @@
   }
 }
 {
-  "_table": "formatted_strings_delta",
+  "_table": "formatted_strings",
   "rows": {
     "date": null,
     "datetime": null,
@@ -1216,6 +1099,36 @@
     "num_and_str": null,
     "num_str": -1.7976931348623157e+308,
     "time": null
+  }
+}
+{
+  "_table": "deletions",
+  "rows": {
+    "_meta/op": "u",
+    "flow_document": {
+      "_meta": {
+        "op": "u",
+        "uuid": "84c4f100-1dda-11b2-8000-071353030311"
+      },
+      "id": 2
+    },
+    "flow_published_at": "1970-01-01 01:00:26+00",
+    "id": 2
+  }
+}
+{
+  "_table": "deletions",
+  "rows": {
+    "_meta/op": "c",
+    "flow_document": {
+      "_meta": {
+        "op": "c",
+        "uuid": "855d8780-1dda-11b2-8000-071353030311"
+      },
+      "id": 3
+    },
+    "flow_published_at": "1970-01-01 01:00:27+00",
+    "id": 3
   }
 }
 [
