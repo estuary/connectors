@@ -11,11 +11,13 @@ function dropTable() {
 echo "--- Running Cleanup ---"
 
 # Remove materialized tables.
-dropTable "simple_delta"
+dropTable "simple"
+dropTable "duplicate_keys_standard"
 dropTable "duplicate_keys_delta"
 dropTable "duplicate_keys_delta_exclude_flow_doc"
-dropTable "multiple_types_delta"
-dropTable "formatted_strings_delta"
+dropTable "multiple_types"
+dropTable "formatted_strings"
+dropTable "deletions"
 
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.

@@ -1,12 +1,99 @@
---- Begin db.schema.delta_updates createTargetTable ---
-CREATE TABLE IF NOT EXISTS db.schema.delta_updates (
+--- Begin "default"."a-schema".target_table createTargetTable ---
+CREATE TABLE IF NOT EXISTS "default"."a-schema".target_table (
+	key1 BIGINT NOT NULL,
+	"key!2" BOOLEAN NOT NULL,
+	"Camel_Case" BIGINT,
+	"a Time" TIMESTAMP WITH TIME ZONE,
+	"array" JSON,
+	lower_case BIGINT,
+	value VARCHAR,
+	flow_document JSON NOT NULL
+);
+--- End "default"."a-schema".target_table createTargetTable ---
+
+--- Begin "default"."a-schema".target_table loadQuery ---
+SELECT 0 AS binding, l.flow_document AS doc
+FROM "default"."a-schema".target_table AS l
+JOIN read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		"key!2": 'BOOLEAN NOT NULL'
+	}
+) AS r
+	 ON  l.key1 = r.key1
+	 AND l."key!2" = r."key!2"
+--- End "default"."a-schema".target_table loadQuery ---
+
+--- Begin "default"."a-schema".target_table storeDeleteQuery ---
+DELETE FROM "default"."a-schema".target_table AS l
+USING read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		"key!2": 'BOOLEAN NOT NULL',
+		"Camel_Case": 'BIGINT',
+		"a Time": 'TIMESTAMP WITH TIME ZONE',
+		"array": 'JSON',
+		lower_case: 'BIGINT',
+		value: 'VARCHAR',
+		flow_document: 'JSON NOT NULL'
+	}
+) AS r
+	 WHERE l.key1 = r.key1
+	 AND l."key!2" = r."key!2";
+--- End "default"."a-schema".target_table storeDeleteQuery ---
+
+--- Begin "default"."a-schema".target_table storeQuery ---
+INSERT INTO "default"."a-schema".target_table BY NAME
+SELECT * FROM read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		"key!2": 'BOOLEAN NOT NULL',
+		"Camel_Case": 'BIGINT',
+		"a Time": 'TIMESTAMP WITH TIME ZONE',
+		"array": 'JSON',
+		lower_case: 'BIGINT',
+		value: 'VARCHAR',
+		flow_document: 'JSON NOT NULL'
+	}
+) WHERE flow_document != '"delete"';
+--- End "default"."a-schema".target_table storeQuery ---
+
+--- Begin "default"."a-schema"."Delta Updates" createTargetTable ---
+CREATE TABLE IF NOT EXISTS "default"."a-schema"."Delta Updates" (
 	"theKey" VARCHAR NOT NULL,
 	"aValue" BIGINT
 );
---- End db.schema.delta_updates createTargetTable ---
+--- End "default"."a-schema"."Delta Updates" createTargetTable ---
 
---- Begin db.schema.delta_updates storeQuery ---
-INSERT INTO db.schema.delta_updates BY NAME
+--- Begin "default"."a-schema"."Delta Updates" loadQuery ---
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+--- End "default"."a-schema"."Delta Updates" loadQuery ---
+
+--- Begin "default"."a-schema"."Delta Updates" storeDeleteQuery ---
+DELETE FROM "default"."a-schema"."Delta Updates" AS l
+USING read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		"theKey": 'VARCHAR NOT NULL',
+		"aValue": 'BIGINT'
+	}
+) AS r
+	 WHERE l."theKey" = r."theKey";
+--- End "default"."a-schema"."Delta Updates" storeDeleteQuery ---
+
+--- Begin "default"."a-schema"."Delta Updates" storeQuery ---
+INSERT INTO "default"."a-schema"."Delta Updates" BY NAME
 SELECT * FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
@@ -16,7 +103,7 @@ SELECT * FROM read_json(
 		"aValue": 'BIGINT'
 	}
 );
---- End db.schema.delta_updates storeQuery ---
+--- End "default"."a-schema"."Delta Updates" storeQuery ---
 
 --- Begin Fence Update ---
 UPDATE checkpoints

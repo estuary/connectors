@@ -17,10 +17,15 @@ config_json_template='{
 resources_json_template='[
   {
     "resource": {
-      "table": "simple_delta",
-      "delta_updates": true
+      "table": "simple"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
+  },
+  {
+    "resource": {
+      "table": "duplicate_keys_standard"
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
   },
   {
     "resource": {
@@ -44,8 +49,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "multiple_types_delta",
-      "delta_updates": true
+      "table": "multiple_types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
     "fields": {
@@ -60,13 +64,18 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "formatted_strings_delta",
-      "delta_updates": true
+      "table": "formatted_strings"
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 

@@ -19,31 +19,43 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
-	var shape = sqlDriver.BuildTableShape(spec, 1, tableConfig{
-		Table:    "delta_updates",
-		Schema:   "schema",
-		Delta:    true,
-		database: "db",
+	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
+		Schema:   "a-schema",
+		Table:    "target_table",
+		Delta:    false,
+		database: "default",
 	})
-	shape.Document = nil
+	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
+		Schema:   "a-schema",
+		Table:    "Delta Updates",
+		Delta:    true,
+		database: "default",
+	})
+	shape2.Document = nil
 
-	table, err := sqlDriver.ResolveTable(shape, duckDialect)
+	table1, err := sqlDriver.ResolveTable(shape1, duckDialect)
+	require.NoError(t, err)
+	table2, err := sqlDriver.ResolveTable(shape2, duckDialect)
 	require.NoError(t, err)
 
 	var snap strings.Builder
 
-	for _, tpl := range []*template.Template{
-		tplCreateTargetTable,
-		tplStoreQuery,
-	} {
-		var testcase = table.Identifier + " " + tpl.Name()
+	for _, tbl := range []sqlDriver.Table{table1, table2} {
+		for _, tpl := range []*template.Template{
+			tplCreateTargetTable,
+			tplLoadQuery,
+			tplStoreDeleteQuery,
+			tplStoreQuery,
+		} {
+			var testcase = tbl.Identifier + " " + tpl.Name()
 
-		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(&snap, &storeParams{
-			Table: table,
-			Files: []string{"s3://bucket/file1", "s3://bucket/file2"},
-		}))
-		snap.WriteString("--- End " + testcase + " ---\n\n")
+			snap.WriteString("--- Begin " + testcase + " ---")
+			require.NoError(t, tpl.Execute(&snap, &queryParams{
+				Table: tbl,
+				Files: []string{"s3://bucket/file1", "s3://bucket/file2"},
+			}))
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	var fence = sqlDriver.Fence{
