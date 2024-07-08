@@ -362,6 +362,7 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 			// This should never be possible, since we ask for a single key from the source
 			// document. It's here to make the intent of looping over values of d.Source below
 			// explicit, since we'll only see a single value.
+			log.WithField("gotDoc", d).Warn("unexpected number of returned source fields")
 			return fmt.Errorf("unexpected number of returned source fields: %d", len(d.Source))
 		}
 
