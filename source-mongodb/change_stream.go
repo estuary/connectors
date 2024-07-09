@@ -31,6 +31,12 @@ func makeEventDocument(ev changeEvent, resourceBindingInfo map[string]bindingInf
 		return nil, 0
 	}
 
+	var doc map[string]any
+	meta := make(map[string]any)
+	if ev.FullDocumentBeforeChange != nil {
+		meta[beforeProperty] = ev.FullDocumentBeforeChange
+	}
+
 	switch ev.OperationType {
 	case "insert", "update", "replace":
 		if ev.FullDocument == nil {
@@ -44,33 +50,22 @@ func makeEventDocument(ev changeEvent, resourceBindingInfo map[string]bindingInf
 			return nil, 0
 		}
 
-		doc := sanitizeDocument(ev.FullDocument)
-
-		var op string
 		if ev.OperationType == "update" || ev.OperationType == "replace" {
-			op = "u"
+			meta[opProperty] = "u"
 		} else if ev.OperationType == "insert" {
-			op = "c"
+			meta[opProperty] = "c"
 		}
-		doc[metaProperty] = map[string]any{
-			opProperty: op,
-		}
-
-		return doc, binding.index
+		doc = ev.FullDocument
 	case "delete":
-		var doc = map[string]any{
-			idProperty: ev.DocumentKey.Id,
-			metaProperty: map[string]any{
-				opProperty: "d",
-			},
-		}
-		doc = sanitizeDocument(doc)
-
-		return doc, binding.index
+		meta[opProperty] = "d"
+		doc = map[string]any{idProperty: ev.DocumentKey.Id}
 	default:
 		// Event is of an operation type that we don't care about.
 		return nil, 0
 	}
+
+	doc[metaProperty] = meta
+	return sanitizeDocument(doc), binding.index
 }
 
 type docKey struct {
@@ -83,11 +78,12 @@ type namespace struct {
 }
 
 type changeEvent struct {
-	DocumentKey   docKey              `bson:"documentKey"`
-	OperationType string              `bson:"operationType"`
-	FullDocument  bson.M              `bson:"fullDocument"`
-	Ns            namespace           `bson:"ns"`
-	ClusterTime   primitive.Timestamp `bson:"clusterTime"`
+	DocumentKey              docKey              `bson:"documentKey"`
+	OperationType            string              `bson:"operationType"`
+	FullDocument             bson.M              `bson:"fullDocument"`
+	FullDocumentBeforeChange bson.M              `bson:"fullDocumentBeforeChange"`
+	Ns                       namespace           `bson:"ns"`
+	ClusterTime              primitive.Timestamp `bson:"clusterTime"`
 }
 
 // initializeStreams starts change streams for the capture. Streams are started from any prior
@@ -95,6 +91,7 @@ type changeEvent struct {
 func (c *capture) initializeStreams(
 	ctx context.Context,
 	bindings []bindingInfo,
+	requestPreImages bool,
 	exclusiveCollectionFilter bool,
 ) ([]changeStream, error) {
 	var out []changeStream
@@ -123,11 +120,12 @@ func (c *capture) initializeStreams(
 		// 16MB limit.
 		pl := mongo.Pipeline{
 			{{Key: "$project", Value: bson.M{
-				"documentKey":   1,
-				"operationType": 1,
-				"fullDocument":  1,
-				"ns":            1,
-				"clusterTime":   1,
+				"documentKey":              1,
+				"operationType":            1,
+				"fullDocument":             1,
+				"ns":                       1,
+				"clusterTime":              1,
+				"fullDocumentBeforeChange": 1,
 			}}},
 		}
 
@@ -150,6 +148,10 @@ func (c *capture) initializeStreams(
 		}
 
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+		if requestPreImages {
+			opts = opts.SetFullDocumentBeforeChange(options.WhenAvailable)
+		}
+
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
 			logEntry = logEntry.WithField("resumeToken", t)
 			opts = opts.SetResumeAfter(t)

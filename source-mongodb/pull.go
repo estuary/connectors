@@ -81,12 +81,17 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	// Log some basic information about the database we are connected to if possible. buildInfo is
 	// an administrator command so it may not be available on all databases / configurations.
+	requestPreImages := false
 	if info, err := getBuildInfo(ctx, client); err != nil {
 		log.WithError(err).Info("could not query buildInfo")
 	} else {
 		log.WithFields(log.Fields{
 			"version": info.Version,
 		}).Info("buildInfo")
+		requestPreImages = info.supportsPreImages()
+	}
+	if !requestPreImages {
+		log.Info("pre-images will not be requested for change streams")
 	}
 
 	var prevState captureState
@@ -127,7 +132,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
 		// and streamCatchup catches up the streams to the present and closes the cursors out while
 		// the backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, bindings, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+		if streams, err := c.initializeStreams(ctx, bindings, requestPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
 		} else if err := c.streamCatchup(ctx, streams); err != nil {
 			return err
@@ -141,7 +146,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, bindings, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+	if streams, err := c.initializeStreams(ctx, bindings, requestPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 		return err
 	} else if err := c.streamForever(ctx, streams); err != nil {
 		return fmt.Errorf("streaming changes forever: %w", err)
@@ -313,7 +318,25 @@ func idToString(value interface{}) string {
 }
 
 type buildInfo struct {
-	Version string `bson:"version"`
+	Version      string `bson:"version"`
+	VersionArray []int  `bson:"versionArray"`
+}
+
+// supportsPreImages returns true if the server supports pre-images, which is
+// really a proxy for it supporting the $changeStreamSplitLargeEvent pipeline
+// staged which was introduced in 6.0.9 and 7.0.0+. Pre-images were technically
+// supported starting in 6.0, but since we may need to use
+// $changeStreamSplitLargeEvent to handle resulting event documents larger than
+// 16MB we only support them if we're on 6.0.9 or later.
+func (b buildInfo) supportsPreImages() bool {
+	if len(b.VersionArray) < 3 {
+		return false
+	}
+
+	major := b.VersionArray[0]
+	minor := b.VersionArray[1]
+	patch := b.VersionArray[2]
+	return major >= 7 || (major == 6 && patch >= 9) || (major == 6 && minor >= 1)
 }
 
 func getBuildInfo(ctx context.Context, client *mongo.Client) (buildInfo, error) {
