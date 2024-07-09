@@ -14,6 +14,7 @@ type replicationSlotInfo struct {
 	Database          string
 	Plugin            string
 	SlotType          string
+	Active            bool
 	RestartLSN        pglogrepl.LSN
 	ConfirmedFlushLSN pglogrepl.LSN
 	WALStatus         string
@@ -29,8 +30,8 @@ func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName stri
 	// This is necessary because the 'wal_status' column was only added in Postgres 13, and
 	// while we definitely want it if it's available we also need to support older versions
 	// where the column doesn't exist.
-	var query = `SELECT slot_name, database, plugin, slot_type, restart_lsn, confirmed_flush_lsn, coalesce(row_to_json(s)->>'wal_status'::text, 'unknown') as wal_status FROM pg_catalog.pg_replication_slots s WHERE slot_name = $1`
-	if err := conn.QueryRow(ctx, query, slotName).Scan(&info.SlotName, &info.Database, &info.Plugin, &info.SlotType, &info.RestartLSN, &info.ConfirmedFlushLSN, &info.WALStatus); err != nil {
+	var query = `SELECT slot_name, database, plugin, slot_type, active, restart_lsn, confirmed_flush_lsn, coalesce(row_to_json(s)->>'wal_status'::text, 'unknown') as wal_status FROM pg_catalog.pg_replication_slots s WHERE slot_name = $1`
+	if err := conn.QueryRow(ctx, query, slotName).Scan(&info.SlotName, &info.Database, &info.Plugin, &info.SlotType, &info.Active, &info.RestartLSN, &info.ConfirmedFlushLSN, &info.WALStatus); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
