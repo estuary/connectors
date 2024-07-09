@@ -69,6 +69,8 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		// completely unable to produce a fatal error, and double-checking to make extra sure we don't
 		// accidentally dereference a null pointer doesn't really hurt anything.
 		logrus.WithField("slot", slot).Warn("replication slot has no metadata (and probably doesn't exist?)")
+	} else if slotInfo.Active {
+		logrus.WithField("slot", slot).Warn("replication slot is already active (is another capture already running against this database?)")
 	} else if slotInfo.WALStatus == "lost" {
 		logrus.WithField("slot", slot).Warn("replication slot was invalidated by the server, it must be deleted and all bindings backfilled")
 	} else if startLSN < slotInfo.ConfirmedFlushLSN {
