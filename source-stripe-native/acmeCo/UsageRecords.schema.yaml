@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 description: "Child Stream\nParent Stream: SubscriptionItems"
 properties:
   _meta:
@@ -31,58 +31,11 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Parent Id
-  object:
-    const: usage_record_summary
-    enum:
-      - usage_record_summary
-    title: Object
-    type: string
-  livemode:
-    title: Livemode
-    type: boolean
-  quantity:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Quantity
   subscription_item:
     title: Subscription Item
     type: string
-  timestamp:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Timestamp
-  invoice:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Invoice
-  period:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Period
-  total_usage:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Total Usage
 required:
   - id
-  - object
-  - livemode
   - subscription_item
 title: UsageRecords
 type: object

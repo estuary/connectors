@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 properties:
   _meta:
     allOf:
@@ -30,67 +30,8 @@ properties:
   id:
     title: Id
     type: string
-  object:
-    const: promotion_code
-    enum:
-      - promotion_code
-    title: Object
-    type: string
-  active:
-    title: Active
-    type: boolean
-  code:
-    title: Code
-    type: string
-  coupon:
-    title: Coupon
-    type: object
-  created:
-    title: Created
-    type: integer
-  customer:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Customer
-  expires_at:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Expires At
-  livemode:
-    title: Livemode
-    type: boolean
-  max_redemptions:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Max Redemptions
-  metadata:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Metadata
-  restrictions:
-    title: Restrictions
-    type: object
-  times_redeemed:
-    title: Times Redeemed
-    type: integer
 required:
   - id
-  - object
-  - active
-  - code
-  - coupon
-  - created
-  - livemode
-  - restrictions
-  - times_redeemed
 title: PromotionCode
 type: object
 x-infer-schema: true
