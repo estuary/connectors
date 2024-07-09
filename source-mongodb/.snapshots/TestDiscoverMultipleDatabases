@@ -44,6 +44,11 @@ Binding 0:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
             }
           },
           "type": "object"
@@ -101,6 +106,11 @@ Binding 1:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
             }
           },
           "type": "object"
@@ -158,6 +168,11 @@ Binding 2:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
             }
           },
           "type": "object"
@@ -215,6 +230,11 @@ Binding 3:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
             }
           },
           "type": "object"
