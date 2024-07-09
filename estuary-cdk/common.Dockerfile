@@ -8,24 +8,15 @@ RUN apt-get update && \
     apt install -y --no-install-recommends \
     python3-poetry
 
-# install oracle instant client
-RUN apt-get update && apt-get install -y --no-install-recommends alien libaio1 wget && \
-    wget https://download.oracle.com/otn_software/linux/instantclient/185000/oracle-instantclient18.5-basiclite-18.5.0.0.0-3.x86_64.rpm && \
-    wget https://download.oracle.com/otn_software/linux/instantclient/185000/oracle-instantclient18.5-devel-18.5.0.0.0-3.x86_64.rpm && \
-    alien -i oracle-instantclient18.5-basiclite-18.5.0.0.0-3.x86_64.rpm && \
-    alien -i oracle-instantclient18.5-devel-18.5.0.0.0-3.x86_64.rpm
-ENV LD_LIBRARY_PATH="/usr/lib/oracle/18.5/client64/lib:${LD_LIBRARY_PATH}"
-
 RUN python -m venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 
 WORKDIR /opt/${CONNECTOR_NAME}
-COPY ${CONNECTOR_NAME}/poetry.lock /opt/${CONNECTOR_NAME}
-COPY ${CONNECTOR_NAME}/pyproject.toml /opt/${CONNECTOR_NAME}/pyproject.toml
+COPY ${CONNECTOR_NAME} /opt/${CONNECTOR_NAME}
 COPY estuary-cdk /opt/estuary-cdk
+
 RUN poetry install
 
-COPY ${CONNECTOR_NAME} /opt/${CONNECTOR_NAME}
 
 FROM base as runner
 
