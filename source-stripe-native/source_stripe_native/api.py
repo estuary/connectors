@@ -327,7 +327,7 @@ async def fetch_incremental_no_events(
                 iterating = False
                 break
         if result.has_more is True:
-            parameters["starting_after"] = result.data[-1]["id"]
+            parameters["starting_after"] = result.data[-1].id
         else:
             break
     if max_ts != log_cursor:
