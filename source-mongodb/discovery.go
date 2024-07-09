@@ -24,12 +24,14 @@ var minimalSchema = generateMinimalSchema()
 const idProperty = "_id"
 
 const (
-	metaProperty = "_meta"
-	opProperty   = "op"
+	metaProperty   = "_meta"
+	opProperty     = "op"
+	beforeProperty = "before"
 )
 
 type documentMetadata struct {
-	Op string `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
+	Op     string         `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
+	Before map[string]any `json:"before,omitempty" jsonschema:"title=Before Document,description=Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."`
 }
 
 func generateMinimalSchema() json.RawMessage {
