@@ -2,6 +2,9 @@
   [
     "acmeCo/Accounts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -165,6 +168,9 @@
   [
     "acmeCo/Accounts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -561,6 +567,9 @@
   [
     "acmeCo/Accounts",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -695,6 +704,9 @@
   [
     "acmeCo/Customers",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "address": {
         "city": "",
         "country": "BR",
@@ -736,6 +748,9 @@
   [
     "acmeCo/Customers",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "address": null,
       "balance": 0,
       "created": 1715026232,
@@ -758,7 +773,7 @@
         "some-interesting": "piece-of-information"
       },
       "name": "My Cool Customer",
-      "next_invoice_sequence": 65,
+      "next_invoice_sequence": 66,
       "object": "customer",
       "phone": null,
       "preferred_locales": [],
@@ -770,6 +785,9 @@
   [
     "acmeCo/Customers",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "address": {
         "city": "Maringa",
         "country": "BR",
@@ -822,6 +840,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -931,6 +952,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 1000,
@@ -1040,6 +1064,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 23000,
       "amount_captured": 23000,
       "amount_refunded": 0,
@@ -1149,6 +1176,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 4500,
       "amount_captured": 4500,
       "amount_refunded": 0,
@@ -1258,6 +1288,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1367,6 +1400,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1476,6 +1512,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1585,6 +1624,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1695,6 +1737,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1805,6 +1850,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 300,
@@ -1915,6 +1963,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1200,
       "amount_captured": 1200,
       "amount_refunded": 0,
@@ -2024,6 +2075,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1200,
       "amount_captured": 1200,
       "amount_refunded": 0,
@@ -2133,6 +2187,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 3400,
       "amount_captured": 3400,
       "amount_refunded": 3400,
@@ -2242,6 +2299,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2351,6 +2411,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2460,6 +2523,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2569,6 +2635,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2678,6 +2747,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2787,6 +2859,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2896,6 +2971,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3005,6 +3083,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3114,6 +3195,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3223,6 +3307,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3332,6 +3419,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3441,6 +3531,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3550,6 +3643,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3659,6 +3755,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3768,6 +3867,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3877,6 +3979,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3986,6 +4091,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4095,6 +4203,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4204,6 +4315,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4313,6 +4427,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4422,6 +4539,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4531,6 +4651,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4640,6 +4763,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4749,6 +4875,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4858,6 +4987,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4967,6 +5099,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5076,6 +5211,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5185,6 +5323,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5294,6 +5435,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5403,6 +5547,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5512,6 +5659,9 @@
   [
     "acmeCo/Charges",
     {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
