@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/mdibaiee/vitess/go/vt/sqlparser"
 	"github.com/sirupsen/logrus"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 type redoFile struct {
