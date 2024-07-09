@@ -1,0 +1,60 @@
+---
+properties:
+  created_at:
+    type:
+      - string
+      - "null"
+  description:
+    type:
+      - string
+      - "null"
+  id:
+    type:
+      - integer
+  key:
+    type:
+      - string
+      - "null"
+  namespace:
+    type:
+      - string
+      - "null"
+  owner_id:
+    type:
+      - integer
+      - "null"
+  owner_resource:
+    type:
+      - string
+      - "null"
+  updated_at:
+    type:
+      - string
+      - "null"
+  value:
+    type:
+      - string
+      - integer
+      - boolean
+      - "null"
+  type:
+    type:
+      - string
+      - "null"
+  value_type:
+    type:
+      - string
+      - "null"
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type:
+          - integer
+    required:
+      - row_id
+type: object
+required:
+  - id
+  - _meta
+x-infer-schema: true

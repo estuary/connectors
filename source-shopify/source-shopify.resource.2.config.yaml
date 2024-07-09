@@ -1,0 +1,177 @@
+---
+tap_stream_id: customers
+replication_key: updated_at
+replication_method: INCREMENTAL
+key_properties:
+  - id
+stream: customers
+metadata:
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - email
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - accepts_marketing
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - first_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - last_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - orders_count
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - state
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_spent
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - last_order_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - note
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - verified_email
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - multipass_identifier
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tax_exempt
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - phone
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tags
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - last_order_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - currency
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - addresses
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - accepts_marketing_updated_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - marketing_opt_in_level
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tax_exemptions
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - admin_graphql_api_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - default_address
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - email_marketing_consent
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - sms_marketing_consent
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id
+      valid-replication-keys:
+        - updated_at

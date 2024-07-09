@@ -78,16 +78,21 @@
     "properties": {
       "name": {
         "type": "string",
-        "title": "Name",
+        "title": "Resource Name",
         "description": "The unique name of this resource.",
         "order": 0
       },
-      "template": {
+      "schema": {
         "type": "string",
-        "title": "Query Template",
-        "description": "The query template (pkg.go.dev/text/template) which will be rendered and then executed.",
-        "multiline": true,
-        "order": 3
+        "title": "Schema Name",
+        "description": "The name of the schema in which the captured table lives. The query template must be overridden if this is unset.",
+        "order": 1
+      },
+      "table": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be captured. The query template must be overridden if this is unset.",
+        "order": 2
       },
       "cursor": {
         "items": {
@@ -96,20 +101,26 @@
         "type": "array",
         "title": "Cursor Columns",
         "description": "The names of columns which should be persisted between query executions as a cursor.",
-        "order": 2
+        "order": 3
       },
       "poll": {
         "type": "string",
         "title": "Polling Schedule",
         "description": "When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day.",
-        "order": 1,
+        "order": 4,
         "pattern": "^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"
+      },
+      "template": {
+        "type": "string",
+        "title": "Query Template Override",
+        "description": "Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples.",
+        "multiline": true,
+        "order": 5
       }
     },
     "type": "object",
     "required": [
-      "name",
-      "template"
+      "name"
     ],
     "title": "Batch SQL Resource Spec"
   },

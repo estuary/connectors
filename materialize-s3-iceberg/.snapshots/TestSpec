@@ -1,0 +1,91 @@
+{
+  "config_schema_json": {
+    "properties": {
+      "aws_access_key_id": {
+        "description": "Access Key ID for accessing AWS services.",
+        "order": 0,
+        "title": "AWS Access Key ID",
+        "type": "string"
+      },
+      "aws_secret_access_key": {
+        "description": "Secret Access Key for accessing AWS services.",
+        "order": 1,
+        "secret": true,
+        "title": "AWS Secret Access Key",
+        "type": "string"
+      },
+      "bucket": {
+        "description": "The S3 bucket to write data files to.",
+        "order": 2,
+        "title": "Bucket",
+        "type": "string"
+      },
+      "prefix": {
+        "default": "",
+        "description": "Optional prefix that will be used to store objects.",
+        "order": 3,
+        "title": "Prefix",
+        "type": "string"
+      },
+      "region": {
+        "description": "AWS region.",
+        "order": 4,
+        "title": "Region",
+        "type": "string"
+      },
+      "namespace": {
+        "description": "Namespace for bound collection tables (unless overridden within the binding resource configuration).",
+        "order": 5,
+        "pattern": "^[^.]*$",
+        "title": "Namespace",
+        "type": "string"
+      },
+      "upload_interval": {
+        "default": "PT5M",
+        "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
+        "format": "duration",
+        "order": 6,
+        "title": "Upload Interval",
+        "type": "string"
+      }
+    },
+    "required": [
+      "aws_access_key_id",
+      "aws_secret_access_key",
+      "bucket",
+      "region",
+      "namespace"
+    ],
+    "title": "EndpointConfig",
+    "type": "object"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-s3-iceberg/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table.",
+        "x-collection-name": true
+      },
+      "namespace": {
+        "type": "string",
+        "title": "Alternative Namespace",
+        "description": "Alternative namespace for this table (optional)."
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Currently this connector only supports delta updates.",
+        "default": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "ResourceConfig"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-s3-iceberg"
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	_ "github.com/go-mysql-org/go-mysql/driver"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
@@ -482,51 +484,6 @@ func TestAlterTable_AddUnsignedColumn(t *testing.T) {
 	t.Run("rebackfilled", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-// TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"
-// sanity check is working as intended.
-func TestBinlogExpirySanityCheck(t *testing.T) {
-	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var cs = tb.CaptureSpec(ctx, t)
-
-	for idx, tc := range []struct {
-		VarName     string
-		VarValue    int
-		SkipCheck   bool
-		ExpectError bool
-		Message     string
-	}{
-		{"binlog_expire_logs_seconds", 2592000, false, false, "A 30-day expiry should not produce an error"},
-		{"binlog_expire_logs_seconds", 604800, false, false, "A 7-day expiry should not produce an error"},
-		{"binlog_expire_logs_seconds", 518400, false, true, "A 6-day expiry *should* produce an error"},
-		{"binlog_expire_logs_seconds", 518400, true, false, "A 6-day expiry should not produce an error if we skip the sanity check"},
-		{"expire_logs_days", 30, false, false, "A 30-day expiry should not produce an error"},
-		{"expire_logs_days", 7, false, false, "A 7-day expiry should not produce an error"},
-		{"expire_logs_days", 6, false, true, "A 6-day expiry *should* produce an error"},
-		{"expire_logs_days", 6, true, false, "A 6-day expiry should not produce an error if we skip the sanity check"},
-		{"binlog_expire_logs_seconds", 0, false, false, "A value of zero should also not produce an error"},
-		{"binlog_expire_logs_seconds", 2592000, false, false, "Resetting expiry back to the default value"},
-	} {
-		t.Run(fmt.Sprintf("%d_%s_%d", idx, tc.VarName, tc.VarValue), func(t *testing.T) {
-			// Set both expiry variables to their desired values. We start by setting them
-			// both to zero because MySQL only allows one at a time to be nonzero.
-			tb.Query(ctx, t, "SET GLOBAL binlog_expire_logs_seconds = 0;")
-			tb.Query(ctx, t, "SET GLOBAL expire_logs_days = 0;")
-			tb.Query(ctx, t, fmt.Sprintf("SET GLOBAL %s = %d;", tc.VarName, tc.VarValue))
-
-			// Perform validation, which should run the sanity check
-			cs.EndpointSpec.(*Config).Advanced.SkipBinlogRetentionCheck = tc.SkipCheck
-			var _, err = cs.Validate(ctx, t)
-
-			// Verify the result
-			if tc.ExpectError {
-				require.Error(t, err, tc.Message)
-			} else {
-				require.NoError(t, err, tc.Message)
-			}
-		})
-	}
-}
-
 func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
@@ -591,10 +548,18 @@ func TestComplexDataset(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
 
 	t.Run("init", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
-		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 130
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0x94, 0x01, 0x4e, 0x56, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
@@ -603,9 +568,18 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
 	})
 	t.Run("restart1", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 230
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0xbc, 0x01, 0x4e, 0x48, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))

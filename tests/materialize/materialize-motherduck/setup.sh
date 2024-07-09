@@ -4,15 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export MOTHERDUCK_TOKEN="${MOTHERDUCK_TOKEN}"
-export MOTHERDUCK_DATABASE="${MOTHERDUCK_DATABASE}"
-export MOTHERDUCK_SCHEMA="${MOTHERDUCK_SCHEMA}"
-export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
-export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
-export AWS_REGION="${AWS_REGION}"
-
-export motherduck_token="${MOTHERDUCK_TOKEN}"
-
 config_json_template='{
     "token": "${MOTHERDUCK_TOKEN}",
     "database": "${MOTHERDUCK_DATABASE}",
@@ -79,5 +70,9 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export MOTHERDUCK_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
+export MOTHERDUCK_SCHEMA="$(echo $CONNECTOR_CONFIG | jq -r .schema)"
+export motherduck_token="$(echo $CONNECTOR_CONFIG | jq -r .token)"
+
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"

@@ -1,0 +1,567 @@
+---
+tap_stream_id: orders
+replication_key: updated_at
+replication_method: INCREMENTAL
+key_properties:
+  - id
+stream: orders
+metadata:
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - admin_graphql_api_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - app_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - browser_ip
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - buyer_accepts_marketing
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - cancel_reason
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - cancelled_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - cart_token
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - checkout_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - checkout_token
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - client_details
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - closed_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - confirmed
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - contact_email
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - currency
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_subtotal_price
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_subtotal_price_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_discounts
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_discounts_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_duties_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_price
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_price_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_tax
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_tax_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - customer_locale
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - device_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - discount_codes
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - email
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - estimated_taxes
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - financial_status
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - fulfillment_status
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - gateway
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - landing_site
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - landing_site_ref
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - location_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - note
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - note_attributes
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - number
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - order_number
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - order_status_url
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - original_total_duties_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - payment_gateway_names
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - phone
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - presentment_currency
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - processed_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - processing_method
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - reference
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - referring_site
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - source_identifier
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - source_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - source_url
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - subtotal_price
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - subtotal_price_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tags
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tax_lines
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - taxes_included
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - test
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - token
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_discounts
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_discounts_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_line_items_price
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_line_items_price_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_outstanding
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_price
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_price_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_price_usd
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_shipping_price_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_tax
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_tax_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_tip_received
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - total_weight
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - user_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - billing_address
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - customer
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - discount_applications
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - fulfillments
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - line_items
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - payment_details
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - payment_terms
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - refunds
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - shipping_lines
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - company
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - confirmation_number
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - current_total_additional_fees_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - merchant_of_record_app_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - original_total_additional_fees_set
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - po_number
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - tax_exempt
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - shipping_address
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id
+      valid-replication-keys:
+        - updated_at

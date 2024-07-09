@@ -73,6 +73,9 @@
 
     ["tests/deletions", { "id": 1, "_meta": {"op": "d"} }],
     ["tests/deletions", { "id": 2, "_meta": {"op": "u"} }],
-    ["tests/deletions", { "id": 3, "_meta": {"op": "c"} }]
+    ["tests/deletions", { "id": 3, "_meta": {"op": "c"} }],
+
+    ["tests/deletions", { "id": 4, "_meta": {"op": "c"} }],
+    ["tests/deletions", { "id": 4, "_meta": {"op": "d"} }]
   ]
 ]

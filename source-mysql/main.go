@@ -129,6 +129,7 @@ type advancedConfig struct {
 	NodeID                   uint32 `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	SkipBackfills            string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize        int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	HeartbeatInterval        string `json:"heartbeat_interval,omitempty" jsonschema:"title=Heartbeat Interval,default=60s,description=How frequently to issue watermark writes as a heartbeat during replication streaming. Must be a valid Go duration string." jsonschema_extras:"pattern=^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -160,6 +161,11 @@ func (c *Config) Validate() error {
 			if !strings.Contains(skipStreamID, ".") {
 				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
 			}
+		}
+	}
+	if c.Advanced.HeartbeatInterval != "" {
+		if _, err := time.ParseDuration(c.Advanced.HeartbeatInterval); err != nil {
+			return fmt.Errorf("invalid 'heartbeat_interval' configuration: interval %q must be a valid Go duration string", c.Advanced.HeartbeatInterval)
 		}
 	}
 	return nil
@@ -206,6 +212,10 @@ func configSchema() json.RawMessage {
 }
 
 type mysqlDatabase struct {
+	versionString              string // The raw contents of the 'version' system variable
+	versionProduct             string // Usually either "MySQL" or "MariaDB"
+	versionMajor, versionMinor int    // The major/minor version the server is running
+
 	config           *Config
 	conn             *client.Conn
 	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
@@ -296,6 +306,10 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
 
+	if err := db.queryDatabaseVersion(); err != nil {
+		logrus.WithField("err", err).Warn("failed to query database version")
+	}
+
 	return nil
 }
 
@@ -384,6 +398,14 @@ func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
 		db.includeTxIDs = make(map[string]bool)
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
+}
+
+func (db *mysqlDatabase) HeartbeatWatermarkInterval() time.Duration {
+	if db.config.Advanced.HeartbeatInterval != "" {
+		var dt, _ = time.ParseDuration(db.config.Advanced.HeartbeatInterval)
+		return dt
+	}
+	return 60 * time.Second
 }
 
 // mysqlSourceInfo is source metadata for data capture events.
