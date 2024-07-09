@@ -241,6 +241,23 @@
     }
   ]
 }
+{
+  "index": "deletions",
+  "rows": [
+    {
+      "_id": "1502",
+      "id": {
+        "$numberInt": "2"
+      }
+    },
+    {
+      "_id": "1503",
+      "id": {
+        "$numberInt": "3"
+      }
+    }
+  ]
+}
 [
   "applied.actionDescription",
   "update persisted spec"

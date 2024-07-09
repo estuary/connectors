@@ -1,0 +1,34 @@
+---
+collections:
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/email_templates:
+    schema: email_templates.schema.yaml
+    key:
+      - /id
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /id
+  acmeCo/flows:
+    schema: flows.schema.yaml
+    key:
+      - /id
+  acmeCo/global_exclusions:
+    schema: global_exclusions.schema.yaml
+    key:
+      - /id
+  acmeCo/lists:
+    schema: lists.schema.yaml
+    key:
+      - /id
+  acmeCo/metrics:
+    schema: metrics.schema.yaml
+    key:
+      - /id
+  acmeCo/profiles:
+    schema: profiles.schema.yaml
+    key:
+      - /id

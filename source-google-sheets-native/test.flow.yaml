@@ -18,11 +18,11 @@ captures:
     bindings:
       - resource:
           name: VariousTypes
-          interval: PT5S
+          interval: PT30S
         target: acmeCo/VariousTypes
       - resource:
           name: OtherThings
-          interval: PT5S
+          interval: PT30S
         target: acmeCo/OtherThings
     interval: 3m
     shards:

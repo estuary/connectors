@@ -1,0 +1,13 @@
+captures:
+  acmeCo/source-recharge:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_recharge
+        config:
+          access_token: sk_2x2_248826b763dbb494b939e4360bab8524adf00092655a25cd556d4c886e4fa573
+          start_date: "2020-01-01T00:00:00Z"
+          use_orders_deprecated_api: true
+    bindings: []

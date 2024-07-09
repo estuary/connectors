@@ -54,6 +54,31 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
+	// Check that the slot's `confirmed_flush_lsn` is less than or equal to our resume cursor value.
+	// This is necessary because Postgres deliberately allows clients to specify an older start LSN,
+	// and then ignores that and uses the confirmed LSN instead. Supposedly this simplifies writing
+	// clients in some cases, but in our case it never helps, and instead it causes trouble if/when
+	// the replication slot is dropped and recreated.
+	//
+	// TODO(wgd): Upgrade this check to an actual failure once it's been verified to work in prod.
+	if slotInfo, err := queryReplicationSlotInfo(ctx, db.conn, slot); err != nil {
+		logrus.WithField("err", err).Warn("error querying replication slot info")
+	} else if slotInfo == nil {
+		// This should never happen, since the "does the slot exist" validation check still exists and
+		// runs before we reach this part of the code. But I want this section of new logic here to be
+		// completely unable to produce a fatal error, and double-checking to make extra sure we don't
+		// accidentally dereference a null pointer doesn't really hurt anything.
+		logrus.WithField("slot", slot).Warn("replication slot has no metadata (and probably doesn't exist?)")
+	} else if slotInfo.WALStatus == "lost" {
+		logrus.WithField("slot", slot).Warn("replication slot was invalidated by the server, it must be deleted and all bindings backfilled")
+	} else if startLSN < slotInfo.ConfirmedFlushLSN {
+		logrus.WithFields(logrus.Fields{
+			"slot":         slot,
+			"confirmedLSN": slotInfo.ConfirmedFlushLSN,
+			"startLSN":     startLSN,
+		}).Warn("replication slot confirmed_flush_lsn greater than connector start LSN (this means it was probably deleted+recreated and all bindings need to be backfilled)")
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"startLSN":    startLSN,
 		"publication": publication,
@@ -707,7 +732,7 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 		}
 	}
 
-	query("SELECT * FROM public.flow_watermarks;")
+	query("SELECT * FROM " + db.WatermarksTable() + ";")
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil

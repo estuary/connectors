@@ -463,6 +463,7 @@ async def fetch_recent_email_events(
     # Email events are in reverse-chronological order. Page through them and yield them along the
     # way, which will not produce documents ordered chronologically, but it isn't practical to load
     # them all into memory and sort.
+    yielded_event = False
     while True:
         result = EmailEventsResponse.model_validate_json(
             await http.request(log, url, params=input)
@@ -472,6 +473,7 @@ async def fetch_recent_email_events(
             if event.created > max_ts:
                 max_ts = event.created
 
+            yielded_event = True
             yield event
 
         if not result.hasMore:
@@ -479,7 +481,7 @@ async def fetch_recent_email_events(
 
         input["offset"] = result.offset
 
-    if max_ts != log_cursor:
+    if yielded_event:
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 

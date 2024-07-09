@@ -1,6 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
     "type": "object",
+    "required": ["id"],
     "properties": {
         "id": {
             "type": [
@@ -517,7 +518,7 @@
         },
         "subtotal_price": {
             "type": [
-                "number",
+                "string",
                 "null"
             ]
         },
@@ -705,9 +706,8 @@
             ]
         },
         "total_price": {
-            "minimum": 0,
             "type": [
-                "number",
+                "string",
                 "null"
             ]
         },

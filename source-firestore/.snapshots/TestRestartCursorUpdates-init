@@ -1,0 +1,28 @@
+# ================================
+# Collection "flow_source_tests/*/users/*/docs": 20 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":0,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":1,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":2,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":3,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":4,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":5,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":6,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":7,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":8,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/1/docs/9","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":9,"monotonic_id":"<TIMESTAMP>","user":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":0,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":1,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":2,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":3,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":4,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":5,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":6,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":7,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":8,"monotonic_id":"<TIMESTAMP>","user":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestRestartCursorUpdates/users/2/docs/9","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"doc":9,"monotonic_id":"<TIMESTAMP>","user":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"flow_source_tests%2F%2A%2Fusers%2F%2A%2Fdocs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
+
