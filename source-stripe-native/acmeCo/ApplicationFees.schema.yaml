@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 properties:
   _meta:
     allOf:
@@ -30,63 +30,8 @@ properties:
   id:
     title: Id
     type: string
-  object:
-    const: application_fee
-    enum:
-      - application_fee
-    title: Object
-    type: string
-  account:
-    title: Account
-    type: string
-  amount:
-    title: Amount
-    type: integer
-  amount_refunded:
-    title: Amount Refunded
-    type: integer
-  application:
-    title: Application
-    type: string
-  balance_transaction:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Balance Transaction
-  charge:
-    title: Charge
-    type: string
-  created:
-    title: Created
-    type: integer
-  currency:
-    title: Currency
-    type: string
-  livemode:
-    title: Livemode
-    type: boolean
-  originating_transaction:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Originating Transaction
-  refunded:
-    title: Refunded
-    type: boolean
 required:
   - id
-  - object
-  - account
-  - amount
-  - amount_refunded
-  - application
-  - charge
-  - created
-  - currency
-  - livemode
-  - refunded
 title: ApplicationFees
 type: object
 x-infer-schema: true

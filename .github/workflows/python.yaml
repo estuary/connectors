@@ -19,6 +19,7 @@ on:
       - "source-oracle-flashback/**"
       - "source-klaviyo/**"
       - "source-recharge/**"
+      - "source-stripe-native/**"
   pull_request:
     branches: [main]
     paths:
@@ -33,11 +34,13 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-stripe-native/**"
       - "source-linkedin-ads-v2/**"
       - "source-oracle-flashback/**"
       - "source-recharge/**"
       - "source-klaviyo/**"
       - "source-recharge/**"
+      - "source-stripe-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -106,6 +109,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-recharge
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-stripe-native
             type: capture
             version: v1
             usage_rate: "1.0"

@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 description: "Child Stream\nParent Stream: CheckoutSessions"
 properties:
   _meta:
@@ -31,59 +31,8 @@ properties:
   id:
     title: Id
     type: string
-  parent_id:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Parent Id
-  object:
-    const: item
-    enum:
-      - item
-    title: Object
-    type: string
-  amount_discount:
-    title: Amount Discount
-    type: integer
-  amount_subtotal:
-    title: Amount Subtotal
-    type: integer
-  amount_tax:
-    title: Amount Tax
-    type: integer
-  amount_total:
-    title: Amount Total
-    type: integer
-  currency:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Currency
-  description:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Description
-  price:
-    title: Price
-    type: object
-  quantity:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Quantity
 required:
   - id
-  - object
-  - amount_discount
-  - amount_subtotal
-  - amount_tax
-  - amount_total
-  - price
 title: CheckoutSessionsLine
 type: object
 x-infer-schema: true
