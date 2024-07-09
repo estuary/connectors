@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 properties:
   _meta:
     allOf:
@@ -30,41 +30,8 @@ properties:
   id:
     title: Id
     type: string
-  object:
-    const: radar.early_fraud_warning
-    enum:
-      - radar.early_fraud_warning
-    title: Object
-    type: string
-  actionable:
-    title: Actionable
-    type: boolean
-  charge:
-    title: Charge
-    type: string
-  created:
-    title: Created
-    type: integer
-  fraud_type:
-    title: Fraud Type
-    type: string
-  payment_intent:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Payment Intent
-  livemode:
-    title: Livemode
-    type: boolean
 required:
   - id
-  - object
-  - actionable
-  - charge
-  - created
-  - fraud_type
-  - livemode
 title: EarlyFraudWarning
 type: object
 x-infer-schema: true

@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 description: Incremental stream with no Events
 properties:
   _meta:
@@ -31,49 +31,8 @@ properties:
   id:
     title: Id
     type: string
-  object:
-    const: file_link
-    enum:
-      - file_link
-    title: Object
-    type: string
-  created:
-    title: Created
-    type: integer
-  expired:
-    title: Expired
-    type: boolean
-  expires_at:
-    anyOf:
-      - type: integer
-      - type: "null"
-    default: ~
-    title: Expires At
-  file:
-    title: File
-    type: string
-  livemode:
-    title: Livemode
-    type: boolean
-  metadata:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Metadata
-  url:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Url
 required:
   - id
-  - object
-  - created
-  - expired
-  - file
-  - livemode
 title: FilesLink
 type: object
 x-infer-schema: true

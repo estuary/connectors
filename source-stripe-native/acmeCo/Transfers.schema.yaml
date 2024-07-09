@@ -18,7 +18,7 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 properties:
   _meta:
     allOf:
@@ -30,89 +30,8 @@ properties:
   id:
     title: Id
     type: string
-  object:
-    const: transfer
-    enum:
-      - transfer
-    title: Object
-    type: string
-  amount:
-    title: Amount
-    type: integer
-  amount_reversed:
-    title: Amount Reversed
-    type: integer
-  balance_transaction:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Balance Transaction
-  created:
-    title: Created
-    type: integer
-  currency:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Currency
-  description:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Description
-  destination:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Destination
-  destination_payment:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Destination Payment
-  livemode:
-    title: Livemode
-    type: boolean
-  metadata:
-    anyOf:
-      - type: object
-      - type: "null"
-    default: ~
-    title: Metadata
-  reversed:
-    title: Reversed
-    type: boolean
-  source_transaction:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Source Transaction
-  source_type:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Source Type
-  transfer_group:
-    anyOf:
-      - type: string
-      - type: "null"
-    default: ~
-    title: Transfer Group
 required:
   - id
-  - object
-  - amount
-  - amount_reversed
-  - created
-  - livemode
-  - reversed
 title: Transfers
 type: object
 x-infer-schema: true
