@@ -156,16 +156,6 @@ func newTransactor(
 		d.sched = sched
 	}
 
-	// If the warehouse has auto-stop configured to be longer than 15 minutes, disable update delay
-	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
-		return nil, fmt.Errorf("get warehouse %q details: %w", warehouseId, err)
-	} else {
-		if res.AutoStopMins >= 15 {
-			log.Info(fmt.Sprintf("Auto-stop is configured to be %d minutes for this warehouse, disabling update delay. To save costs you can reduce the auto-stop idle configuration and tune the update delay config of this connector. See docs for more information: https://go.estuary.dev/materialize-databricks", res.AutoStopMins))
-			d.sched = nil
-		}
-	}
-
 	db, err := stdsql.Open("databricks", d.cfg.ToURI())
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
