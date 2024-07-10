@@ -78,13 +78,15 @@ type testBackend struct {
 	config  Config  // Default capture configuration for test captures
 }
 
+func (tb *testBackend) UpperCaseMode() bool { return true }
+
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
-	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"scn":11111111`] = regexp.MustCompile(`"scn":([0-9]+)`)
 	sanitizers[`"cursor":"11111111"`] = regexp.MustCompile(`"cursor":"([0-9]+)"`)
 	sanitizers[`"row_id":"AAAAAAAAAAAAAAAAAA"`] = regexp.MustCompile(`"row_id":"[^"]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
+	sanitizers[`"scanned":"AAAAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"scanned":"[^"]+"`)
 
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
@@ -192,6 +194,15 @@ func (tb *testBackend) Query(ctx context.Context, t testing.TB, fatal bool, quer
 	}
 }
 
+// A type that passes the string DDL as-is when using argsTuple
+type rawTupleValue struct {
+	DDL string
+}
+
+func NewRawTupleValue(s string) rawTupleValue {
+	return rawTupleValue{DDL: s}
+}
+
 func argsTuple(row []any) string {
 	var tuple = "("
 	for idx, value := range row {
@@ -205,6 +216,8 @@ func argsTuple(row []any) string {
 			tuple += fmt.Sprintf("%d", v)
 		case float64:
 			tuple += fmt.Sprintf("%f", v)
+		case rawTupleValue:
+			tuple += v.DDL
 		}
 	}
 	return tuple + ")"
@@ -243,10 +256,12 @@ func TestCapitalizedTables(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("Capture", func(t *testing.T) {
-		tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (1, 'Alice'), (2, 'Bob')`, tb.config.User))
+		tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (1, 'Alice')`, tb.config.User))
+		tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (2, 'Bob')`, tb.config.User))
 		tests.VerifiedCapture(ctx, t, cs)
 		t.Run("Replication", func(t *testing.T) {
-			tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (3, 'Carol'), (4, 'Dave')`, tb.config.User))
+			tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (3, 'Carol')`, tb.config.User))
+			tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (4, 'Dave')`, tb.config.User))
 			tests.VerifiedCapture(ctx, t, cs)
 		})
 	})

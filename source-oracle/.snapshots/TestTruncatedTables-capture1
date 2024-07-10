@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/flow_test_logminer_t14026504": 3 Documents
 # ================================
-{"DATA":"eight","ID":8,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"nine","ID":9,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"seven","ID":7,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"eight","ID":"8","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"nine","ID":"9","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"seven","ID":"7","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================

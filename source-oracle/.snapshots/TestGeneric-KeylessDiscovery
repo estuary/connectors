@@ -12,10 +12,32 @@ Binding 0:
           "type": "object",
           "$anchor": "FLOW_TEST_LOGMINERTT32386",
           "properties": {
-            "A": null,
-            "B": null,
-            "C": null,
-            "D": null
+            "A": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "B": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "C": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "D": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         }
       },

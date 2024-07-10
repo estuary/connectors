@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf16"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/mdibaiee/vitess/go/vt/sqlparser"
@@ -28,6 +31,20 @@ func (db *oracleDatabase) HeartbeatWatermarkInterval() time.Duration {
 	return 60 * time.Second
 }
 
+// Specify default formats for DATE, TIMESTAMP and TIMESTAMP_TZ types so
+// their formats are predictable when we receive SQL statements from Logminer
+const ORACLE_DATE_FORMAT = "YYYY-MM-DD HH24:MI:SS"
+const ORACLE_TS_FORMAT = "YYYY-MM-DD HH24:MI:SS.FF"
+const ORACLE_TSTZ_FORMAT = `YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM`
+
+const PARSE_DATE_FORMAT = "2006-01-02 15:04:05"
+const PARSE_TS_FORMAT = "2006-01-02 15:04:05.999999999"
+const PARSE_TSTZ_FORMAT = time.RFC3339Nano
+
+const OUT_DATE_FORMAT = "2006-01-02T15:04:05"
+const OUT_TS_FORMAT = "2006-01-02T15:04:05.999999999"
+const OUT_TSTZ_FORMAT = time.RFC3339Nano
+
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	dbConn, err := sql.Open("oracle", db.config.ToURI())
 	if err != nil {
@@ -37,6 +54,16 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 	conn, err := dbConn.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
+	}
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_DATE_FORMAT = '%s'", ORACLE_DATE_FORMAT)); err != nil {
+		return nil, fmt.Errorf("set NLS_DATE_FORMAT: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '%s'", ORACLE_TS_FORMAT)); err != nil {
+		return nil, fmt.Errorf("set NLS_TIMESTAMP_FORMAT: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = '%s'", ORACLE_TSTZ_FORMAT)); err != nil {
+		return nil, fmt.Errorf("set NLS_TIMESTAMP_TZ_FORMAT: %w", err)
 	}
 
 	var startSCN int
@@ -62,11 +89,9 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 
 		ackSCN:        uint64(startSCN),
 		lastTxnEndSCN: startSCN + 1,
-		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
 
-	err = stream.startLogminer(ctx, startSCN)
-	if err != nil {
+	if err = stream.startLogminer(ctx, startSCN); err != nil {
 		return nil, fmt.Errorf("starting logminer: %w", err)
 	}
 
@@ -87,13 +112,24 @@ func (s *replicationStream) endLogminer(ctx context.Context) error {
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error {
 	logrus.WithField("startSCN", startSCN).Debug("adding log files")
 
+	// See DBMS_LOGMNR_D.BUILD reference:
+	// https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_LOGMNR_D.html#GUID-20E210F3-A566-46F1-B817-486723069AF4
 	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
 		if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
 			return fmt.Errorf("creating logfile with dictionary: %w", err)
 		}
 	}
+	// We only add the local version of archived log files to avoid duplicates
+	var row = s.conn.QueryRowContext(ctx, "SELECT DEST_ID FROM V$ARCHIVE_DEST_STATUS WHERE TYPE='LOCAL' AND STATUS='VALID' AND ROWNUM=1")
+	var localDestID int
+	if err := row.Scan(&localDestID); err != nil {
+		return fmt.Errorf("querying archive log files destination: %w", err)
+	}
 
-	rows, err := s.conn.QueryContext(ctx, "SELECT V$LOG.STATUS, MEMBER, SEQUENCE# FROM V$LOG, V$LOGFILE WHERE V$LOG.GROUP# = V$LOGFILE.GROUP# AND NEXT_CHANGE# >= :1 AND MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) ORDER BY SEQUENCE#", startSCN)
+	var liveLogFiles = "SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE# FROM V$LOGFILE LF, V$LOG L LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE# WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED' AND L.NEXT_CHANGE# >= :1 AND LF.MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#"
+	var archivedLogFiles = "SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE# FROM V$ARCHIVED_LOG A WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND A.NAME NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) AND DEST_ID IN (" + strconv.Itoa(localDestID) + ")"
+	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
+	rows, err := s.conn.QueryContext(ctx, fullQuery, startSCN)
 	if err != nil {
 		return fmt.Errorf("fetching log file list: %w", err)
 	}
@@ -173,8 +209,7 @@ func (s *oracleSource) Common() sqlcapture.SourceCommon {
 }
 
 // A replicationStream represents the process of receiving Oracle
-// Logical Replication events, managing keepalives and status updates,
-// and translating changes into a more friendly representation. There
+// logminer events, and translating changes into a more friendly representation. There
 // is no built-in concurrency, so Process() must be called reasonably
 // soon after StartReplication() in order to not time out.
 type replicationStream struct {
@@ -238,8 +273,8 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 	return nil
 }
 
-// run is the main loop of the replicationStream which combines message
-// receiving/relaying with periodic standby status updates.
+// run is the main loop of the replicationStream which loops message
+// receiving and relaying
 func (s *replicationStream) run(ctx context.Context) error {
 	for {
 		select {
@@ -261,10 +296,6 @@ func (s *replicationStream) run(ctx context.Context) error {
 	}
 }
 
-// relayMessages receives logical replication messages from PostgreSQL and sends
-// them on the stream's output channel until its context is cancelled. This is
-// expected to happen every 10 seconds, so that a standby status update can be
-// sent.
 func (s *replicationStream) poll(ctx context.Context) error {
 	for {
 		// If there's already a change event which needs to be sent to the consumer,
@@ -288,7 +319,9 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		}
 
 		if switched {
-			if err := s.addLogFiles(ctx, s.lastTxnEndSCN); err != nil {
+			if err := s.endLogminer(ctx); err != nil {
+				return err
+			} else if err := s.startLogminer(ctx, s.lastTxnEndSCN); err != nil {
 				return err
 			}
 		}
@@ -316,6 +349,133 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			Cursor: strconv.Itoa(s.lastTxnEndSCN),
 		}
 	}
+}
+
+// decode the escaped unicode literals in UNISTR() functions
+// the unicode literals are in the UCS-2 format
+// see https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/UNISTR.html
+func decodeUnistr(input string) (string, error) {
+	var val string
+	for i := 0; i < len(input); i++ {
+		var c = input[i]
+		// 92 = \ (backslash)
+		if c == 92 && len(input) > i+4 {
+			var codeStrOne = fmt.Sprintf("%s", input[i+1:i+5])
+			var codeOne, err = strconv.ParseInt(codeStrOne, 16, 32)
+			if err != nil {
+				return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+1, err)
+			}
+			if utf16.IsSurrogate(rune(codeOne)) {
+				var codeStrTwo = fmt.Sprintf("%s", input[i+6:i+10])
+				var codeTwo, err = strconv.ParseInt(codeStrTwo, 16, 32)
+				if err != nil {
+					return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+6, err)
+				}
+				i += 5
+
+				val += string(utf16.DecodeRune(rune(codeOne), rune(codeTwo)))
+			} else {
+				val += string(rune(codeOne))
+			}
+
+			i += 4
+		} else {
+			val += string(c)
+		}
+	}
+
+	return val, nil
+}
+
+// decode SQL values extracted from the sql queries returned by logminer and parsed by sqlparser, into values
+// to be used in the document
+func decodeValue(colInfo sqlcapture.ColumnInfo, expr sqlparser.Expr, colName string, originalSql string) (any, error) {
+	switch v := expr.(type) {
+	case *sqlparser.Literal:
+		return v.Val, nil
+	case *sqlparser.OrExpr:
+		// Oracle's string concatenation using pipes || is parsed as an OrExpr
+		// UNISTR('literal string')
+		var leftLiteral = v.Left.(*sqlparser.FuncExpr).Exprs[0].(*sqlparser.Literal).Val
+		var left, err = decodeUnistr(leftLiteral)
+		if err != nil {
+			return nil, err
+		}
+		var rightLiteral = v.Right.(*sqlparser.FuncExpr).Exprs[0].(*sqlparser.Literal).Val
+		right, err := decodeUnistr(rightLiteral)
+		if err != nil {
+			return nil, err
+		}
+
+		return left + right, nil
+	case *sqlparser.FuncExpr:
+		switch v.Name.String() {
+		// Unicode strings (used for NVARCHAR2 literals with unicode characters)
+		case "UNISTR":
+			var val, err = decodeUnistr(v.Exprs[0].(*sqlparser.Literal).Val)
+			if err != nil {
+				return "", err
+			}
+			return val, nil
+		// Used for DATE values
+		case "TO_DATE":
+			var val = v.Exprs[0].(*sqlparser.Literal).Val
+			if t, err := time.Parse(PARSE_DATE_FORMAT, val); err != nil {
+				return nil, fmt.Errorf("invalid date %q: %w", val, err)
+			} else {
+				return t.Format(OUT_DATE_FORMAT), nil
+			}
+			return val, nil
+		case "TO_TIMESTAMP":
+			var val = v.Exprs[0].(*sqlparser.Literal).Val
+
+			// Timestamp has no fractional seconds, it ends up with a trailing dot
+			if strings.HasSuffix(val, ".") {
+				val += "0"
+			}
+			if t, err := time.Parse(PARSE_TS_FORMAT, val); err != nil {
+				return nil, fmt.Errorf("invalid timestamp %q: %w", val, err)
+			} else {
+				return t.Format(OUT_TS_FORMAT), nil
+			}
+		case "TO_TIMESTAMP_TZ":
+			var val = v.Exprs[0].(*sqlparser.Literal).Val
+			// Timestamp has no fractional seconds, it ends up with a trailing dot
+			if strings.HasSuffix(val, ".") {
+				val += "0"
+			}
+			if t, err := time.ParseInLocation(PARSE_TSTZ_FORMAT, val, time.UTC); err != nil {
+				// If the function is TO_TIMESTAMP_TZ but it has been output as TS format, then the value
+				// is a local timestamp
+				if tlocal, e := time.Parse(PARSE_TS_FORMAT, val); e == nil {
+					return tlocal.Format(OUT_TS_FORMAT), nil
+				}
+				return nil, fmt.Errorf("invalid timestamptz %q: %w", val, err)
+			} else {
+				return t.UTC().Format(OUT_TSTZ_FORMAT), nil
+			}
+		case "TO_YMINTERVAL":
+			var val = v.Exprs[0].(*sqlparser.Literal).Val
+			return val, nil
+		case "TO_DSINTERVAL":
+			var val = v.Exprs[0].(*sqlparser.Literal).Val
+			return val, nil
+		case "HEXTORAW":
+			var val = v.Exprs[0].(*sqlparser.Literal).Val
+			var src = []byte(val)
+			var hx = make([]byte, hex.DecodedLen(len(src)))
+			if _, err := hex.Decode(hx, src); err != nil {
+				return nil, fmt.Errorf("decoding hex %q: %w", val, err)
+			}
+
+			var b64 = make([]byte, base64.StdEncoding.EncodedLen(len(hx)))
+			base64.StdEncoding.Encode(b64, hx)
+
+			return string(b64), nil
+		}
+	}
+
+	return nil, fmt.Errorf("unknown expression: %s %+v", reflect.TypeOf(expr).Name(), expr)
 }
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
@@ -348,12 +508,16 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		if !ok {
 			return nil, fmt.Errorf("expected VALUES in INSERT statement, instead got: %v", insert.Rows)
 		}
+		// sql_redo field of logminer will have a single VALUES set for each insertion
+		var vs = values[0]
 
 		for i, col := range insert.Columns {
 			var key = col.String()
 
-			// sql_redo field of logminer will have a single values for each insertion
-			var value = values[0][i].(*sqlparser.Literal).Val
+			value, err := decodeValue(s.tables.discovery[streamID].Columns[key], vs[i], col.String(), msg.sql)
+			if err != nil {
+				return nil, fmt.Errorf("decoding value %s=%v: %w", key, values[0][i], err)
+			}
 			after[key] = value
 		}
 
@@ -382,6 +546,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		before = make(map[string]any)
 		after = make(map[string]any)
 		op = sqlcapture.UpdateOp
+		// construct `after` from the redo sql
 		update, ok := ast.(*sqlparser.Update)
 		if !ok {
 			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
@@ -403,6 +568,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			after[key] = value
 		}
 
+		// construct `before` from the undo sql
 		undo, ok := undoAST.(*sqlparser.Update)
 		if !ok {
 			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
@@ -476,7 +642,6 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	if err != nil {
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 	}
-	logrus.WithField("columns", keyColumns).WithField("rowKey", string(rowKey)).Debug("replicate")
 	delete(after, "ROWID")
 	delete(before, "ROWID")
 
@@ -521,6 +686,9 @@ type logminerMessage struct {
 	ts        int64
 	status    int
 	info      string
+	rsID      string
+	ssn       int
+	csf       int
 }
 
 const (
@@ -533,7 +701,7 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')", s.lastTxnEndSCN)
+	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')", s.lastTxnEndSCN)
 	if err != nil {
 		return nil, fmt.Errorf("logminer query: %w", err)
 	}
@@ -541,16 +709,23 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 
 	var msgs []logminerMessage
 	for rows.Next() {
+		var lastMsg *logminerMessage
+
+		if len(msgs) > 0 {
+			lastMsg = &msgs[len(msgs)-1]
+		}
+
 		var msg logminerMessage
 		var ts time.Time
 		var undoSql sql.NullString
 		var info sql.NullString
-		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &undoSql, &msg.tableName, &msg.owner, &msg.status, &info); err != nil {
+		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &undoSql, &msg.tableName, &msg.owner, &msg.status, &info, &msg.rsID, &msg.ssn, &msg.csf); err != nil {
 			return nil, err
 		}
 		if undoSql.Valid {
 			msg.undoSql = undoSql.String
 		}
+
 		if info.Valid {
 			msg.info = info.String
 		}
@@ -567,7 +742,23 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 			"info":      msg.info,
 			"startSCN":  msg.startSCN,
 			"endSCN":    msg.endSCN,
+			"ssn":       msg.ssn,
+			"rsid":      msg.rsID,
+			"csf":       msg.csf,
 		}).Trace("received message")
+
+		// last message indicated a continuation of SQL_REDO and SQL_UNDO values
+		// so this row's sqls will be appended to the last
+		if lastMsg != nil && lastMsg.csf == 1 {
+			// sanity check the (SSN, RSID) tuple matches between the rows
+			if lastMsg.ssn != msg.ssn || lastMsg.rsID != msg.rsID {
+				return nil, fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.ssn, lastMsg.rsID, msg.ssn, msg.rsID)
+			}
+			lastMsg.sql += msg.sql
+			lastMsg.undoSql += msg.undoSql
+			lastMsg.csf = msg.csf
+			continue
+		}
 
 		// If this change event is on a table we're not capturing, skip doing any
 		// further processing on it.
@@ -651,7 +842,7 @@ func (s *replicationStream) redoFileSwitched(ctx context.Context) (bool, error) 
 
 func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	var query = func(q string) {
-		logrus.WithField("query", q).Info("running diagnostics query")
+		logrus.WithField("query", q).Info("replication diagnostics")
 		var rows, err = db.conn.QueryContext(ctx, q)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -693,10 +884,10 @@ func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
 				}).Error("unable to scan diagnostics query")
 			}
 
-			logrus.WithField("result", fields).Info("got diagnostic row")
+			logrus.WithField("result", fields).Info("replication diagnostics")
 		}
 		if numResults == 0 {
-			logrus.WithField("query", q).Info("no results")
+			logrus.WithField("query", q).Info("replication diagnostics: no results")
 		}
 	}
 

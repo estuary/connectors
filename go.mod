@@ -16,7 +16,7 @@ require (
 	github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0
 	github.com/apache/arrow/go/v17 v17.0.0-20240521152544-34f042762061
 	github.com/aws/aws-sdk-go v1.54.2
-	github.com/aws/aws-sdk-go-v2 v1.30.0
+	github.com/aws/aws-sdk-go-v2 v1.20.3
 	github.com/aws/aws-sdk-go-v2/config v1.18.21
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.20
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.10.29
@@ -27,10 +27,10 @@ require (
 	github.com/aws/smithy-go v1.20.2
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/databricks/databricks-sdk-go v0.43.0
-	github.com/databricks/databricks-sql-go v1.5.7
+	github.com/databricks/databricks-sdk-go v0.41.0
+	github.com/databricks/databricks-sql-go v1.5.5
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
-	github.com/elastic/go-elasticsearch/v8 v8.14.0
+	github.com/elastic/go-elasticsearch/v8 v8.9.0
 	github.com/estuary/flow v0.4.0
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-mysql-org/go-mysql v1.8.0
@@ -39,7 +39,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/iancoleman/orderedmap v0.3.0
-	github.com/invopop/jsonschema v0.12.0
+	github.com/invopop/jsonschema v0.5.0
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pglogrepl v0.0.0-20240307033717-828fbfe908e9
 	github.com/jackc/pgx/v5 v5.6.0
@@ -47,7 +47,7 @@ require (
 	github.com/klauspost/compress v1.17.9
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/mdibaiee/vitess v0.15.4
+	github.com/mdibaiee/vitess v0.15.7
 	github.com/microsoft/go-mssqldb v0.21.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/mitchellh/mapstructure v1.5.0
@@ -84,10 +84,8 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
-	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
 	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/pingcap/log v1.1.1-0.20230317032135-a0d097d16e22 // indirect
@@ -117,24 +115,23 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
+	github.com/apache/arrow/go/v16 v16.0.0 // indirect
 	github.com/apache/thrift v0.20.0 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.8 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.12 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.12 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.12 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.14 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.9.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.14 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.12 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.21.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.25.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.29.1 // indirect
-	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.13 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.40 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.34 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.34 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.1.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.9.14 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.1.35 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.7.34 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.34 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.15.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.12.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.18.9 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.10.0 // indirect
 	github.com/danieljoos/wincred v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -211,7 +208,6 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
