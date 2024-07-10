@@ -1,21 +1,23 @@
 services:
   db:
-    image: 'container-registry.oracle.com/database/enterprise:21.3.0'
+    image: 'gvenzl/oracle-free:23.2'
+    platform: 'linux/amd64'
     ports:
       - "1521:1521"
-      - "5500:5500"
     environment:
       {
-        "ORACLE_SID": "ORCL",
-        "ORACLE_PWD": "adminpassword",
-        "ENABLE_ARCHIVELOG": "true",
-        "ORACLE_CHARACTERSET": "AL32UTF8",
+        "ORACLE_PASSWORD": "adminpassword",
+        "ORACLE_DATABASE": "PDB1,PDB2",
+        "APP_USER": "FLOW",
+        "APP_USER_PASSWORD": "FLOW123"
       }
     healthcheck:
-      test: "true"
-      interval: 3s
+      test: "healthcheck.sh"
+      interval: 10s
     networks:
       - flow-test
+    volumes:
+      - oracle_data:/opt/oracle/oradata
 
 networks:
   flow-test:
@@ -23,4 +25,4 @@ networks:
     external: true
 
 volumes:
-  postgres_data: {}
+  oracle_data: {}

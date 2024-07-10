@@ -84,18 +84,6 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 	return tableMap, nil
 }
 
-// Returns true if the bytewise lexicographic ordering of serialized row keys for
-// this column type matches the database backfill ordering.
-func predictableColumnOrder(colType any) bool {
-	// Currently all textual primary key columns are considered to be 'unpredictable' so that backfills
-	// will default to using the 'imprecise' ordering semantics which avoids full-table sorts. Refer to
-	// https://github.com/estuary/connectors/issues/1343 for more details.
-	if colType == "varchar" || colType == "bpchar" || colType == "text" {
-		return false
-	}
-	return true
-}
-
 func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnNames []string) bool {
 	for _, columnName := range columnNames {
 		if columnsInfo[columnName].IsNullable {
@@ -107,15 +95,18 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
+	var col = column.DataType.(oracleColumnType)
+
 	var jsonType *jsonschema.Schema
+	jsonType = col.toJSONSchemaType()
+
+	// Pass-through Oracle column description
+	if column.Description != nil {
+		jsonType.Description = *column.Description
+	}
 	return jsonType, nil
 }
 
-// translateRecordField "translates" a value from the PostgreSQL driver into
-// an appropriate JSON-encodeable output format. As a concrete example, the
-// PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
-// marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
-// the `String()` method to get the usual "192.168.100.0/24" notation.
 func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
 	var dataType oracleColumnType
 	if column != nil {
@@ -124,10 +115,16 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		return val, nil
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"col":               column,
+		"val":               val,
+		"dataType.jsonType": dataType.jsonType,
+		"dataType.t":        dataType.t,
+	}).Trace("translateRecordField")
 	var out = reflect.New(dataType.t).Interface()
 	switch v := val.(type) {
 	case string:
-		if dataType.t.Name() != "string" {
+		if dataType.jsonType != "string" {
 			if err := json.Unmarshal([]byte(v), out); err != nil {
 				return nil, err
 			}
@@ -144,6 +141,22 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 	}
 
 	return out, nil
+}
+
+func (ct *oracleColumnType) toJSONSchemaType() *jsonschema.Schema {
+	var out = &jsonschema.Schema{
+		Format: ct.format,
+		Extras: make(map[string]interface{}),
+	}
+
+	if ct.jsonType == "" {
+		// No type constraint.
+	} else if ct.nullable {
+		out.Extras["type"] = []string{ct.jsonType, "null"} // Use variadic form.
+	} else {
+		out.Type = ct.jsonType
+	}
+	return out
 }
 
 func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
@@ -264,6 +277,8 @@ type oracleColumnType struct {
 	scale    int16
 	t        reflect.Type
 	format   string
+	jsonType string
+	nullable bool
 }
 
 func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
@@ -304,30 +319,39 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		var t reflect.Type
 		var format string
-		if dataType == "NUMBER" && dataScale.Int16 == 0 {
+		var jsonType string
+		if dataType == "NUMBER" && (dataScale.Valid && dataScale.Int16 == 0 && dataPrecision.Valid && dataPrecision.Int16 <= 18) {
 			t = reflect.TypeFor[int64]()
+			jsonType = "integer"
 		} else if slices.Contains([]string{"NUMBER", "DOUBLE", "FLOAT"}, dataType) {
 			if isPrimaryKey || dataPrecision.Int16 == 0 || dataPrecision.Int16 > 18 {
 				t = reflect.TypeFor[string]()
 				format = "number"
+				jsonType = "string"
 			} else {
 				t = reflect.TypeFor[float64]()
+				jsonType = "number"
 			}
 		} else if slices.Contains([]string{"INTEGER", "SMALLINT"}, dataType) {
 			t = reflect.TypeFor[string]()
 			format = "number"
+			jsonType = "string"
 		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
 			t = reflect.TypeFor[string]()
-		} else if strings.Contains(dataType, "TIME ZONE") {
-			t = reflect.TypeFor[time.Time]()
+			jsonType = "string"
+		} else if strings.Contains(dataType, "WITH TIME ZONE") {
+			t = reflect.TypeFor[string]()
+			jsonType = "string"
+			format = "date-time"
 		} else if dataType == "DATE" || strings.Contains(dataType, "TIMESTAMP") {
 			t = reflect.TypeFor[string]()
-			// TODO: enable this after we have added local-datetime to flow
-			// format = "local-datetime"
+			jsonType = "string"
 		} else if strings.Contains(dataType, "INTERVAL") {
 			t = reflect.TypeFor[string]()
+			jsonType = "string"
 		} else if slices.Contains([]string{"CLOB", "RAW"}, dataType) {
 			t = reflect.TypeFor[[]byte]()
+			jsonType = "string"
 		} else {
 			return nil, nil, fmt.Errorf("unsupported data type: %s", dataType)
 		}
@@ -338,6 +362,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			length:   dataLength,
 			t:        t,
 			format:   format,
+			jsonType: jsonType,
+			nullable: sc.IsNullable,
 		}
 
 		if isPrimaryKey {

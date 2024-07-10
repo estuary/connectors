@@ -29,4 +29,7 @@ type TestBackend interface {
 	Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{})
 	// CaptureSpec returns a new st.CaptureSpec which can be used to run discovery and captures.
 	CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec
+	// Some SQL sources default to uppercase identifiers, in those cases we change certain aspects of our test
+	// fixtures to work with these SQL sources
+	UpperCaseMode() bool
 }

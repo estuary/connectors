@@ -1,41 +1,28 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_t49210954",
+    "recommended_name": "flow_test_logminer_users",
     "resource_config_json": {
       "namespace": "FLOW_TEST_LOGMINER",
-      "stream": "T49210954"
+      "stream": "USERS"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT49210954": {
+        "FLOW_TEST_LOGMINERUSERS": {
           "type": "object",
           "required": [
-            "A"
+            "ID"
           ],
-          "$anchor": "FLOW_TEST_LOGMINERT49210954",
+          "$anchor": "FLOW_TEST_LOGMINERUSERS",
           "properties": {
-            "A": {
+            "DATA": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ID": {
               "type": "string",
               "format": "number"
-            },
-            "B": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "C": {
-              "format": "number",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "D": {
-              "type": [
-                "string",
-                "null"
-              ]
             }
           }
         }
@@ -76,7 +63,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT49210954",
+                  "$ref": "#FLOW_TEST_LOGMINERUSERS",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -133,12 +120,12 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT49210954"
+          "$ref": "#FLOW_TEST_LOGMINERUSERS"
         }
       ]
     },
     "key": [
-      "/A"
+      "/ID"
     ]
   }
 

@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/flow_test_logminer_t17789375": 2 Documents
 # ================================
-{"DATA":"eight","ID":8,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"six","ID":6,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"eight","ID":"8","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"six","ID":"6","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================
