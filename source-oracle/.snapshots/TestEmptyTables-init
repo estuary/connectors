@@ -1,9 +1,0 @@
-# ================================
-# Final State Checkpoint
-# ================================
-{"cursor":"","bindingStateV1":{"t14026504%2FADMIN":{"mode":"Pending","key_columns":null,"scanned":null,"backfilled":0}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-watermarks table "admin.flow_watermarks" does not exist
-

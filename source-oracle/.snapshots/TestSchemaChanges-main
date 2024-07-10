@@ -1,7 +1,7 @@
 # ================================
 # Collection "acmeCo/test/flow_test_logminer_t83287013": 1 Documents
 # ================================
-{"FULLNAME":"No Such State","STATE":"CC","YEAR":1940,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T83287013","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"No Such State","STATE":"CC","YEAR":"1940","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T83287013","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================

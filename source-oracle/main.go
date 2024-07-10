@@ -244,14 +244,11 @@ func (db *oracleDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/row_id"}
 }
 
-func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
-	colType, ok := ktype.(oracleColumnType)
-	if ok && colType.original == "NUMBER" {
-		if colType.scale == 0 {
-			return int64(*key.(*float64)), nil
-		} else {
-			return nil, fmt.Errorf("unsupported %q primary key with precision %d", colType.original, colType.scale)
-		}
+func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {
+	if colType.jsonType == "integer" {
+		return *key.(*int64), nil
+	} else if colType.jsonType == "number" {
+		return nil, fmt.Errorf("unsupported %q primary key with precision %d", colType.original, colType.scale)
 	}
 
 	switch key := key.(type) {
