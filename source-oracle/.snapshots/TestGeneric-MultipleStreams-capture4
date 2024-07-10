@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/flow_test_logminer_t14930049": 1 Documents
 # ================================
-{"DATA":"nine","ID":9,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14930049","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"nine","ID":"9","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14930049","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Collection "acmeCo/test/flow_test_logminer_t30084965": 1 Documents
 # ================================
-{"DATA":"eleven","ID":11,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T30084965","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"eleven","ID":"11","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T30084965","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================

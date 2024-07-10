@@ -1,37 +1,159 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_t49210954",
+    "recommended_name": "flow_test_logminer_t18110541",
     "resource_config_json": {
+      "mode": "Without Primary Key",
       "namespace": "FLOW_TEST_LOGMINER",
-      "stream": "T49210954"
+      "stream": "T18110541"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT49210954": {
+        "FLOW_TEST_LOGMINERT18110541": {
           "type": "object",
-          "required": [
-            "A"
-          ],
-          "$anchor": "FLOW_TEST_LOGMINERT49210954",
+          "$anchor": "FLOW_TEST_LOGMINERT18110541",
           "properties": {
-            "A": {
-              "type": "string",
-              "format": "number"
-            },
-            "B": {
+            "DATEONLY": {
               "type": [
                 "string",
                 "null"
               ]
             },
-            "C": {
+            "DATETIME": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "DOUBLE_PRECISION": {
               "format": "number",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "D": {
+            "FLOAT_126": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "INTEG": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "INTERVAL_DAY": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "INTERVAL_YEAR": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "NUM": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "NUM15": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "NUM19": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "NVCHAR2": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "R": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "REAL_NUM": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "SINGLE_NCHAR": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "SMALL_INT": {
+              "format": "number",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "TS": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "TS_LOCAL_TZ": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "TS_LOCAL_TZ_NINE": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "TS_NINE": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "TS_TZ": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "TS_TZ_NINE": {
+              "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "VCAHR2": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "VCHAR": {
               "type": [
                 "string",
                 "null"
@@ -76,7 +198,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT49210954",
+                  "$ref": "#FLOW_TEST_LOGMINERT18110541",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -133,12 +255,12 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT49210954"
+          "$ref": "#FLOW_TEST_LOGMINERT18110541"
         }
       ]
     },
     "key": [
-      "/A"
+      "/_meta/source/row_id"
     ]
   }
 
