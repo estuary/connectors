@@ -14,8 +14,16 @@ Binding 0:
           ],
           "$anchor": "FLOW_TEST_LOGMINERT39256824",
           "properties": {
-            "DATA": null,
-            "`Meta/'wtf'~ID`": null
+            "DATA": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "`Meta/'wtf'~ID`": {
+              "type": "string",
+              "format": "number"
+            }
           }
         }
       },
@@ -136,8 +144,16 @@ Binding 1:
           ],
           "$anchor": "FLOW_TEST_LOGMINERT42531495",
           "properties": {
-            "DATA": null,
-            "table": null
+            "DATA": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "table": {
+              "type": "string",
+              "format": "number"
+            }
           }
         }
       },

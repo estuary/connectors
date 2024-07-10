@@ -188,7 +188,11 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Mode = sqlcapture.BackfillModeAutomatic
-	res.PrimaryKey = []string{"fullname", "year"}
+	if tb.UpperCaseMode() {
+		res.PrimaryKey = []string{"FULLNAME", "YEAR"}
+	} else {
+		res.PrimaryKey = []string{"fullname", "year"}
+	}
 	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceJSON
@@ -215,7 +219,11 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Mode = sqlcapture.BackfillModeAutomatic
-	res.PrimaryKey = []string{"fullname", "year"}
+	if tb.UpperCaseMode() {
+		res.PrimaryKey = []string{"FULLNAME", "YEAR"}
+	} else {
+		res.PrimaryKey = []string{"fullname", "year"}
+	}
 	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceJSON

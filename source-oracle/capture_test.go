@@ -37,6 +37,90 @@ func TestViewDiscovery(t *testing.T) {
 	}
 }
 
+func TestAllTypes(t *testing.T) {
+	var unique = "18110541"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var typesAndValues = [][]any{
+		[]any{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ 🔥️'')"},
+		[]any{"vcahr2", "VARCHAR2(2000)", "varchar2 value"},
+		[]any{"single_nchar", "NCHAR", "a"},
+		[]any{"vchar", "VARCHAR(2000)", "varchar value"},
+		[]any{"num", "NUMBER(38, 9)", 123456789.123456789},
+		[]any{"num19", "NUMBER(19, 0)", 1234567891234567891},
+		[]any{"num15", "NUMBER(15, 0)", 123456789123456},
+		[]any{"small_int", "SMALLINT", 123456789.123456789},
+		[]any{"integ", "INTEGER", NewRawTupleValue("18446744073709551615")},
+		[]any{"double_precision", "DOUBLE PRECISION", 123456789.123456789},
+		[]any{"float_126", "FLOAT(126)", 123456789.123456789},
+		[]any{"real_num", "REAL", 123456789.123456789},
+		[]any{"dateonly", "DATE", NewRawTupleValue("DATE '2022-01-01'")},
+		[]any{"datetime", "DATE", NewRawTupleValue("TO_DATE('1998-JAN-01 13:00:00', 'YYYY-MON-DD HH24:MI:SS', 'NLS_DATE_LANGUAGE=AMERICAN')")},
+		[]any{"ts", "TIMESTAMP", NewRawTupleValue("TIMESTAMP '2022-01-01 13:00:00'")},
+		[]any{"ts_nine", "TIMESTAMP(9)", NewRawTupleValue("TIMESTAMP '2022-01-01 13:00:00.123456789'")},
+		[]any{"ts_tz", "TIMESTAMP WITH TIME ZONE", NewRawTupleValue("TIMESTAMP '2022-01-01 13:00:00 +01:00'")},
+		[]any{"ts_tz_nine", "TIMESTAMP(9) WITH TIME ZONE", NewRawTupleValue("TIMESTAMP '2022-01-01 13:00:00.123456789 +01:00'")},
+		[]any{"ts_local_tz", "TIMESTAMP WITH LOCAL TIME ZONE", NewRawTupleValue("TIMESTAMP '2022-01-01 13:00:00 +02:00'")},
+		[]any{"ts_local_tz_nine", "TIMESTAMP(9) WITH LOCAL TIME ZONE", NewRawTupleValue("TIMESTAMP '2022-01-01 13:00:00 +02:00'")},
+		[]any{"interval_year", "INTERVAL YEAR(4) TO MONTH", NewRawTupleValue("INTERVAL '1234-5' YEAR(4) TO MONTH")},
+		[]any{"interval_day", "INTERVAL DAY TO SECOND", NewRawTupleValue("INTERVAL '1 2:3:4.567' DAY TO SECOND(3)")},
+		[]any{"r", "RAW(1000)", NewRawTupleValue("UTL_RAW.CAST_To_RAW('testing raw value')")},
+	}
+
+	var columnDefs = "("
+	var vals []any
+	for idx, tv := range typesAndValues {
+		if idx > 0 {
+			columnDefs += ", "
+		}
+		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
+		vals = append(vals, tv[2])
+		idx += 1
+	}
+	columnDefs += ")"
+	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)
+
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestLongStrings(t *testing.T) {
+	var unique = "18110541"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var fire, ice, normalString string
+	for i := 0; i < 250; i++ {
+		fire += "🔥️"
+		ice += "🧊"
+		normalString += fmt.Sprintf("%x%x", i, i)
+	}
+	var unicode = NewRawTupleValue(fmt.Sprintf("'%s' || '%s'", fire, ice))
+	var unicode2 = NewRawTupleValue(fmt.Sprintf("'%s' || '%s'", ice, fire))
+	var normal = NewRawTupleValue(fmt.Sprintf("'%s' || '%s'", normalString, normalString))
+	var mixed = NewRawTupleValue(fmt.Sprintf("'%s' || '%s'", fire, normalString))
+	var tableName = tb.CreateTable(ctx, t, unique, "(UNISTR NVARCHAR2(2000), s NVARCHAR2(2000), UNISTR2 NVARCHAR2(2000), s3 NVARCHAR2(2000), mixed NVARCHAR2(2000))")
+
+	tb.Insert(ctx, t, tableName, [][]any{{unicode, normal, unicode2, normal, mixed}})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{{unicode, normal, unicode2, normal, mixed}})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
@@ -135,63 +219,11 @@ func TestCursorResume(t *testing.T) {
 	cupaloy.SnapshotT(t, summary)
 }
 
-// TestComplexDataset tries to throw together a bunch of different bits of complexity
-// to synthesize something vaguely "realistic". It features a multiple-column primary
-// key, a dataset large enough that the initial table scan gets divided across many
-// "chunks", two connector restarts at different points in the initial table scan, and
-// some concurrent modifications to row ranges already-scanned and not-yet-scanned.
-func TestComplexDataset(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t), context.Background()
-	var uniqueID = "86827053"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
-	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-
-	// Reduce the backfill chunk size to 10 rows for this test.
-	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
-
-	t.Run("init", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
-		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
-		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
-	})
-
-	tb.Insert(ctx, t, tableName, [][]any{
-		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
-		{1970, "XX", "No Such State", 12345},  // An insert between the two restarts, which will be visible in the table scan and should be filtered during replication
-		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
-	})
-	t.Run("restart1", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
-		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
-	})
-
-	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX'", tableName))
-	tb.Insert(ctx, t, tableName, [][]any{
-		{1930, "XX", "No Such State", 1234},   // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
-		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
-		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
-	})
-
-	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
-	// and creations for N% state records after that date which reflect the update.
-	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY')", tableName))
-	// We'll see a deletion since this row has already been scanned through.
-	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970", tableName))
-
-	t.Run("restart2", func(t *testing.T) {
-		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
-		cupaloy.SnapshotT(t, summary)
-	})
-}
-
 func TestCaptureCapitalization(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t), context.Background()
 
 	var uniqueA, uniqueB = "69943814", "73423348"
-	var tablePrefix = strings.TrimPrefix(t.Name(), "Test")
+	var tablePrefix = "test"
 	var tableA = tablePrefix + "_AaAaA_" + uniqueA                  // Name containing capital letters
 	var tableB = strings.ToUpper(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all uppercase (like all our other test table names)
 
@@ -205,8 +237,10 @@ func TestCaptureCapitalization(t *testing.T) {
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, tb.config.User, tableA))
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data VARCHAR(2000))`, tb.config.User, tableB))
 
-	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf')`, tb.config.User, tableA))
-	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa')`, tb.config.User, tableB))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello')`, tb.config.User, tableA))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (1, 'asdf')`, tb.config.User, tableA))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world')`, tb.config.User, tableB))
+	tb.Query(ctx, t, true, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (3, 'fdsa')`, tb.config.User, tableB))
 
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
 }

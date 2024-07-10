@@ -26,9 +26,9 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	var logEntry = logrus.WithField("stream", streamID)
 
-	var columnTypes = make(map[string]interface{})
+	var columnTypes = make(map[string]oracleColumnType)
 	for name, column := range info.Columns {
-		columnTypes[name] = column.DataType
+		columnTypes[name] = column.DataType.(oracleColumnType)
 	}
 
 	// Compute backfill query and arguments list
@@ -36,6 +36,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var args []any
 	switch state.Mode {
 	case sqlcapture.TableModeKeylessBackfill:
+		// A is the lexicographically smallest character in base64 encoding, so this is the smallest possible base64 encoded string
 		var afterRowID = "AAAAAAAAAAAAAAAAAA"
 		if resumeAfter != nil {
 			afterRowID = string(resumeAfter)
@@ -85,10 +86,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	if err != nil {
 		return false, fmt.Errorf("rows.Columns: %w", err)
 	}
-	colTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return false, fmt.Errorf("rows.ColumnTypes: %w", err)
-	}
 	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
 	var prevRowID string // Used when processing keyless backfill results to sanity-check ordering
@@ -97,16 +94,19 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		// Scan the row values and copy into the equivalent map
 		var fields = make(map[string]any)
 		var fieldsPtr = make([]any, len(cols))
+		var rowid string
 		for idx, col := range cols {
-			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
-			fieldsPtr[idx] = fields[col]
+			if col == "ROWID" {
+				fieldsPtr[idx] = &rowid
+			} else {
+				fields[col] = reflect.New(columnTypes[col].t).Interface()
+				fieldsPtr[idx] = fields[col]
+			}
 		}
 		if err := rows.Scan(fieldsPtr...); err != nil {
 			return false, fmt.Errorf("scanning row: %w", err)
 		}
 		var rowKey []byte
-		var rowid = *fields["ROWID"].(*string)
-		delete(fields, "ROWID")
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
 			rowKey = []byte(rowid)
 
@@ -189,17 +189,19 @@ func (db *oracleDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-// The set of column types for which we need to specify `COLLATE "C"` to get
+// The set of column types for which we need to specify `COLLATE BINARY` to get
 // proper ordering and comparison. Represented as a map[string]bool so that it can be
 // combined with the "is the column typename a string" check into one if statement.
+// See https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/COLLATE-Operator.html
 var columnBinaryKeyComparison = map[string]bool{
 	"varchar2": true,
 	"char":     true,
 	"nvarchar": true,
 	"nchar":    true,
-	"long":     true,
 }
 
+// render a "cast" expression for a column so that we can cast it to the
+// type and format we expect for that column (e.g. for timestamps we expect a certain format with UTC timezone, etc.)
 func castColumn(col sqlcapture.ColumnInfo) string {
 	var dataType = col.DataType.(oracleColumnType).original
 	var isDateTime = dataType == "DATE" || strings.HasPrefix(dataType, "TIMESTAMP")
@@ -225,7 +227,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 
 	var out = fmt.Sprintf("TO_CHAR(%s", quoteColumnName(col.Name))
 	var format = ""
-	if strings.Contains(dataType, "TIME ZONE") {
+	if strings.Contains(dataType, "TIME ZONE") && !strings.Contains(dataType, "LOCAL TIME ZONE") {
 		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"'`
 	} else if dataScale > 0 {
 		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF'`
@@ -241,6 +243,9 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 	return out
 }
 
+// Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
+// since ROWIDs do not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
+// but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
 func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
 	var columnSelect []string
@@ -254,7 +259,7 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	return query.String()
 }
 
-func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryInfo, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryInfo, keyColumns []string, columnTypes map[string]oracleColumnType, schemaName, tableName string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	var args []string
@@ -262,7 +267,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 		var quotedName = quoteColumnName(colName)
 		// If a precise backfill is requested *and* the column type requires binary ordering for precise
 		// backfill comparisons to work, add the 'COLLATE BINARY' qualifier to the column name.
-		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
+		if columnTypes[colName].jsonType == "string" && columnBinaryKeyComparison[colName] {
 			pkey = append(pkey, quotedName+" COLLATE BINARY")
 		} else {
 			pkey = append(pkey, quotedName)
