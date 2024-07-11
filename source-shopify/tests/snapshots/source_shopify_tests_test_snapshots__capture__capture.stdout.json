@@ -3,7 +3,8 @@
     "acmeCo/collects",
     {
       "_meta": {
-        "row_id": 1
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "collection_id": 466392154422,
       "created_at": "2023-11-09T13:19:30-05:00",
@@ -19,7 +20,8 @@
     "acmeCo/collects",
     {
       "_meta": {
-        "row_id": 2
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "collection_id": 466392219958,
       "created_at": "2023-11-09T13:19:35-05:00",
@@ -35,7 +37,8 @@
     "acmeCo/collects",
     {
       "_meta": {
-        "row_id": 3
+        "row_id": 3,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "collection_id": 466392219958,
       "created_at": "2023-11-09T13:19:35-05:00",
@@ -51,7 +54,8 @@
     "acmeCo/collects",
     {
       "_meta": {
-        "row_id": 4
+        "row_id": 4,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "collection_id": 466392219958,
       "created_at": "2023-11-09T13:19:35-05:00",
@@ -67,7 +71,8 @@
     "acmeCo/custom_collections",
     {
       "_meta": {
-        "row_id": 1
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Collection/466392154422",
       "body_html": null,
@@ -86,7 +91,8 @@
     "acmeCo/custom_collections",
     {
       "_meta": {
-        "row_id": 2
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Collection/466392219958",
       "body_html": null,
@@ -105,7 +111,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 2
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550077750,
@@ -118,7 +125,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 3
+        "row_id": 3,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550176054,
@@ -131,7 +139,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 4
+        "row_id": 4,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550372662,
@@ -144,7 +153,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 5
+        "row_id": 5,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 20,
       "inventory_item_id": 49446550405430,
@@ -157,7 +167,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 6
+        "row_id": 6,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550438198,
@@ -170,7 +181,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 7
+        "row_id": 7,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446550470966,
@@ -183,7 +195,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 8
+        "row_id": 8,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446550503734,
@@ -196,7 +209,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 9
+        "row_id": 9,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446550536502,
@@ -209,7 +223,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 10
+        "row_id": 10,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446550569270,
@@ -222,7 +237,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 11
+        "row_id": 11,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446550602038,
@@ -235,7 +251,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 12
+        "row_id": 12,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550634806,
@@ -248,7 +265,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 13
+        "row_id": 13,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": null,
       "inventory_item_id": 49446550667574,
@@ -261,7 +279,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 14
+        "row_id": 14,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 0,
       "inventory_item_id": 49446550700342,
@@ -274,7 +293,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 15
+        "row_id": 15,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446550733110,
@@ -287,7 +307,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 16
+        "row_id": 16,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": null,
       "inventory_item_id": 49446550765878,
@@ -300,7 +321,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 17
+        "row_id": 17,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": null,
       "inventory_item_id": 49446550798646,
@@ -313,7 +335,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 18
+        "row_id": 18,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": null,
       "inventory_item_id": 49446550831414,
@@ -326,7 +349,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 19
+        "row_id": 19,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": null,
       "inventory_item_id": 49446550864182,
@@ -339,7 +363,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 27
+        "row_id": 27,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 20,
       "inventory_item_id": 49446550896950,
@@ -352,7 +377,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 1
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550929718,
@@ -365,7 +391,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 20
+        "row_id": 20,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550929718,
@@ -378,7 +405,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 21
+        "row_id": 21,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550995254,
@@ -391,7 +419,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 28
+        "row_id": 28,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446550995254,
@@ -404,7 +433,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 22
+        "row_id": 22,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446551028022,
@@ -417,7 +447,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 23
+        "row_id": 23,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 50,
       "inventory_item_id": 49446551060790,
@@ -430,7 +461,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 24
+        "row_id": 24,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446551093558,
@@ -443,7 +475,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 25
+        "row_id": 25,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446551126326,
@@ -456,7 +489,8 @@
     "acmeCo/inventory_levels",
     {
       "_meta": {
-        "row_id": 26
+        "row_id": 26,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "available": 10,
       "inventory_item_id": 49446551159094,
@@ -469,7 +503,8 @@
     "acmeCo/locations",
     {
       "_meta": {
-        "row_id": 2
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "active": true,
       "address1": null,
@@ -497,7 +532,8 @@
     "acmeCo/locations",
     {
       "_meta": {
-        "row_id": 1
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "active": true,
       "address1": "123 Main St",
@@ -525,7 +561,8 @@
     "acmeCo/locations",
     {
       "_meta": {
-        "row_id": 3
+        "row_id": 3,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "active": true,
       "address1": null,
@@ -553,7 +590,8 @@
     "acmeCo/metafields",
     {
       "_meta": {
-        "row_id": 1
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "created_at": "2023-11-09T13:19:20-05:00",
       "description": null,
@@ -572,7 +610,8 @@
     "acmeCo/metafields",
     {
       "_meta": {
-        "row_id": 2
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "created_at": "2023-11-09T13:19:30-05:00",
       "description": null,
@@ -591,7 +630,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 13
+        "row_id": 13,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741167926",
       "body_html": null,
@@ -657,7 +697,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 17
+        "row_id": 17,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741200694",
       "body_html": null,
@@ -749,7 +790,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 4
+        "row_id": 4,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741298998",
       "body_html": null,
@@ -841,7 +883,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 10
+        "row_id": 10,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741331766",
       "body_html": null,
@@ -933,7 +976,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 9
+        "row_id": 9,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741364534",
       "body_html": "This <b>PREMIUM</b> <i>snowboard</i> is so <b>SUPER</b><i>DUPER</i> awesome!",
@@ -1141,7 +1185,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 11
+        "row_id": 11,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741397302",
       "body_html": null,
@@ -1233,7 +1278,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 5
+        "row_id": 5,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741430070",
       "body_html": null,
@@ -1325,7 +1371,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 12
+        "row_id": 12,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741462838",
       "body_html": null,
@@ -1417,7 +1464,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 16
+        "row_id": 16,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741495606",
       "body_html": null,
@@ -1509,7 +1557,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 8
+        "row_id": 8,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741528374",
       "body_html": null,
@@ -1601,7 +1650,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 1
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741561142",
       "body_html": "This is a gift card for the store",
@@ -1780,7 +1830,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 14
+        "row_id": 14,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741593910",
       "body_html": null,
@@ -1872,7 +1923,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 3
+        "row_id": 3,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741626678",
       "body_html": null,
@@ -1964,7 +2016,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 15
+        "row_id": 15,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741659446",
       "body_html": null,
@@ -2056,7 +2109,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 7
+        "row_id": 7,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741692214",
       "body_html": null,
@@ -2148,7 +2202,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 6
+        "row_id": 6,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741724982",
       "body_html": null,
@@ -2240,7 +2295,8 @@
     "acmeCo/products",
     {
       "_meta": {
-        "row_id": 2
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "admin_graphql_api_id": "gid://shopify/Product/8907741757750",
       "body_html": null,
