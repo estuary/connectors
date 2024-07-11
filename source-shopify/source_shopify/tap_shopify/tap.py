@@ -130,6 +130,8 @@ class Tap_Shopify(Tap):
         th.Property(
             "start_date",
             th.DateTimeType,
+            required=True,
+            default="2020-01-01",
             description="The earliest record date to sync",
         ),
         th.Property(
