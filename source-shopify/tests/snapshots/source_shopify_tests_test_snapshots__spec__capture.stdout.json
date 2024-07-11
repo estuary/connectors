@@ -73,10 +73,10 @@
         },
         "start_date": {
           "type": [
-            "string",
-            "null"
+            "string"
           ],
           "format": "date-time",
+          "default": "2020-01-01",
           "description": "The earliest record date to sync"
         },
         "admin_url": {
@@ -96,7 +96,8 @@
       },
       "required": [
         "credentials",
-        "store"
+        "store",
+        "start_date"
       ]
     },
     "resourceConfigSchema": {

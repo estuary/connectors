@@ -66,6 +66,21 @@ class tap_shopifyStream(RESTStream):
 
         if next_page_token:
             return dict(parse_qsl(urlsplit(next_page_token).query))
+        elif not next_page_token and self.name == "orders":
+            params["status"] = "any"
+            params["order"] = "updated_at asc"
+
+            context_state = self.get_context_state(context)
+            last_updated = context_state.get("replication_key_value")
+
+            start_date = self.config.get("start_date")
+
+            if last_updated:
+                params["updated_at_min"] = last_updated
+            elif start_date:
+                params["updated_at_min"] = start_date
+
+            return params
 
         context_state = self.get_context_state(context)
         last_updated = context_state.get("replication_key_value")
