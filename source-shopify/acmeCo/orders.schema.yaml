@@ -864,6 +864,18 @@ properties:
           type:
             - string
             - "null"
+        attributed_staffs:
+          type:
+            - array
+            - "null"
+        pre_tax_price:
+          type:
+            - string
+            - "null"
+        pre_tax_price_set:
+          type:
+            - object
+            - "null"
         fulfillable_quantity:
           type:
             - integer
