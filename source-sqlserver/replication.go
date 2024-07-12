@@ -21,11 +21,14 @@ import (
 
 var replicationBufferSize = 4 * 1024 // Assuming change events average ~2kB then 4k * 2kB = 8MB
 
+// LSN is just a type alias for []byte to make the code that works with LSN values a bit clearer.
+type LSN = []byte
+
 // sqlserverSourceInfo is source metadata for data capture events.
 type sqlserverSourceInfo struct {
 	sqlcapture.SourceCommon
 
-	LSN        []byte `json:"lsn" jsonschema:"description=The LSN at which a CDC event occurred. Only set for CDC events, not backfills."`
+	LSN        LSN    `json:"lsn" jsonschema:"description=The LSN at which a CDC event occurred. Only set for CDC events, not backfills."`
 	SeqVal     []byte `json:"seqval" jsonschema:"description=Sequence value used to order changes to a row within a transaction. Only set for CDC events, not backfills."`
 	UpdateMask any    `json:"updateMask,omitempty" jsonschema:"description=A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events, not backfills."`
 }
@@ -68,7 +71,7 @@ type sqlserverReplicationStream struct {
 	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
 	events chan sqlcapture.DatabaseEvent // Change event channel from the replication goroutine to the main thread
 
-	fromLSN []byte // The LSN from which we will request changes on the next polling cycle
+	fromLSN LSN // The LSN from which we will request changes on the next polling cycle
 
 	tables struct {
 		sync.RWMutex
@@ -190,7 +193,7 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	// TODO(wgd): Make the number of transactions per polling interval configurable.
 	var pollTransactionsLimit = 1024
-	var toLSN []byte
+	var toLSN LSN
 	if pollTransactionsLimit == 0 {
 		var maxLSN, err = cdcGetMaxLSN(ctx, rs.conn)
 		if err != nil {
@@ -255,7 +258,7 @@ type tablePollInfo struct {
 // Zero by default, this allows tests to simulate a higher latency connection to the database.
 var simulatedPollingLatency time.Duration
 
-func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, toLSN []byte, info *tablePollInfo) error {
+func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, toLSN LSN, info *tablePollInfo) error {
 	log.WithFields(log.Fields{
 		"stream":   info.StreamID,
 		"instance": info.InstanceName,
@@ -296,7 +299,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 
 		// Extract the event's LSN and remove it from the record fields, since
 		// it will be included in the source metadata already.
-		var changeLSN, ok = fields["__$start_lsn"].([]byte)
+		var changeLSN, ok = fields["__$start_lsn"].(LSN)
 		if !ok || changeLSN == nil {
 			return fmt.Errorf("invalid '__$start_lsn' value (capture user may not have correct permissions): %v", changeLSN)
 		}
@@ -333,7 +336,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 		delete(fields, "__$operation")
 
 		// Move the '__$seqval' and '__$update_mask' columns into metadata as well.
-		seqval, ok := fields["__$seqval"].([]byte)
+		seqval, ok := fields["__$seqval"].(LSN)
 		if !ok || seqval == nil {
 			return fmt.Errorf("invalid '__$seqval' value: %v", seqval)
 		}
@@ -380,8 +383,8 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 	return nil
 }
 
-func cdcGetMinLSN(ctx context.Context, conn *sql.DB, instanceName string) ([]byte, error) {
-	var minLSN []byte
+func cdcGetMinLSN(ctx context.Context, conn *sql.DB, instanceName string) (LSN, error) {
+	var minLSN LSN
 	const query = `SELECT sys.fn_cdc_get_min_lsn(@p1);`
 	if err := conn.QueryRowContext(ctx, query, instanceName).Scan(&minLSN); err != nil {
 		return nil, fmt.Errorf("error querying minimum LSN for %q: %w", instanceName, err)
@@ -389,8 +392,8 @@ func cdcGetMinLSN(ctx context.Context, conn *sql.DB, instanceName string) ([]byt
 	return minLSN, nil
 }
 
-func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) ([]byte, error) {
-	var maxLSN []byte
+func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) (LSN, error) {
+	var maxLSN LSN
 	const query = `SELECT sys.fn_cdc_get_max_lsn();`
 	if err := conn.QueryRowContext(ctx, query).Scan(&maxLSN); err != nil {
 		return nil, fmt.Errorf("error querying database maximum LSN: %w", err)
@@ -401,8 +404,8 @@ func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) ([]byte, error) {
 	return maxLSN, nil
 }
 
-func cdcGetNextLSN(ctx context.Context, conn *sql.DB, fromLSN []byte, pollTransactionsLimit int) ([]byte, error) {
-	var nextLSN []byte
+func cdcGetNextLSN(ctx context.Context, conn *sql.DB, fromLSN LSN, pollTransactionsLimit int) (LSN, error) {
+	var nextLSN LSN
 	const query = `SELECT MAX(start_lsn) FROM (
 		             SELECT start_lsn FROM cdc.lsn_time_mapping
 					   WHERE start_lsn >= @p2 AND tran_id <> 0
