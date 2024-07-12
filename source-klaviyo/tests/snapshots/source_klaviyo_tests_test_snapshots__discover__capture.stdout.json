@@ -362,6 +362,12 @@
             "object"
           ]
         },
+        "campaign_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "datetime": {
           "format": "date-time",
           "type": "string"
