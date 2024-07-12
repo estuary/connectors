@@ -209,15 +209,46 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	}
 
 	if bytes.Equal(rs.fromLSN, toLSN) {
-		log.Trace("lsn hasn't advanced, not polling tables")
+		log.Trace("server lsn hasn't advanced, not polling any tables")
 		return nil
 	}
 
-	// Make a list of tables we intend to poll. The copying is necessary
-	// to avoid holding the table-info lock for too long.
+	// Make a list of capture instances that we might want to poll, and then query the
+	// database to determine the most recent change LSN for each capture instance.
+	var captureInstances []string
+	rs.tables.RLock()
+	for _, info := range rs.tables.info {
+		captureInstances = append(captureInstances, info.CaptureInstance)
+	}
+	rs.tables.RUnlock()
+	captureInstanceMaxLSNs, err := cdcGetInstanceMaxLSNs(ctx, rs.conn, captureInstances)
+	if err != nil {
+		return fmt.Errorf("failed to query maximum LSNs for capture instances: %w", err)
+	}
+
+	// Put together a work queue of CDC polling operations to perform
 	var queue []*tablePollInfo
 	rs.tables.RLock()
 	for streamID, info := range rs.tables.info {
+		// Skip polling a particular capture instance if its maximum LSN is less than or
+		// equal to our 'fromLSN' value for this polling operation, as this means that it
+		// doesn't have any new changes for us.
+		//
+		// As documented on the `cdcGetInstanceMaxLSNs` function, a completely empty change
+		// table will have a nil value in the max LSNs map, and the nil byte string compares
+		// lexicographically before any other value, so the comparison here also covers the
+		// case of a CDC instance which doesn't need to be polled because it has no changes
+		// at all.
+		var instanceMaxLSN, ok = captureInstanceMaxLSNs[info.CaptureInstance]
+		if ok && bytes.Compare(instanceMaxLSN, rs.fromLSN) <= 0 {
+			log.WithFields(log.Fields{
+				"instance":       info.CaptureInstance,
+				"instanceMaxLSN": instanceMaxLSN,
+				"pollFromLSN":    rs.fromLSN,
+			}).Debug("skipping poll for unchanged capture instance")
+			continue
+		}
+
 		var schemaName, tableName = splitStreamID(streamID)
 		queue = append(queue, &tablePollInfo{
 			StreamID:     streamID,
@@ -422,6 +453,57 @@ func cdcGetNextLSN(ctx context.Context, conn *sql.DB, fromLSN LSN, pollTransacti
 		return fromLSN, nil
 	}
 	return nextLSN, nil
+}
+
+// cdcGetInstanceMaxLSNs queries the maximum change event LSN for each listed capture instance.
+//
+// It does this by generating a hairy union query which simply selects `MAX(__$start_lsn)` for
+// the underlying change table of each instance and combines the results. I have verified that
+// this specific query executes as a cheap backwards index scan taking the first result for each
+// change table, so this should be reasonably efficient.
+//
+// In the event that a capture instance contains no changes at all, the results map will contain
+// a nil value for that instance LSN.
+//
+// The generated query has contains a distinct `SELECT` statement for every named capture instance,
+// but I have verified in practice that this works for querying at least 1k capture instances at a
+// time. If we ever hit a scaling limit here we can implement chunking, but so far that doesn't
+// appear to be necessary.
+func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []string) (map[string]LSN, error) {
+	var subqueries []string
+	for idx, instanceName := range instanceNames {
+		// TODO(wgd): It would probably be a good idea to properly quote the CDC table name instead of just splatting
+		// the instance name into the query string. But currently we don't do that for backfills or for the actual
+		// replication polling query, so it would be premature to worry about it only here.
+		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].[%s_CT]", idx, instanceName)
+		subqueries = append(subqueries, subquery)
+	}
+	var query = strings.Join(subqueries, " UNION ALL ")
+
+	rows, err := conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	var results = make(map[string]LSN)
+	for rows.Next() {
+		var index int
+		var instanceMaxLSN LSN
+		if err := rows.Scan(&index, &instanceMaxLSN); err != nil {
+			return nil, fmt.Errorf("error scanning result: %w", err)
+		}
+		if index < 0 || index >= len(instanceNames) {
+			return nil, fmt.Errorf("internal error: result index %d out of range for instance list %q", index, len(instanceNames))
+		}
+		var instanceName = instanceNames[index]
+		log.WithFields(log.Fields{
+			"instance": instanceName,
+			"lsn":      instanceMaxLSN,
+		}).Trace("queried max LSN for capture instance")
+		results[instanceName] = instanceMaxLSN
+	}
+	return results, rows.Err()
 }
 
 func splitStreamID(streamID string) (string, string) {
