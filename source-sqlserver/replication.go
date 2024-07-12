@@ -230,7 +230,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	for _, item := range queue {
 		log.WithField("table", item.StreamID).Trace("polling table")
 		if err := rs.pollTable(ctx, rs.fromLSN, toLSN, item); err != nil {
-			return fmt.Errorf("table %q: %w", sqlcapture.JoinStreamID(item.SchemaName, item.TableName), err)
+			return fmt.Errorf("table %q: %w", item.StreamID, err)
 		}
 	}
 
@@ -252,6 +252,9 @@ type tablePollInfo struct {
 	ColumnTypes  map[string]any
 }
 
+// Zero by default, this allows tests to simulate a higher latency connection to the database.
+var simulatedPollingLatency time.Duration
+
 func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, toLSN []byte, info *tablePollInfo) error {
 	log.WithFields(log.Fields{
 		"stream":   info.StreamID,
@@ -259,6 +262,8 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 		"fromLSN":  fromLSN,
 		"toLSN":    toLSN,
 	}).Trace("polling stream")
+
+	time.Sleep(simulatedPollingLatency)
 
 	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
 	rows, err := rs.conn.QueryContext(ctx, query, fromLSN, toLSN)
