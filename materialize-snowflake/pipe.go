@@ -162,10 +162,11 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 		return nil, err
 	}
 
+	var requestId = uuid.New().String()
 	var urlTemplate = insertFilesURLTemplate{
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
-		RequestId: uuid.New().String(),
+		RequestId: requestId,
 	}
 
 	var reqBody = insertFilesRequest{
@@ -194,14 +195,14 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("insertFiles request: %w", err)
+		return nil, fmt.Errorf("insertFiles request (%s): %w", requestId, err)
 	}
 
 	var respBuf = new(strings.Builder)
 	_, err = io.Copy(respBuf, resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("reading response of insertFiles: %w", err)
+		return nil, fmt.Errorf("reading response of insertFiles (%s): %w", requestId, err)
 	}
 
 	log.WithFields(log.Fields{
@@ -213,7 +214,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	if resp.StatusCode >= 400 {
 		var errResponse InsertFilesError
 		if err := json.Unmarshal([]byte(respBuf.String()), &errResponse); err != nil {
-			return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf.String())
+			return nil, fmt.Errorf("response error code (%s): %d %s", requestId, resp.StatusCode, respBuf.String())
 		} else {
 			return nil, errResponse
 		}
@@ -221,7 +222,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 
 	var response InsertFilesResponse
 	if err := json.Unmarshal([]byte(respBuf.String()), &response); err != nil {
-		return nil, fmt.Errorf("parsing response of insertFiles failed: %w", err)
+		return nil, fmt.Errorf("parsing response of insertFiles failed (%s): %w", requestId, err)
 	}
 
 	if response.Status != "SUCCESS" {
@@ -271,10 +272,11 @@ func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error
 		return nil, err
 	}
 
+	var requestId = uuid.New().String()
 	var urlTemplate = insertReportURLTemplate{
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
-		RequestId: uuid.New().String(),
+		RequestId: requestId,
 	}
 
 	var w strings.Builder
@@ -292,23 +294,23 @@ func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("insertReport request: %w", err)
+		return nil, fmt.Errorf("insertReport request (%s): %w", requestId, err)
 	}
 
 	var respBuf = new(strings.Builder)
 	_, err = io.Copy(respBuf, resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("reading response of insertReport: %w", err)
+		return nil, fmt.Errorf("reading response of insertReport (%s): %w", requestId, err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
+		return nil, fmt.Errorf("response error code (%s): %d %s", requestId, resp.StatusCode, respBuf)
 	}
 
 	var response InsertReportResponse
 	if err := json.Unmarshal([]byte(respBuf.String()), &response); err != nil {
-		return nil, fmt.Errorf("parsing response of insertReport failed: %w", err)
+		return nil, fmt.Errorf("parsing response of insertReport failed (%s): %w", requestId, err)
 	}
 
 	log.WithFields(log.Fields{
