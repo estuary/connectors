@@ -220,7 +220,6 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	for _, info := range rs.tables.info {
 		captureInstances = append(captureInstances, info.CaptureInstance)
 	}
-	rs.tables.RUnlock()
 	captureInstanceMaxLSNs, err := cdcGetInstanceMaxLSNs(ctx, rs.conn, captureInstances)
 	if err != nil {
 		return fmt.Errorf("failed to query maximum LSNs for capture instances: %w", err)
@@ -228,7 +227,6 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	// Put together a work queue of CDC polling operations to perform
 	var queue []*tablePollInfo
-	rs.tables.RLock()
 	for streamID, info := range rs.tables.info {
 		// Skip polling a particular capture instance if its maximum LSN is less than or
 		// equal to our 'fromLSN' value for this polling operation, as this means that it
