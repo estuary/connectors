@@ -263,6 +263,10 @@ func TestManyTables(t *testing.T) {
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
 	var uniquePrefix = "2546318"
 
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	simulatedPollingLatency = 1000 * time.Millisecond
 	t.Cleanup(func() { simulatedPollingLatency = 0 })
 
@@ -285,5 +289,4 @@ func TestManyTables(t *testing.T) {
 		tb.Insert(ctx, t, tableNames[i], [][]any{{2, fmt.Sprintf("table %d row two", i)}, {3, fmt.Sprintf("table %d row three", i)}})
 	}
 	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-
 }
