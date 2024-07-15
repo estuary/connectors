@@ -355,26 +355,18 @@ class Events(IncrementalKlaviyoStream):
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
-        params.update({"include": "attributions"})
         return params
     
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
-        for record, included in zip(response.json()['data'],response.json()['included']):
+        for record in super().parse_response(response, **kwargs):
+ 
             if not record['attributes'].get("datetime", {}):
                 continue
+
             record['datetime'] = record['attributes']['datetime'].replace(" ","T")
             record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
-            
-            try:
-                record["campaign_id"] = included['relationships']['campaign']['data']['id']
-            except Exception as e:
-                pass
-            try:
-                link = record['relationships']['metric']['links']['related']
-                response2 = requests.get(link, headers=self.request_headers())
-                record["event_name"] = response2.json()['data']["attributes"]['name']
-            except:
-                self.logger.warning(f"Name not found for Event {record['id']}")
+            record['campaign_id'] = record['attributes']["event_properties"].get("Campaign Name")
+
             yield record
 
 

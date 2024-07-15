@@ -12,7 +12,7 @@ properties:
   datetime:
     type: string
     format: date-time
-  event_name:
+  campaign_id:
     type:
       - "null"
       - string
