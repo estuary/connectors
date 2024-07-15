@@ -372,12 +372,6 @@
           "format": "date-time",
           "type": "string"
         },
-        "event_name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "id": {
           "type": "string"
         },
