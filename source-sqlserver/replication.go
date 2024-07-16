@@ -14,6 +14,7 @@ import (
 
 	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // TODO(wgd): Contemplate https://github.com/debezium/debezium/blob/main/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerStreamingChangeEventSource.java#L51
@@ -243,15 +244,32 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 			InstanceName: info.CaptureInstance,
 			KeyColumns:   info.KeyColumns,
 			ColumnTypes:  info.ColumnTypes,
+			FromLSN:      rs.fromLSN,
+			ToLSN:        toLSN,
 		})
 	}
 	rs.tables.RUnlock()
 
+	// cdcPollingWorkers controls the number of parallel CDC polling queries which can
+	// be running simultaneously.
+	//
+	// TODO(wgd): Make this configurable?
+	var cdcPollingWorkers = 4
+
+	// Execute all polling operations in the work queue
+	var workers, workerContext = errgroup.WithContext(ctx)
+	workers.SetLimit(cdcPollingWorkers)
 	for _, item := range queue {
-		log.WithField("table", item.StreamID).Trace("polling table")
-		if err := rs.pollTable(ctx, rs.fromLSN, toLSN, item); err != nil {
-			return fmt.Errorf("table %q: %w", item.StreamID, err)
-		}
+		var item = item // Copy to avoid loop+closure issues
+		workers.Go(func() error {
+			if err := rs.pollTable(workerContext, item); err != nil {
+				return fmt.Errorf("error polling changes for table %q: %w", item.StreamID, err)
+			}
+			return nil
+		})
+	}
+	if err := workers.Wait(); err != nil {
+		return err
 	}
 
 	log.WithField("lsn", toLSN).Trace("flushed up to LSN")
@@ -270,18 +288,20 @@ type tablePollInfo struct {
 	InstanceName string
 	KeyColumns   []string
 	ColumnTypes  map[string]any
+	FromLSN      LSN
+	ToLSN        LSN
 }
 
-func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, toLSN LSN, info *tablePollInfo) error {
+func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *tablePollInfo) error {
 	log.WithFields(log.Fields{
 		"stream":   info.StreamID,
 		"instance": info.InstanceName,
-		"fromLSN":  fromLSN,
-		"toLSN":    toLSN,
+		"fromLSN":  info.FromLSN,
+		"toLSN":    info.ToLSN,
 	}).Trace("polling stream")
 
 	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
-	rows, err := rs.conn.QueryContext(ctx, query, fromLSN, toLSN)
+	rows, err := rs.conn.QueryContext(ctx, query, info.FromLSN, info.ToLSN)
 	if err != nil {
 		return fmt.Errorf("error requesting changes: %w", err)
 	}
@@ -315,11 +335,11 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 		if !ok || changeLSN == nil {
 			return fmt.Errorf("invalid '__$start_lsn' value (capture user may not have correct permissions): %v", changeLSN)
 		}
-		if bytes.Compare(changeLSN, fromLSN) <= 0 {
+		if bytes.Compare(changeLSN, info.FromLSN) <= 0 {
 			log.WithFields(log.Fields{
 				"stream":    info.StreamID,
 				"changeLSN": changeLSN,
-				"fromLSN":   fromLSN,
+				"fromLSN":   info.FromLSN,
 			}).Trace("filtered change <= fromLSN")
 			continue
 		}
