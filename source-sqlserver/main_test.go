@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -267,12 +266,9 @@ func TestManyTables(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	simulatedPollingLatency = 1000 * time.Millisecond
-	t.Cleanup(func() { simulatedPollingLatency = 0 })
-
 	var tableNames []string
 	var streamMatchers []*regexp.Regexp
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		var uniqueID = fmt.Sprintf("%s_%03d", uniquePrefix, i)
 		var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 		tableNames = append(tableNames, tableName)
@@ -280,13 +276,18 @@ func TestManyTables(t *testing.T) {
 	}
 	var cs = tb.CaptureSpec(ctx, t, streamMatchers...)
 
-	for i := 0; i <= 4; i++ {
+	for i := 0; i < 20; i++ {
 		tb.Insert(ctx, t, tableNames[i], [][]any{{0, fmt.Sprintf("table %d row zero", i)}, {1, fmt.Sprintf("table %d row one", i)}})
 	}
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	for i := 0; i <= 2; i++ {
+	for i := 0; i < 20; i++ {
 		tb.Insert(ctx, t, tableNames[i], [][]any{{2, fmt.Sprintf("table %d row two", i)}, {3, fmt.Sprintf("table %d row three", i)}})
 	}
 	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	for i := 0; i < 10; i++ {
+		tb.Insert(ctx, t, tableNames[i], [][]any{{4, fmt.Sprintf("table %d row four", i)}, {5, fmt.Sprintf("table %d row five", i)}})
+	}
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
