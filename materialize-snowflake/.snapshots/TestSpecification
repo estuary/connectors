@@ -10,34 +10,34 @@
         "order": 0,
         "pattern": "^[^/:]+.snowflakecomputing.com$"
       },
-      "account": {
-        "type": "string",
-        "title": "Account",
-        "description": "The Snowflake account identifier.",
-        "order": 1
-      },
       "database": {
         "type": "string",
         "title": "Database",
         "description": "The SQL database to connect to.",
-        "order": 4
+        "order": 3
       },
       "schema": {
         "type": "string",
         "title": "Schema",
         "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
-        "order": 5
+        "order": 4
       },
       "warehouse": {
         "type": "string",
         "title": "Warehouse",
         "description": "The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank.",
-        "order": 6
+        "order": 5
       },
       "role": {
         "type": "string",
         "title": "Role",
         "description": "The user role used to perform actions.",
+        "order": 6
+      },
+      "account": {
+        "type": "string",
+        "title": "Account",
+        "description": "Optional Snowflake account identifier.",
         "order": 7
       },
       "hardDelete": {
@@ -191,7 +191,6 @@
     "type": "object",
     "required": [
       "host",
-      "account",
       "database",
       "schema",
       "credentials"

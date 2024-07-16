@@ -176,7 +176,12 @@ func newTransactor(
 
 	dialect := snowflakeDialect(cfg.Schema)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	dsn, err := cfg.toURI(ep.Tenant)
+	if err != nil {
+		return nil, fmt.Errorf("building snowflake dsn: %w", err)
+	}
+
+	db, err := stdsql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
@@ -212,13 +217,13 @@ func newTransactor(
 	d.store.fence = &fence
 
 	// Establish connections.
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
+	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
 
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
+	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
