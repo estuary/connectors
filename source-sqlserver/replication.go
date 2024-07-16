@@ -191,21 +191,9 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 }
 
 func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
-	// TODO(wgd): Make the number of transactions per polling interval configurable.
-	var pollTransactionsLimit = 1024
-	var toLSN LSN
-	if pollTransactionsLimit == 0 {
-		var maxLSN, err = cdcGetMaxLSN(ctx, rs.conn)
-		if err != nil {
-			return err
-		}
-		toLSN = maxLSN
-	} else {
-		var nextLSN, err = cdcGetNextLSN(ctx, rs.conn, rs.fromLSN, pollTransactionsLimit)
-		if err != nil {
-			return err
-		}
-		toLSN = nextLSN
+	var toLSN, err = cdcGetMaxLSN(ctx, rs.conn)
+	if err != nil {
+		return err
 	}
 
 	if bytes.Equal(rs.fromLSN, toLSN) {
@@ -431,26 +419,6 @@ func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) (LSN, error) {
 		return nil, fmt.Errorf("invalid result from 'sys.fn_cdc_get_max_lsn()', agent process likely not running")
 	}
 	return maxLSN, nil
-}
-
-func cdcGetNextLSN(ctx context.Context, conn *sql.DB, fromLSN LSN, pollTransactionsLimit int) (LSN, error) {
-	var nextLSN LSN
-	const query = `SELECT MAX(start_lsn) FROM (
-		             SELECT start_lsn FROM cdc.lsn_time_mapping
-					   WHERE start_lsn >= @p2 AND tran_id <> 0
-					   ORDER BY start_lsn
-					   OFFSET 0 ROWS FETCH FIRST (@p1 + 1) ROWS ONLY
-				   ) AS lsns;`
-	if err := conn.QueryRowContext(ctx, query, pollTransactionsLimit, fromLSN).Scan(&nextLSN); err != nil {
-		return nil, fmt.Errorf("error querying database for next poll-to LSN: %w", err)
-	}
-	if len(nextLSN) == 0 {
-		// Sometimes the above query will return a null result. This is not a fatal error,
-		// and will be corrected if/when more transactions get committed on the DB side.
-		log.Trace("minor failure querying 'cdc.lsn_time_mapping' for the next target LSN")
-		return fromLSN, nil
-	}
-	return nextLSN, nil
 }
 
 // cdcGetInstanceMaxLSNs queries the maximum change event LSN for each listed capture instance.
