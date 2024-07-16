@@ -108,8 +108,10 @@ class Sheet(BaseModel, extra="allow"):
         @model_validator(mode="after")
         def _post_init(self) -> "Sheet.Data":
             # Remove all trailing rows which have no set cells.
+            # Note that this can be represented as either no values, or a list of values where the
+            # effectiveValue of each cell is empty.
             while self.rowData:
-                if all(not v.effectiveValue for v in self.rowData[-1].values):
+                if (not self.rowData[-1].values) or all(not v.effectiveValue for v in self.rowData[-1].values):
                     self.rowData.pop()
                 else:
                     break
