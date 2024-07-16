@@ -61,7 +61,10 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
+	dsn, err := cfg.toURI("testing")
+	require.NoError(t, err)
+
+	db, err := stdsql.Open("snowflake", dsn)
 	require.NoError(t, err)
 	defer db.Close()
 

@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -18,18 +20,14 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	// TODO(mahdi): the Host and Account config is very confusing since Snowflake has multiple ways and very specific requirements
-	// for specifying the url of an instance. Ideally we should just accept the URL directly and use that, that would save us and
-	// users some headache
-	// See: https://docs.snowflake.com/en/user-guide/admin-account-identifier#non-vps-account-locator-formats-by-cloud-platform-and-region
 	Host       string `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	Account    string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
 	User       string `json:"user" jsonschema:"-"`
 	Password   string `json:"password" jsonschema:"-"`
-	Database   string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
-	Schema     string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=5"`
-	Warehouse  string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=6"`
-	Role       string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
+	Database   string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
+	Schema     string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
+	Warehouse  string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
+	Role       string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
+	Account    string `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=8"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication"`
@@ -42,24 +40,63 @@ type advancedConfig struct {
 	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
-// ToURI converts the Config to a DSN string.
-func (c *config) ToURI(tenant string) string {
-	// Build a DSN connection string.
-	var configCopy = c.asSnowflakeConfig(tenant)
-	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
-	// Without this, the authentication token will expire after 4 hours of inactivity.
-	// The Params map will not have been initialized if the endpoint config didn't specify
-	// it, so we check and initialize here if needed.
-	if configCopy.Params == nil {
-		configCopy.Params = make(map[string]*string)
-	}
-	configCopy.Params["client_session_keep_alive"] = &trueString
-	dsn, err := sf.DSN(&configCopy)
-	if err != nil {
-		panic(fmt.Errorf("building snowflake dsn: %w", err))
+// toURI manually builds the DSN connection string.
+func (c *config) toURI(tenant string) (string, error) {
+	var uri = url.URL{
+		Host: c.Host + ":443",
 	}
 
-	return dsn
+	queryParams := make(url.Values)
+
+	// Required params
+	queryParams.Add("application", fmt.Sprintf("%s_EstuaryFlow", tenant))
+	queryParams.Add("database", c.Database)
+	queryParams.Add("schema", c.Schema)
+	// GO_QUERY_RESULT_FORMAT is json in order to enable stream downloading of load results.
+	queryParams.Add("GO_QUERY_RESULT_FORMAT", "json")
+	// By default Snowflake expects the number of statements to be provided
+	// with every request. By setting this parameter to zero we are allowing a
+	// variable number of statements to be executed in a single request.
+	queryParams.Add("MULTI_STATEMENT_COUNT", "0")
+	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
+	// Without this, the authentication token will expire after 4 hours of inactivity.
+	queryParams.Add("client_session_keep_alive", "true")
+
+	// Optional params
+	if c.Warehouse != "" {
+		queryParams.Add("warehouse", c.Warehouse)
+	}
+
+	if c.Role != "" {
+		queryParams.Add("role", c.Role)
+	}
+
+	if c.Account != "" {
+		queryParams.Add("account", c.Account)
+	}
+
+	// Authentication
+	if c.Credentials.AuthType == UserPass {
+		uri.User = url.UserPassword(c.Credentials.User, c.Credentials.Password)
+	} else if c.Credentials.AuthType == JWT {
+		// We run this as part of validate to ensure that there is no error, so
+		// this is not expected to error here.
+		if key, err := c.Credentials.privateKey(); err != nil {
+			return "", err
+		} else if privateKey, err := x509.MarshalPKCS8PrivateKey(key); err != nil {
+			return "", fmt.Errorf("parsing private key: %w", err)
+		} else {
+			privateKeyString := base64.URLEncoding.EncodeToString(privateKey)
+			queryParams.Add("privateKey", privateKeyString)
+			queryParams.Add("authenticator", strings.ToLower(sf.AuthTypeJwt.String()))
+		}
+		uri.User = url.User(c.Credentials.User)
+	} else {
+		uri.User = url.UserPassword(c.User, c.Password)
+	}
+
+	dsn := uri.User.String() + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
+	return dsn, nil
 }
 
 func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
@@ -78,50 +115,6 @@ func (c *credentialConfig) privateKey() (*rsa.PrivateKey, error) {
 	}
 
 	return nil, fmt.Errorf("only supported with JWT authentication")
-}
-
-func (c *config) asSnowflakeConfig(tenant string) sf.Config {
-	var maxStatementCount string = "0"
-	var json string = "json"
-
-	var conf = sf.Config{
-		Account:     c.Account,
-		Host:        c.Host,
-		Database:    c.Database,
-		Schema:      c.Schema,
-		Warehouse:   c.Warehouse,
-		Role:        c.Role,
-		Application: fmt.Sprintf("%s_EstuaryFlow", tenant),
-		Params: map[string]*string{
-			// By default Snowflake expects the number of statements to be provided
-			// with every request. By setting this parameter to zero we are allowing a
-			// variable number of statements to be executed in a single request
-			"MULTI_STATEMENT_COUNT":  &maxStatementCount,
-			"GO_QUERY_RESULT_FORMAT": &json,
-		},
-	}
-
-	if c.Credentials.AuthType == UserPass {
-		conf.Authenticator = sf.AuthTypeSnowflake
-		conf.User = c.Credentials.User
-		conf.Password = c.Credentials.Password
-	} else if c.Credentials.AuthType == JWT {
-		conf.Authenticator = sf.AuthTypeJwt
-		// We run this as part of validate to ensure that there is no error, so
-		// this is not expected to error here
-		if key, err := c.Credentials.privateKey(); err != nil {
-			panic(err)
-		} else {
-			conf.PrivateKey = key
-		}
-		conf.User = c.Credentials.User
-	} else {
-		conf.Authenticator = sf.AuthTypeSnowflake
-		conf.User = c.User
-		conf.Password = c.Password
-	}
-
-	return conf
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
@@ -143,7 +136,6 @@ func validHost(h string) error {
 
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
-		{"account", c.Account},
 		{"host", c.Host},
 		{"database", c.Database},
 		{"schema", c.Schema},

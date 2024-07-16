@@ -24,7 +24,12 @@ type client struct {
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	dsn, err := cfg.toURI(ep.Tenant)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := stdsql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, err
 	}
