@@ -272,9 +272,6 @@ type tablePollInfo struct {
 	ColumnTypes  map[string]any
 }
 
-// Zero by default, this allows tests to simulate a higher latency connection to the database.
-var simulatedPollingLatency time.Duration
-
 func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, toLSN LSN, info *tablePollInfo) error {
 	log.WithFields(log.Fields{
 		"stream":   info.StreamID,
@@ -282,8 +279,6 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 		"fromLSN":  fromLSN,
 		"toLSN":    toLSN,
 	}).Trace("polling stream")
-
-	time.Sleep(simulatedPollingLatency)
 
 	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
 	rows, err := rs.conn.QueryContext(ctx, query, fromLSN, toLSN)
