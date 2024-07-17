@@ -343,7 +343,7 @@ class Events(IncrementalKlaviyoStream):
 
     cursor_field = "datetime"
     state_checkpoint_interval = 200  # API can return maximum 200 records per page
-    api_revision = "2024-06-15"
+    api_revision = "2024-07-15"
 
     def path(self, **kwargs) -> str:
         return "events"
@@ -355,17 +355,19 @@ class Events(IncrementalKlaviyoStream):
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        params["include"] = "attributions" 
         return params
     
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
-        for record in super().parse_response(response, **kwargs):
- 
-            if not record['attributes'].get("datetime", {}):
-                continue
+        for record in response.json()["data"]:
+            for attr in response.json()["included"]:
+                if attr['id'] == record['id'] and attr.get("relationships", {}).get("campaign", {}).get("data", {}).get("id", None) != None:
+                    record["campaign_id"] = attr.get("relationships", {}).get("campaign", {}).get("data", {}).get("id", None)
+                else:
+                    pass
 
             record['datetime'] = record['attributes']['datetime'].replace(" ","T")
             record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
-            record['campaign_id'] = record['attributes']["event_properties"].get("Campaign Name")
 
             yield record
 
