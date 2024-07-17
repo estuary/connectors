@@ -267,6 +267,11 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
+	// Debug logging hook so we can get the server config variables when needed
+	if err := db.logServerVariables(); err != nil {
+		logrus.WithField("err", err).Warn("failed to log server variables")
+	}
+
 	if db.config.Timezone != "" {
 		// The user-entered timezone value is verified to parse without error in (*Config).Validate,
 		// so this parsing is not expected to fail.
@@ -311,6 +316,38 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		logrus.WithField("err", err).Warn("failed to query database version")
 	}
 
+	return nil
+}
+
+func (db *mysqlDatabase) logServerVariables() error {
+	if !logrus.IsLevelEnabled(logrus.DebugLevel) {
+		return nil
+	}
+
+	var results, err = db.conn.Execute("SHOW VARIABLES;")
+	if err != nil {
+		return fmt.Errorf("unable to query server variables: %w", err)
+	}
+	defer results.Close()
+
+	if len(results.Fields) != 2 {
+		var fieldNames []string
+		for _, field := range results.Fields {
+			fieldNames = append(fieldNames, string(field.Name))
+		}
+		return fmt.Errorf("unexpected result columns: got %q", fieldNames)
+	}
+
+	var fields = make(logrus.Fields)
+	for _, row := range results.Values {
+		var key = string(row[0].AsString())
+		var val = row[1].Value()
+		if bs, ok := val.([]byte); ok {
+			val = string(bs)
+		}
+		fields[key] = val
+	}
+	logrus.WithFields(fields).Debug("queried server variables")
 	return nil
 }
 
