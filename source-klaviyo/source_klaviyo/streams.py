@@ -368,6 +368,7 @@ class Events(IncrementalKlaviyoStream):
 
             record['datetime'] = record['attributes']['datetime'].replace(" ","T")
             record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
+            record["attributes"]['event_properties'] = None
 
             yield record
 
