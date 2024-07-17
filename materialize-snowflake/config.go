@@ -36,6 +36,14 @@ type config struct {
 
 	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
+	// Compatibility config option for materializations that were created before
+	// we stopped creating columns for datetime fields as the general TIMESTAMP
+	// column type which often ends up being a TIMESTAMP_NTZ, which do not
+	// preserve timezone information or normalize to UTC. For new
+	// materializations we explicitly create datetime columns as either
+	// TIMESTAMP_LTZ or TIMESTAMP_TZ.
+	LegacyTimestampColumns bool `json:"_legacyTimestampColumns,omitempty" jsonschema:"-"`
 }
 
 type advancedConfig struct {

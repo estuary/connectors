@@ -109,7 +109,7 @@ func newSnowflakeDriver() *sql.Driver {
 			}
 			defer db.Close()
 
-			timestampTypeMapping, err := getTimestampTypeMapping(ctx, db)
+			timestampTypeMapping, err := getTimestampTypeMapping(ctx, db, parsed.LegacyTimestampColumns)
 			if err != nil {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
@@ -135,7 +135,12 @@ func newSnowflakeDriver() *sql.Driver {
 	}
 }
 
-func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, error) {
+func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB, legacyTimestampColumns bool) (timestampTypeMapping, error) {
+	if legacyTimestampColumns {
+		// Compatibility option was set.
+		return timestampUnspecified, nil
+	}
+
 	xdb := sqlx.NewDb(db, "snowflake").Unsafe()
 
 	type paramRow struct {

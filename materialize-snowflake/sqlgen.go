@@ -55,6 +55,13 @@ var (
 
 	// TZ stores the time in Snowflake as UTC with a time zone offset.
 	timestampTZ timestampTypeMapping = "TIMESTAMP_TZ"
+
+	// This generic timestamp column type is only allowed for old
+	// materializations that have the configuration option
+	// `_legacyTimestampColumns` set. It will result in columns being created as
+	// whatever the TIMESTAMP_TYPE_MAPPING is set to, which is TIMESTAMP_NTZ by
+	// default.
+	timestampUnspecified timestampTypeMapping = "TIMESTAMP"
 )
 
 func (m timestampTypeMapping) valid() bool {
