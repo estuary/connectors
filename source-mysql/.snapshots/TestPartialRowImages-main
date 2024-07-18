@@ -1,12 +1,12 @@
 # ================================
 # Collection "acmeCo/test/test_partialrowimages_16824726": 6 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"}},"a":3,"b":null,"c":null,"id":3}
-{"_meta":{"op":"c","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"}},"a":null,"b":4,"c":null,"id":4}
-{"_meta":{"op":"c","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"}},"a":null,"b":null,"c":5,"id":5}
-{"_meta":{"op":"u","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"},"before":{"a":null,"b":null,"c":null,"id":0}},"a":6,"b":null,"c":null,"id":null}
-{"_meta":{"op":"u","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"},"before":{"a":null,"b":null,"c":null,"id":1}},"a":null,"b":7,"c":null,"id":null}
-{"_meta":{"op":"u","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"},"before":{"a":null,"b":null,"c":null,"id":2}},"a":null,"b":null,"c":8,"id":null}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"a":3,"id":3}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"b":4,"id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"c":5,"id":5}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"},"before":{"id":0}},"a":6,"id":0}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"},"before":{"id":1}},"b":7,"id":1}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"},"before":{"id":2}},"c":8,"id":2}
 # ================================
 # Final State Checkpoint
 # ================================
