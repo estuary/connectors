@@ -267,7 +267,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for rowIdx, row := range data.Rows {
-					var after, err = decodeRow(streamID, columnNames, row)
+					var after, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
@@ -298,14 +298,15 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				for rowIdx := range data.Rows {
 					// Update events contain alternating (before, after) pairs of rows
 					if rowIdx%2 == 1 {
-						before, err := decodeRow(streamID, columnNames, data.Rows[rowIdx-1])
+						before, err := decodeRow(streamID, columnNames, data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1])
 						if err != nil {
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
-						after, err := decodeRow(streamID, columnNames, data.Rows[rowIdx])
+						after, err := decodeRow(streamID, columnNames, data.Rows[rowIdx], data.SkippedColumns[rowIdx])
 						if err != nil {
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
+						after = mergePreimage(after, before)
 						rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
 						if err != nil {
 							return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
@@ -336,7 +337,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				}
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 				for rowIdx, row := range data.Rows {
-					var before, err = decodeRow(streamID, columnNames, row)
+					var before, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
@@ -421,7 +422,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 	}
 }
 
-func decodeRow(streamID string, colNames []string, row []interface{}) (map[string]interface{}, error) {
+// decodeRow takes a list of column names, a parallel list of column values, and a list of indices
+// of columns which should be omitted from the decoded row state, and returns a map from colum names
+// to the corresponding values.
+func decodeRow(streamID string, colNames []string, row []any, skips []int) (map[string]any, error) {
 	// If we have more or fewer values than expected, something has gone wrong
 	// with our metadata tracking and it's best to die immediately. The fix in
 	// this case is almost always going to be deleting and recreating the
@@ -437,7 +441,21 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 	for idx, val := range row {
 		fields[colNames[idx]] = val
 	}
+	for _, omitColIdx := range skips {
+		delete(fields, colNames[omitColIdx])
+	}
 	return fields, nil
+}
+
+// mergePreimage fills out any unspecified properties of the 'fields' map with the
+// corresponding values from the 'preimage' map.
+func mergePreimage(fields map[string]any, preimage map[string]any) map[string]any {
+	for key, val := range preimage {
+		if _, ok := fields[key]; !ok {
+			fields[key] = val
+		}
+	}
+	return fields
 }
 
 // Query Events in the MySQL binlog are normalized enough that we can use
