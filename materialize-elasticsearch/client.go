@@ -32,8 +32,9 @@ func (c *client) createMetaIndex(ctx context.Context, replicas *int) error {
 		"specBytes": {Type: elasticTypeBinary},
 	}
 
-	numShards := 1
-	return c.createIndex(ctx, defaultFlowMaterializations, &numShards, replicas, props)
+	// The meta index will always be created with the default number of shards.
+	// Long term we plan to not require a meta index at all.
+	return c.createIndex(ctx, defaultFlowMaterializations, nil, replicas, props)
 }
 
 func (c *client) putSpec(ctx context.Context, spec *pf.MaterializationSpec, version string) error {
