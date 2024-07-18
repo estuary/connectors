@@ -471,6 +471,14 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		return nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 
+	serverless, err := client.serverless(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting serverless status: %w", err)
+	}
+	if serverless {
+		log.Info("connected to a serverless elasticsearch cluster")
+	}
+
 	indexToBinding := make(map[string]int)
 	var bindings []binding
 	for idx, b := range open.Materialization.Bindings {
@@ -506,6 +514,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		cfg:            &cfg,
 		client:         client,
 		bindings:       bindings,
+		serverless:     serverless,
 		indexToBinding: indexToBinding,
 	}
 	return transactor, &pm.Response_Opened{}, nil
