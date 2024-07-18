@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/test_partialrowimages_16824726": 6 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"}},"a":3,"b":null,"c":null,"id":3}
+{"_meta":{"op":"c","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"}},"a":null,"b":4,"c":null,"id":4}
+{"_meta":{"op":"c","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"}},"a":null,"b":null,"c":5,"id":5}
+{"_meta":{"op":"u","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"},"before":{"a":null,"b":null,"c":null,"id":0}},"a":6,"b":null,"c":null,"id":null}
+{"_meta":{"op":"u","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"},"before":{"a":null,"b":null,"c":null,"id":1}},"a":null,"b":7,"c":null,"id":null}
+{"_meta":{"op":"u","source":{"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123"},"before":{"a":null,"b":null,"c":null,"id":2}},"a":null,"b":null,"c":8,"id":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FPartialRowImages_16824726":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","a","b","c"],"types":{"a":{"type":"int"},"b":{"type":"int"},"c":{"type":"int"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

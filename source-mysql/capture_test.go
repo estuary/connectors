@@ -286,3 +286,29 @@ func TestUnsignedIntegers(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{2, "222", "55555", "11111111", "3333333333", "17777777777777777777"}})
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
+
+func TestPartialRowImages(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+
+	tb.Query(ctx, t, "SET SESSION binlog_row_image = 'MINIMAL'")
+	t.Cleanup(func() { tb.Query(ctx, t, "SET SESSION binlog_row_image = 'FULL'") })
+
+	var uniqueID = "16824726"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a INTEGER, b INTEGER, c INTEGER)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, 0, 0, 0}, {1, 1, 1, 1}, {2, 2, 2, 2}})
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s(id, a) VALUES (3, 3)", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s(id, b) VALUES (4, 4)", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s(id, c) VALUES (5, 5)", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET a = 6 WHERE id = 0", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET b = 7 WHERE id = 1", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET c = 8 WHERE id = 2", tableName))
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 0", tableName))
+	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
