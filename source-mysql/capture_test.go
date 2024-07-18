@@ -309,6 +309,6 @@ func TestPartialRowImages(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET c = 8 WHERE id = 2", tableName))
 	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 0", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 2", tableName))
 	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
