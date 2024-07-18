@@ -214,7 +214,7 @@ const standbyStatusInterval = 10 * time.Second
 // This buffer has been set to a fairly small value, because larger buffers can
 // cause OOM kills when the incoming data rate exceeds the rate at which we're
 // serializing data and getting it into Gazette journals.
-var replicationBufferSize = 1
+var replicationBufferSize = 16
 
 func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return s.events
