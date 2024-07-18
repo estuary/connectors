@@ -46,9 +46,10 @@ type binding struct {
 }
 
 type transactor struct {
-	cfg      *config
-	client   *client
-	bindings []binding
+	cfg          *config
+	client       *client
+	bindings     []binding
+	isServerless bool
 
 	// Used to correlate the binding number for loaded documents from Elasticsearch.
 	indexToBinding map[string]int
@@ -135,7 +136,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 	errCh := make(chan error, 1)
 
-	indexer, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
+	config := esutil.BulkIndexerConfig{
 		NumWorkers: storeWorkers,
 		FlushBytes: storeBatchSize,
 		Client:     t.client.es,
@@ -155,7 +156,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// the very least we could consider making this an advanced configuration option in the
 		// future if it is problematic.
 		WaitForActiveShards: "all",
-	})
+	}
+
+	if t.isServerless {
+		// Serverless does not support WaitForActiveShards.
+		config.WaitForActiveShards = ""
+	}
+
+	indexer, err := esutil.NewBulkIndexer(config)
 	if err != nil {
 		return nil, fmt.Errorf("creating bulk indexer: %w", err)
 	}
