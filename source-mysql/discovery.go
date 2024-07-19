@@ -640,20 +640,12 @@ func getPrimaryKeys(ctx context.Context, conn *client.Conn) (map[string][]string
 }
 
 const queryDiscoverSecondaryIndices = `
-SELECT stat.table_schema,
-       stat.table_name,
-       stat.index_name,
-	   stat.column_name,
-	   stat.seq_in_index
-FROM information_schema.statistics stat
-     JOIN information_schema.table_constraints tco
-          ON stat.table_schema = tco.table_schema
-          AND stat.table_name = tco.table_name
-          AND stat.index_name = tco.constraint_name
-WHERE stat.non_unique = 0
-      AND stat.table_schema NOT IN ('information_schema', 'sys', 'performance_schema', 'mysql')
-      AND tco.constraint_type != 'PRIMARY KEY'
-ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index
+SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, stat.seq_in_index
+  FROM information_schema.statistics stat
+  WHERE stat.non_unique = 0
+    AND stat.index_name != 'PRIMARY'
+    AND stat.table_schema NOT IN ('information_schema', 'sys', 'performance_schema', 'mysql')
+  ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index
 `
 
 func getSecondaryIndexes(ctx context.Context, conn *client.Conn) (map[string]map[string][]string, error) {
