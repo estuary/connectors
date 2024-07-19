@@ -60,7 +60,8 @@ func TestValidateAndApply(t *testing.T) {
 	}
 
 	catalog := glueCatalog{
-		cfg: &cfg,
+		cfg:           &cfg,
+		resourcePaths: [][]string{{"test_namespace", "test_table"}},
 	}
 
 	boilerplate.RunValidateAndApplyTestCases(
