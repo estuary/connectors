@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/estuary/connectors/go/auth/aws/credential-config",
+  "oneOf": [
+    {
+      "properties": {
+        "authType": {
+          "type": "string",
+          "const": "AccessKey",
+          "default": "AccessKey"
+        },
+        "awsAccessKeyId": {
+          "type": "string",
+          "title": "AWS Access Key ID",
+          "description": "Access Key ID to use for authorization.",
+          "order": 0
+        },
+        "awsSecretAccessKey": {
+          "type": "string",
+          "title": "AWS Secret Access Key",
+          "description": "Access secret access key to use for authorization.",
+          "order": 1,
+          "secret": true
+        }
+      },
+      "required": [
+        "authType",
+        "awsAccessKeyId",
+        "awsSecretAccessKey"
+      ],
+      "title": "Access Key"
+    },
+    {
+      "properties": {
+        "authType": {
+          "type": "string",
+          "const": "IamRolesAnywhere",
+          "default": "IamRolesAnywhere"
+        },
+        "clientPrivateKey": {
+          "type": "string",
+          "title": "Client Private Key",
+          "description": "Client private key.",
+          "multiline": true,
+          "order": 0,
+          "secret": true
+        },
+        "clientCertificate": {
+          "type": "string",
+          "title": "Client certificate",
+          "description": "Client certificate.",
+          "multiline": true,
+          "order": 1,
+          "secret": true
+        },
+        "trustAnchorArn": {
+          "type": "string",
+          "title": "Trust Anchor ARN",
+          "description": "Trust anchor to use for authentication.",
+          "examples": [
+            "arn:aws:rolesanywhere:region:account:trust-anchor/TA_ID"
+          ],
+          "order": 2
+        },
+        "profileArn": {
+          "type": "string",
+          "title": "Profile ARN",
+          "description": "Profile to pull policies from.",
+          "examples": [
+            "arn:aws:rolesanywhere:region:account:profile/PROFILE_ID"
+          ],
+          "order": 3
+        },
+        "roleArn": {
+          "type": "string",
+          "title": "Role ARN",
+          "description": "Target role to assume.",
+          "examples": [
+            "arn:aws:iam::account:role/role-name-with-path"
+          ],
+          "order": 4
+        }
+      },
+      "required": [
+        "authType",
+        "clientPrivateKey",
+        "clientCertificate",
+        "trustAnchorArn",
+        "profileArn",
+        "roleArn"
+      ],
+      "title": "IAM Roles Anywhere"
+    }
+  ],
+  "type": "object",
+  "title": "Test Config Schema",
+  "description": "AWS authentication credentials.",
+  "default": {
+    "authType": "AccessKey"
+  },
+  "discriminator": {
+    "propertyName": "authType"
+  }
+}
