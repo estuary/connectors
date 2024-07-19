@@ -20,11 +20,13 @@ type glueCatalog struct {
 	// the lastSpec from the validate or apply request.
 	lastSpec      *pf.MaterializationSpec
 	tableLocation string
+	resourcePaths [][]string
 }
 
-func newGlueCatalog(cfg config, lastSpec *pf.MaterializationSpec) *glueCatalog {
+func newGlueCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.MaterializationSpec) *glueCatalog {
 	return &glueCatalog{
 		cfg:           &cfg,
+		resourcePaths: resourcePaths,
 		lastSpec:      lastSpec,
 		tableLocation: fmt.Sprintf("s3://%s/%s/", cfg.Bucket, cfg.Prefix),
 	}
@@ -36,7 +38,17 @@ func (c *glueCatalog) infoSchema() (*boilerplate.InfoSchema, error) {
 		func(f string) string { return f },
 	)
 
-	b, err := runIcebergctl(c.cfg, "info-schema")
+	if len(c.resourcePaths) == 0 {
+		// No bindings so there are no tables that we care about; nothing to do.
+		return is, nil
+	}
+
+	pathsJson, err := json.Marshal(c.resourcePaths)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling paths: %w", err)
+	}
+
+	b, err := runIcebergctl(c.cfg, "info-schema", string(pathsJson))
 	if err != nil {
 		return nil, err
 	}
