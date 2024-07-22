@@ -470,8 +470,10 @@ async def fetch_recent_email_events(
     assert isinstance(log_cursor, datetime)
 
     url = f"{HUB}/email/public/v1/events"
-    # The email events API has known inconsistencies with very recent data.
-    horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
+    # The email events API has known inconsistencies with recent data. Empirical
+    # evidence suggests that values as short as 5 minutes are too recent, but 1
+    # hour of delay will work.
+    horizon = datetime.now(tz=UTC) - timedelta(hours=1)
     if horizon <= log_cursor:
         return
 
