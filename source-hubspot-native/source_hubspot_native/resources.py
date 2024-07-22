@@ -17,7 +17,7 @@ from .api import (
     fetch_properties,
     fetch_recent_companies,
     fetch_recent_contacts,
-    fetch_recent_custom_objects,
+    fetch_recent_search_objects,
     fetch_recent_deals,
     fetch_recent_email_events,
     fetch_recent_engagements,
@@ -59,15 +59,15 @@ async def all_resources(
 
     custom_object_resources = [
         crm_object(
-            CustomObject, n, http, functools.partial(fetch_recent_custom_objects, n)
+            CustomObject, n, http, functools.partial(fetch_recent_search_objects, n, None)
         )
         for n in custom_object_names
     ]
 
     return [
-        crm_object(Company, Names.companies, http, fetch_recent_companies),
+        crm_object(Company, Names.companies, http, fetch_recent_companies, True),
         crm_object(Contact, Names.contacts, http, fetch_recent_contacts),
-        crm_object(Deal, Names.deals, http, fetch_recent_deals),
+        crm_object(Deal, Names.deals, http, fetch_recent_deals, True),
         crm_object(Engagement, Names.engagements, http, fetch_recent_engagements),
         crm_object(Ticket, Names.tickets, http, fetch_recent_tickets),
         properties(http, itertools.chain(standard_object_names, custom_object_names)),
@@ -77,7 +77,11 @@ async def all_resources(
 
 
 def crm_object(
-    cls: type[CRMObject], object_name, http: HTTPSession, fetch_recent: FetchRecentFn
+    cls: type[CRMObject],
+    object_name: str,
+    http: HTTPSession,
+    fetch_recent: FetchRecentFn,
+    fallback_to_search_api: bool = False,
 ) -> Resource:
 
     def open(
@@ -92,7 +96,7 @@ def crm_object(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http, object_name),
+            fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http, object_name, fallback_to_search_api),
             fetch_page=functools.partial(fetch_page, cls, http, object_name),
         )
 
