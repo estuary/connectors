@@ -180,6 +180,6 @@ def email_events(http: HTTPSession) -> Resource:
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=Names.email_events),
+        initial_config=ResourceConfig(name=Names.email_events, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
