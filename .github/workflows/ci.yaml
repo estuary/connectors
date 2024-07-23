@@ -71,6 +71,7 @@ jobs:
         connector:
           - source-alpaca
           - source-bigquery-batch
+          - source-dropbox
           - source-dynamodb
           - source-firestore
           - source-gcs
