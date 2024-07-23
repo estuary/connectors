@@ -1,0 +1,9 @@
+captures:
+  acmeCo/source-iterable:
+    shards:
+      logLevel: debug
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-iterable:dev"
+        config: config.yaml
+    bindings: []
