@@ -27,6 +27,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/databricks/databricks-sdk-go v0.41.0
 	github.com/databricks/databricks-sql-go v1.5.5
+	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
 	github.com/estuary/flow v0.3.12-0.20240118233153-7681c66d4e1f
 	github.com/evanphx/json-patch/v5 v5.6.0
