@@ -19,9 +19,9 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -264,6 +264,9 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		}
 
 		return fmt.Errorf("unable to connect to database: %w", err)
+	}
+	if err := registerDatatypeTweaks(conn.TypeMap()); err != nil {
+		return err
 	}
 	db.conn = conn
 	return nil

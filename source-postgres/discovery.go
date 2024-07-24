@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -13,15 +12,15 @@ import (
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	infinityTimestamp         = "9999-12-31T23:59:59Z"
 	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
-	RFC3339TimeFormat         = "15:04:05.999999999Z07:00"
+	rfc3339TimeFormat         = "15:04:05.999999999Z07:00"
 	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
 )
 
@@ -305,17 +304,15 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			}
 			for _, format := range formats {
 				if t, err := time.Parse(format, x); err == nil {
-					return t.Format(RFC3339TimeFormat), nil
+					return t.Format(rfc3339TimeFormat), nil
 				}
 			}
 		}
 	}
 	switch x := val.(type) {
-	case *net.IPNet:
+	case net.HardwareAddr: // column types 'macaddr' and 'macaddr8'
 		return x.String(), nil
-	case net.HardwareAddr:
-		return x.String(), nil
-	case [16]uint8: // UUIDs
+	case [16]uint8: // column type 'uuid'
 		var s = new(strings.Builder)
 		for i := range x {
 			if i == 4 || i == 6 || i == 8 || i == 10 {
@@ -334,7 +331,11 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			return x[:truncateColumnThreshold], nil
 		}
 		return x, nil
-	case map[string]any:
+	case pgtype.Array[any]:
+		return translateArray(column, x)
+	case pgtype.Range[any]:
+		return stringifyRange(x)
+	case map[string]any: // TODO(wgd): Is this needed for anything after we fix JSON columns?
 		var bs, err = json.Marshal(x)
 		if err != nil {
 			return nil, fmt.Errorf("error reserializing json column %q: %w", columnName, err)
@@ -348,35 +349,6 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			return x.String[:truncateColumnThreshold], nil
 		}
 		return x.String, nil
-	case pgtype.Bytea:
-		if len(x.Bytes) > truncateColumnThreshold {
-			return x.Bytes[:truncateColumnThreshold], nil
-		}
-		return x.Bytes, nil
-	case pgtype.JSON:
-		if len(x.Bytes) > truncateColumnThreshold {
-			return oversizePlaceholderJSON(x.Bytes), nil
-		}
-		return json.RawMessage(x.Bytes), nil
-	case pgtype.JSONB:
-		if len(x.Bytes) > truncateColumnThreshold {
-			return oversizePlaceholderJSON(x.Bytes), nil
-		}
-		return json.RawMessage(x.Bytes), nil
-	case pgtype.Float4:
-		return x.Float, nil
-	case pgtype.Float8:
-		return x.Float, nil
-	case pgtype.BPCharArray, pgtype.BoolArray, pgtype.ByteaArray, pgtype.CIDRArray,
-		pgtype.DateArray, pgtype.EnumArray, pgtype.Float4Array, pgtype.Float8Array,
-		pgtype.HstoreArray, pgtype.InetArray, pgtype.Int2Array, pgtype.Int4Array,
-		pgtype.Int8Array, pgtype.JSONBArray, pgtype.MacaddrArray, pgtype.NumericArray,
-		pgtype.TextArray, pgtype.TimestampArray, pgtype.TimestamptzArray, pgtype.TsrangeArray,
-		pgtype.TstzrangeArray, pgtype.UUIDArray, pgtype.UntypedTextArray, pgtype.VarcharArray:
-		// TODO(wgd): If PostgreSQL value translation starts using the provided column
-		// information, this will need to be plumbed through the array translation
-		// logic so that the same behavior can apply to individual array elements.
-		return translateArray(nil, x)
 	case pgtype.InfinityModifier:
 		// Postgres has special timestamp values for "infinity" and "-infinity" which it handles
 		// internally for performing comparisions. We do our best to represent these as an RFC3339
@@ -389,21 +361,74 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		} else if x == pgtype.NegativeInfinity {
 			return negativeInfinityTimestamp, nil
 		}
-	case pgtype.Timestamptz:
-		return formatRFC3339(x.Time)
-	case pgtype.Timestamp:
-		return formatRFC3339(x.Time)
 	case time.Time:
 		return formatRFC3339(x)
+	case pgtype.Time:
+		return x.Microseconds, nil // For historical reasons, times (note: not timestamps) without time zone are serialized as Unix microseconds
+	case pgtype.Numeric:
+		// By default a Numeric value is marshalled to a JSON number, but most JSON parsers and
+		// encoders suffer from precision issues so we really want them to be turned into a JSON
+		// string containing the formatted number instead.
+		var bs, err = json.Marshal(x)
+		if err != nil {
+			return nil, err
+		}
+		return string(bs), nil
+	case pgtype.Bits:
+		return x.Value() // The Value() method encodes to the desired "0101" text string
+	case pgtype.Interval:
+		return x.Value()
+	case pgtype.Line:
+		return x.Value()
+	case pgtype.Lseg:
+		return x.Value()
+	case pgtype.Box:
+		return x.Value()
+	case pgtype.Path:
+		return x.Value()
+	case pgtype.Polygon:
+		return x.Value()
+	case pgtype.Circle:
+		return x.Value()
 	}
-	if _, ok := val.(json.Marshaler); ok {
-		return val, nil
-	}
-	if enc, ok := val.(pgtype.TextEncoder); ok {
-		var bs, err = enc.EncodeText(nil, nil)
-		return string(bs), err
-	}
+
 	return val, nil
+}
+
+func stringifyRange(r pgtype.Range[any]) (string, error) {
+	if r.LowerType == pgtype.Empty || r.UpperType == pgtype.Empty {
+		return "empty", nil
+	}
+
+	var buf = new(strings.Builder)
+	switch r.LowerType {
+	case pgtype.Inclusive:
+		buf.WriteString("[")
+	case pgtype.Exclusive, pgtype.Unbounded:
+		buf.WriteString("(")
+	}
+	if r.LowerType == pgtype.Inclusive || r.LowerType == pgtype.Exclusive {
+		if translated, err := translateRecordField(nil, r.Lower); err != nil {
+			fmt.Fprintf(buf, "%v", r.Lower)
+		} else {
+			fmt.Fprintf(buf, "%v", translated)
+		}
+	}
+	buf.WriteString(",")
+	if r.UpperType == pgtype.Inclusive || r.UpperType == pgtype.Exclusive {
+		if translated, err := translateRecordField(nil, r.Upper); err != nil {
+			fmt.Fprintf(buf, "%v", r.Upper)
+		} else {
+			fmt.Fprintf(buf, "%v", translated)
+		}
+	}
+	switch r.UpperType {
+	case pgtype.Inclusive:
+		buf.WriteString("]")
+	case pgtype.Exclusive, pgtype.Unbounded:
+		buf.WriteString(")")
+	}
+	return buf.String(), nil
 }
 
 func formatRFC3339(t time.Time) (any, error) {
@@ -416,39 +441,21 @@ func formatRFC3339(t time.Time) (any, error) {
 	return t.Format(time.RFC3339Nano), nil
 }
 
-func translateArray(column *sqlcapture.ColumnInfo, x interface{}) (interface{}, error) {
-	// Use reflection to extract the 'elements' field
-	var array = reflect.ValueOf(x)
-	if array.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("array translation expected struct, got %v", array.Kind())
+func translateArray(_ *sqlcapture.ColumnInfo, x pgtype.Array[any]) (any, error) {
+	var dims []int
+	for _, dim := range x.Dims {
+		dims = append(dims, int(dim.Length))
 	}
-
-	var elements = array.FieldByName("Elements")
-	if elements.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("array translation expected Elements slice, got %v", elements.Kind())
-	}
-	var vals = make([]interface{}, elements.Len())
-	for idx := 0; idx < len(vals); idx++ {
-		var element = elements.Index(idx)
-		var translated, err = translateRecordField(column, element.Interface())
+	for idx := range x.Elements {
+		var translated, err = translateRecordField(nil, x.Elements[idx])
 		if err != nil {
-			return nil, fmt.Errorf("error translating array element %d: %w", idx, err)
+			return nil, err
 		}
-		vals[idx] = translated
+		x.Elements[idx] = translated
 	}
-
-	var dimensions, ok = array.FieldByName("Dimensions").Interface().([]pgtype.ArrayDimension)
-	if !ok {
-		return nil, fmt.Errorf("array translation error: expected Dimensions to have type []ArrayDimension")
-	}
-	var dims = make([]int, len(dimensions))
-	for idx := 0; idx < len(dims); idx++ {
-		dims[idx] = int(dimensions[idx].Length)
-	}
-
-	return map[string]interface{}{
+	return map[string]any{
 		"dimensions": dims,
-		"elements":   vals,
+		"elements":   x.Elements,
 	}, nil
 }
 
@@ -537,8 +544,16 @@ const queryDiscoverTables = `
 func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
 	logrus.Debug("listing all tables in the database")
 	var tables []*sqlcapture.DiscoveryInfo
-	var tableSchema, tableName string
-	var _, err = conn.QueryFunc(ctx, queryDiscoverTables, nil, []any{&tableSchema, &tableName}, func(pgx.QueryFuncRow) error {
+	var rows, err = conn.Query(ctx, queryDiscoverTables)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tableSchema, tableName string
+		if err := rows.Scan(&tableSchema, &tableName); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
 		var omitBinding = false
 		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, tableSchema) {
 			logrus.WithFields(logrus.Fields{
@@ -553,9 +568,8 @@ func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([
 			BaseTable:   true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
 			OmitBinding: omitBinding,
 		})
-		return nil
-	})
-	return tables, err
+	}
+	return tables, rows.Err()
 }
 
 const queryDiscoverColumns = `
@@ -581,34 +595,40 @@ const queryDiscoverColumns = `
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
 	logrus.Debug("listing all columns in the database")
 	var columns []sqlcapture.ColumnInfo
-	var sc sqlcapture.ColumnInfo
-	var typtype string
-	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
-		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType, &typtype},
-		func(r pgx.QueryFuncRow) error {
-			// Special cases for user-defined types where we must resolve the columnSchema directly.
-			switch typtype {
-			case "c": // composite
-				// TODO(whb): We don't currently do any kind of special handling for composite
-				// (tuple) types and just output whatever we get from from pgx's GenericText
-				// decoder. The generated text for these isn't very usable and we may be able to
-				// improve this by discovering composite types, building decoders for them, and
-				// registering the decoders with the pgx connection. pgx v5 has new utility methods
-				// specifically for doing this.
-			case "e": // enum
-				// Enum values are always strings corresponding to an enum label.
-				sc.DataType = columnSchema{jsonType: "string"}
-			case "r", "m": // range, multirange
-				// Capture ranges in their text form to retain inclusive (like `[`) & exclusive
-				// (like `(`) bounds information. For example, the text form of a range representing
-				// "integers greater than or equal to 1 but less than 5" is '[1,5)'
-				sc.DataType = columnSchema{jsonType: "string"}
-			}
+	var rows, err = conn.Query(ctx, queryDiscoverColumns)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var col sqlcapture.ColumnInfo
+		var typtype string
+		if err := rows.Scan(&col.TableSchema, &col.TableName, &col.Index, &col.Name, &col.IsNullable, &col.DataType, &typtype); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
 
-			columns = append(columns, sc)
-			return nil
-		})
-	return columns, err
+		// Special cases for user-defined types where we must resolve the columnSchema directly.
+		switch typtype {
+		case "c": // composite
+			// TODO(whb): We don't currently do any kind of special handling for composite
+			// (tuple) types and just output whatever we get from from pgx's GenericText
+			// decoder. The generated text for these isn't very usable and we may be able to
+			// improve this by discovering composite types, building decoders for them, and
+			// registering the decoders with the pgx connection. pgx v5 has new utility methods
+			// specifically for doing this.
+		case "e": // enum
+			// Enum values are always strings corresponding to an enum label.
+			col.DataType = columnSchema{jsonType: "string"}
+		case "r", "m": // range, multirange
+			// Capture ranges in their text form to retain inclusive (like `[`) & exclusive
+			// (like `(`) bounds information. For example, the text form of a range representing
+			// "integers greater than or equal to 1 but less than 5" is '[1,5)'
+			col.DataType = columnSchema{jsonType: "string"}
+		}
+
+		columns = append(columns, col)
+	}
+	return columns, rows.Err()
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
@@ -640,19 +660,24 @@ const queryDiscoverPrimaryKeys = `
 func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, error) {
 	logrus.Debug("listing all primary-key columns in the database")
 	var keys = make(map[string][]string)
-	var tableSchema, tableName, columnName string
-	var columnIndex int
-	var _, err = conn.QueryFunc(ctx, queryDiscoverPrimaryKeys, nil,
-		[]interface{}{&tableSchema, &tableName, &columnName, &columnIndex},
-		func(r pgx.QueryFuncRow) error {
-			var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
-			keys[streamID] = append(keys[streamID], columnName)
-			if columnIndex != len(keys[streamID]) {
-				return fmt.Errorf("primary key column %q of table %q appears out of order (expected index %d, in context %q)", columnName, streamID, columnIndex, keys[streamID])
-			}
-			return nil
-		})
-	return keys, err
+	var rows, err = conn.Query(ctx, queryDiscoverPrimaryKeys)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tableSchema, tableName, columnName string
+		var columnIndex int
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+		keys[streamID] = append(keys[streamID], columnName)
+		if columnIndex != len(keys[streamID]) {
+			return nil, fmt.Errorf("primary key column %q of table %q appears out of order (expected index %d, in context %q)", columnName, streamID, columnIndex, keys[streamID])
+		}
+	}
+	return keys, rows.Err()
 }
 
 const queryDiscoverSecondaryIndices = `
@@ -679,28 +704,33 @@ ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
 
 func getSecondaryIndexes(ctx context.Context, conn *pgx.Conn) (map[string]map[string][]string, error) {
 	logrus.Debug("listing secondary indexes")
-
 	// Run the 'list secondary indexes' query and aggregate results into
 	// a `map[StreamID]map[IndexName][]ColumnName`
 	var streamIndexColumns = make(map[string]map[string][]string)
-	var tableSchema, tableName, indexName, columnName string
-	var keySequence int
-	var _, err = conn.QueryFunc(ctx, queryDiscoverSecondaryIndices, nil,
-		[]interface{}{&tableSchema, &tableName, &indexName, &keySequence, &columnName},
-		func(r pgx.QueryFuncRow) error {
-			var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
-			var indexColumns = streamIndexColumns[streamID]
-			if indexColumns == nil {
-				indexColumns = make(map[string][]string)
-				streamIndexColumns[streamID] = indexColumns
-			}
-			indexColumns[indexName] = append(indexColumns[indexName], columnName)
-			if len(indexColumns[indexName]) != keySequence {
-				return fmt.Errorf("internal error: secondary index key ordering failure: index %q on stream %q: column %q appears out of order", indexName, streamID, columnName)
-			}
-			return nil
-		})
-	return streamIndexColumns, err
+	var rows, err = conn.Query(ctx, queryDiscoverSecondaryIndices)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tableSchema, tableName, indexName, columnName string
+		var keySequence int
+		if err := rows.Scan(&tableSchema, &tableName, &indexName, &keySequence, &columnName); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+		var indexColumns = streamIndexColumns[streamID]
+		if indexColumns == nil {
+			indexColumns = make(map[string][]string)
+			streamIndexColumns[streamID] = indexColumns
+		}
+		indexColumns[indexName] = append(indexColumns[indexName], columnName)
+		if len(indexColumns[indexName]) != keySequence {
+			return nil, fmt.Errorf("internal error: secondary index key ordering failure: index %q on stream %q: column %q appears out of order", indexName, streamID, columnName)
+		}
+	}
+
+	return streamIndexColumns, rows.Err()
 }
 
 const queryColumnDescriptions = `
@@ -723,12 +753,17 @@ type columnDescription struct {
 
 func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescription, error) {
 	var descriptions []columnDescription
-	var desc columnDescription
-	var _, err = conn.QueryFunc(ctx, queryColumnDescriptions, nil,
-		[]interface{}{&desc.TableSchema, &desc.TableName, &desc.ColumnName, &desc.Description},
-		func(r pgx.QueryFuncRow) error {
-			descriptions = append(descriptions, desc)
-			return nil
-		})
-	return descriptions, err
+	var rows, err = conn.Query(ctx, queryColumnDescriptions)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var desc columnDescription
+		if err := rows.Scan(&desc.TableSchema, &desc.TableName, &desc.ColumnName, &desc.Description); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		descriptions = append(descriptions, desc)
+	}
+	return descriptions, rows.Err()
 }

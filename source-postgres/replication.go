@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -103,6 +103,11 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
+	var typeMap = pgtype.NewMap()
+	if err := registerDatatypeTweaks(typeMap); err != nil {
+		return nil, err
+	}
+
 	var stream = &replicationStream{
 		db:       db,
 		conn:     conn,
@@ -113,7 +118,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		lastTxnEndLSN:   startLSN,
 		nextTxnFinalLSN: 0,
 		nextTxnMillis:   0,
-		connInfo:        pgtype.NewConnInfo(),
+		typeMap:         typeMap,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
@@ -185,9 +190,8 @@ type replicationStream struct {
 	// the DB.
 	standbyStatusDeadline time.Time
 
-	// connInfo is a sort of type registry used when decoding values
-	// from the database.
-	connInfo *pgtype.ConnInfo
+	// typeMap is a sort of type registry used when decoding values from the database.
+	typeMap *pgtype.Map
 
 	// relations keeps track of all "Relation Messages" from the database. These
 	// messages tell us about the integer ID corresponding to a particular table
@@ -566,28 +570,24 @@ func (s *replicationStream) decodeTuple(
 	return fields, nil
 }
 
-func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
-	var decoder pgtype.TextDecoder
-	if dt, ok := s.connInfo.DataTypeForOID(dataType); ok {
-		decoder, ok = dt.Value.(pgtype.TextDecoder)
-		if !ok {
-			decoder = &pgtype.GenericText{}
-		}
-	} else {
-		decoder = &pgtype.GenericText{}
+func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (any, error) {
+	var dt, ok = s.typeMap.TypeForOID(dataType)
+	if !ok {
+		// Replication values always use the text encoding, and in the absence of any specific
+		// data type mapping we want to treat them as generic text strings, which is just a cast.
+		return string(data), nil
 	}
-	if err := decoder.DecodeText(s.connInfo, data); err != nil {
-		if _, ok := err.(*time.ParseError); ok {
-			// The only known situations where a valid Postgres timestamp may fail to parse
-			// are when the year is greater than 9999 or less than 0. We don't support years
-			// outside of that range because timestamps are serialized to RFC3339, but generally
-			// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
-			// these all to the same error value is as good as any other option.
-			return negativeInfinityTimestamp, nil
-		}
-		return nil, err
+
+	var val, err = dt.Codec.DecodeValue(s.typeMap, dataType, pgtype.TextFormatCode, data)
+	// The only known situations where a valid Postgres timestamp may fail to parse
+	// are when the year is greater than 9999 or less than 0. We don't support years
+	// outside of that range because timestamps are serialized to RFC3339, but generally
+	// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
+	// these all to the same error value is as good as any other option.
+	if _, ok := err.(*time.ParseError); ok {
+		return negativeInfinityTimestamp, nil
 	}
-	return decoder.(pgtype.Value).Get(), nil
+	return val, err
 }
 
 // receiveMessage reads and parses the next replication message from the database,

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/sirupsen/logrus"
 )
 
@@ -186,17 +186,16 @@ func (db *postgresDatabase) prerequisiteWatermarksTable(ctx context.Context) err
 	var logEntry = logrus.WithField("table", table)
 
 	// If we can successfully write a watermark then we're satisfied here
-	if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
+	var err = db.WriteWatermark(ctx, "existence-check")
+	if err == nil {
 		logEntry.Debug("watermarks table already exists")
 		return nil
-	} else {
-		logEntry.WithField("err", err).Warn("error writing to watermarks table")
 	}
+	logEntry.WithField("err", err).Warn("error writing to watermarks table")
 
 	// If we can create the watermarks table and then write a watermark, that also works
 	logEntry.Info("attempting to create watermarks table")
-	var _, err = db.conn.Exec(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table))
-	if err == nil {
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table)); err == nil {
 		if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
 			logEntry.Info("successfully created watermarks table")
 			return nil
