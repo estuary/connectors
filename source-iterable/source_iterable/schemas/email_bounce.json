@@ -21,13 +21,13 @@
       }
     },
     "messageId": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "templateId": {
       "type": ["null", "integer"]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userId": {
       "type": ["null", "string"]
@@ -36,5 +36,5 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

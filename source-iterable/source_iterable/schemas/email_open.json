@@ -33,7 +33,7 @@
       "type": ["null", "string"]
     },
     "messageId": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userAgent": {
       "type": ["null", "string"]
@@ -45,11 +45,11 @@
       "type": ["null", "string"]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userId": {
       "type": ["null", "string"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

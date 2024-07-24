@@ -32,7 +32,7 @@
       "type": ["null", "string"]
     },
     "messageId": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "hrefIndex": {
       "type": ["null", "integer"]
@@ -54,11 +54,11 @@
       "type": ["null", "string"]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userId": {
       "type": ["null", "string"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

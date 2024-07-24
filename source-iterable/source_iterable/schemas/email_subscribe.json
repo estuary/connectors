@@ -1,7 +1,7 @@
 {
   "properties": {
     "createdAt": {
-      "type": ["null", "string"],
+      "type": "string",
       "format": "date-time"
     },
     "signupSource": {
@@ -28,7 +28,7 @@
       "type": ["null", "integer"]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userId": {
       "type": ["null", "string"]
@@ -41,5 +41,5 @@
       "type": ["null", "integer"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

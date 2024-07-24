@@ -1,8 +1,15 @@
 {
-  "properties": {
-    "data": {
-      "type": ["null", "object"]
-    }
+  "properties":{
+      "data": {
+          "properties":{
+              "id":{
+                  "type":"integer"
+              }
+          },
+          "type":"object"
+      }
+
+      
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

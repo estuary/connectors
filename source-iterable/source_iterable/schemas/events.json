@@ -17,11 +17,11 @@
       "type": ["null", "string"]
     },
     "createdAt": {
-      "type": ["null", "string"],
+      "type": "string",
       "format": "date-time"
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userId": {
       "type": ["null", "string"]
@@ -30,5 +30,5 @@
       "type": ["null", "object"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }
