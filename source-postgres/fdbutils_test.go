@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,39 +18,39 @@ func TestEncodePgNumeric(t *testing.T) {
 		expected tuple.Tuple
 	}{
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(1), Exp: 0},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(1), Exp: 0},
 			[]tuple.TupleElement{20001, []byte("1")}, // "1e0"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(1), Exp: -16382},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(1), Exp: -16382},
 			[]tuple.TupleElement{3619, []byte("1")}, // "1e-16382"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(12309), Exp: -6},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(12309), Exp: -6},
 			[]tuple.TupleElement{19999, []byte("12309")}, // "12309e-6"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(123400), Exp: 3},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(123400), Exp: 3},
 			[]tuple.TupleElement{20009, []byte("1234")}, // "123400e3"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(0), Exp: 0},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(0), Exp: 0},
 			[]tuple.TupleElement{0, []byte(nil)}, // "0e0"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-1), Exp: 0},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(-1), Exp: 0},
 			[]tuple.TupleElement{-20001, []byte("8:")}, // "-1e0"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-1), Exp: -16382},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(-1), Exp: -16382},
 			[]tuple.TupleElement{-3619, []byte("8:")}, // "-1e-1"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-12309), Exp: -6},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(-12309), Exp: -6},
 			[]tuple.TupleElement{-19999, []byte("87690:")}, // "-12309e-6"
 		},
 		{
-			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-123400), Exp: 3},
+			pgtype.Numeric{Valid: true, Int: big.NewInt(-123400), Exp: 3},
 			[]tuple.TupleElement{-20009, []byte("8765:")}, // "-123400e3"
 		},
 	}
