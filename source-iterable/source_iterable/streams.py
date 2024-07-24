@@ -13,7 +13,7 @@ import pendulum
 import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
-from airbyte_cdk.sources.streams.core import CheckpointMixin, package_name_from_class
+from airbyte_cdk.sources.streams.core import IncrementalMixin, package_name_from_class
 from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException, UserDefinedBackoffException
 from airbyte_cdk.sources.utils.schema_helpers import ResourceSchemaLoader
@@ -137,7 +137,7 @@ class IterableStream(HttpStream, ABC):
             raise e
 
 
-class IterableExportStream(IterableStream, CheckpointMixin, ABC):
+class IterableExportStream(IterableStream, IncrementalMixin, ABC):
     """
     This stream utilize "export" Iterable api for getting large amount of data.
     It can return data in form of new line separater strings each of each
@@ -393,6 +393,7 @@ class ListUsers(IterableStream):
 
 class Campaigns(IterableStream):
     data_field = "campaigns"
+    primary_key = "id"
 
     def path(self, **kwargs) -> str:
         return "campaigns"
@@ -400,7 +401,7 @@ class Campaigns(IterableStream):
 
 class CampaignsMetrics(IterableStream):
     name = "campaigns_metrics"
-    primary_key = None
+    primary_key = "data/id"
     data_field = None
 
     def __init__(self, start_date: str, end_date: Optional[str] = None, **kwargs):
@@ -545,144 +546,179 @@ class Events(IterableStream):
 
 class EmailBounce(IterableExportStreamAdjustableRange):
     data_field = "emailBounce"
+    primary_key = ["messageId", "email"]
 
 
 class EmailClick(IterableExportStreamAdjustableRange):
     data_field = "emailClick"
+    primary_key = ["messageId", "email"]
 
 
 class EmailComplaint(IterableExportStreamAdjustableRange):
     data_field = "emailComplaint"
+    primary_key = ["messageId", "email"]
 
 
 class EmailOpen(IterableExportStreamAdjustableRange):
     data_field = "emailOpen"
+    primary_key = ["messageId", "email"]
 
 
 class EmailSend(IterableExportStreamAdjustableRange):
     data_field = "emailSend"
+    primary_key = ["messageId", "email"]
 
 
 class EmailSendSkip(IterableExportStreamAdjustableRange):
     data_field = "emailSendSkip"
+    primary_key = ["messageId", "email"]
 
 
 class EmailSubscribe(IterableExportStreamAdjustableRange):
     data_field = "emailSubscribe"
+    primary_key = ["email", "createdAt"]
 
 
 class EmailUnsubscribe(IterableExportStreamAdjustableRange):
     data_field = "emailUnsubscribe"
+    primary_key = ["email"]
 
 
 class PushSend(IterableExportEventsStreamAdjustableRange):
     data_field = "pushSend"
+    primary_key = ["email", "createdAt"]
 
 
 class PushSendSkip(IterableExportEventsStreamAdjustableRange):
     data_field = "pushSendSkip"
+    primary_key = ["email", "createdAt"]
 
 
 class PushOpen(IterableExportEventsStreamAdjustableRange):
     data_field = "pushOpen"
+    primary_key = ["email", "createdAt"]
 
 
 class PushUninstall(IterableExportEventsStreamAdjustableRange):
     data_field = "pushUninstall"
+    primary_key = ["email", "createdAt"]
 
 
 class PushBounce(IterableExportEventsStreamAdjustableRange):
     data_field = "pushBounce"
+    primary_key = ["email", "createdAt"]
 
 
 class WebPushSend(IterableExportEventsStreamAdjustableRange):
     data_field = "webPushSend"
+    primary_key = ["email", "createdAt"]
 
 
 class WebPushClick(IterableExportEventsStreamAdjustableRange):
     data_field = "webPushClick"
+    primary_key = ["email", "createdAt"]
 
 
 class WebPushSendSkip(IterableExportEventsStreamAdjustableRange):
     data_field = "webPushSendSkip"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppSend(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppSend"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppOpen(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppOpen"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppClick(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppClick"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppClose(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppClose"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppDelete(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppDelete"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppDelivery(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppDelivery"
+    primary_key = ["email", "createdAt"]
 
 
 class InAppSendSkip(IterableExportEventsStreamAdjustableRange):
     data_field = "inAppSendSkip"
+    primary_key = ["email", "createdAt"]
 
 
 class InboxSession(IterableExportEventsStreamAdjustableRange):
     data_field = "inboxSession"
+    primary_key = ["email", "createdAt"]
 
 
 class InboxMessageImpression(IterableExportEventsStreamAdjustableRange):
     data_field = "inboxMessageImpression"
+    primary_key = ["email", "createdAt"]
 
 
 class SmsSend(IterableExportEventsStreamAdjustableRange):
     data_field = "smsSend"
+    primary_key = ["email", "createdAt"]
 
 
 class SmsBounce(IterableExportEventsStreamAdjustableRange):
     data_field = "smsBounce"
+    primary_key = ["email", "createdAt"]
 
 
 class SmsClick(IterableExportEventsStreamAdjustableRange):
     data_field = "smsClick"
+    primary_key = ["email", "createdAt"]
 
 
 class SmsReceived(IterableExportEventsStreamAdjustableRange):
     data_field = "smsReceived"
+    primary_key = ["email", "createdAt"]
 
 
 class SmsSendSkip(IterableExportEventsStreamAdjustableRange):
     data_field = "smsSendSkip"
+    primary_key = ["email", "createdAt"]
 
 
 class SmsUsageInfo(IterableExportEventsStreamAdjustableRange):
     data_field = "smsUsageInfo"
+    primary_key = ["email", "createdAt"]
 
 
 class Purchase(IterableExportEventsStreamAdjustableRange):
     data_field = "purchase"
+    primary_key = ["email", "createdAt"]
 
 
 class CustomEvent(IterableExportEventsStreamAdjustableRange):
     data_field = "customEvent"
+    primary_key = ["email", "createdAt"]
 
 
 class HostedUnsubscribeClick(IterableExportEventsStreamAdjustableRange):
     data_field = "hostedUnsubscribeClick"
+    primary_key = ["email", "createdAt"]
 
 
 class Templates(IterableExportStreamRanged):
     data_field = "templates"
     template_types = ["Base", "Blast", "Triggered", "Workflow"]
     message_types = ["Email", "Push", "InApp", "SMS"]
+    primary_key = "templateId"
 
     def path(self, **kwargs) -> str:
         return "templates"
@@ -705,6 +741,7 @@ class Templates(IterableExportStreamRanged):
 class Users(IterableExportStreamRanged):
     data_field = "user"
     cursor_field = "profileUpdatedAt"
+    primary_key = "email"
 
 
 class AccessCheck(ListUsers):

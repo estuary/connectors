@@ -1,7 +1,7 @@
 {
   "properties": {
     "templateId": {
-      "type": ["null", "number"]
+      "type": "number"
     },
     "createdAt": {
       "type": ["null", "string"],
@@ -26,5 +26,5 @@
       "type": ["null", "string"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

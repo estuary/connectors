@@ -111,7 +111,7 @@
       "type": ["null", "integer"]
     },
     "messageId": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "messageBusId": {
       "type": ["null", "string"]
@@ -120,7 +120,7 @@
       "type": ["null", "integer"]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "userId": {
       "type": ["null", "string"]
@@ -129,5 +129,5 @@
       "type": ["null", "integer"]
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }

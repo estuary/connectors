@@ -276,7 +276,7 @@
       "type": ["null", "string"]
     },
     "email": {
-      "type": ["null", "string"]
+      "type": "string"
     },
     "thirdMostRecentOrderCards": {
       "type": ["null", "array"],
