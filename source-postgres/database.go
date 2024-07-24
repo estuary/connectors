@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 )
 
 type replicationSlotInfo struct {
@@ -33,9 +33,8 @@ func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName stri
 	if err := conn.QueryRow(ctx, query, slotName).Scan(&info.SlotName, &info.Database, &info.Plugin, &info.SlotType, &info.RestartLSN, &info.ConfirmedFlushLSN, &info.WALStatus); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
-		} else {
-			return nil, fmt.Errorf("error querying replication slots: %w", err)
 		}
+		return nil, fmt.Errorf("error querying replication slots: %w", err)
 	}
 	return &info, nil
 }

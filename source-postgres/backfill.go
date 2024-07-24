@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -114,10 +114,10 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			var ctid = fields["ctid"].(pgtype.TID)
 			delete(fields, "ctid")
 
-			rowKey, err = ctid.EncodeText(db.conn.ConnInfo(), nil)
-			if err != nil {
-				return false, fmt.Errorf("internal error: failed to encode ctid %#v: %w", ctid, err)
+			if !ctid.Valid {
+				return false, fmt.Errorf("internal error: invalid ctid value %#v", ctid)
 			}
+			rowKey = []byte(fmt.Sprintf("(%d,%d)", ctid.BlockNumber, ctid.OffsetNumber))
 
 			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
 			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
