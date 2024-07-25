@@ -331,11 +331,18 @@ def append_files(
     # append the same files concurrently. In principal Iceberg catalogs support the atomic
     # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
     # at a lower level than PyIceberg currently makes available.
-
     tbl.add_files(
         file_paths.split(","), snapshot_properties={"checkpoint": next_checkpoint}
     )
 
+    # TODO(whb): This additional checking should not really be necessary, but is
+    # included for now to assist in troubleshooting potential errors.
+    tbl = catalog.load_table(table)
+    snap = tbl.current_snapshot()
+    assert snap is not None
+    assert snap.summary is not None
+    cp = snap.summary["checkpoint"]
+    print(f"set checkpoint to {cp}")
 
 if __name__ == "__main__":
     run(auto_envvar_prefix="ICEBERG")
