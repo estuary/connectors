@@ -91,15 +91,13 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `tsvector`, ExpectType: `{"type":["string","null"]}`, InputValue: `a fat cat`, ExpectValue: `"'a' 'cat' 'fat'"`},
 		{ColumnType: `tsquery`, ExpectType: `{"type":["string","null"]}`, InputValue: `fat & cat`, ExpectValue: `"'fat' \u0026 'cat'"`},
 
-		// TODO(wgd): JSON values read by pgx/pgtype are currently unmarshalled (by the `pgtype.JSON.Get()` method)
-		// into an `interface{}`, which means that the un-normalized JSON text coming from PostgreSQL is getting
-		// normalized in various ways by the JSON -> interface{} -> JSON round-trip. For `jsonb` this is probably
-		// fine since the value has already been decomposed into a binary format within PostgreSQL, but we might
-		// possibly want to try and fix this for `json` at some point?
-		//
-		// Ahahaha nope, this is terrible and causes us to OOM on even moderately large (like 40MB) values.
-		{ColumnType: `json`, ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
-		{ColumnType: `jsonb`, ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
+		// The difference between JSON and JSONB is that JSONB is stored in a binary format internally on
+		// the server while JSON is stored as the raw input text. In both cases we receive JSON from the
+		// server and preserve it as a json.RawMessage, but the final document serialization still does
+		// some whitespace noramlization. Thus both JSON and JSONB have unnecessary spaces removed but
+		// only JSONB has the fields reordered.
+		{ColumnType: `json`, ExpectType: `{}`, InputValue: `{    "type": "hello world", "data": 123}`, ExpectValue: `{"type":"hello world","data":123}`},
+		{ColumnType: `jsonb`, ExpectType: `{}`, InputValue: `{    "type": "hello world", "data": 123}`, ExpectValue: `{"data":123,"type":"hello world"}`},
 		{ColumnType: `jsonpath`, ExpectType: `{"type":["string","null"]}`, InputValue: `$foo`, ExpectValue: `"$\"foo\""`},
 		{ColumnType: `xml`, ExpectType: `{"type":["string","null"]}`, InputValue: `<foo>bar &gt; baz</foo>`, ExpectValue: `"\u003cfoo\u003ebar \u0026gt; baz\u003c/foo\u003e"`},
 
