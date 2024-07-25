@@ -58,9 +58,22 @@ func registerDatatypeTweaks(m *pgtype.Map) error {
 		m.RegisterType(&pgtype.Type{
 			Name:  typ.Name,
 			OID:   typ.OID,
-			Codec: &dimensionedArrayCodec{inner: &pgtype.ArrayCodec{ElementType: codec.ElementType}},
+			Codec: &customDecodingCodec{decodeDimensionedArray, &pgtype.ArrayCodec{ElementType: codec.ElementType}},
 		})
 	}
+
+	// 'Decode' JSON and JSONB column values by directly turning the bytes into a json.RawMessage
+	// rather than unmarshalling them as the normal DecodeValue implementation for these types would.
+	m.RegisterType(&pgtype.Type{
+		Name:  "json",
+		OID:   pgtype.JSONOID,
+		Codec: &customDecodingCodec{decodeRawJSON, &pgtype.JSONCodec{Marshal: json.Marshal, Unmarshal: json.Unmarshal}},
+	})
+	m.RegisterType(&pgtype.Type{
+		Name:  "jsonb",
+		OID:   pgtype.JSONBOID,
+		Codec: &customDecodingCodec{decodeRawJSONB, &pgtype.JSONBCodec{Marshal: json.Marshal, Unmarshal: json.Unmarshal}},
+	})
 	return nil
 }
 
@@ -87,27 +100,58 @@ func (c *preferTextCodec) DecodeValue(m *pgtype.Map, oid uint32, format int16, s
 	return c.inner.DecodeValue(m, oid, format, src)
 }
 
-// dimensionedArrayCodec wraps a PGX array codec to make it always decode values into a pgtype.Array[any]
-type dimensionedArrayCodec struct{ inner pgtype.Codec }
+// customDecodingCodec wraps an inner codec but overrides the DecodeValue function with a custom version.
+type customDecodingCodec struct {
+	decode func(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error)
+	inner  pgtype.Codec
+}
 
-func (c *dimensionedArrayCodec) FormatSupported(f int16) bool { return c.inner.FormatSupported(f) }
-func (c *dimensionedArrayCodec) PreferredFormat() int16       { return c.inner.PreferredFormat() }
-func (c *dimensionedArrayCodec) PlanEncode(m *pgtype.Map, oid uint32, format int16, value any) pgtype.EncodePlan {
+func (c *customDecodingCodec) FormatSupported(f int16) bool { return c.inner.FormatSupported(f) }
+func (c *customDecodingCodec) PreferredFormat() int16       { return c.inner.PreferredFormat() }
+func (c *customDecodingCodec) PlanEncode(m *pgtype.Map, oid uint32, format int16, value any) pgtype.EncodePlan {
 	return c.inner.PlanEncode(m, oid, format, value)
 }
-func (c *dimensionedArrayCodec) PlanScan(m *pgtype.Map, oid uint32, format int16, target any) pgtype.ScanPlan {
+func (c *customDecodingCodec) PlanScan(m *pgtype.Map, oid uint32, format int16, target any) pgtype.ScanPlan {
 	return c.inner.PlanScan(m, oid, format, target)
 }
-func (c *dimensionedArrayCodec) DecodeDatabaseSQLValue(m *pgtype.Map, oid uint32, format int16, src []byte) (driver.Value, error) {
+func (c *customDecodingCodec) DecodeDatabaseSQLValue(m *pgtype.Map, oid uint32, format int16, src []byte) (driver.Value, error) {
 	return c.inner.DecodeDatabaseSQLValue(m, oid, format, src)
 }
-func (c *dimensionedArrayCodec) DecodeValue(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
+func (c *customDecodingCodec) DecodeValue(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
+	return c.decode(m, oid, format, src)
+}
+
+// decodeDimensionedArray is a custom DecodeValue function which decodes into a `pgtype.Array[any]`
+func decodeDimensionedArray(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
 	if src == nil {
 		return nil, nil
 	}
 	var dst pgtype.Array[any]
 	err := m.PlanScan(oid, format, &dst).Scan(src, &dst)
 	return dst, err
+}
+
+// decodeRawJSON is a custom DecodeValue function which turns the input bytes directly into a json.RawMessage.
+func decodeRawJSON(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
+	if src == nil {
+		return nil, nil
+	}
+	return json.RawMessage(src), nil
+}
+
+// decodeRawJSONB is a custom DecodeValue function which turns the input bytes directly into a json.RawMessage,
+// but if the input format is binary it strips off a leading '0x01' prefix.
+func decodeRawJSONB(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
+	if src == nil {
+		return nil, nil
+	}
+	if format == pgtype.BinaryFormatCode {
+		if len(src) == 0 || src[0] != 1 {
+			return nil, fmt.Errorf("invalid binary-format jsonb value: %#v", src)
+		}
+		src = src[1:]
+	}
+	return json.RawMessage(src), nil
 }
 
 func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
@@ -141,10 +185,8 @@ func oversizePlaceholderJSON(orig []byte) json.RawMessage {
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
 func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
-	var columnName = "<unknown>"
-	var dataType interface{}
+	var dataType any
 	if column != nil {
-		columnName = column.Name
 		dataType = column.DataType
 	}
 
@@ -186,19 +228,15 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			return x[:truncateColumnThreshold], nil
 		}
 		return x, nil
+	case json.RawMessage:
+		if len(x) > truncateColumnThreshold {
+			return oversizePlaceholderJSON(x), nil
+		}
+		return x, nil
 	case pgtype.Array[any]:
 		return translateArray(column, x)
 	case pgtype.Range[any]:
 		return stringifyRange(x)
-	case map[string]any: // TODO(wgd): Is this needed for anything after we fix JSON columns?
-		var bs, err = json.Marshal(x)
-		if err != nil {
-			return nil, fmt.Errorf("error reserializing json column %q: %w", columnName, err)
-		}
-		if len(bs) > truncateColumnThreshold {
-			return oversizePlaceholderJSON(bs), nil
-		}
-		return json.RawMessage(bs), nil
 	case pgtype.Text:
 		if len(x.String) > truncateColumnThreshold {
 			return x.String[:truncateColumnThreshold], nil
