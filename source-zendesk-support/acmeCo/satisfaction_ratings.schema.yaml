@@ -1,0 +1,53 @@
+---
+properties:
+  assignee_id:
+    type:
+      - "null"
+      - integer
+  comment:
+    type:
+      - "null"
+      - string
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  group_id:
+    type:
+      - "null"
+      - integer
+  id:
+    type: integer
+  reason:
+    type:
+      - "null"
+      - string
+  reason_id:
+    type:
+      - "null"
+      - integer
+  requester_id:
+    type:
+      - "null"
+      - integer
+  score:
+    type:
+      - "null"
+      - string
+  ticket_id:
+    type:
+      - "null"
+      - integer
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object
