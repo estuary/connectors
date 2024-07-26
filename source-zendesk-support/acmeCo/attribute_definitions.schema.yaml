@@ -1,0 +1,73 @@
+---
+properties:
+  condition:
+    type:
+      - "null"
+      - string
+  group:
+    type:
+      - "null"
+      - string
+  nullable:
+    type:
+      - "null"
+      - boolean
+  operators:
+    items:
+      properties:
+        terminal:
+          type:
+            - "null"
+            - boolean
+        title:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  repeatable:
+    type:
+      - "null"
+      - boolean
+  subject:
+    type: string
+  title:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+  values:
+    items:
+      properties:
+        enabled:
+          type:
+            - "null"
+            - boolean
+        title:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+required:
+  - subject
+type: object

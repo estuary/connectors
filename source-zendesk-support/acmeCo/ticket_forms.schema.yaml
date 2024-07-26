@@ -1,0 +1,74 @@
+---
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  default:
+    type:
+      - "null"
+      - boolean
+  display_name:
+    type:
+      - "null"
+      - string
+  end_user_visible:
+    type:
+      - "null"
+      - boolean
+  id:
+    type: integer
+  in_all_brands:
+    type:
+      - "null"
+      - boolean
+  name:
+    type:
+      - "null"
+      - string
+  position:
+    type:
+      - "null"
+      - integer
+  raw_display_name:
+    type:
+      - "null"
+      - string
+  raw_name:
+    type:
+      - "null"
+      - string
+  restricted_brand_ids:
+    items:
+      type:
+        - "null"
+        - integer
+    type:
+      - "null"
+      - array
+  ticket_field_ids:
+    items:
+      type:
+        - "null"
+        - integer
+    type:
+      - "null"
+      - array
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object
