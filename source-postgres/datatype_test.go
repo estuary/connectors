@@ -105,6 +105,7 @@ func TestDatatypes(t *testing.T) {
 		//    [...] declaring the array size or number of dimensions in CREATE TABLE is
 		//    simply documentation; it does not affect run-time behavior.
 		// This set of test cases exercises that expectation.
+		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{}`, ExpectValue: `{"dimensions":[],"elements":[]}`},
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{{{{{{1}}}}}}`, ExpectValue: `{"dimensions":[1,1,1,1,1,1],"elements":[1]}`},
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{1,2,3,4,5,6}`, ExpectValue: `{"dimensions":[6],"elements":[1,2,3,4,5,6]}`},
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{{1,2,3},{4,5,6},{7,8,9}}`, ExpectValue: `{"dimensions":[3,3],"elements":[1,2,3,4,5,6,7,8,9]}`},
