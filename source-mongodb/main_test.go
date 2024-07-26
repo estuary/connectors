@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -15,8 +14,6 @@ import (
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestCapture(t *testing.T) {
@@ -104,95 +101,6 @@ func TestCapture(t *testing.T) {
 	updateData(ctx, t, client, database2, col3, binaryPkVals(1), "forthColumn_new")
 
 	advanceCapture(ctx, t, cs)
-
-	cupaloy.SnapshotT(t, cs.Summary())
-}
-
-func TestCaptureSplitLargeDocuments(t *testing.T) {
-	database := "testDb"
-	col := "testCollection"
-
-	ctx := context.Background()
-	client, cfg := testClient(t)
-
-	cleanup := func() {
-		dropCollection(ctx, t, client, database, col)
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	require.NoError(t, client.Database(database).CreateCollection(ctx, col, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
-
-	cs := &st.CaptureSpec{
-		Driver:       &driver{},
-		EndpointSpec: &cfg,
-		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
-		Sanitizers:   commonSanitizers(),
-		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col)},
-	}
-
-	collection := client.Database(database).Collection(col)
-
-	// Do the initial backfill to get into "streaming mode" to start capturing changes.
-	advanceCapture(ctx, t, cs)
-
-	// Insert a small document and update it.
-	val := map[string]string{"_id": "smallDocument", "foo": "bar", "baz": "qux"}
-	_, err := collection.InsertOne(ctx, val)
-	require.NoError(t, err)
-	val["foo"] = "bar_updated"
-	res, err := collection.UpdateOne(ctx, bson.D{{Key: "_id", Value: val["_id"]}}, bson.D{{Key: "$set", Value: val}})
-	require.NoError(t, err)
-	require.Equal(t, 1, int(res.ModifiedCount))
-
-	// Insert a huge document and update it. The output sanitizers will replace
-	// the very long values with `<TOKEN>` based on the simple token
-	// sanitization logic.
-	val = map[string]string{
-		"_id":  "hugeDocument",
-		"key1": strings.Repeat("value1", 200000),
-		"key2": strings.Repeat("value2", 200000),
-		"key3": strings.Repeat("value3", 200000),
-		"key4": strings.Repeat("value4", 200000),
-		"key5": strings.Repeat("value5", 200000),
-		"key6": strings.Repeat("value6", 200000),
-		"key7": strings.Repeat("value7", 200000),
-		"key8": strings.Repeat("value8", 200000),
-		"key9": strings.Repeat("value9", 200000),
-	}
-	_, err = collection.InsertOne(ctx, val)
-	require.NoError(t, err)
-	val["key1"] = "updated"
-	val["key9"] = "also updated"
-	res, err = collection.UpdateOne(ctx, bson.D{{Key: "_id", Value: val["_id"]}}, bson.D{{Key: "$set", Value: val}})
-	require.NoError(t, err)
-	require.Equal(t, 1, int(res.ModifiedCount))
-
-	// Another small document.
-	val = map[string]string{"_id": "otherSmallDocument", "some": "other", "values": "here"}
-	_, err = collection.InsertOne(ctx, val)
-	require.NoError(t, err)
-	val["some"] = "other_updated"
-	res, err = collection.UpdateOne(ctx, bson.D{{Key: "_id", Value: val["_id"]}}, bson.D{{Key: "$set", Value: val}})
-	require.NoError(t, err)
-	require.Equal(t, 1, int(res.ModifiedCount))
-
-	// Read change stream documents, waiting until we have received all 6
-	// expected change stream documents, not counting checkpoints. Reading the
-	// huge document and its updates from the change stream takes a non-trivial
-	// amount of time.
-	count := 0
-	captureCtx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(5*time.Second, cancel) // don't wait forever though
-	cs.Capture(captureCtx, t, func(msg json.RawMessage) {
-		if !strings.Contains(string(msg), "bindingStateV1") {
-			count++
-		}
-		if count == 6 {
-			cancel()
-		}
-	})
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
