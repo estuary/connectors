@@ -1,0 +1,61 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+properties:
+  author_id:
+    type:
+      - "null"
+      - integer
+  body:
+    type:
+      - "null"
+      - string
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  html_url:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  non_author_editor_id:
+    type:
+      - "null"
+      - integer
+  non_author_updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  official:
+    type:
+      - "null"
+      - boolean
+  post_id:
+    type:
+      - "null"
+      - integer
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+  vote_count:
+    type:
+      - "null"
+      - integer
+  vote_sum:
+    type:
+      - "null"
+      - integer
+required:
+  - id
+title: Post Comments
+type:
+  - object
