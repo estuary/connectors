@@ -1,0 +1,158 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "credentials": {
+          "description": "Zendesk service provides two authentication methods. Choose between: `OAuth2.0` or `API token`.",
+          "oneOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "access_token": {
+                  "airbyte_secret": true,
+                  "description": "The value of the API token generated. See the <a href=\"https://docs.airbyte.com/integrations/sources/zendesk-support\">docs</a> for more information.",
+                  "title": "Access Token",
+                  "type": "string"
+                },
+                "client_id": {
+                  "airbyte_secret": true,
+                  "type": "string"
+                },
+                "client_secret": {
+                  "airbyte_secret": true,
+                  "type": "string"
+                },
+                "credentials": {
+                  "const": "oauth2.0",
+                  "default": "oauth2.0",
+                  "order": 0,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "access_token"
+              ],
+              "title": "OAuth2.0",
+              "type": "object",
+              "x-oauth2-provider": "zendesk"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "api_token": {
+                  "airbyte_secret": true,
+                  "description": "The value of the API token generated. See https://go.estuary.dev/zendesk-support for more information.",
+                  "title": "API Token",
+                  "type": "string"
+                },
+                "credentials": {
+                  "const": "api_token",
+                  "default": "api_token",
+                  "order": 0,
+                  "type": "string"
+                },
+                "email": {
+                  "description": "The user email for your Zendesk account.",
+                  "title": "Email",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "api_token"
+              ],
+              "title": "API Token",
+              "type": "object"
+            }
+          ],
+          "title": "Authentication",
+          "type": "object"
+        },
+        "ignore_pagination": {
+          "default": false,
+          "description": "Makes each stream read a single page of data.",
+          "title": "Should the connector read the second and further pages of data.",
+          "type": "boolean"
+        },
+        "start_date": {
+          "description": "The date from which you'd like to replicate data for Zendesk Support API, in the format YYYY-MM-DDT00:00:00Z. All data generated after this date will be replicated.",
+          "examples": [
+            "2020-10-15T00:00:00Z"
+          ],
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "subdomain": {
+          "description": "This is your Zendesk subdomain that can be found in your account URL. For example, in https://{MY_SUBDOMAIN}.zendesk.com/, where MY_SUBDOMAIN is the value of your subdomain.",
+          "title": "Subdomain",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_date",
+        "subdomain",
+        "credentials"
+      ],
+      "title": "Source Zendesk Support Spec",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ResourceSpec",
+      "type": "object",
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "properties": {
+        "cursorField": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "type": "string",
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ]
+        }
+      }
+    },
+    "documentationUrl": "https://go.estuary.dev/an43nb",
+    "oauth2": {
+      "provider": "zendesk",
+      "authUrlTemplate": "https://estuarysupport.zendesk.com/oauth/authorizations/new?response_type=code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=read&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://estuarysupport.zendesk.com/oauth/tokens",
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

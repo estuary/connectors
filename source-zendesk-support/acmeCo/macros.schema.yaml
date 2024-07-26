@@ -1,0 +1,76 @@
+---
+properties:
+  actions:
+    items:
+      properties:
+        field:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  active:
+    type:
+      - "null"
+      - boolean
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  position:
+    type:
+      - "null"
+      - integer
+  restriction:
+    properties:
+      id:
+        type:
+          - "null"
+          - integer
+      ids:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      type:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  title:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type:
+  - object

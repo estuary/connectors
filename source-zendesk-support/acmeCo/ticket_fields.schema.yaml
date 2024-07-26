@@ -1,0 +1,131 @@
+---
+properties:
+  active:
+    type:
+      - "null"
+      - boolean
+  agent_description:
+    type:
+      - "null"
+      - string
+  collapsed_for_agents:
+    type:
+      - "null"
+      - boolean
+  created_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  custom_field_options:
+    items:
+      properties:
+        default:
+          type:
+            - "null"
+            - boolean
+        id:
+          type:
+            - "null"
+            - integer
+        name:
+          type:
+            - "null"
+            - string
+        raw_name:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  description:
+    type:
+      - "null"
+      - string
+  editable_in_portal:
+    type:
+      - "null"
+      - boolean
+  id:
+    type: integer
+  position:
+    type:
+      - "null"
+      - integer
+  raw_description:
+    type:
+      - "null"
+      - string
+  raw_title:
+    type:
+      - "null"
+      - string
+  raw_title_in_portal:
+    type:
+      - "null"
+      - string
+  regexp_for_validation:
+    type:
+      - "null"
+      - string
+  removable:
+    type:
+      - "null"
+      - boolean
+  required:
+    type:
+      - "null"
+      - boolean
+  required_in_portal:
+    type:
+      - "null"
+      - boolean
+  sub_type_id:
+    type:
+      - "null"
+      - integer
+  system_field_options:
+    type:
+      - "null"
+      - array
+  tag:
+    type:
+      - "null"
+      - string
+  title:
+    type:
+      - "null"
+      - string
+  title_in_portal:
+    type:
+      - "null"
+      - string
+  type:
+    type:
+      - "null"
+      - string
+  updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  url:
+    type:
+      - "null"
+      - string
+  visible_in_portal:
+    type:
+      - "null"
+      - boolean
+required:
+  - id
+type:
+  - object
