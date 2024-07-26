@@ -335,7 +335,7 @@ func formatRFC3339(t time.Time) (any, error) {
 }
 
 func translateArray(_ *sqlcapture.ColumnInfo, x pgtype.Array[any]) (any, error) {
-	var dims []int
+	var dims = make([]int, 0)
 	for _, dim := range x.Dims {
 		dims = append(dims, int(dim.Length))
 	}
