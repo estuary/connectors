@@ -345,8 +345,37 @@ class Events(IncrementalKlaviyoStream):
     state_checkpoint_interval = 200  # API can return maximum 200 records per page
     api_revision = "2024-07-15"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.campaign_data = self._prepare_campaign()
+
     def path(self, **kwargs) -> str:
         return "events"
+
+    def _prepare_campaign(self):
+
+        urls = ["https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')","https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'sms')"]
+        campaign_ids = []
+
+        iterate = True
+        try:
+            for url in urls:
+                while iterate:
+                    data = requests.get(url, headers=self.request_headers()).json()
+                    if len(data["data"]) == 0:
+                        pass
+                    else:
+                        for record in data["data"]:
+                            campaign_ids.append(record["id"]) 
+                    if data["links"]["next"] is not None:
+                        url = data["links"]["next"]
+                    else:
+                        iterate = False
+                        break
+        except:
+            return None
+        return campaign_ids
 
     def request_params(
         self,
@@ -355,20 +384,22 @@ class Events(IncrementalKlaviyoStream):
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
-        params["include"] = "attributions" 
         return params
     
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
         for record in response.json()["data"]:
-            for attr in response.json()["included"]:
-                if attr['id'] == record['id'] and attr.get("relationships", {}).get("campaign", {}).get("data", {}).get("id", None) != None:
-                    record["campaign_id"] = attr.get("relationships", {}).get("campaign", {}).get("data", {}).get("id", None)
-                else:
-                    pass
-
             record['datetime'] = record['attributes']['datetime'].replace(" ","T")
             record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
-            record["attributes"]['event_properties'] = None
+
+            if self.campaign_data is not None:
+                if type(record["attributes"]['event_properties'].get("$message")) is str and record["attributes"]['event_properties']["$message"] in self.campaign_data:
+                    record["campaign_id"] = record["attributes"]['event_properties']["$message"]
+            else:
+                if type(record["attributes"]['event_properties'].get("$message")) is str and len(record["attributes"]['event_properties']["$message"]) >= 20:
+                    record["campaign_id"] = record["attributes"]['event_properties']["$message"]
+
+            if type(record["attributes"]['event_properties'].get("$flow")) is str:
+                record["flow_id"] = record["attributes"]['event_properties']["$flow"]
 
             yield record
 
