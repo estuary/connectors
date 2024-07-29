@@ -207,12 +207,6 @@ func newRedshiftDriver() *sql.Driver {
 				"user":     cfg.User,
 			}).Info("opening database")
 
-			var metaBase sql.TablePath
-			if cfg.Schema != "" {
-				metaBase = append(metaBase, cfg.Schema)
-			}
-			metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
-
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.networkTunnelEnabled() {
 				host, port, err := net.SplitHostPort(cfg.Address)
@@ -248,6 +242,12 @@ func newRedshiftDriver() *sql.Driver {
 			var caseSensitiveIdentifierEnabled = strings.EqualFold(caseSensitiveIdentifier, "on")
 			var dialect = rsDialect(caseSensitiveIdentifierEnabled)
 			var templates = renderTemplates(dialect)
+
+			var metaBase sql.TablePath
+			if cfg.Schema != "" {
+				metaBase = append(metaBase, cfg.Schema)
+			}
+			metaSpecs, metaCheckpoints := sql.MetaTables(dialect, metaBase)
 
 			if caseSensitiveIdentifierEnabled {
 				log.WithField("caseSensitiveIdentifierEnabled", caseSensitiveIdentifierEnabled).Info("detected value for enable_case_sensitive_identifier")

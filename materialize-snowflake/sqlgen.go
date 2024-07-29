@@ -1,15 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 	"text/template"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,19 +21,6 @@ var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
 
 func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
-}
-
-var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
-	switch ii := te.(type) {
-	case []byte:
-		return json.RawMessage(ii), nil
-	case json.RawMessage:
-		return ii, nil
-	case nil:
-		return json.RawMessage(nil), nil
-	default:
-		return nil, fmt.Errorf("invalid type %#v for variant", te)
-	}
 }
 
 // See https://docs.snowflake.com/en/sql-reference/data-types-datetime#timestamp
@@ -63,36 +49,27 @@ func (m timestampTypeMapping) valid() bool {
 
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
 var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
-	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:    variantMapper,
-		sql.BINARY:   sql.NewStaticMapper("STRING"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("INTEGER"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
-		sql.OBJECT:   variantMapper,
-		sql.MULTIPLE: sql.NewStaticMapper("VARIANT", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("STRING"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("INTEGER", sql.WithElementConverter(sql.StdStrToInt())), // Equivalent to NUMBER(38,0)
+	mapper := sql.NewDDLMapper(
+		map[sql.FlatType]sql.ProjectionMapper{
+			sql.ARRAY:          sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
+			sql.BINARY:         sql.MapStatic("STRING"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:        sql.MapStatic("INTEGER"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE"),
+			sql.OBJECT:         sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
+			sql.MULTIPLE:       sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapStatic("INTEGER", boilerplate.StrToInt), // Equivalent to NUMBER(38,0)
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "inf", "-inf")),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("STRING"),
+				WithFormat: map[string]sql.ProjectionMapper{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic(string(timestampMapping)),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					// https://docs.snowflake.com/en/sql-reference/data-types-numeric#special-values
-					Delegate: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "inf", "-inf"))),
-				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper(string(timestampMapping)),
-			},
+			}),
 		},
-	}
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"text"}, Validate: sql.StringCompatible},

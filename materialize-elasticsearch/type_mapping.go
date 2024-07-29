@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -32,69 +31,33 @@ type property struct {
 	IgnoreAbove int                 `json:"ignore_above,omitempty"`
 }
 
-func propForField(field string, binding *pf.MaterializationSpec_Binding) (property, error) {
-	return propForProjection(binding.Collection.GetProjection(field), binding.FieldSelection.FieldConfigJsonMap[field])
+type fieldConfig struct {
+	Keyword bool `json:"keyword"`
 }
 
-var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticPropertyType{
-	boilerplate.StringFormatInteger: elasticTypeLong,
-	boilerplate.StringFormatNumber:  elasticTypeDouble,
-}
-
-func propForProjection(p *pf.Projection, fc json.RawMessage) (property, error) {
-	type fieldConfig struct {
-		Keyword bool `json:"keyword"`
-	}
-
-	var conf fieldConfig
-	if fc != nil {
-		if err := json.Unmarshal(fc, &conf); err != nil {
-			return property{}, fmt.Errorf("unmarshalling raw field config: %w", err)
+func mapType(p boilerplate.Projection, fc *fieldConfig) (property, boilerplate.ElementConverter) {
+	if p.NumericString != nil {
+		switch *p.NumericString {
+		case boilerplate.StringFormatInteger:
+			return property{Type: elasticTypeLong, Coerce: true}, nil
+		case boilerplate.StringFormatNumber:
+			return property{Type: elasticTypeDouble, Coerce: true}, nil
 		}
 	}
 
-	if numericString, ok := boilerplate.AsFormattedNumeric(p); ok {
-		return property{Type: numericStringTypes[numericString], Coerce: true}, nil
+	if len(p.TypesWithoutNull) != 1 {
+		// This isn't possible per validation constraints.
+		panic(fmt.Sprintf("cannot map multiple types: %s", p.TypesWithoutNull))
 	}
 
-	typesWithoutNull := func(ts []string) []string {
-		out := []string{}
-		for _, t := range ts {
-			if t != "null" {
-				out = append(out, t)
-			}
-		}
-		return out
-	}
-
-	switch t := typesWithoutNull(p.Inference.Types)[0]; t {
-	case pf.JsonTypeBoolean:
+	switch p.TypesWithoutNull[0] {
+	case "boolean":
 		return property{Type: elasticTypeBoolean}, nil
-	case pf.JsonTypeInteger:
+	case "integer":
 		return property{Type: elasticTypeLong}, nil
-	case pf.JsonTypeString:
-		if p.Inference.String_.ContentEncoding == "base64" {
-			return property{Type: elasticTypeBinary}, nil
-		}
-
-		switch f := p.Inference.String_.Format; f {
-		// Formats for "integer" and "number" are handled above.
-		case "date":
-			return property{Type: elasticTypeDate}, nil
-		case "date-time":
-			return property{Type: elasticTypeDate}, nil
-		case "ipv4":
-			return property{Type: elasticTypeIp}, nil
-		case "ipv6":
-			return property{Type: elasticTypeIp}, nil
-		default:
-			if p.IsPrimaryKey || conf.Keyword {
-				return property{Type: elasticTypeKeyword}, nil
-			} else {
-				return property{Type: elasticTypeText}, nil
-			}
-		}
-	case pf.JsonTypeObject:
+	case "number":
+		return property{Type: elasticTypeDouble}, nil
+	case "object":
 		return property{
 			Type: elasticTypeFlattened,
 			// See https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html
@@ -104,21 +67,43 @@ func propForProjection(p *pf.Projection, fc json.RawMessage) (property, error) {
 			// _source field.
 			IgnoreAbove: 32766 / 4,
 		}, nil
-	case pf.JsonTypeNumber:
-		return property{Type: elasticTypeDouble}, nil
+	case "string":
+		if p.Inference.String_.ContentEncoding == "base64" {
+			return property{Type: elasticTypeBinary}, nil
+		}
+
+		switch f := p.Inference.String_.Format; f {
+		case "date":
+			return property{Type: elasticTypeDate}, nil
+		case "date-time":
+			return property{Type: elasticTypeDate}, nil
+		case "ipv4":
+			return property{Type: elasticTypeIp}, nil
+		case "ipv6":
+			return property{Type: elasticTypeIp}, nil
+		default:
+			if p.IsPrimaryKey || (fc != nil && fc.Keyword) {
+				return property{Type: elasticTypeKeyword}, nil
+			} else {
+				return property{Type: elasticTypeText}, nil
+			}
+		}
+
 	default:
-		return property{}, fmt.Errorf("propForProjection unsupported type %T (%#v)", t, t)
+		panic(fmt.Sprintf("unsupported type %s", p.Inference.Types))
 	}
 }
+
+var typeMapper = boilerplate.NewTypeMapper(mapType)
 
 func buildIndexProperties(b *pf.MaterializationSpec_Binding) (map[string]property, error) {
 	props := make(map[string]property)
 
 	for _, v := range append(b.FieldSelection.Keys, b.FieldSelection.Values...) {
-		if p, err := propForField(v, b); err != nil {
+		if mt, err := typeMapper.Map(b.Collection.GetProjection(v), b.FieldSelection.FieldConfigJsonMap); err != nil {
 			return nil, fmt.Errorf("buildIndexProperties: %w", err)
 		} else {
-			props[translateField(v)] = p
+			props[translateField(v)] = mt.EndpointType
 		}
 	}
 
@@ -141,9 +126,7 @@ func boolPtr(b bool) *bool {
 
 type constrainter struct{}
 
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
-
+func (constrainter) NewConstraints(p boilerplate.Projection, deltaUpdates bool, fc *fieldConfig) *pm.Response_Validated_Constraint {
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
 	case p.IsPrimaryKey:
@@ -155,7 +138,7 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	case p.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
-	case p.Inference.IsSingleScalarType() || isNumeric:
+	case p.Inference.IsSingleScalarType() || p.IsNumericString():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
 	case p.Inference.IsSingleType() && !slices.Contains(p.Inference.Types, "array"):
@@ -173,20 +156,12 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
-	prop, err := propForProjection(proposed, fc)
-	if err != nil {
-		return false, err
-	}
-
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed boilerplate.Projection, fc *fieldConfig) (bool, error) {
+	prop, _ := mapType(proposed, fc)
 	return strings.EqualFold(existing.Type, string(prop.Type)), nil
 }
 
-func (constrainter) DescriptionForType(p *pf.Projection, fc json.RawMessage) (string, error) {
-	prop, err := propForProjection(p, fc)
-	if err != nil {
-		return "", err
-	}
-
+func (constrainter) DescriptionForType(p boilerplate.Projection, fc *fieldConfig) (string, error) {
+	prop, _ := mapType(p, fc)
 	return string(prop.Type), nil
 }

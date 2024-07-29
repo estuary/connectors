@@ -97,9 +97,6 @@ func newSnowflakeDriver() *sql.Driver {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			var metaBase sql.TablePath = []string{parsed.Schema}
-			var metaSpecs, _ = sql.MetaTables(metaBase)
-
 			dsn, err := parsed.toURI(tenant)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
@@ -118,6 +115,9 @@ func newSnowflakeDriver() *sql.Driver {
 
 			var dialect = snowflakeDialect(parsed.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
+
+			var metaBase sql.TablePath = []string{parsed.Schema}
+			var metaSpecs, _ = sql.MetaTables(dialect, metaBase)
 
 			return &sql.Endpoint{
 				Config:    parsed,

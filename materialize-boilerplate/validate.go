@@ -12,23 +12,23 @@ import (
 
 // Constrainter represents the endpoint requirements for validating new projections or changes to
 // existing projections.
-type Constrainter interface {
+type Constrainter[FC any] interface {
 	// NewConstraints produces constraints for a projection that is not part of the current
 	// materialization.
-	NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint
+	NewConstraints(p Projection, deltaUpdates bool, fieldConfig *FC) *pm.Response_Validated_Constraint
 
 	// Compatible reports whether an existing materialized field in a destination system (such as a
 	// column in a table) is compatible with a proposed projection.
-	Compatible(existing EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error)
+	Compatible(existing EndpointField, proposed Projection, fieldConfig *FC) (bool, error)
 
 	// DescriptionForType produces a human-readable description for a type, which is used in
 	// constraint descriptions when there is an incompatible type change.
-	DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error)
+	DescriptionForType(p Projection, fieldConfig *FC) (string, error)
 }
 
 // Validator performs validation of a materialization binding.
-type Validator struct {
-	c  Constrainter
+type Validator[FC any] struct {
+	c  Constrainter[FC]
 	is *InfoSchema
 	// maxFieldLength is used to produce "forbidden" constraints on fields that are too long. If
 	// maxFieldLength is 0, no constraints are enforced. The length of a field name is in terms of
@@ -42,13 +42,13 @@ type Validator struct {
 	caseInsensitiveFields bool
 }
 
-func NewValidator(
-	c Constrainter,
+func NewValidator[FC any](
+	c Constrainter[FC],
 	is *InfoSchema,
 	maxFieldLength int,
 	caseInsensitiveFields bool,
-) Validator {
-	return Validator{
+) Validator[FC] {
+	return Validator[FC]{
 		c:                     c,
 		is:                    is,
 		maxFieldLength:        maxFieldLength,
@@ -57,7 +57,7 @@ func NewValidator(
 }
 
 // ValidateBinding calculates the constraints for a new binding or a change to an existing binding.
-func (v Validator) ValidateBinding(
+func (v Validator[FC]) ValidateBinding(
 	path []string,
 	deltaUpdates bool,
 	backfill uint32,
@@ -72,8 +72,8 @@ func (v Validator) ValidateBinding(
 
 	if existingBinding != nil && existingBinding.Backfill > backfill {
 		// Sanity check: Don't allow backfill counters to decrease.
-		// TODO(whb): This check will soon be moved to the control plane, and then can be removed
-		// from here.
+		// TODO(whb): This check may one day be moved to the control plane, and
+		// then can be removed from here.
 		return nil, fmt.Errorf(
 			"backfill count %d is less than previously applied count of %d",
 			backfill,
@@ -102,7 +102,10 @@ func (v Validator) ValidateBinding(
 		// Always validate as a new table if the existing table doesn't exist, since there is no
 		// existing table to be incompatible with. Also validate as a new table if we are going to
 		// be replacing the table.
-		constraints = v.validateNewBinding(boundCollection, deltaUpdates)
+		constraints, err = v.validateNewBinding(boundCollection, deltaUpdates, fieldConfigJsonMap)
+		if err != nil {
+			return nil, fmt.Errorf("validating new binding: %w", err)
+		}
 	} else {
 		if existingBinding != nil && existingBinding.DeltaUpdates && !deltaUpdates {
 			// We allow a binding to switch from standard => delta updates but not the other
@@ -119,13 +122,22 @@ func (v Validator) ValidateBinding(
 	return forbidLongFields(v.maxFieldLength, boundCollection, constraints)
 }
 
-func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUpdates bool) map[string]*pm.Response_Validated_Constraint {
+func (v Validator[FC]) validateNewBinding(
+	boundCollection pf.CollectionSpec,
+	deltaUpdates bool,
+	fieldConfigJsonMap map[string]json.RawMessage,
+) (map[string]*pm.Response_Validated_Constraint, error) {
 	constraints := make(map[string]*pm.Response_Validated_Constraint)
 
 	sawRoot := false
 
 	for _, p := range boundCollection.Projections {
-		c := v.c.NewConstraints(&p, deltaUpdates)
+		parsedFieldConfig, err := parseFieldConfig[FC](p.Field, fieldConfigJsonMap)
+		if err != nil {
+			return nil, fmt.Errorf("parsing field config: %w", err)
+		}
+
+		c := v.c.NewConstraints(buildProjection(&p), deltaUpdates, parsedFieldConfig)
 
 		if p.IsRootDocumentProjection() {
 			if sawRoot && !deltaUpdates {
@@ -155,10 +167,10 @@ func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUp
 		constraints[p.Field] = c
 
 	}
-	return constraints
+	return constraints, nil
 }
 
-func (v Validator) validateMatchesExistingBinding(
+func (v Validator[FC]) validateMatchesExistingBinding(
 	existing *pf.MaterializationSpec_Binding,
 	path []string,
 	boundCollection pf.CollectionSpec,
@@ -169,10 +181,17 @@ func (v Validator) validateMatchesExistingBinding(
 
 	docFields := []string{}
 	for _, p := range boundCollection.Projections {
+		parsedFieldConfig, err := parseFieldConfig[FC](p.Field, fieldConfigJsonMap)
+		if err != nil {
+			return nil, fmt.Errorf("parsing field config: %w", err)
+		}
+
+		projection := buildProjection(&p)
+
 		// Base constraint used for all new projections of the binding. This may be re-evaluated
 		// below, depending on the details of the projection and any pre-existing materialization of
 		// it.
-		c := v.c.NewConstraints(&p, deltaUpdates)
+		c := v.c.NewConstraints(projection, deltaUpdates, parsedFieldConfig)
 
 		if c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
 			// Is the proposed type completely disallowed by the materialization? This differs from
@@ -242,8 +261,7 @@ func (v Validator) validateMatchesExistingBinding(
 		} else if existingField, err := v.is.GetField(path, p.Field); err == nil {
 			// All other fields that are already being materialized. Any error from GetField is
 			// because the field does not already exist.
-			rawConfig := fieldConfigJsonMap[p.Field]
-			if compatible, err := v.c.Compatible(existingField, &p, rawConfig); err != nil {
+			if compatible, err := v.c.Compatible(existingField, projection, parsedFieldConfig); err != nil {
 				return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", existingField.Name, p.Field, err)
 			} else if compatible {
 				if p.IsPrimaryKey {
@@ -261,7 +279,7 @@ func (v Validator) validateMatchesExistingBinding(
 					}
 				}
 			} else {
-				newDesc, err := v.c.DescriptionForType(&p, rawConfig)
+				newDesc, err := v.c.DescriptionForType(projection, parsedFieldConfig)
 				if err != nil {
 					return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
 				}
@@ -318,7 +336,7 @@ func (v Validator) validateMatchesExistingBinding(
 // For example, if a destination is strictly case-insensitive and lowercases all field names,
 // `ThisField` and `thisField` are ambiguous and cannot be materialized together. If there is a set
 // of ambiguous fields, only a single one of them can be materialized.
-func (v Validator) ambiguousFields(p pf.Projection, ps []pf.Projection) []string {
+func (v Validator[FC]) ambiguousFields(p pf.Projection, ps []pf.Projection) []string {
 	ambiguous := []string{}
 
 	compareFields := func(f1, f2 string) bool {
@@ -345,7 +363,7 @@ func (v Validator) ambiguousFields(p pf.Projection, ps []pf.Projection) []string
 
 // ambiguousFieldIsSelected returns true if any of the selected fields are ambiguous with the
 // provided projection, excluding the projection itself being selected.
-func (v Validator) ambiguousFieldIsSelected(p pf.Projection, fieldSelection []string) bool {
+func (v Validator[FC]) ambiguousFieldIsSelected(p pf.Projection, fieldSelection []string) bool {
 	endpointFieldName := v.is.translateField(p.Field)
 
 	for _, f := range fieldSelection {
@@ -429,38 +447,6 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 	}
 
 	return constraints, nil
-}
-
-type StringWithNumericFormat string
-
-const (
-	StringFormatInteger StringWithNumericFormat = "stringFormatInteger"
-	StringFormatNumber  StringWithNumericFormat = "stringFormatNumber"
-)
-
-func AsFormattedNumeric(projection *pf.Projection) (StringWithNumericFormat, bool) {
-	typesMatch := func(actual, allowed []string) bool {
-		for _, t := range actual {
-			if !slices.Contains(allowed, t) {
-				return false
-			}
-		}
-		return true
-	}
-
-	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
-		switch {
-		case projection.Inference.String_.Format == "integer" && typesMatch(projection.Inference.Types, []string{"integer", "null", "string"}):
-			return StringFormatInteger, true
-		case projection.Inference.String_.Format == "number" && typesMatch(projection.Inference.Types, []string{"null", "number", "string"}):
-			return StringFormatNumber, true
-		default:
-			// Fallthrough.
-		}
-	}
-
-	// Not a formatted numeric field.
-	return "", false
 }
 
 func fieldSchema(p pf.Projection) string {

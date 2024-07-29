@@ -261,17 +261,13 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 	if endpoint.MetaCheckpoints != nil {
 		// We must install a fence to prevent another (zombie) instances of this
 		// materialization from committing further transactions.
-		var metaCheckpoints, err = ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect)
-		if err != nil {
-			return nil, nil, fmt.Errorf("resolving checkpoints table: %w", err)
-		}
 
 		// Initialize a checkpoint such that the materialization starts from scratch,
 		// regardless of the recovery log checkpoint.
 		fence.TablePath = endpoint.MetaCheckpoints.Path
 		fence.Checkpoint = pm.ExplicitZeroCheckpoint
 
-		fence, err = client.InstallFence(ctx, metaCheckpoints, fence)
+		fence, err = client.InstallFence(ctx, *endpoint.MetaCheckpoints, fence)
 		if err != nil {
 			return nil, nil, fmt.Errorf("installing checkpoints fence: %w", err)
 		}

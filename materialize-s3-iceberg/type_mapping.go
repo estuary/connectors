@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -68,9 +67,7 @@ func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
 
 type icebergConstrainter struct{}
 
-func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
-
+func (icebergConstrainter) NewConstraints(p boilerplate.Projection, deltaUpdates bool, fc *any) *pm.Response_Validated_Constraint {
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
 	case p.IsPrimaryKey:
@@ -91,7 +88,7 @@ func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *
 	case strings.HasPrefix(p.Field, "_meta/"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "Metadata fields fields are able to be materialized"
-	case p.Inference.IsSingleScalarType() || isNumeric:
+	case p.Inference.IsSingleScalarType() || p.IsNumericString():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
 	case slices.Equal(p.Inference.Types, []string{"null"}):
@@ -109,15 +106,15 @@ func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *
 	return &constraint
 }
 
-func (icebergConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
-	s := enc.ProjectionToParquetSchemaElement(*proposed, schemaOptions...)
+func (icebergConstrainter) Compatible(existing boilerplate.EndpointField, proposed boilerplate.Projection, fc *any) (bool, error) {
+	s := enc.ProjectionToParquetSchemaElement(proposed.Projection, schemaOptions...)
 	t := parquetTypeToIcebergType(s.DataType)
 
 	return strings.EqualFold(existing.Type, string(t)), nil
 }
 
-func (icebergConstrainter) DescriptionForType(p *pf.Projection, fc json.RawMessage) (string, error) {
-	s := enc.ProjectionToParquetSchemaElement(*p, schemaOptions...)
+func (icebergConstrainter) DescriptionForType(p boilerplate.Projection, fc *any) (string, error) {
+	s := enc.ProjectionToParquetSchemaElement(p.Projection, schemaOptions...)
 	t := parquetTypeToIcebergType(s.DataType)
 
 	return string(t), nil

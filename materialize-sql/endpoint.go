@@ -104,10 +104,10 @@ type Endpoint struct {
 	// Dialect of the Endpoint.
 	Dialect
 	// MetaSpecs is the specification meta-table of the Endpoint.
-	MetaSpecs *TableShape
+	MetaSpecs *Table
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
 	// It's optional, and won't be created or used if it's nil.
-	MetaCheckpoints *TableShape
+	MetaCheckpoints *Table
 	// NewClient creates a client, which provides Endpoint-specific methods for performing
 	// operations with the Endpoint store.
 	NewClient func(context.Context, *Endpoint) (Client, error)

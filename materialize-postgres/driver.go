@@ -176,7 +176,7 @@ func newPostgresDriver() *sql.Driver {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+			var metaSpecs, metaCheckpoints = sql.MetaTables(pgDialect, metaBase)
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {

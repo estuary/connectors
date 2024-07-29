@@ -2,7 +2,6 @@ package boilerplate
 
 import (
 	"embed"
-	"encoding/json"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -519,17 +518,15 @@ func TestAsFormattedNumeric(t *testing.T) {
 
 type testConstrainter struct{}
 
-func (testConstrainter) Compatible(existing EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (testConstrainter) Compatible(existing EndpointField, proposed Projection, parsedFieldConfig *any) (bool, error) {
 	return existing.Type == strings.Join(proposed.Inference.Types, ","), nil
 }
 
-func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
+func (testConstrainter) DescriptionForType(p Projection, parsedFieldConfig *any) (string, error) {
 	return strings.Join(p.Inference.Types, ", "), nil
 }
 
-func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, numericString := AsFormattedNumeric(p)
-
+func (testConstrainter) NewConstraints(p Projection, deltaUpdates bool, parsedFieldConfig *any) *pm.Response_Validated_Constraint {
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
 	case p.IsPrimaryKey:
@@ -544,7 +541,7 @@ func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.
 	case p.Field == "locRequiredVal":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "This location is required to be materialized"
-	case p.Inference.IsSingleScalarType() || numericString:
+	case p.Inference.IsSingleScalarType() || p.NumericString != nil:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
 	case reflect.DeepEqual(p.Inference.Types, []string{"null"}):

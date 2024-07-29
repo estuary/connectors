@@ -161,7 +161,7 @@ func newDuckDriver() *sql.Driver {
 				"database": cfg.Database,
 			}).Info("opening database")
 
-			metaSpecs, metaCheckpoints := sql.MetaTables([]string{cfg.Database, cfg.Schema})
+			metaSpecs, metaCheckpoints := sql.MetaTables(duckDialect, []string{cfg.Database, cfg.Schema})
 
 			return &sql.Endpoint{
 				Config:              cfg,

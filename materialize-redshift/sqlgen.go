@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
@@ -29,58 +30,50 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 		return te, nil
 	}
 
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.ARRAY:    sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:   sql.NewStaticMapper("TEXT"),
-		sql.MULTIPLE: sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)), // Note: Actually a VARCHAR(256)
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
-					Delegate:   sql.NewStaticMapper("NUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
-				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
-					// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
-					// There's some indication that others have resorted to mapping these to NULL:
-					// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat(nil, nil, nil))),
-				},
-				"date": sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
-					func(te tuple.TupleElement) (interface{}, error) {
+	mapper := sql.NewDDLMapper(
+		map[sql.FlatType]sql.ProjectionMapper{
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:         sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
+			sql.ARRAY:          sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
+			sql.BINARY:         sql.MapStatic("TEXT"),
+			sql.MULTIPLE:       sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(38,0)", boilerplate.StrToInt),
+			// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
+			// There's some indication that others have resorted to mapping these to NULL:
+			// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", boilerplate.StrToFloat(nil, nil, nil)),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("TEXT", textConverter), // Note: Actually a VARCHAR(256)
+				WithFormat: map[string]sql.ProjectionMapper{
+					"date": sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("TIMESTAMPTZ", boilerplate.StringCastConverter(func(s string) (any, error) {
 						// Redshift supports timestamps with microsecond precision. It will reject
 						// timestamps with higher precision than that, so we truncate anything
 						// beyond microseconds.
-						if s, ok := te.(string); ok {
-							parsed, err := time.Parse(time.RFC3339Nano, s)
-							if err != nil {
-								return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
-							}
-
-							return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
+						parsed, err := time.Parse(time.RFC3339Nano, s)
+						if err != nil {
+							return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
 						}
 
-						return te, nil
+						return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
 					})),
-				// "time" is not currently support due to limitations with loading time values from
-				// staged JSON.
-				// "time": sql.NewStaticMapper("TIMETZ"),
-			},
-			WithContentType: map[string]sql.TypeMapper{
-				// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and
-				// checkpoints can be quite long, so we need to use as large of column size as
-				// possible for these tables.
-				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("VARBYTE(1024000)"),
-				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("VARBYTE(1024000)"),
-			},
+				},
+				WithContentType: map[string]sql.ProjectionMapper{
+					// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.MapStatic("VARBYTE(1024000)"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.MapStatic("VARBYTE(1024000)"),
+				},
+			}),
 		},
-	}
+		// NB: We are not using NOT NULL text so that all columns are created as nullable. This is
+		// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
+		// create columns as nullable to preserve the ability to change collection schema fields from
+		// required to not required or remove fields from the materialization.
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
@@ -137,10 +130,6 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 			// parameters start at $1
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		// NB: We are not using sql.NullableMapper so that all columns are created as nullable. This is
-		// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
-		// create columns as nullable to preserve the ability to change collection schema fields from
-		// required to not required or remove fields from the materialization.
 		TypeMapper:             mapper,
 		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Redshift automatically truncates column names that are too long

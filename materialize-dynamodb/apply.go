@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -48,7 +49,10 @@ func (e *ddbApplier) CreateResource(ctx context.Context, spec *pf.Materializatio
 	binding := spec.Bindings[bindingIndex]
 
 	tableName := binding.ResourcePath[0]
-	attrs, schema := tableConfigFromBinding(binding.Collection.Projections)
+	attrs, schema, err := tableConfigFromBinding(binding.Collection.Projections, binding.FieldSelection.FieldConfigJsonMap)
+	if err != nil {
+		return "", nil, err
+	}
 
 	return fmt.Sprintf("create table %q", tableName), func(ctx context.Context) error {
 		return createTable(ctx, e.client, tableName, attrs, schema)
@@ -212,11 +216,15 @@ func deleteTable(ctx context.Context, client *client, name string) error {
 	}
 }
 
-func tableConfigFromBinding(projections []pf.Projection) ([]types.AttributeDefinition, []types.KeySchemaElement) {
-	mappedKeys := []mappedType{}
+func tableConfigFromBinding(projections []pf.Projection, fieldConfigJsonMap map[string]json.RawMessage) ([]types.AttributeDefinition, []types.KeySchemaElement, error) {
+	mappedKeys := []field{}
 	for _, p := range projections {
 		if p.IsPrimaryKey {
-			mappedKeys = append(mappedKeys, mapType(&p))
+			mapped, err := typeMapper.Map(&p, fieldConfigJsonMap)
+			if err != nil {
+				return nil, nil, err
+			}
+			mappedKeys = append(mappedKeys, mapped.EndpointType)
 		}
 	}
 
@@ -228,14 +236,14 @@ func tableConfigFromBinding(projections []pf.Projection) ([]types.AttributeDefin
 
 	for idx, k := range mappedKeys {
 		attrs = append(attrs, types.AttributeDefinition{
-			AttributeName: aws.String(k.field),
-			AttributeType: k.ddbScalarType,
+			AttributeName: aws.String(k.name),
+			AttributeType: k.scalarType,
 		})
 		schema = append(schema, types.KeySchemaElement{
-			AttributeName: aws.String(k.field),
+			AttributeName: aws.String(k.name),
 			KeyType:       keyTypes[idx],
 		})
 	}
 
-	return attrs, schema
+	return attrs, schema, nil
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -68,8 +69,8 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, templates.alterTableColumns.Execute(&snap, sqlDriver.TableAlter{
 		Table: table1,
 		AddColumns: []sqlDriver.Column{
-			{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
-			{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+			{Identifier: "first_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "STRING"}},
+			{Identifier: "second_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "BOOL"}},
 		},
 	}))
 	snap.WriteString("--- End alter table add columns ---\n\n")
@@ -92,7 +93,7 @@ func TestSQLGeneration(t *testing.T) {
 
 func TestDateTimeColumn(t *testing.T) {
 	var dialect = testDialect
-	var mapped, err = dialect.MapType(&sqlDriver.Projection{
+	var mapped, converter = dialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -100,20 +101,21 @@ func TestDateTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "DATETIME2 NOT NULL", mapped.DDL)
 
 	expected, err := time.Parse(time.RFC3339Nano, "2022-04-04T10:09:08.234567Z")
 	require.NoError(t, err)
-	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
+	parsed, err := converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, expected, parsed)
 	require.NoError(t, err)
 }
 
 func TestDateTimePKColumn(t *testing.T) {
 	var dialect = testDialect
-	var mapped, err = dialect.MapType(&sqlDriver.Projection{
+	var mapped, _ = dialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -122,14 +124,15 @@ func TestDateTimePKColumn(t *testing.T) {
 			},
 			IsPrimaryKey: true,
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "DATETIME2 NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {
 	var dialect = testDialect
-	var mapped, err = dialect.MapType(&sqlDriver.Projection{
+	var mapped, converter = dialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -137,13 +140,14 @@ func TestTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "TIME NOT NULL", mapped.DDL)
 
 	expected, err := time.Parse("15:04:05Z07:00", "10:09:08.234567Z")
 	require.NoError(t, err)
-	parsed, err := mapped.Converter("10:09:08.234567Z")
+	parsed, err := converter("10:09:08.234567Z")
 	require.Equal(t, expected, parsed)
 	require.NoError(t, err)
 }

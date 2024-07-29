@@ -133,9 +133,6 @@ func newSqlServerDriver() *sql.Driver {
 				"user":     cfg.User,
 			}).Info("opening database")
 
-			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 				host, port, err := net.SplitHostPort(cfg.Address)
@@ -179,6 +176,9 @@ func newSqlServerDriver() *sql.Driver {
 
 			var dialect = sqlServerDialect(collation, schema)
 			var templates = renderTemplates(dialect)
+
+			var metaBase sql.TablePath
+			var metaSpecs, metaCheckpoints = sql.MetaTables(dialect, metaBase)
 
 			return &sql.Endpoint{
 				Config:              cfg,

@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -47,9 +48,10 @@ type transactor struct {
 }
 
 type binding struct {
-	tableName string
-	fields    []mappedType
-	docField  string
+	tableName  string
+	fields     []field
+	converters []boilerplate.ElementConverter
+	docField   string
 }
 
 func (b binding) convertKey(ts tuple.Tuple) (map[string]types.AttributeValue, error) {
@@ -62,12 +64,12 @@ func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]types.
 	fieldsIdx := 0
 	do := func(v tuple.TupleElement) error {
 		f := b.fields[fieldsIdx]
-		c, err := f.converter(v)
+		c, err := b.converters[fieldsIdx](v)
 		if err != nil {
-			return fmt.Errorf("converting field %s: %w", f.field, err)
+			return fmt.Errorf("converting field %s: %w", f.name, err)
 		}
 
-		vals[f.field] = c
+		vals[f.name] = c
 		fieldsIdx++
 
 		return nil

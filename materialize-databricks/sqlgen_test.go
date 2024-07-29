@@ -67,8 +67,8 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, tplAlterTableColumns.Execute(&snap, sqlDriver.TableAlter{
 		Table: table1,
 		AddColumns: []sqlDriver.Column{
-			{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
-			{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+			{Identifier: "first_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "STRING"}},
+			{Identifier: "second_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "BOOL"}},
 		},
 	}))
 	snap.WriteString("--- End alter table add columns ---\n\n")

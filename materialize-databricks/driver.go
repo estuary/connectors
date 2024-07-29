@@ -87,7 +87,7 @@ func newDatabricksDriver() *sql.Driver {
 			}).Info("connecting to databricks")
 
 			var metaBase sql.TablePath = []string{cfg.SchemaName}
-			var metaSpecs, _ = sql.MetaTables(metaBase)
+			var metaSpecs, _ = sql.MetaTables(databricksDialect, metaBase)
 
 			return &sql.Endpoint{
 				Config:              cfg,

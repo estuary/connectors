@@ -58,8 +58,8 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	addCols := []sqlDriver.Column{
-		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
-		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+		{Identifier: "first_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "BOOL"}},
 	}
 	dropNotNulls := []boilerplate.EndpointField{
 		{
@@ -136,7 +136,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = pgDialect.MapType(&sqlDriver.Projection{
+	var mapped, converter = pgDialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -144,11 +144,12 @@ func TestDateTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "TIMESTAMPTZ NOT NULL", mapped.DDL)
 
-	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
+	parsed, err := converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
 	require.NoError(t, err)
 }

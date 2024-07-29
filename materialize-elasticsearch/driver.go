@@ -493,9 +493,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 
 		for idx, field := range allFields {
 			fields = append(fields, translateField(field))
-			if prop, err := propForField(field, b); err != nil {
+			if mt, err := typeMapper.Map(b.Collection.GetProjection(field), b.FieldSelection.FieldConfigJsonMap); err != nil {
 				return nil, nil, err
-			} else if prop.Type == elasticTypeDouble {
+			} else if mt.EndpointType.Type == elasticTypeDouble {
 				floatFields[idx] = true
 			}
 		}

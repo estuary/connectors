@@ -287,10 +287,17 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	tablesToBindings := make(map[string]int)
 	for idx, b := range open.Materialization.Bindings {
 		tablesToBindings[b.ResourcePath[0]] = idx
+
+		fields, converters, err := mapBinding(b)
+		if err != nil {
+			return nil, nil, fmt.Errorf("mapping fields: %w", err)
+		}
+
 		bindings = append(bindings, binding{
-			tableName: b.ResourcePath[0],
-			fields:    mapFields(b),
-			docField:  b.FieldSelection.Document,
+			tableName:  b.ResourcePath[0],
+			fields:     fields,
+			converters: converters,
+			docField:   b.FieldSelection.Document,
 		})
 	}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
@@ -24,8 +25,9 @@ type TableShape struct {
 	// The table is operating in delta-updates mode (instead of a standard materialization).
 	DeltaUpdates bool
 
-	Keys, Values []Projection
-	Document     *Projection
+	Keys, Values       []pf.Projection
+	Document           *pf.Projection
+	FieldConfigJsonMap map[string]json.RawMessage
 }
 
 // Table is a database table which is fully resolved using the database Dialect.
@@ -48,15 +50,15 @@ type Table struct {
 
 // Column is a database table column which is fully resolved using the database Dialect.
 type Column struct {
-	Projection
-	MappedType
+	ColumnDef
+	Converter boilerplate.ElementConverter
 
 	// Quoted identifier for this column, suited for direct inclusion in SQL.
 	Identifier string
 	// Placeholder for this column's converted value in parameterized statements.
 	Placeholder string
-	// If this column can be null or not.
-	MustExist bool
+	// Flow collection field name.
+	Field string
 }
 
 // ConvertKey converts a key Tuple to database parameters.
@@ -74,7 +76,7 @@ func (t *Table) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) (out []
 	}
 
 	if t.Document != nil {
-		if m, err := t.Document.MappedType.Converter(doc); err != nil {
+		if m, err := t.Document.Converter(doc); err != nil {
 			return nil, fmt.Errorf("converting document %s: %w", t.Document.Field, err)
 		} else {
 			out = append(out, m)
@@ -90,7 +92,7 @@ func convertTuple(in tuple.Tuple, columns []Column, out []interface{}) ([]interf
 	}
 
 	for i := range in {
-		if m, err := columns[i].MappedType.Converter(in[i]); err != nil {
+		if m, err := columns[i].Converter(in[i]); err != nil {
 			return nil, fmt.Errorf("converting field %s: %w", columns[i].Field, err)
 		} else {
 			out = append(out, m)
@@ -150,42 +152,51 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 		InfoLocation: dialect.TableLocator(shape.Path),
 	}
 
-	for _, key := range shape.Keys {
-		key.IsPrimaryKey = true
-		table.Keys = append(table.Keys, Column{Projection: key})
-	}
-	for _, val := range shape.Values {
-		table.Values = append(table.Values, Column{Projection: val})
-	}
-	if shape.Document != nil {
-		table.Document = &Column{Projection: *shape.Document}
+	idx := 0
+	do := func(dst *[]Column, p pf.Projection) error {
+		col, err := ResolveColumn(idx, p, dialect, shape.FieldConfigJsonMap)
+		if err != nil {
+			return err
+		}
+		*dst = append(*dst, col)
+		idx++
+		return nil
 	}
 
-	for index, col := range table.Columns() {
-		resolved, err := ResolveColumn(index, &col.Projection, dialect)
-		if err != nil {
-			return Table{}, fmt.Errorf("resolving column %s of %s: %w", col.Field, shape.Path, err)
+	for _, key := range shape.Keys {
+		key.IsPrimaryKey = true
+		if err := do(&table.Keys, key); err != nil {
+			return Table{}, err
 		}
-		*col = resolved
+	}
+	for _, val := range shape.Values {
+		if err := do(&table.Values, val); err != nil {
+			return Table{}, err
+		}
+	}
+	if shape.Document != nil {
+		col, err := ResolveColumn(idx, *shape.Document, dialect, shape.FieldConfigJsonMap)
+		if err != nil {
+			return Table{}, err
+		}
+		table.Document = &col
 	}
 
 	return table, nil
 }
 
-func ResolveColumn(index int, projection *Projection, dialect Dialect) (Column, error) {
-	mappedType, err := dialect.MapType(projection)
+func ResolveColumn(index int, projection pf.Projection, dialect Dialect, fieldConfig map[string]json.RawMessage) (Column, error) {
+	mappedType, err := boilerplate.NewTypeMapper(dialect.MapType).Map(&projection, fieldConfig)
 	if err != nil {
 		return Column{}, err
 	}
 
-	_, mustExist := projection.AsFlatType()
-
 	return Column{
-		Projection:  *projection,
-		MappedType:  mappedType,
+		ColumnDef:   mappedType.EndpointType,
+		Converter:   mappedType.Converter,
 		Identifier:  dialect.Identifier(projection.Field),
 		Placeholder: dialect.Placeholder(index),
-		MustExist:   mustExist,
+		Field:       projection.Field,
 	}, nil
 }
 
@@ -195,31 +206,32 @@ func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource)
 		binding = spec.Bindings[index]
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
 			spec.Name, binding.Collection.Name)
-		keys, values, document = BuildProjections(binding)
+		keys, values, document = buildProjections(binding)
 	)
 
 	return TableShape{
-		Path:         resource.Path(),
-		Binding:      index,
-		Source:       binding.Collection.Name,
-		Comment:      comment,
-		DeltaUpdates: resource.DeltaUpdates(),
-		Keys:         keys,
-		Values:       values,
-		Document:     document,
+		Path:               resource.Path(),
+		Binding:            index,
+		Source:             binding.Collection.Name,
+		Comment:            comment,
+		DeltaUpdates:       resource.DeltaUpdates(),
+		Keys:               keys,
+		Values:             values,
+		Document:           document,
+		FieldConfigJsonMap: binding.FieldSelection.FieldConfigJsonMap,
 	}
 }
 
-// Pop the last component from the TablePath and return its cloned result.
-func (p TablePath) Pop() TablePath {
-	if len(p) == 0 {
-		return TablePath{}
-	} else {
-		return append(TablePath{}, p[:len(p)-1]...)
+func buildProjections(binding *pf.MaterializationSpec_Binding) (keys, values []pf.Projection, document *pf.Projection) {
+	for _, field := range binding.FieldSelection.Keys {
+		keys = append(keys, *binding.Collection.GetProjection(field))
 	}
-}
+	for _, field := range binding.FieldSelection.Values {
+		values = append(values, *binding.Collection.GetProjection(field))
+	}
+	if field := binding.FieldSelection.Document; field != "" {
+		document = binding.Collection.GetProjection(field)
+	}
 
-// Push a component onto the TablePath and returned its cloned result.
-func (p TablePath) Push(component string) TablePath {
-	return append(append(TablePath{}, p...), component)
+	return
 }

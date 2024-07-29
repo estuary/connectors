@@ -69,20 +69,16 @@ func (a *sqlApplier) CreateMetaTables(ctx context.Context, spec *pf.Materializat
 	var creates []TableCreate
 	var actionDesc []string
 
-	for _, meta := range []*TableShape{a.endpoint.MetaSpecs, a.endpoint.MetaCheckpoints} {
+	for _, meta := range []*Table{a.endpoint.MetaSpecs, a.endpoint.MetaCheckpoints} {
 		if meta == nil {
 			continue
 		}
-		resolved, err := ResolveTable(*meta, a.endpoint.Dialect)
-		if err != nil {
-			return "", nil, err
-		}
-		createStatement, err := RenderTableTemplate(resolved, a.endpoint.CreateTableTemplate)
+		createStatement, err := RenderTableTemplate(*meta, a.endpoint.CreateTableTemplate)
 		if err != nil {
 			return "", nil, err
 		}
 		creates = append(creates, TableCreate{
-			Table:              resolved,
+			Table:              *meta,
 			TableCreateSql:     createStatement,
 			ResourceConfigJson: nil, // not applicable for meta tables
 		})
@@ -251,7 +247,6 @@ func getTable(endpoint *Endpoint, spec *pf.MaterializationSpec, bindingIndex int
 func loadSpec(ctx context.Context, client Client, endpoint *Endpoint, materialization pf.Materialization) (*pf.MaterializationSpec, string, error) {
 	var (
 		err              error
-		metaSpecs        Table
 		spec             = new(pf.MaterializationSpec)
 		specB64, version string
 	)
@@ -259,10 +254,7 @@ func loadSpec(ctx context.Context, client Client, endpoint *Endpoint, materializ
 	if endpoint.MetaSpecs == nil {
 		return nil, "", nil
 	}
-	if metaSpecs, err = ResolveTable(*endpoint.MetaSpecs, endpoint.Dialect); err != nil {
-		return nil, "", fmt.Errorf("resolving specifications table: %w", err)
-	}
-	specB64, version, err = client.FetchSpecAndVersion(ctx, metaSpecs, materialization)
+	specB64, version, err = client.FetchSpecAndVersion(ctx, *endpoint.MetaSpecs, materialization)
 
 	if err == sql.ErrNoRows {
 		return nil, "", nil

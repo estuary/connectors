@@ -172,7 +172,7 @@ func newBigQueryDriver() *sql.Driver {
 			}).Info("creating bigquery endpoint")
 
 			var metaBase sql.TablePath = []string{cfg.ProjectID, cfg.Dataset}
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+			var metaSpecs, metaCheckpoints = sql.MetaTables(bqDialect, metaBase)
 
 			return &sql.Endpoint{
 				Config:              cfg,

@@ -74,8 +74,8 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	addCols := []sqlDriver.Column{
-		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
-		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+		{Identifier: "first_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "BOOL"}},
 	}
 	dropNotNulls := []boilerplate.EndpointField{
 		{

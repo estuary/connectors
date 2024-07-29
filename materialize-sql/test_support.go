@@ -33,9 +33,7 @@ func RunFenceTestCases(
 	var runTest = func(t *testing.T, ranges ...uint32) {
 		var ctx = context.Background()
 
-		var metaShape = FlowCheckpointsTable(checkpointsPath...)
-		var metaTable, err = ResolveTable(metaShape, dialect)
-		require.NoError(t, err)
+		var metaTable = FlowCheckpointsTable(dialect, checkpointsPath...)
 
 		createSQL, err := RenderTableTemplate(metaTable, createTableTpl)
 		require.NoError(t, err)
@@ -52,7 +50,7 @@ func RunFenceTestCases(
 
 		for i := 0; i*2 < len(fixtures); i++ {
 			var _, err = client.InstallFence(ctx, metaTable, Fence{
-				TablePath:       metaShape.Path,
+				TablePath:       metaTable.Path,
 				Materialization: "the/materialization",
 				KeyBegin:        ranges[i*2],
 				KeyEnd:          ranges[i*2+1],
@@ -64,7 +62,7 @@ func RunFenceTestCases(
 
 		// Add an extra fixture from a different materialization.
 		_, err = client.InstallFence(ctx, metaTable, Fence{
-			TablePath:       metaShape.Path,
+			TablePath:       metaTable.Path,
 			Materialization: "other/one",
 			KeyBegin:        0,
 			KeyEnd:          math.MaxUint32,
@@ -78,7 +76,7 @@ func RunFenceTestCases(
 
 		// Install the fence under test
 		fence, err := client.InstallFence(ctx, metaTable, Fence{
-			TablePath:       metaShape.Path,
+			TablePath:       metaTable.Path,
 			Materialization: "the/materialization",
 			KeyBegin:        testCase[0],
 			KeyEnd:          testCase[1],

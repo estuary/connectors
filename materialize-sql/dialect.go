@@ -3,6 +3,8 @@ package sql
 import (
 	"regexp"
 	"strings"
+
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 )
 
 // Dialect encapsulates many specifics of an Endpoint's interpretation of SQL.
@@ -70,7 +72,7 @@ type Placeholderer interface {
 // A TypeMapper is a function that maps a Projection into a MappedType.
 // For example, it might map a `string` Projection into a `TEXT` SQL type.
 type TypeMapper interface {
-	MapType(*Projection) (MappedType, error)
+	MapType(boilerplate.Projection, *fieldConfig) (ColumnDef, boilerplate.ElementConverter)
 }
 
 // TableLocatorFn is a function that implements TableLocatorer.
@@ -98,11 +100,6 @@ type PlaceholderFn func(index int) string
 
 func (f PlaceholderFn) Placeholder(index int) string { return f(index) }
 
-// TypeMapperFn is a function that implements TypeMapper.
-type TypeMapperFn func(*Projection) (MappedType, error)
-
-func (f TypeMapperFn) MapType(p *Projection) (MappedType, error) { return f(p) }
-
 // Compile-time check that wrapping functions with typed  Fn() implementations
 // can be used to build a Dialect.
 var _ = Dialect{
@@ -111,7 +108,7 @@ var _ = Dialect{
 	Placeholderer:   PlaceholderFn(func(index int) string { return "" }),
 	Literaler:       LiteralFn(func(s string) string { return "" }),
 	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
-	TypeMapper:      &NullableMapper{},
+	TypeMapper:      &DDLMapper{},
 	ColumnValidator: ColumnValidator{},
 }
 

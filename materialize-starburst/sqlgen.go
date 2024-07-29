@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -21,7 +22,7 @@ func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(TRINO_RESERVED_WORDS, strings.ToLower(s))
 }
 
-var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
+var jsonConverter boilerplate.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	switch ii := te.(type) {
 	case []byte:
 		return string(ii), nil
@@ -39,11 +40,11 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-var doubleConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
+var doubleConverter boilerplate.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	return fmt.Sprintf("%v", te), nil
 }
 
-var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
+var timestampConverter boilerplate.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	parsed, err := time.Parse(time.RFC3339, te.(string))
 	if err != nil {
 		return nil, err
@@ -54,41 +55,38 @@ var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (inter
 
 // starburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
 var starburstTrinoDialect = func() sql.Dialect {
-	dateTimeMapper := sql.NewStaticMapper("TIMESTAMP(6) WITH TIME ZONE", sql.WithElementConverter(timestampConverter))
-	return starburstDialect(sql.NewStaticMapper("DATE"), dateTimeMapper)
+	dateTimeMapper := sql.MapStatic("TIMESTAMP(6) WITH TIME ZONE", timestampConverter)
+	return starburstDialect(sql.MapStatic("DATE"), dateTimeMapper)
 }()
 
 // starburstHiveDialect returns a representation of the Starburst Hive format SQL dialect used for temp table.
 var starburstHiveDialect = func() sql.Dialect {
-	return starburstDialect(sql.NewStaticMapper("VARCHAR"), sql.NewStaticMapper("VARCHAR"))
+	return starburstDialect(sql.MapStatic("VARCHAR"), sql.MapStatic("VARCHAR"))
 }()
 
-var starburstDialect = func(dateMapper sql.TypeMapper, dateTimeMapper sql.TypeMapper) sql.Dialect {
-
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:    sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("VARCHAR"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(doubleConverter)),
-		sql.OBJECT:   sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.MULTIPLE: sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("VARCHAR"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
+var starburstDialect = func(dateMapper sql.ProjectionMapper, dateTimeMapper sql.ProjectionMapper) sql.Dialect {
+	mapper := sql.NewDDLMapper(
+		map[sql.FlatType]sql.ProjectionMapper{
+			sql.ARRAY:          sql.MapStatic("VARCHAR", jsonConverter),
+			sql.BINARY:         sql.MapStatic("VARCHAR"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE", doubleConverter),
+			sql.OBJECT:         sql.MapStatic("VARCHAR", jsonConverter),
+			sql.MULTIPLE:       sql.MapStatic("VARCHAR", jsonConverter),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", boilerplate.StrToInt),
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "inf", "-inf")),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("VARCHAR"),
+				WithFormat: map[string]sql.ProjectionMapper{
+					"date":      dateMapper,
+					"date-time": dateTimeMapper,
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "inf", "-inf"))),
-				},
-				"date":      dateMapper,
-				"date-time": dateTimeMapper,
-			},
+			}),
 		},
-	}
+		// We are not using NOT NULL TEXT so that all columns are created as nullable. This is
+		// necessary because Hive temp table which does not support NOT NULL
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"varchar"}, Validate: stringCompatible},

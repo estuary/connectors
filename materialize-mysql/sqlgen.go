@@ -7,6 +7,7 @@ import (
 	"text/template"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -43,47 +44,39 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 }
 
 var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:  sql.NewStaticMapper("JSON"),
-		sql.ARRAY:   sql.NewStaticMapper("JSON"),
-		sql.BINARY:  sql.NewStaticMapper("LONGTEXT"),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.PrimaryKeyMapper{
-				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-				Delegate:   sql.NewStaticMapper("LONGTEXT"),
-			},
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					Delegate:   sql.NewStaticMapper("NUMERIC(65,0)", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		map[sql.FlatType]sql.ProjectionMapper{
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:         sql.MapStatic("JSON"),
+			sql.ARRAY:          sql.MapStatic("JSON"),
+			sql.BINARY:         sql.MapStatic("LONGTEXT"),
+			sql.MULTIPLE:       sql.MapStatic("JSON", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(65,0)", boilerplate.StrToInt),
+			// We encode as CSV and must send MySQL string sentinels.
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", boilerplate.StrToFloat("NaN", "+inf", "-inf")),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapPrimaryKey(
+					sql.MapStatic("VARCHAR(256)"),
+					sql.MapStatic("LONGTEXT"),
+				),
+				WithFormat: map[string]sql.ProjectionMapper{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("DATETIME(6)", rfc3339ToTZ(tzLocation)),
+					"time":      sql.MapStatic("TIME(6)", rfc3339TimeToTZ(tzLocation)),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					// We encode as CSV and must send MySQL string sentinels.
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat("NaN", "+inf", "-inf"))),
+				WithContentType: map[string]sql.ProjectionMapper{
+					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.MapStatic("LONGBLOB"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.MapStatic("LONGBLOB"),
 				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),
-				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToTZ(tzLocation))),
-			},
-			WithContentType: map[string]sql.TypeMapper{
-				// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
-				// checkpoints can be quite long, so we need to use as large of column size as
-				// possible for these tables.
-				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("LONGBLOB"),
-				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("LONGBLOB"),
-			},
+			}),
 		},
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		// "decimal" is for NUMERIC(65,0) that is used for { type: string, format: integer }
@@ -123,8 +116,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 	}
 }
 
-func rfc3339ToTZ(loc *time.Location) sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
+func rfc3339ToTZ(loc *time.Location) boilerplate.ElementConverter {
+	return boilerplate.StringCastConverter(func(str string) (interface{}, error) {
 		// sanity check, this should not happen
 		if loc == nil {
 			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize date-time field. Consider setting a timezone in your database or in the connector configuration to continue")
@@ -138,8 +131,8 @@ func rfc3339ToTZ(loc *time.Location) sql.ElementConverter {
 	})
 }
 
-func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
+func rfc3339TimeToTZ(loc *time.Location) boilerplate.ElementConverter {
+	return boilerplate.StringCastConverter(func(str string) (interface{}, error) {
 		// sanity check, this should not happen
 		if loc == nil {
 			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize time field: Consider setting a timezone in your database or in the connector configuration to continue")

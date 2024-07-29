@@ -228,9 +228,6 @@ func newMysqlDriver() *sql.Driver {
 				"user":     cfg.User,
 			}).Info("opening database")
 
-			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 				host, port, err := net.SplitHostPort(cfg.Address)
@@ -304,6 +301,9 @@ func newMysqlDriver() *sql.Driver {
 
 			var dialect = mysqlDialect(tzLocation, cfg.Database)
 			var templates = renderTemplates(dialect)
+
+			var metaBase sql.TablePath
+			var metaSpecs, metaCheckpoints = sql.MetaTables(dialect, metaBase)
 
 			return &sql.Endpoint{
 				Config:              cfg,
@@ -535,12 +535,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, key := range target.Keys {
-		columnType, err := t.dialect.TypeMapper.MapType(&key.Projection)
-		if err != nil {
-			return fmt.Errorf("temp column metas: %w", err)
-		}
-
-		if strings.Contains(columnType.DDL, "VARCHAR(256)") {
+		if strings.Contains(key.DDL, "VARCHAR(256)") {
 			tempColumnMetas[idx] = varcharColumnMeta{
 				identifier: key.Identifier,
 				maxLength:  256,

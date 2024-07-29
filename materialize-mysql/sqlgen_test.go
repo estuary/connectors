@@ -66,8 +66,8 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	addCols := []sqlDriver.Column{
-		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
-		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+		{Identifier: "first_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", ColumnDef: sqlDriver.ColumnDef{NullableDDL: "BOOL"}},
 	}
 	dropNotNulls := []boilerplate.EndpointField{
 		{
@@ -132,7 +132,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
+	var mapped, converter = testDialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -140,17 +140,18 @@ func TestDateTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 
-	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
+	parsed, err := converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567", parsed)
 	require.NoError(t, err)
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
+	var mapped, _ = testDialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -159,13 +160,14 @@ func TestDateTimePKColumn(t *testing.T) {
 			},
 			IsPrimaryKey: true,
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {
-	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
+	var mapped, converter = testDialect.MapType(boilerplate.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -173,11 +175,12 @@ func TestTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+		TypesWithoutNull: []string{"string"},
+		MustExist:        true,
+	}, nil)
 	require.Equal(t, "TIME(6) NOT NULL", mapped.DDL)
 
-	parsed, err := mapped.Converter("10:09:08.234567Z")
+	parsed, err := converter("10:09:08.234567Z")
 	require.Equal(t, "10:09:08.234567", parsed)
 	require.NoError(t, err)
 }

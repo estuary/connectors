@@ -123,7 +123,7 @@ func newStarburstDriver() *sql.Driver {
 			}).Info("opening Starburst")
 
 			var metaBase sql.TablePath
-			var metaSpecs, _ = sql.MetaTables(metaBase)
+			var metaSpecs, _ = sql.MetaTables(starburstTrinoDialect, metaBase)
 			var templates = renderTemplates(starburstTrinoDialect)
 
 			return &sql.Endpoint{
@@ -356,7 +356,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	for it.Next() {
 		var b = t.bindings[it.Binding]
-		doc, err := b.target.Document.MappedType.Converter(it.RawJSON)
+		doc, err := b.target.Document.Converter(it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting document %s: %w", b.target.Document.Field, err)
 		}

@@ -8,6 +8,7 @@ import (
 	"text/template"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
@@ -16,8 +17,8 @@ import (
 // an integer. The sqlserver driver doesn't appear to have any way to provide an integer value
 // larger than 8 bytes as a parameter (such as may go in a NUMERIC(38,0) column). The value provided
 // must always be an integer that fits in an int64.
-func strToInt() sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
+func strToInt() boilerplate.ElementConverter {
+	return boilerplate.StringCastConverter(func(str string) (interface{}, error) {
 		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
 		// per JSON specification so we must handle this possibility here. Anything after the
 		// decimal is discarded on the assumption that Flow has validated the data and verified that
@@ -46,50 +47,37 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
 	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
 
-	// nvarchar and varchar fields require the value to be a string instead of a
-	// bytearray to handle unicode properly, so we convert to str after converting
-	// to json.RawMessage
-	var jsonConverter = sql.WithElementConverter(sql.Compose(sql.StdByteArrayToStr, sql.JsonBytesConverter))
-
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
-		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),
-		sql.ARRAY:   sql.NewStaticMapper(textType, jsonConverter),
-		sql.BINARY:  sql.NewStaticMapper(textType),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.PrimaryKeyMapper{
-				// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
-				// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
-				// stored in the column, not the character count.
-				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
-				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-				PrimaryKey: sql.NewStaticMapper(textPKType),
-				Delegate:   sql.NewStaticMapper(textType),
-			},
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper(textPKType),
-					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(strToInt())),
+	mapper := sql.NewDDLMapper(
+		map[sql.FlatType]sql.ProjectionMapper{
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:        sql.MapStatic("BIT"),
+			sql.OBJECT:         sql.MapStatic(textType, boilerplate.ToJsonString),
+			sql.ARRAY:          sql.MapStatic(textType, boilerplate.ToJsonString),
+			sql.BINARY:         sql.MapStatic(textType),
+			sql.MULTIPLE:       sql.MapStatic(textType, boilerplate.ToJsonString),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", strToInt()),
+			// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", boilerplate.StrToFloat(nil, nil, nil)),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapPrimaryKey(
+					// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
+					// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
+					// stored in the column, not the character count.
+					// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
+					// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
+					sql.MapStatic(textPKType),
+					sql.MapStatic(textType),
+				),
+				WithFormat: map[string]sql.ProjectionMapper{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("DATETIME2", rfc3339ToUTC()),
+					"time":      sql.MapStatic("TIME", rfc3339TimeToUTC()),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper(textPKType),
-					// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat(nil, nil, nil))),
-				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),
-				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
-			},
+			}),
 		},
-		sql.MULTIPLE: sql.NewStaticMapper(textType, jsonConverter),
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{stringType}, Validate: stringCompatible},
@@ -134,8 +122,8 @@ func stringCompatible(p pf.Projection) bool {
 	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
-func rfc3339ToUTC() sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
+func rfc3339ToUTC() boilerplate.ElementConverter {
+	return boilerplate.StringCastConverter(func(str string) (interface{}, error) {
 		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
 		} else {
@@ -144,8 +132,8 @@ func rfc3339ToUTC() sql.ElementConverter {
 	})
 }
 
-func rfc3339TimeToUTC() sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
+func rfc3339TimeToUTC() boilerplate.ElementConverter {
+	return boilerplate.StringCastConverter(func(str string) (interface{}, error) {
 		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
 		} else {

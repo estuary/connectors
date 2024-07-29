@@ -2,12 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,180 +16,123 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
-func mapFields(spec *pf.MaterializationSpec_Binding) []mappedType {
-	out := []mappedType{}
-
-	for _, f := range spec.FieldSelection.AllFields() {
-		p := spec.Collection.GetProjection(f)
-		out = append(out, mapType(p))
-	}
-
-	return out
+type field struct {
+	name       string
+	scalarType types.ScalarAttributeType
 }
 
-type mappedType struct {
-	// Name of the field.
-	field string
+// mapType maps a Projection to a DynamoDB ScalarAttributeType. The
+// ScalarAttributeType will be an empty string unless the Projection can be used
+// as a hash or sort key.
+func mapType(p boilerplate.Projection, fc *any) (field, boilerplate.ElementConverter) {
+	out := field{name: p.Field}
 
-	// The equivalent DynamoDB scalar attribute type if this JSON type is able to be used as a
-	// DynamoDB partition key or sort key. Unset otherwise.
-	ddbScalarType types.ScalarAttributeType
-
-	// Converts tuple values into database-friendly values.
-	converter func(tuple.TupleElement) (any, error)
-}
-
-func mapType(p *pf.Projection) mappedType {
-	out := mappedType{
-		field: p.Field,
+	if p.NumericString != nil {
+		switch *p.NumericString {
+		case boilerplate.StringFormatInteger:
+			return out, convertStringInteger
+		case boilerplate.StringFormatNumber:
+			// DynamoDB doesn't support non-numeric float values.
+			// https://boto3.amazonaws.com/v1/documentation/api/latest/_modules/boto3/dynamodb/types.html
+			return out, boilerplate.StrToFloat(nil, nil, nil)
+		}
 	}
 
-	if _, ok := boilerplate.AsFormattedNumeric(p); ok {
-		// A string field formatted as an integer or number, with a possible additional
-		// corresponding integer or number type.
-		out.converter = convertNumeric
-		return out
-	}
-
-	jsonTypes := slices.DeleteFunc(p.Inference.Types, func(t string) bool {
-		// DynamoDB has no requirements for nullability of non-key fields.
-		return t == pf.JsonTypeNull
-	})
-
-	if len(jsonTypes) != 1 {
+	if len(p.TypesWithoutNull) != 1 {
 		// Multiple possible types, a single null type, or completely unconstrained types.
-		out.converter = passthrough
-		return out
+		return out, nil
 	}
 
 	// Single type. Map it to a DynamoDB scalar type if possible, and establish additional
 	// conversions for storing its data in the database.
-	switch t := jsonTypes[0]; t {
-	case pf.JsonTypeString:
+	switch p.TypesWithoutNull[0] {
+	case "string":
 		if p.Inference.String_.ContentEncoding == "base64" {
-			out.ddbScalarType = types.ScalarAttributeTypeB
-			out.converter = convertBase64
+			out.scalarType = types.ScalarAttributeTypeB
+			return out, boilerplate.DecodeBase64String
 		} else {
-			out.ddbScalarType = types.ScalarAttributeTypeS
-			out.converter = passthrough
+			out.scalarType = types.ScalarAttributeTypeS
+			return out, nil
 		}
-	case pf.JsonTypeBoolean:
+	case "boolean":
 		// For boolean key fields to be used as DynamoDB key fields, they must be converted to
 		// strings. Otherwise they can be directly as booleans.
 		if p.IsPrimaryKey {
-			out.ddbScalarType = types.ScalarAttributeTypeS
-			out.converter = stringify
+			out.scalarType = types.ScalarAttributeTypeS
+			return out, boilerplate.ToStr
 		} else {
-			out.converter = passthrough
+			return out, nil
 		}
-	case pf.JsonTypeInteger:
-		out.ddbScalarType = types.ScalarAttributeTypeN
-		out.converter = convertNumeric
-	case pf.JsonTypeNumber:
-		out.converter = convertNumeric
-	case pf.JsonTypeArray, pf.JsonTypeObject:
-		out.converter = convertObject
+	case "integer":
+		out.scalarType = types.ScalarAttributeTypeN
+		return out, nil
+	case "number":
+		return out, nil
+	case "array", "object":
+		return out, boilerplate.HydrateObject
 	default:
-		panic(fmt.Errorf("invalid JSON type %s", t))
+		panic(fmt.Sprintf("unsupported type %s", p.Inference.Types))
 	}
-
-	return out
 }
 
-func stringify(te tuple.TupleElement) (any, error) {
-	b, err := json.Marshal(te)
-	if err != nil {
-		return nil, err
-	}
-	return string(b), nil
-}
+var typeMapper = boilerplate.NewTypeMapper(mapType)
 
-func convertObject(te tuple.TupleElement) (any, error) {
-	var out any
+func mapBinding(bindingSpec *pf.MaterializationSpec_Binding) ([]field, []boilerplate.ElementConverter, error) {
+	fields := make([]field, 0, len(bindingSpec.FieldSelection.AllFields()))
+	converters := make([]boilerplate.ElementConverter, 0, len(bindingSpec.FieldSelection.AllFields()))
 
-	switch b := te.(type) {
-	case []byte:
-		if err := json.Unmarshal(b, &out); err != nil {
-			return nil, err
+	for _, f := range bindingSpec.FieldSelection.AllFields() {
+		mapped, err := typeMapper.Map(bindingSpec.Collection.GetProjection(f), bindingSpec.FieldSelection.FieldConfigJsonMap)
+		if err != nil {
+			return nil, nil, err
 		}
-	case json.RawMessage:
-		if err := json.Unmarshal(b, &out); err != nil {
-			return nil, err
-		}
-	case nil:
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("invalid type %T (%#v) for variant", te, te)
+		fields = append(fields, mapped.EndpointType)
+		converters = append(converters, mapped.Converter)
 	}
 
-	return out, nil
+	return fields, converters, nil
 }
 
-func passthrough(te tuple.TupleElement) (any, error) {
-	return te, nil
+// wrappedInteger provides handling for integer values that may be
+// string-encoded. These integer values will may be very large and their string
+// representation will be preserved if possible. It is constructed using the
+// element converter convertStringInteger.
+type wrappedInteger struct {
+	stringified string
 }
 
-// wrappedNumeric provides handling for numeric values that can either be the actual numeric value
-// (integer or number), or a string with an applicable format.
-type wrappedNumeric struct {
-	innerNumeric string
-}
+var _ attributevalue.Marshaler = (*wrappedInteger)(nil)
 
-var _ attributevalue.Marshaler = (*wrappedNumeric)(nil)
-
-func (w *wrappedNumeric) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+func (w *wrappedInteger) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	return &types.AttributeValueMemberN{
-		Value: w.innerNumeric,
+		Value: w.stringified,
 	}, nil
 }
 
-func convertNumeric(te tuple.TupleElement) (any, error) {
-	out := &wrappedNumeric{}
+func convertStringInteger(te tuple.TupleElement) (any, error) {
+	out := &wrappedInteger{}
 
 	switch tt := te.(type) {
 	case string:
-		switch tt {
-		case "NaN", "Infinity", "-Infinity":
-			// DynamoDB doesn't support non-numeric float values.
-			// https://boto3.amazonaws.com/v1/documentation/api/latest/_modules/boto3/dynamodb/types.html
-			return nil, nil
-		default:
-			out.innerNumeric = tt
+		out.stringified = tt
+	case int64, uint64:
+		c, err := boilerplate.ToStr(te)
+		if err != nil {
+			return nil, err
 		}
-	case int:
-		out.innerNumeric = strconv.Itoa(tt)
-	case int64:
-		out.innerNumeric = strconv.FormatInt(tt, 10)
-	case float64:
-		out.innerNumeric = strconv.FormatFloat(tt, 'f', -1, 64)
+		out.stringified = c.(string)
 	case nil:
 		return nil, nil
 	default:
-		return out, fmt.Errorf("unsupported type %T (%#v)", te, te)
+		return nil, fmt.Errorf("unsupported type %T (%#v)", te, te)
 	}
 
 	return out, nil
-}
-
-func convertBase64(te tuple.TupleElement) (any, error) {
-	switch t := te.(type) {
-	case string:
-		bytes, err := base64.StdEncoding.DecodeString(t)
-		if err != nil {
-			return nil, fmt.Errorf("decoding bytes from string: %w", err)
-		}
-
-		return bytes, nil
-	case nil:
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("convertBase64 unsupported type %T (%#v)", te, te)
-	}
 }
 
 type constrainter struct{}
 
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (constrainter) NewConstraints(p boilerplate.Projection, deltaUpdates bool, fc *any) *pm.Response_Validated_Constraint {
 	// By default only the collection key and root document fields are materialized, due to
 	// DynamoDB's 400kb single item size limit. Additional fields are optional and may be selected
 	// to materialize as top-level properties with the applicable conversion applied, if desired.
@@ -217,7 +156,7 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed boilerplate.Projection, fc *any) (bool, error) {
 	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
 	// This relies on the assumption that the key of an establish Flow collection cannot be changed
 	// after the fact.
@@ -225,12 +164,15 @@ func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.
 		return true, nil
 	}
 
-	return strings.EqualFold(existing.Type, string(mapType(proposed).ddbScalarType)), nil
+	field, _ := mapType(proposed, fc)
+	return strings.EqualFold(existing.Type, string(field.scalarType)), nil
 }
 
-func (constrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
+func (constrainter) DescriptionForType(p boilerplate.Projection, fc *any) (string, error) {
+	field, _ := mapType(p, fc)
+
 	out := ""
-	switch t := mapType(p).ddbScalarType; t {
+	switch t := field.scalarType; t {
 	case types.ScalarAttributeTypeS:
 		out = "string"
 	case types.ScalarAttributeTypeN:
