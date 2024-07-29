@@ -350,7 +350,7 @@ class Events(IncrementalKlaviyoStream):
         super().__init__(**kwargs)
 
         self.campaign_data = None
-        self.record_amount = 500000 # bypass failing snapshot tests, since current credentials break _prepare_campaign
+        self.record_amount = 100000 # bypass failing snapshot tests, since current credentials break _prepare_campaign
 
     def path(self, **kwargs) -> str:
         return "events"
@@ -390,7 +390,7 @@ class Events(IncrementalKlaviyoStream):
         return params
     
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
-        if self.record_amount >= 500000:
+        if self.record_amount >= 100000:
             self.campaign_data = self._prepare_campaign()
             self.record_amount = 0
 
