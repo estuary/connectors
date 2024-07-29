@@ -8,6 +8,7 @@ from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Union
 
 import pendulum
 import requests
+from requests.exceptions import HTTPError
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
 from airbyte_cdk.sources.streams.core import StreamData
@@ -349,6 +350,7 @@ class Events(IncrementalKlaviyoStream):
         super().__init__(**kwargs)
 
         self.campaign_data = self._prepare_campaign()
+        self.record_amount = 0
 
     def path(self, **kwargs) -> str:
         return "events"
@@ -356,7 +358,7 @@ class Events(IncrementalKlaviyoStream):
     def _prepare_campaign(self):
 
         urls = ["https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')","https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'sms')"]
-        campaign_ids = []
+        campaign_ids = set()
 
         iterate = True
         try:
@@ -367,14 +369,15 @@ class Events(IncrementalKlaviyoStream):
                         pass
                     else:
                         for record in data["data"]:
-                            campaign_ids.append(record["id"]) 
+                            campaign_ids.add(record["id"]) 
                     if data["links"]["next"] is not None:
                         url = data["links"]["next"]
                     else:
                         iterate = False
                         break
-        except:
-            return None
+        except Exception as e:
+            self.logger.error(f"{e}")
+            raise Exception("Campaign data extraction failed. Please, re-run your capture")
         return campaign_ids
 
     def request_params(
@@ -387,19 +390,23 @@ class Events(IncrementalKlaviyoStream):
         return params
     
     def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        if self.record_amount >= 500000:
+            self.campaign_data = self._prepare_campaign()
+            self.record_amount = 0
+
         for record in response.json()["data"]:
             record['datetime'] = record['attributes']['datetime'].replace(" ","T")
             record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
 
-            if self.campaign_data is not None:
-                if type(record["attributes"]['event_properties'].get("$message")) is str and record["attributes"]['event_properties']["$message"] in self.campaign_data:
-                    record["campaign_id"] = record["attributes"]['event_properties']["$message"]
-            else:
-                if type(record["attributes"]['event_properties'].get("$message")) is str and len(record["attributes"]['event_properties']["$message"]) >= 20:
-                    record["campaign_id"] = record["attributes"]['event_properties']["$message"]
+            campaign_id = record["attributes"]['event_properties'].get("$message")
+
+            if type(campaign_id) is str and campaign_id in self.campaign_data:
+                record["campaign_id"] = campaign_id
 
             if type(record["attributes"]['event_properties'].get("$flow")) is str:
                 record["flow_id"] = record["attributes"]['event_properties']["$flow"]
+            
+            self.record_amount += 1
 
             yield record
 
