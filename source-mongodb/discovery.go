@@ -27,19 +27,11 @@ const (
 	metaProperty   = "_meta"
 	opProperty     = "op"
 	beforeProperty = "before"
-	sourceProperty = "source"
 )
 
 type documentMetadata struct {
 	Op     string         `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
 	Before map[string]any `json:"before,omitempty" jsonschema:"title=Before Document,description=Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."`
-	Source *sourceMeta    `json:"source,omitempty" jsonschema:"title=Source,description=Document source metadata."`
-}
-
-type sourceMeta struct {
-	Database   string `json:"database" jsonschema:"description=Name of the source MongoDB database."`
-	Collection string `json:"collection" jsonschema:"description=Name of the source MongoDB collection."`
-	Snapshot   bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."`
 }
 
 func generateMinimalSchema() json.RawMessage {

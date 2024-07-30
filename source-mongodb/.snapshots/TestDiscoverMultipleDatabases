@@ -49,30 +49,6 @@ Binding 0:
               "type": "object",
               "title": "Before Document",
               "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
-            },
-            "source": {
-              "properties": {
-                "database": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB database."
-                },
-                "collection": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB collection."
-                },
-                "snapshot": {
-                  "type": "boolean",
-                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
-                }
-              },
-              "additionalProperties": false,
-              "type": "object",
-              "required": [
-                "database",
-                "collection"
-              ],
-              "title": "Source",
-              "description": "Document source metadata."
             }
           },
           "type": "object"
@@ -135,30 +111,6 @@ Binding 1:
               "type": "object",
               "title": "Before Document",
               "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
-            },
-            "source": {
-              "properties": {
-                "database": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB database."
-                },
-                "collection": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB collection."
-                },
-                "snapshot": {
-                  "type": "boolean",
-                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
-                }
-              },
-              "additionalProperties": false,
-              "type": "object",
-              "required": [
-                "database",
-                "collection"
-              ],
-              "title": "Source",
-              "description": "Document source metadata."
             }
           },
           "type": "object"
@@ -221,30 +173,6 @@ Binding 2:
               "type": "object",
               "title": "Before Document",
               "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
-            },
-            "source": {
-              "properties": {
-                "database": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB database."
-                },
-                "collection": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB collection."
-                },
-                "snapshot": {
-                  "type": "boolean",
-                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
-                }
-              },
-              "additionalProperties": false,
-              "type": "object",
-              "required": [
-                "database",
-                "collection"
-              ],
-              "title": "Source",
-              "description": "Document source metadata."
             }
           },
           "type": "object"
@@ -307,30 +235,6 @@ Binding 3:
               "type": "object",
               "title": "Before Document",
               "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
-            },
-            "source": {
-              "properties": {
-                "database": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB database."
-                },
-                "collection": {
-                  "type": "string",
-                  "description": "Name of the source MongoDB collection."
-                },
-                "snapshot": {
-                  "type": "boolean",
-                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
-                }
-              },
-              "additionalProperties": false,
-              "type": "object",
-              "required": [
-                "database",
-                "collection"
-              ],
-              "title": "Source",
-              "description": "Document source metadata."
             }
           },
           "type": "object"
