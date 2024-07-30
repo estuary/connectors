@@ -1,0 +1,20 @@
+# ================================
+# Collection "acmeCo/test/collectionOne": 2 Documents
+# ================================
+{"_id":"collection_one_second_value","_meta":{"op":"c"}}
+{"_id":"collection_one_third_value","_meta":{"op":"c"}}
+# ================================
+# Collection "acmeCo/test/collectionThree": 2 Documents
+# ================================
+{"_id":"collection_three_second_value","_meta":{"op":"c"}}
+{"_id":"collection_three_third_value","_meta":{"op":"c"}}
+# ================================
+# Collection "acmeCo/test/collectionTwo": 2 Documents
+# ================================
+{"_id":"collection_two_second_value","_meta":{"op":"c"}}
+{"_id":"collection_two_third_value","_meta":{"op":"c"}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_db_1%2FcollectionOne":{"backfill":{"done":true}},"test_db_2%2FcollectionTwo":{"backfill":{"done":true}},"test_db_3%2FcollectionThree":{"backfill":{"done":true}}},"databaseResumeTokens":{"test_db_1":"<TOKEN>","test_db_2":"<TOKEN>","test_db_3":"<TOKEN>"}}
+
