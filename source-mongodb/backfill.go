@@ -214,8 +214,13 @@ func (c *capture) doBackfill(
 			return fmt.Errorf("backfill decoding document: %w", err)
 		}
 
-		doc[metaProperty] = map[string]interface{}{
+		doc[metaProperty] = map[string]any{
 			opProperty: "c",
+			sourceProperty: sourceMeta{
+				Database:   binding.resource.Database,
+				Collection: binding.resource.Collection,
+				Snapshot:   true,
+			},
 		}
 		doc = sanitizeDocument(doc)
 

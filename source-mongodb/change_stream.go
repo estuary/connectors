@@ -32,7 +32,12 @@ func makeEventDocument(ev changeEvent, resourceBindingInfo map[string]bindingInf
 	}
 
 	var doc map[string]any
-	meta := make(map[string]any)
+	meta := map[string]any{
+		sourceProperty: sourceMeta{
+			Database:   binding.resource.Database,
+			Collection: binding.resource.Collection,
+		},
+	}
 	if ev.FullDocumentBeforeChange != nil {
 		meta[beforeProperty] = ev.FullDocumentBeforeChange
 	}
