@@ -217,7 +217,7 @@ func (c *capture) doBackfill(
 		doc[metaProperty] = map[string]any{
 			opProperty: "c",
 			sourceProperty: sourceMeta{
-				Database:   binding.resource.Database,
+				DB:         binding.resource.Database,
 				Collection: binding.resource.Collection,
 				Snapshot:   true,
 			},

@@ -34,7 +34,7 @@ func makeEventDocument(ev changeEvent, resourceBindingInfo map[string]bindingInf
 	var doc map[string]any
 	meta := map[string]any{
 		sourceProperty: sourceMeta{
-			Database:   binding.resource.Database,
+			DB:         binding.resource.Database,
 			Collection: binding.resource.Collection,
 		},
 	}
