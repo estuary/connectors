@@ -259,14 +259,7 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 	case pgtype.Time:
 		return x.Microseconds, nil // For historical reasons, times (note: not timestamps) without time zone are serialized as Unix microseconds
 	case pgtype.Numeric:
-		// By default a Numeric value is marshalled to a JSON number, but most JSON parsers and
-		// encoders suffer from precision issues so we really want them to be turned into a JSON
-		// string containing the formatted number instead.
-		var bs, err = json.Marshal(x)
-		if err != nil {
-			return nil, err
-		}
-		return string(bs), nil
+		return x.Value() // Happily the stringified representations of "NaN", "Infinity", and "-Infinity" exactly match what we need
 	case pgtype.Bits:
 		return x.Value() // The Value() method encodes to the desired "0101" text string
 	case pgtype.Interval:

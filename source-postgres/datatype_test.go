@@ -34,6 +34,8 @@ func TestDatatypes(t *testing.T) {
 
 		{ColumnType: `decimal`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123.456"`},
 		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123.456"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `-infinity`, ExpectValue: `"-Infinity"`},
 		{ColumnType: `numeric(4,2)`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `12.34`, ExpectValue: `"12.34"`},
 		{ColumnType: `character varying(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
 		{ColumnType: `varchar(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
