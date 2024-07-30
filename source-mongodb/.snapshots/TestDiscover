@@ -52,7 +52,7 @@ Binding 0:
             },
             "source": {
               "properties": {
-                "database": {
+                "db": {
                   "type": "string",
                   "description": "Name of the source MongoDB database."
                 },
@@ -68,7 +68,7 @@ Binding 0:
               "additionalProperties": false,
               "type": "object",
               "required": [
-                "database",
+                "db",
                 "collection"
               ],
               "title": "Source",
@@ -138,7 +138,7 @@ Binding 1:
             },
             "source": {
               "properties": {
-                "database": {
+                "db": {
                   "type": "string",
                   "description": "Name of the source MongoDB database."
                 },
@@ -154,7 +154,7 @@ Binding 1:
               "additionalProperties": false,
               "type": "object",
               "required": [
-                "database",
+                "db",
                 "collection"
               ],
               "title": "Source",

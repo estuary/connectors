@@ -37,7 +37,7 @@ type documentMetadata struct {
 }
 
 type sourceMeta struct {
-	Database   string `json:"database" jsonschema:"description=Name of the source MongoDB database."`
+	DB         string `json:"db" jsonschema:"description=Name of the source MongoDB database."`
 	Collection string `json:"collection" jsonschema:"description=Name of the source MongoDB collection."`
 	Snapshot   bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."`
 }
