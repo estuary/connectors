@@ -1,0 +1,312 @@
+---
+collections:
+  acmeCo/application_roles:
+    schema: application_roles.schema.yaml
+    key:
+      - /key
+  acmeCo/avatars:
+    schema: avatars.schema.yaml
+    key:
+      - /id
+  acmeCo/board_issues:
+    schema: board_issues.schema.yaml
+    key:
+      - /id
+  acmeCo/boards:
+    schema: boards.schema.yaml
+    key:
+      - /id
+  acmeCo/dashboards:
+    schema: dashboards.schema.yaml
+    key:
+      - /id
+  acmeCo/filter_sharing:
+    schema: filter_sharing.schema.yaml
+    key:
+      - /id
+  acmeCo/filters:
+    schema: filters.schema.yaml
+    key:
+      - /id
+  acmeCo/groups:
+    schema: groups.schema.yaml
+    key:
+      - /groupId
+  acmeCo/issue_comments:
+    schema: issue_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_custom_field_contexts:
+    schema: issue_custom_field_contexts.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_custom_field_options:
+    schema: issue_custom_field_options.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_field_configurations:
+    schema: issue_field_configurations.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_fields:
+    schema: issue_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_link_types:
+    schema: issue_link_types.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_navigator_settings:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      description: Details of an issue navigator column item.
+      properties:
+        label:
+          description: The issue navigator column label.
+          type: string
+        value:
+          description: The issue navigator column value.
+          type: string
+      required:
+        - value
+      type: object
+    key:
+      - /value
+  acmeCo/issue_notification_schemes:
+    schema: issue_notification_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_priorities:
+    schema: issue_priorities.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_properties:
+    schema: issue_properties.schema.yaml
+    key:
+      - /key
+  acmeCo/issue_remote_links:
+    schema: issue_remote_links.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_resolutions:
+    schema: issue_resolutions.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_security_schemes:
+    schema: issue_security_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_transitions:
+    schema: issue_transitions.schema.yaml
+    key:
+      - /issueId
+      - /id
+  acmeCo/issue_type_schemes:
+    schema: issue_type_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_type_screen_schemes:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      description: Details of an issue type screen scheme.
+      properties:
+        description:
+          description: The description of the issue type screen scheme.
+          type: string
+        id:
+          description: The ID of the issue type screen scheme.
+          type: string
+        name:
+          description: The name of the issue type screen scheme.
+          type: string
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/issue_types:
+    schema: issue_types.schema.yaml
+    key:
+      - /id
+  acmeCo/issue_votes:
+    schema: issue_votes.schema.yaml
+    key:
+      - /self
+  acmeCo/issue_watchers:
+    schema: issue_watchers.schema.yaml
+    key:
+      - /self
+  acmeCo/issue_worklogs:
+    schema: issue_worklogs.schema.yaml
+    key:
+      - /id
+  acmeCo/issues:
+    schema: issues.schema.yaml
+    key:
+      - /id
+  acmeCo/jira_settings:
+    schema: jira_settings.schema.yaml
+    key:
+      - /id
+  acmeCo/labels:
+    schema:
+      properties:
+        label:
+          type: string
+      required:
+        - label
+      type:
+        - object
+    key:
+      - /label
+  acmeCo/permission_schemes:
+    schema: permission_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/permissions:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      description: Details about permissions.
+      properties:
+        description:
+          type:
+            - "null"
+            - string
+        key:
+          type: string
+        name:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      required:
+        - key
+      type: object
+    key:
+      - /key
+  acmeCo/project_avatars:
+    schema: project_avatars.schema.yaml
+    key:
+      - /id
+  acmeCo/project_categories:
+    schema: project_categories.schema.yaml
+    key:
+      - /id
+  acmeCo/project_components:
+    schema: project_components.schema.yaml
+    key:
+      - /id
+  acmeCo/project_email:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      description: "A project's sender email address."
+      properties:
+        emailAddress:
+          description: The email address.
+          type: string
+        projectId:
+          type: string
+      required:
+        - projectId
+      type: object
+    key:
+      - /projectId
+  acmeCo/project_permission_schemes:
+    schema: project_permission_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/project_roles:
+    schema: project_roles.schema.yaml
+    key:
+      - /id
+  acmeCo/project_types:
+    schema: project_types.schema.yaml
+    key:
+      - /key
+  acmeCo/project_versions:
+    schema: project_versions.schema.yaml
+    key:
+      - /id
+  acmeCo/projects:
+    schema: projects.schema.yaml
+    key:
+      - /id
+  acmeCo/screen_schemes:
+    schema: screen_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/screen_tab_fields:
+    schema: screen_tab_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/screen_tabs:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      description: A screen tab.
+      properties:
+        id:
+          description: The ID of the screen tab.
+          readOnly: true
+          type: integer
+        name:
+          description: The name of the screen tab. The maximum length is 255 characters.
+          type: string
+        screenId:
+          description: Id of the related screen.
+          type:
+            - "null"
+            - integer
+      required:
+        - name
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/screens:
+    schema: screens.schema.yaml
+    key:
+      - /id
+  acmeCo/sprint_issues:
+    schema: sprint_issues.schema.yaml
+    key:
+      - /id
+  acmeCo/sprints:
+    schema: sprints.schema.yaml
+    key:
+      - /id
+  acmeCo/time_tracking:
+    schema: time_tracking.schema.yaml
+    key:
+      - /key
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /accountId
+  acmeCo/users_groups_detailed:
+    schema: users_groups_detailed.schema.yaml
+    key:
+      - /accountId
+  acmeCo/workflow_schemes:
+    schema: workflow_schemes.schema.yaml
+    key:
+      - /id
+  acmeCo/workflow_status_categories:
+    schema: workflow_status_categories.schema.yaml
+    key:
+      - /id
+  acmeCo/workflow_statuses:
+    schema: workflow_statuses.schema.yaml
+    key:
+      - /id
+  acmeCo/workflows:
+    schema: workflows.schema.yaml
+    key:
+      - /id/name
