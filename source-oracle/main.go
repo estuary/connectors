@@ -246,24 +246,24 @@ func (db *oracleDatabase) FallbackCollectionKey() []string {
 
 func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {
 	if colType.jsonType == "integer" {
-		return *key.(*int64), nil
+		return key.(int64), nil
 	} else if colType.jsonType == "number" {
-		return nil, fmt.Errorf("unsupported %q primary key with precision %d", colType.original, colType.scale)
+		return nil, fmt.Errorf("unsupported %q primary key with scale %d", colType.original, colType.scale)
 	}
 
 	switch key := key.(type) {
-	case *[16]uint8:
+	case [16]uint8:
 		var id, err = uuid.FromBytes(key[:])
 		if err != nil {
 			return nil, fmt.Errorf("error parsing uuid: %w", err)
 		}
 		return id.String(), nil
-	case *time.Time:
+	case time.Time:
 		return key.Format(sortableRFC3339Nano), nil
-	case *string:
-		return *key, nil
-	case *int64:
-		return *key, nil
+	case string:
+		return key, nil
+	case int64:
+		return key, nil
 	default:
 		return key, nil
 	}
