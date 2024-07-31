@@ -830,7 +830,7 @@ func (s *replicationStream) Close(ctx context.Context) error {
 }
 
 func (s *replicationStream) redoFileSwitched(ctx context.Context) (bool, error) {
-	row := s.conn.QueryRowContext(ctx, "SELECT SEQUENCE# FROM V$LOG WHERE STATUS = 'CURRENT' AND ROWNUM=1 ORDER BY SEQUENCE#")
+	row := s.conn.QueryRowContext(ctx, "SELECT SEQUENCE# FROM V$LOG WHERE STATUS = 'CURRENT' ORDER BY SEQUENCE# FETCH NEXT 1 ROW ONLY")
 
 	var newSequence int
 	if err := row.Scan(&newSequence); err != nil {

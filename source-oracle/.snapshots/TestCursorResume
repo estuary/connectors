@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
 # ================================
-{"COUNT":"1","DATA":"bvzf","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"COUNT":"3","DATA":"gboj","EPOCH":"   ","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -12,17 +12,68 @@
 
 
 ####################################
-### Capture from Key "AmFhYQACMQA="
+### Capture from Key "AiAgIAACMwA="
 ####################################
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 2 Documents
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
 # ================================
-{"COUNT":"2","DATA":"ukwh","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"COUNT":"3","DATA":"lntg","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"COUNT":"-1","DATA":"kvxr","EPOCH":".","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":2,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "Ai4AAi0xAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"0","DATA":"xakg","EPOCH":".","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================
 {"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":3,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "Ai4AAjAA"
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"1","DATA":"bvzf","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":4,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "AmFhYQACMQA="
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"2","DATA":"ukwh","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":5,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "AmFhYQACMgA="
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"3","DATA":"lntg","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":6,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -35,23 +86,59 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":4,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":7,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
 ### Capture from Key "AmJiYgACLTEwMAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 4 Documents
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
 # ================================
 {"COUNT":"2","DATA":"ajgp","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"COUNT":"333","DATA":"zljj","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"COUNT":"4096","DATA":"lhnw","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"COUNT":"800000","DATA":"iask","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================
 {"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":8,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "AmJiYgACMgA="
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"333","DATA":"zljj","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":9,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "AmJiYgACMzMzAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"4096","DATA":"lhnw","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":10,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+
+
+####################################
+### Capture from Key "AmJiYgACNDA5NgA="
+####################################
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# ================================
+{"COUNT":"800000","DATA":"iask","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":11,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -64,7 +151,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":9,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":12,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -77,7 +164,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":10,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":13,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -90,7 +177,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":11,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":14,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -103,7 +190,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":12,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":15,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -116,7 +203,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":13,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":16,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
@@ -125,7 +212,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":13,"key_columns":["EPOCH","COUNT"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":16,"key_columns":["EPOCH","COUNT"],"mode":"Active"}},"cursor":"11111111"}
 
 
 

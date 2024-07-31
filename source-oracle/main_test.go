@@ -123,7 +123,7 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE %s %s`, tableName, tableDef))
 	t.Cleanup(func() {
 		log.WithField("table", tableName).Debug("destroying test table")
-		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE %s`, tableName))
+		//tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE %s`, tableName))
 	})
 	return tableName
 }
