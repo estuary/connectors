@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT46055452":{"backfilled":51,"key_columns":["FULLNAME","YEAR"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT46055452":{"backfilled":100,"key_columns":["FULLNAME","YEAR"],"mode":"Active"}},"cursor":"11111111"}
 
