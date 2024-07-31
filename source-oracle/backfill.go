@@ -254,8 +254,8 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	}
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
 	fmt.Fprintf(query, ` WHERE ROWID > :1`)
-	fmt.Fprintf(query, ` AND ROWNUM <= %d`, db.config.Advanced.BackfillChunkSize)
 	fmt.Fprintf(query, ` ORDER BY ROWID ASC`)
+	fmt.Fprintf(query, ` FETCH NEXT %d ROWS ONLY`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 
@@ -282,11 +282,10 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 		columnSelect = append(columnSelect, castColumn(col))
 	}
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
-	fmt.Fprintf(query, " WHERE ROWNUM <= %d", db.config.Advanced.BackfillChunkSize)
 	if !start {
 		for i := 0; i != len(pkey); i++ {
 			if i == 0 {
-				fmt.Fprintf(query, " AND (")
+				fmt.Fprintf(query, " WHERE (")
 			} else {
 				fmt.Fprintf(query, ") OR (")
 			}
@@ -299,6 +298,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 		fmt.Fprintf(query, ")")
 	}
 	fmt.Fprintf(query, " ORDER BY %s ASC", strings.Join(pkey, ", "))
+	fmt.Fprintf(query, ` FETCH NEXT %d ROWS ONLY`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 

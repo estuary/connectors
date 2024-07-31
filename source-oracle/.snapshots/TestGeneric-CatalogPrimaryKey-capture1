@@ -1,59 +1,108 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t46055452": 51 Documents
+# Collection "acmeCo/test/flow_test_logminer_t46055452": 100 Documents
 # ================================
 {"FULLNAME":"Alabama","POPULATION":"1830000","STATE":"AL","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Alabama","POPULATION":"2359000","STATE":"AL","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Alabama","POPULATION":"2845000","STATE":"AL","YEAR":"1940","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Arizona","POPULATION":"124000","STATE":"AZ","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Arizona","POPULATION":"340000","STATE":"AZ","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Arkansas","POPULATION":"1314000","STATE":"AR","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Arkansas","POPULATION":"1756000","STATE":"AR","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Arkansas","POPULATION":"1955000","STATE":"AR","YEAR":"1940","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"California","POPULATION":"1490000","STATE":"CA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"California","POPULATION":"3554000","STATE":"CA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Colorado","POPULATION":"543000","STATE":"CO","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Colorado","POPULATION":"937000","STATE":"CO","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Connecticut","POPULATION":"1391000","STATE":"CT","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Connecticut","POPULATION":"910000","STATE":"CT","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Delaware","POPULATION":"185000","STATE":"DE","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Delaware","POPULATION":"219000","STATE":"DE","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"District of Columbia","POPULATION":"278000","STATE":"DC","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"District of Columbia","POPULATION":"440000","STATE":"DC","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Florida","POPULATION":"530000","STATE":"FL","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Florida","POPULATION":"962000","STATE":"FL","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Georgia","POPULATION":"2220000","STATE":"GA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Georgia","POPULATION":"2926000","STATE":"GA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Idaho","POPULATION":"163000","STATE":"ID","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Idaho","POPULATION":"433000","STATE":"ID","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Illinois","POPULATION":"4828000","STATE":"IL","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Illinois","POPULATION":"6663000","STATE":"IL","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Indiana","POPULATION":"2518000","STATE":"IN","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Indiana","POPULATION":"2947000","STATE":"IN","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Iowa","POPULATION":"2231000","STATE":"IA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Iowa","POPULATION":"2400000","STATE":"IA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Kansas","POPULATION":"1473000","STATE":"KS","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Kansas","POPULATION":"1769000","STATE":"KS","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Kentucky","POPULATION":"2148000","STATE":"KY","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Kentucky","POPULATION":"2421000","STATE":"KY","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Louisiana","POPULATION":"1384000","STATE":"LA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Louisiana","POPULATION":"1813000","STATE":"LA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Maine","POPULATION":"695000","STATE":"ME","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Maine","POPULATION":"771000","STATE":"ME","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Maryland","POPULATION":"1189000","STATE":"MD","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Maryland","POPULATION":"1464000","STATE":"MD","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Massachusetts","POPULATION":"2788000","STATE":"MA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Massachusetts","POPULATION":"3882000","STATE":"MA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Michigan","POPULATION":"2423000","STATE":"MI","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Michigan","POPULATION":"3723000","STATE":"MI","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Minnesota","POPULATION":"1754000","STATE":"MN","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Minnesota","POPULATION":"2403000","STATE":"MN","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Mississippi","POPULATION":"1553000","STATE":"MS","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Mississippi","POPULATION":"1800000","STATE":"MS","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Missouri","POPULATION":"3108000","STATE":"MO","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Missouri","POPULATION":"3404000","STATE":"MO","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Montana","POPULATION":"245000","STATE":"MT","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Montana","POPULATION":"543000","STATE":"MT","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Nebraska","POPULATION":"1067000","STATE":"NE","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Nebraska","POPULATION":"1300000","STATE":"NE","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Nevada","POPULATION":"43000","STATE":"NV","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Nevada","POPULATION":"78000","STATE":"NV","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"New Hampshire","POPULATION":"412000","STATE":"NH","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"New Hampshire","POPULATION":"444000","STATE":"NH","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"New Jersey","POPULATION":"1884000","STATE":"NJ","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"New Jersey","POPULATION":"3198000","STATE":"NJ","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"New Mexico","POPULATION":"196000","STATE":"NM","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"New Mexico","POPULATION":"363000","STATE":"NM","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"New York","POPULATION":"10282000","STATE":"NY","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"New York","POPULATION":"7283000","STATE":"NY","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"North Carolina","POPULATION":"1897000","STATE":"NC","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"North Carolina","POPULATION":"2588000","STATE":"NC","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"North Dakota","POPULATION":"321000","STATE":"ND","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"North Dakota","POPULATION":"646000","STATE":"ND","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Ohio","POPULATION":"4161000","STATE":"OH","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Ohio","POPULATION":"5799000","STATE":"OH","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Oklahoma","POPULATION":"2055000","STATE":"OK","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Oklahoma","POPULATION":"800000","STATE":"OK","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Oregon","POPULATION":"415000","STATE":"OR","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Oregon","POPULATION":"788000","STATE":"OR","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Pennsylvania","POPULATION":"6313000","STATE":"PA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Pennsylvania","POPULATION":"8740000","STATE":"PA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Rhode Island","POPULATION":"430000","STATE":"RI","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Rhode Island","POPULATION":"613000","STATE":"RI","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"South Carolina","POPULATION":"1342000","STATE":"SC","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"South Carolina","POPULATION":"1685000","STATE":"SC","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"South Dakota","POPULATION":"403000","STATE":"SD","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"South Dakota","POPULATION":"640000","STATE":"SD","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Tennessee","POPULATION":"2023000","STATE":"TN","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Tennessee","POPULATION":"2329000","STATE":"TN","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Texas","POPULATION":"3055000","STATE":"TX","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Texas","POPULATION":"4723000","STATE":"TX","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Utah","POPULATION":"277000","STATE":"UT","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Utah","POPULATION":"453000","STATE":"UT","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Vermont","POPULATION":"344000","STATE":"VT","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Vermont","POPULATION":"353000","STATE":"VT","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Virginia","POPULATION":"1858000","STATE":"VA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Virginia","POPULATION":"2347000","STATE":"VA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Washington","POPULATION":"1373000","STATE":"WA","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Washington","POPULATION":"523000","STATE":"WA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"West Virginia","POPULATION":"1470000","STATE":"WV","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"West Virginia","POPULATION":"959000","STATE":"WV","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Wisconsin","POPULATION":"2072000","STATE":"WI","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"Wisconsin","POPULATION":"2679000","STATE":"WI","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Wyoming","POPULATION":"197000","STATE":"WY","YEAR":"1920","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"FULLNAME":"Wyoming","POPULATION":"93000","STATE":"WY","YEAR":"1900","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T46055452","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT46055452":{"backfilled":51,"key_columns":["FULLNAME","YEAR"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT46055452":{"backfilled":100,"key_columns":["FULLNAME","YEAR"],"mode":"Active"}},"cursor":"11111111"}
 
