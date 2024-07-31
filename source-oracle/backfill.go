@@ -91,21 +91,13 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var prevRowID string // Used when processing keyless backfill results to sanity-check ordering
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
-		// Scan the row values and copy into the equivalent map
-		var fields = make(map[string]any)
-		var fieldsPtr = make([]any, len(cols))
-		var rowid string
-		for idx, col := range cols {
-			if col == "ROWID" {
-				fieldsPtr[idx] = &rowid
-			} else {
-				fields[col] = reflect.New(columnTypes[col].t).Interface()
-				fieldsPtr[idx] = fields[col]
-			}
+		fields, err := scanToMap(rows, cols, columnTypes)
+		if err != nil {
+			return false, err
 		}
-		if err := rows.Scan(fieldsPtr...); err != nil {
-			return false, fmt.Errorf("scanning row: %w", err)
-		}
+		var rowid = fields["ROWID"].(string)
+		delete(fields, "ROWID")
+
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
 			rowKey = []byte(rowid)
@@ -158,6 +150,30 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
 	return backfillComplete, nil
+}
+
+func scanToMap(rows *sql.Rows, cols []string, colTypes map[string]oracleColumnType) (map[string]any, error) {
+	var fieldsArr = make([]any, len(cols))
+	var fieldsPtr = make([]any, len(cols))
+	for idx, col := range cols {
+		if col == "ROWID" {
+			var rowid = ""
+			fieldsArr[idx] = &rowid
+		} else {
+			fieldsArr[idx] = reflect.Zero(colTypes[col].t).Interface()
+		}
+		fieldsPtr[idx] = &fieldsArr[idx]
+	}
+	if err := rows.Scan(fieldsPtr...); err != nil {
+		return nil, fmt.Errorf("scanning row: %w", err)
+	}
+
+	var fields = make(map[string]any)
+	for idx, col := range cols {
+		fields[col] = fieldsArr[idx]
+	}
+
+	return fields, nil
 }
 
 // -1 means a < b
