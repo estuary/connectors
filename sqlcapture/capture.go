@@ -823,7 +823,10 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 	var cursor = c.pending.cursors[count-1]
 	c.pending.cursors = c.pending.cursors[count:]
-	logrus.WithField("cursor", cursor).Trace("acknowledged up to cursor")
+	logrus.WithFields(logrus.Fields{
+		"count":  count,
+		"cursor": cursor,
+	}).Debug("acknowledged up to cursor")
 	replStream.Acknowledge(ctx, cursor)
 	return nil
 }

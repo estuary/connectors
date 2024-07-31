@@ -74,13 +74,13 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	} else if startLSN < slotInfo.ConfirmedFlushLSN {
 		logrus.WithFields(logrus.Fields{
 			"slot":         slot,
-			"confirmedLSN": slotInfo.ConfirmedFlushLSN,
-			"startLSN":     startLSN,
+			"confirmedLSN": slotInfo.ConfirmedFlushLSN.String(),
+			"startLSN":     startLSN.String(),
 		}).Warn("replication slot confirmed_flush_lsn greater than connector start LSN (this means it was probably deleted+recreated and all bindings need to be backfilled)")
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"startLSN":    startLSN,
+		"startLSN":    startLSN.String(),
 		"publication": publication,
 		"slot":        slot,
 	}).Info("starting replication")
@@ -180,6 +180,7 @@ type replicationStream struct {
 	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
 
 	ackLSN          uint64        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
+	previousAckLSN  pglogrepl.LSN // The last acknowledged LSN sent to the server in a Standby Status Update. Only used to reduce log spam at INFO level.
 	lastTxnEndLSN   pglogrepl.LSN // End LSN (record + 1) of the last completed transaction.
 	nextTxnFinalLSN pglogrepl.LSN // Final LSN of the commit currently being processed, or zero if between transactions.
 	nextTxnMillis   int64         // Unix timestamp (in millis) at which the change originally occurred.
@@ -675,7 +676,6 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	logrus.WithField("cursor", cursor).Debug("advancing acknowledged LSN")
 	var lsn, err = pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
@@ -686,7 +686,13 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) erro
 
 func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	var ackLSN = pglogrepl.LSN(atomic.LoadUint64(&s.ackLSN))
-	logrus.WithField("ackLSN", ackLSN).Debug("sending Standby Status Update")
+	if ackLSN != s.previousAckLSN {
+		// Log at info level whenever we're about to confirm a different LSN from last time.
+		logrus.WithField("ackLSN", ackLSN.String()).Info("advancing confirmed LSN")
+		s.previousAckLSN = ackLSN
+	} else {
+		logrus.WithField("ackLSN", ackLSN.String()).Debug("sending Standby Status Update")
+	}
 	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: ackLSN,
 	})
