@@ -32,6 +32,7 @@ require (
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
 	github.com/estuary/flow v0.4.0
+	github.com/estuary/vitess v0.15.8
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-mysql-org/go-mysql v1.8.0
 	github.com/go-sql-driver/mysql v1.8.1
@@ -48,7 +49,6 @@ require (
 	github.com/klauspost/compress v1.17.9
 	github.com/marcboeker/go-duckdb v1.5.6
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/mdibaiee/vitess v0.15.7
 	github.com/microsoft/go-mssqldb v0.21.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/mitchellh/mapstructure v1.5.0
