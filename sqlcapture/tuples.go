@@ -15,7 +15,7 @@ func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes
 	var xs = make([]interface{}, len(key))
 	var err error
 	for i, elem := range key {
-		var ktype, _ = fieldTypes[elem]
+		var ktype = fieldTypes[elem]
 		if xs[i], err = translate(fields[elem], ktype); err != nil {
 			return nil, fmt.Errorf("error encoding column %q: %w", elem, err)
 		}
