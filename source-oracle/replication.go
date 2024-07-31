@@ -17,7 +17,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/mdibaiee/vitess/go/vt/sqlparser"
+	"github.com/estuary/vitess/go/vt/sqlparser"
 	"github.com/sirupsen/logrus"
 )
 
