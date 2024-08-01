@@ -19,11 +19,7 @@ Binding 0:
               "description": "(source type: non-nullable int4)"
             },
             "value": {
-              "description": "(source type: composite)",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "(source type: composite)"
             }
           }
         }
