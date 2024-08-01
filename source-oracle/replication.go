@@ -102,7 +102,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 }
 
 func (s *replicationStream) endLogminer(ctx context.Context) error {
-	if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR.END_LOGMNR; END;"); err != nil {
+	if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.END_LOGMNR; END;"); err != nil {
 		return fmt.Errorf("ending logminer session: %w", err)
 	}
 
@@ -115,8 +115,8 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 	// See DBMS_LOGMNR_D.BUILD reference:
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_LOGMNR_D.html#GUID-20E210F3-A566-46F1-B817-486723069AF4
 	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
-		if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
-			return fmt.Errorf("creating logfile with dictionary: %w", err)
+		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
+			return fmt.Errorf("extracting dictionary from logfile: %w", err)
 		}
 	}
 	// We only add the local version of archived log files to avoid duplicates
@@ -161,7 +161,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 	}
 
 	for _, f := range redoFiles {
-		if _, err := s.conn.ExecContext(ctx, "BEGIN DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.file); err != nil {
+		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.file); err != nil {
 			return fmt.Errorf("adding logfile %q (%s) to logminer: %w", f.file, f.status, err)
 		}
 	}
@@ -186,7 +186,7 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) err
 		return err
 	}
 
-	var startQuery = fmt.Sprintf("BEGIN DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY %s); END;", dictionaryOption)
+	var startQuery = fmt.Sprintf("BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY %s); END;", dictionaryOption)
 	if _, err := s.conn.ExecContext(ctx, startQuery, startSCN); err != nil {
 		return fmt.Errorf("starting logminer: %w", err)
 	}
