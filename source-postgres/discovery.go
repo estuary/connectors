@@ -197,8 +197,12 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 		if !ok {
 			return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
 		}
-	} else if colSchema, ok = column.DataType.(columnSchema); ok {
-		// Nothing else to do since the columnSchema was already determined.
+	} else if dataType, ok := column.DataType.(postgresComplexType); ok {
+		var schema, err = dataType.toColumnSchema(column)
+		if err != nil {
+			return nil, err
+		}
+		colSchema = schema
 	} else {
 		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", column.DataType)
 	}
@@ -401,19 +405,54 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, e
 			// improve this by discovering composite types, building decoders for them, and
 			// registering the decoders with the pgx connection. pgx v5 has new utility methods
 			// specifically for doing this.
+			col.DataType = postgresCompositeType{}
 		case "e": // enum
 			// Enum values are always strings corresponding to an enum label.
-			col.DataType = columnSchema{jsonType: "string"}
+			col.DataType = postgresEnumType{}
 		case "r", "m": // range, multirange
 			// Capture ranges in their text form to retain inclusive (like `[`) & exclusive
 			// (like `(`) bounds information. For example, the text form of a range representing
 			// "integers greater than or equal to 1 but less than 5" is '[1,5)'
-			col.DataType = columnSchema{jsonType: "string"}
+			col.DataType = postgresRangeType{multirange: typtype == "m"}
 		}
 
 		columns = append(columns, col)
 	}
 	return columns, rows.Err()
+}
+
+type postgresComplexType interface {
+	String() string
+	toColumnSchema(info sqlcapture.ColumnInfo) (columnSchema, error)
+}
+
+type postgresEnumType struct{}
+
+func (t postgresEnumType) String() string { return "enum" }
+func (t postgresEnumType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	return columnSchema{jsonType: "string"}, nil
+}
+
+type postgresRangeType struct {
+	multirange bool
+}
+
+func (t postgresRangeType) String() string {
+	if t.multirange {
+		return "multirange"
+	}
+	return "range"
+}
+
+func (t postgresRangeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	return columnSchema{jsonType: "string"}, nil
+}
+
+type postgresCompositeType struct{}
+
+func (t postgresCompositeType) String() string { return "composite" }
+func (t postgresCompositeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	return columnSchema{jsonType: "string"}, nil
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with

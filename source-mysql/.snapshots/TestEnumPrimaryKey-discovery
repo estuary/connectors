@@ -17,6 +17,7 @@ Binding 0:
           "properties": {
             "category": {
               "type": "string",
+              "description": "(source type: non-nullable enum)",
               "enum": [
                 "",
                 "A",
@@ -26,13 +27,15 @@ Binding 0:
               ]
             },
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             }
           }
         }

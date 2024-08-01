@@ -15,33 +15,39 @@ Binding 0:
           "$anchor": "TestUnsignedIntegers_45511171",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             },
             "v1": {
+              "description": "(source type: tinyint unsigned)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "v2": {
+              "description": "(source type: smallint unsigned)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "v3": {
+              "description": "(source type: mediumint unsigned)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "v4": {
+              "description": "(source type: int unsigned)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "v8": {
+              "description": "(source type: bigint unsigned)",
               "type": [
                 "integer",
                 "null"

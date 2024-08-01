@@ -16,16 +16,19 @@ Binding 0:
           "$anchor": "TestPartitionedTable_83812828",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "grp": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             }
           }
         }
