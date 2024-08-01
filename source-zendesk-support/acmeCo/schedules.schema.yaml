@@ -1,31 +1,33 @@
 ---
-$schema: "http://json-schema.org/draft-07/schema#"
-title: Posts Schema
-additionalProperties: true
 type:
   - object
 required:
   - id
 properties:
-  author_id:
+  id:
+    type: integer
+  name:
     type:
       - "null"
-      - number
-  content_tag_ids:
+      - string
+  intervals:
     type:
       - "null"
       - array
     items:
       type:
         - "null"
-        - number
-  featured:
-    type:
-      - "null"
-      - boolean
-  id:
-    type: integer
-  title:
+        - object
+      properties:
+        start_time:
+          type:
+            - "null"
+            - integer
+        end_time:
+          type:
+            - "null"
+            - integer
+  time_zone:
     type:
       - "null"
       - string
@@ -34,14 +36,6 @@ properties:
       - "null"
       - string
     format: date-time
-  url:
-    type:
-      - "null"
-      - string
-  description:
-    type:
-      - "null"
-      - string
   updated_at:
     type:
       - "null"

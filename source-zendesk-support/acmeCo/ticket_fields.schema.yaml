@@ -1,42 +1,70 @@
 ---
 properties:
-  active:
-    type:
-      - "null"
-      - boolean
-  agent_description:
+  created_at:
     type:
       - "null"
       - string
+    format: date-time
+  title_in_portal:
+    type:
+      - "null"
+      - string
+  visible_in_portal:
+    type:
+      - "null"
+      - boolean
   collapsed_for_agents:
     type:
       - "null"
       - boolean
-  created_at:
-    format: date-time
+  regexp_for_validation:
+    type:
+      - "null"
+      - string
+  title:
+    type:
+      - "null"
+      - string
+  position:
+    type:
+      - "null"
+      - integer
+  type:
+    type:
+      - "null"
+      - string
+  editable_in_portal:
+    type:
+      - "null"
+      - boolean
+  raw_title_in_portal:
+    type:
+      - "null"
+      - string
+  raw_description:
     type:
       - "null"
       - string
   custom_field_options:
     items:
       properties:
-        default:
-          type:
-            - "null"
-            - boolean
-        id:
-          type:
-            - "null"
-            - integer
         name:
           type:
             - "null"
             - string
-        raw_name:
+        value:
           type:
             - "null"
             - string
-        value:
+        id:
+          type:
+            - "null"
+            - integer
+        default:
+          type:
+            - "null"
+            - boolean
+        raw_name:
           type:
             - "null"
             - string
@@ -46,33 +74,12 @@ properties:
     type:
       - "null"
       - array
-  description:
+  updated_at:
     type:
       - "null"
       - string
-  editable_in_portal:
-    type:
-      - "null"
-      - boolean
-  id:
-    type: integer
-  position:
-    type:
-      - "null"
-      - integer
-  raw_description:
-    type:
-      - "null"
-      - string
-  raw_title:
-    type:
-      - "null"
-      - string
-  raw_title_in_portal:
-    type:
-      - "null"
-      - string
-  regexp_for_validation:
+    format: date-time
+  tag:
     type:
       - "null"
       - string
@@ -80,52 +87,53 @@ properties:
     type:
       - "null"
       - boolean
-  required:
+  active:
     type:
       - "null"
       - boolean
-  required_in_portal:
-    type:
-      - "null"
-      - boolean
-  sub_type_id:
-    type:
-      - "null"
-      - integer
-  system_field_options:
-    type:
-      - "null"
-      - array
-  tag:
-    type:
-      - "null"
-      - string
-  title:
-    type:
-      - "null"
-      - string
-  title_in_portal:
-    type:
-      - "null"
-      - string
-  type:
-    type:
-      - "null"
-      - string
-  updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
   url:
     type:
       - "null"
       - string
-  visible_in_portal:
+  raw_title:
+    type:
+      - "null"
+      - string
+  required:
     type:
       - "null"
       - boolean
-required:
-  - id
+  id:
+    type: integer
+  description:
+    type:
+      - "null"
+      - string
+  agent_description:
+    type:
+      - "null"
+      - string
+  required_in_portal:
+    type:
+      - "null"
+      - boolean
+  system_field_options:
+    type:
+      - "null"
+      - array
+  sub_type_id:
+    type:
+      - "null"
+      - integer
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 type:
   - object
+required:
+  - id
+x-infer-schema: true

@@ -1,76 +1,12 @@
 ---
 properties:
-  agent_wait_time_in_minutes:
-    properties:
-      business:
-        type:
-          - "null"
-          - integer
-      calendar:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
-  assigned_at:
-    format: date-time
+  metric:
     type:
       - "null"
       - string
-  assignee_stations:
-    type:
-      - "null"
-      - integer
-  assignee_updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  custom_status_updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  first_resolution_time_in_minutes:
-    properties:
-      business:
-        type:
-          - "null"
-          - integer
-      calendar:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
-  full_resolution_time_in_minutes:
-    properties:
-      business:
-        type:
-          - "null"
-          - integer
-      calendar:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
-  group_stations:
-    type:
-      - "null"
-      - integer
   id:
     type: integer
-  initially_assigned_at:
-    format: date-time
+  time:
     type:
       - "null"
       - string
@@ -78,28 +14,97 @@ properties:
     type:
       - "null"
       - integer
-  latest_comment_added_at:
-    format: date-time
+  ticket_id:
     type:
       - "null"
-      - string
-  metric:
-    type:
-      - "null"
-      - string
-  on_hold_time_in_minutes:
+      - integer
+  status:
     properties:
-      business:
+      calendar:
         type:
           - "null"
           - integer
-      calendar:
+      business:
         type:
           - "null"
           - integer
     type:
       - "null"
       - object
+  type:
+    type:
+      - "null"
+      - string
+  agent_wait_time_in_minutes:
+    type:
+      - "null"
+      - object
+    properties:
+      calendar:
+        type:
+          - "null"
+          - integer
+      business:
+        type:
+          - "null"
+          - integer
+  assignee_stations:
+    type:
+      - "null"
+      - integer
+  created_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  first_resolution_time_in_minutes:
+    type:
+      - "null"
+      - object
+    properties:
+      calendar:
+        type:
+          - "null"
+          - integer
+      business:
+        type:
+          - "null"
+          - integer
+  full_resolution_time_in_minutes:
+    type:
+      - "null"
+      - object
+    properties:
+      calendar:
+        type:
+          - "null"
+          - integer
+      business:
+        type:
+          - "null"
+          - integer
+  group_stations:
+    type:
+      - "null"
+      - integer
+  latest_comment_added_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  on_hold_time_in_minutes:
+    type:
+      - "null"
+      - object
+    properties:
+      calendar:
+        type:
+          - "null"
+          - integer
+      business:
+        type:
+          - "null"
+          - integer
   reopens:
     type:
       - "null"
@@ -109,81 +114,84 @@ properties:
       - "null"
       - integer
   reply_time_in_minutes:
+    type:
+      - "null"
+      - object
     properties:
-      business:
-        type:
-          - "null"
-          - integer
       calendar:
         type:
           - "null"
           - integer
-    type:
-      - "null"
-      - object
+      business:
+        type:
+          - "null"
+          - integer
   requester_updated_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
   requester_wait_time_in_minutes:
+    type:
+      - "null"
+      - object
     properties:
-      business:
-        type:
-          - "null"
-          - integer
       calendar:
         type:
           - "null"
           - integer
-    type:
-      - "null"
-      - object
-  solved_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  status:
-    properties:
       business:
         type:
           - "null"
           - integer
-      calendar:
-        type:
-          - "null"
-          - integer
-    type:
-      - "null"
-      - object
   status_updated_at:
+    type:
+      - "null"
+      - string
     format: date-time
-    type:
-      - "null"
-      - string
-  ticket_id:
-    type:
-      - "null"
-      - integer
-  time:
-    type:
-      - "null"
-      - string
-  type:
-    type:
-      - "null"
-      - string
   updated_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
   url:
     type:
       - "null"
       - string
-required:
-  - id
+  initially_assigned_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  assigned_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  solved_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  assignee_updated_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  custom_status_updated_at:
+    format: date-time
+    type:
+      - "null"
+      - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 type:
   - object
+required:
+  - id
+x-infer-schema: true

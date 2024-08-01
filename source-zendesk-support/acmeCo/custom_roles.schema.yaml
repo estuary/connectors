@@ -1,5 +1,27 @@
 ---
+type:
+  - object
+required:
+  - id
 properties:
+  id:
+    type: integer
+  name:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  role_type:
+    type:
+      - "null"
+      - integer
+  team_member_count:
+    type:
+      - "null"
+      - integer
   configuration:
     properties:
       assign_tickets_to_any_group:
@@ -154,34 +176,20 @@ properties:
       - "null"
       - object
   created_at:
+    type:
+      - "null"
+      - string
     format: date-time
-    type:
-      - "null"
-      - string
-  description:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  name:
-    type:
-      - "null"
-      - string
-  role_type:
-    type:
-      - "null"
-      - integer
-  team_member_count:
-    type:
-      - "null"
-      - integer
   updated_at:
-    format: date-time
     type:
       - "null"
       - string
-required:
-  - id
-type:
-  - object
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true
