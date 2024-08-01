@@ -21,8 +21,9 @@
       "format": "date-time"
     },
     "id": {
-      "type": ["null", "integer"]
+      "type": "integer"
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"],
+  "required": ["id"]
 }

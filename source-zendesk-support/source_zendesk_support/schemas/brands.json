@@ -1,14 +1,15 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
+  "required": ["id"],
   "properties": {
     "id": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "name": {
       "type": ["null", "string"]
     },
     "logo": {
-      "type": ["null", "string"]
+      "type": ["null", "object"]
     },
     "brand_url": {
       "type": ["null", "string"]

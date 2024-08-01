@@ -4,8 +4,11 @@ import:
 captures:
   acmeCo/source-zendesk-support:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-zendesk-support:v1"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_zendesk_support
         config: config.yaml
     bindings:
       - resource:
@@ -53,20 +56,14 @@ captures:
       - resource:
           stream: post_comments
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/post_comments
       - resource:
           stream: post_comment_votes
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/post_comment_votes
       - resource:
           stream: post_votes
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/post_votes
       - resource:
           stream: satisfaction_ratings
@@ -77,14 +74,10 @@ captures:
       - resource:
           stream: sla_policies
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/sla_policies
       - resource:
           stream: tags
           syncMode: full_refresh
-          cursorField:
-            - name
         target: acmeCo/tags
       - resource:
           stream: ticket_audits
@@ -137,20 +130,14 @@ captures:
       - resource:
           stream: brands
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/brands
       - resource:
           stream: custom_roles
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/custom_roles
       - resource:
           stream: schedules
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/schedules
       - resource:
           stream: ticket_forms
@@ -161,12 +148,8 @@ captures:
       - resource:
           stream: account_attributes
           syncMode: full_refresh
-          cursorField:
-            - id
         target: acmeCo/account_attributes
       - resource:
           stream: attribute_definitions
           syncMode: full_refresh
-          cursorField:
-            - subject
         target: acmeCo/attribute_definitions

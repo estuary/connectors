@@ -1,16 +1,29 @@
 ---
 properties:
   created_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
   id:
     type: integer
   reason:
     type:
       - "null"
       - string
+  ticket_id:
+    type:
+      - "null"
+      - integer
+  updated_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  user_id:
+    type:
+      - "null"
+      - integer
   ticket:
     properties:
       allow_attachments:
@@ -384,20 +397,15 @@ properties:
     type:
       - "null"
       - object
-  ticket_id:
-    type:
-      - "null"
-      - integer
-  updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  user_id:
-    type:
-      - "null"
-      - integer
-required:
-  - id
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 type:
   - object
+required:
+  - id
+x-infer-schema: true

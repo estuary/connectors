@@ -1,5 +1,10 @@
 ---
 $schema: "https://json-schema.org/draft-07/schema#"
+title: Post Comments
+type:
+  - object
+required:
+  - id
 properties:
   author_id:
     type:
@@ -10,10 +15,10 @@ properties:
       - "null"
       - string
   created_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
   html_url:
     type:
       - "null"
@@ -25,10 +30,10 @@ properties:
       - "null"
       - integer
   non_author_updated_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
   official:
     type:
       - "null"
@@ -38,10 +43,10 @@ properties:
       - "null"
       - integer
   updated_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
   url:
     type:
       - "null"
@@ -54,8 +59,11 @@ properties:
     type:
       - "null"
       - integer
-required:
-  - id
-title: Post Comments
-type:
-  - object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

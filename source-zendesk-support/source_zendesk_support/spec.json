@@ -1,10 +1,10 @@
 {
-  "documentationUrl": "https://docs.airbyte.com/integrations/sources/zendesk-support",
+  "documentationUrl": "https://go.estuary.dev/an43nb",
   "connectionSpecification": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Source Zendesk Support Spec",
     "type": "object",
-    "required": ["start_date", "subdomain"],
+    "required": ["start_date", "subdomain", "credentials"],
     "additionalProperties": true,
     "properties": {
       "start_date": {
@@ -28,12 +28,14 @@
           {
             "title": "OAuth2.0",
             "type": "object",
+            "x-oauth2-provider": "zendesk",
             "required": ["access_token"],
             "additionalProperties": true,
             "properties": {
               "credentials": {
                 "type": "string",
                 "const": "oauth2.0",
+                "default": "oauth2.0",
                 "order": 0
               },
               "access_token": {
@@ -41,6 +43,14 @@
                 "title": "Access Token",
                 "description": "The value of the API token generated. See the <a href=\"https://docs.airbyte.com/integrations/sources/zendesk-support\">docs</a> for more information.",
                 "airbyte_secret": true
+              },
+              "client_id": { 
+                "airbyte_secret": true,
+                "type": "string"
+              },
+              "client_secret": {
+                "airbyte_secret": true,
+              "type": "string"
               }
             }
           },
@@ -53,6 +63,7 @@
               "credentials": {
                 "type": "string",
                 "const": "api_token",
+                "default": "api_token",
                 "order": 0
               },
               "email": {
@@ -63,7 +74,7 @@
               "api_token": {
                 "title": "API Token",
                 "type": "string",
-                "description": "The value of the API token generated. See the <a href=\"https://docs.airbyte.com/integrations/sources/zendesk-support#setup-guide\">docs</a> for more information.",
+                "description": "The value of the API token generated. See https://go.estuary.dev/zendesk-support for more information.",
                 "airbyte_secret": true
               }
             }
@@ -74,8 +85,7 @@
         "type": "boolean",
         "default": false,
         "description": "Makes each stream read a single page of data.",
-        "title": "Should the connector read the second and further pages of data.",
-        "airbyte_hidden": true
+        "title": "Should the connector read the second and further pages of data."
       }
     }
   },

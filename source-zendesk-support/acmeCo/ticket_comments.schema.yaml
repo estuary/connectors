@@ -1,103 +1,44 @@
 ---
 properties:
-  attachments:
-    items:
-      properties:
-        content_type:
-          type:
-            - "null"
-            - string
-        content_url:
-          type:
-            - "null"
-            - string
-        file_name:
-          type:
-            - "null"
-            - string
-        height:
-          type:
-            - "null"
-            - integer
-        id:
-          type:
-            - "null"
-            - integer
-        inline:
-          type:
-            - "null"
-            - boolean
-        mapped_content_url:
-          type:
-            - "null"
-            - string
-        size:
-          type:
-            - "null"
-            - integer
-        thumbnails:
-          items:
-            properties:
-              content_type:
-                type:
-                  - "null"
-                  - string
-              content_url:
-                type:
-                  - "null"
-                  - string
-              file_name:
-                type:
-                  - "null"
-                  - string
-              height:
-                type:
-                  - "null"
-                  - integer
-              id:
-                type:
-                  - "null"
-                  - integer
-              inline:
-                type:
-                  - "null"
-                  - boolean
-              mapped_content_url:
-                type:
-                  - "null"
-                  - string
-              size:
-                type:
-                  - "null"
-                  - integer
-              url:
-                type:
-                  - "null"
-                  - string
-              width:
-                type:
-                  - "null"
-                  - integer
-            type:
-              - "null"
-              - object
-          type:
-            - "null"
-            - array
-        url:
-          type:
-            - "null"
-            - string
-        width:
-          type:
-            - "null"
-            - integer
-      type:
-        - "null"
-        - object
+  created_at:
     type:
       - "null"
-      - array
+      - string
+    format: date-time
+  timestamp:
+    type:
+      - "null"
+      - integer
+  body:
+    type:
+      - "null"
+      - string
+  id:
+    type: integer
+  ticket_id:
+    type:
+      - "null"
+      - integer
+  type:
+    type:
+      - "null"
+      - string
+  via_reference_id:
+    type:
+      - "null"
+      - integer
+  html_body:
+    type:
+      - "null"
+      - string
+  plain_body:
+    type:
+      - "null"
+      - string
+  public:
+    type:
+      - "null"
+      - boolean
   audit_id:
     type:
       - "null"
@@ -106,95 +47,154 @@ properties:
     type:
       - "null"
       - integer
-  body:
+  via:
     type:
       - "null"
-      - string
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  html_body:
-    type:
-      - "null"
-      - string
-  id:
-    type: integer
-  metadata:
+      - object
     properties:
-      custom:
-        additionalProperties: true
-        properties: {}
+      channel:
+        type:
+          - "null"
+          - string
+      source:
         type:
           - "null"
           - object
-      flags:
+        properties:
+          from:
+            type:
+              - "null"
+              - object
+            properties:
+              ticket_ids:
+                type:
+                  - "null"
+                  - array
+                items:
+                  type:
+                    - "null"
+                    - integer
+              subject:
+                type:
+                  - "null"
+                  - string
+              name:
+                type:
+                  - "null"
+                  - string
+              address:
+                type:
+                  - "null"
+                  - string
+              original_recipients:
+                type:
+                  - "null"
+                  - array
+                items:
+                  type:
+                    - "null"
+                    - string
+              id:
+                type:
+                  - "null"
+                  - integer
+              ticket_id:
+                type:
+                  - "null"
+                  - integer
+              deleted:
+                type:
+                  - "null"
+                  - boolean
+              title:
+                type:
+                  - "null"
+                  - string
+          to:
+            type:
+              - "null"
+              - object
+            properties:
+              name:
+                type:
+                  - "null"
+                  - string
+              address:
+                type:
+                  - "null"
+                  - string
+          rel:
+            type:
+              - "null"
+              - string
+  metadata:
+    type:
+      - "null"
+      - object
+    properties:
+      custom:
+        type:
+          - "null"
+          - object
+        properties: {}
+        additionalProperties: true
+      trusted:
+        type:
+          - "null"
+          - boolean
+      notifications_suppressed_for:
+        type:
+          - "null"
+          - array
         items:
           type:
             - "null"
             - integer
+      flags_options:
         type:
           - "null"
-          - array
-      flags_options:
+          - object
         properties:
-          "11":
+          "2":
+            type:
+              - "null"
+              - object
             properties:
+              trusted:
+                type:
+                  - "null"
+                  - boolean
+          "11":
+            type:
+              - "null"
+              - object
+            properties:
+              trusted:
+                type:
+                  - "null"
+                  - boolean
               message:
+                type:
+                  - "null"
+                  - object
                 properties:
                   user:
                     type:
                       - "null"
                       - string
-                type:
-                  - "null"
-                  - object
-              trusted:
-                type:
-                  - "null"
-                  - boolean
-            type:
-              - "null"
-              - object
-          "2":
-            properties:
-              trusted:
-                type:
-                  - "null"
-                  - boolean
-            type:
-              - "null"
-              - object
+      flags:
         type:
           - "null"
-          - object
-      notifications_suppressed_for:
+          - array
         items:
           type:
             - "null"
             - integer
+      system:
         type:
           - "null"
-          - array
-      system:
+          - object
         properties:
-          client:
-            type:
-              - "null"
-              - string
-          ip_address:
-            type:
-              - "null"
-              - string
-          json_email_identifier:
-            type:
-              - "null"
-              - string
-          latitude:
-            type:
-              - "null"
-              - number
           location:
             type:
               - "null"
@@ -211,121 +211,129 @@ properties:
             type:
               - "null"
               - string
-        type:
-          - "null"
-          - object
-      trusted:
-        type:
-          - "null"
-          - boolean
+          ip_address:
+            type:
+              - "null"
+              - string
+          json_email_identifier:
+            type:
+              - "null"
+              - string
+          client:
+            type:
+              - "null"
+              - string
+          latitude:
+            type:
+              - "null"
+              - number
+  attachments:
     type:
       - "null"
-      - object
-  plain_body:
-    type:
-      - "null"
-      - string
-  public:
-    type:
-      - "null"
-      - boolean
-  ticket_id:
-    type:
-      - "null"
-      - integer
-  timestamp:
-    type:
-      - "null"
-      - integer
-  type:
-    type:
-      - "null"
-      - string
-  via:
-    properties:
-      channel:
-        type:
-          - "null"
-          - string
-      source:
-        properties:
-          from:
+      - array
+    items:
+      properties:
+        id:
+          type:
+            - "null"
+            - integer
+        size:
+          type:
+            - "null"
+            - integer
+        url:
+          type:
+            - "null"
+            - string
+        inline:
+          type:
+            - "null"
+            - boolean
+        height:
+          type:
+            - "null"
+            - integer
+        width:
+          type:
+            - "null"
+            - integer
+        content_url:
+          type:
+            - "null"
+            - string
+        mapped_content_url:
+          type:
+            - "null"
+            - string
+        content_type:
+          type:
+            - "null"
+            - string
+        file_name:
+          type:
+            - "null"
+            - string
+        thumbnails:
+          items:
             properties:
-              address:
-                type:
-                  - "null"
-                  - string
-              deleted:
-                type:
-                  - "null"
-                  - boolean
               id:
                 type:
                   - "null"
                   - integer
-              name:
-                type:
-                  - "null"
-                  - string
-              original_recipients:
-                items:
-                  type:
-                    - "null"
-                    - string
-                type:
-                  - "null"
-                  - array
-              subject:
-                type:
-                  - "null"
-                  - string
-              ticket_id:
+              size:
                 type:
                   - "null"
                   - integer
-              ticket_ids:
-                items:
-                  type:
-                    - "null"
-                    - integer
+              url:
                 type:
                   - "null"
-                  - array
-              title:
+                  - string
+              inline:
+                type:
+                  - "null"
+                  - boolean
+              height:
+                type:
+                  - "null"
+                  - integer
+              width:
+                type:
+                  - "null"
+                  - integer
+              content_url:
+                type:
+                  - "null"
+                  - string
+              mapped_content_url:
+                type:
+                  - "null"
+                  - string
+              content_type:
+                type:
+                  - "null"
+                  - string
+              file_name:
                 type:
                   - "null"
                   - string
             type:
               - "null"
               - object
-          rel:
-            type:
-              - "null"
-              - string
-          to:
-            properties:
-              address:
-                type:
-                  - "null"
-                  - string
-              name:
-                type:
-                  - "null"
-                  - string
-            type:
-              - "null"
-              - object
-        type:
-          - "null"
-          - object
-    type:
-      - "null"
-      - object
-  via_reference_id:
-    type:
-      - "null"
-      - integer
-required:
-  - id
+          type:
+            - "null"
+            - array
+      type:
+        - "null"
+        - object
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 type:
   - object
+required:
+  - id
+x-infer-schema: true
