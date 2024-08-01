@@ -1,11 +1,14 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
+  "required": [
+    "name"
+  ],
   "properties": {
     "count": {
       "type": ["null", "integer"]
     },
     "name": {
-      "type": ["null", "string"]
+      "type": "string"
     }
   }
 }

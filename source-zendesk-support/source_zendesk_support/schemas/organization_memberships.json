@@ -15,7 +15,7 @@
       "format": "date-time"
     },
     "id": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "user_id": {
       "type": ["null", "integer"]
@@ -30,5 +30,6 @@
       "type": ["null", "boolean"]
     }
   },
-  "type": ["null", "object"]
+  "type": ["object"],
+  "required": ["id"]
 }

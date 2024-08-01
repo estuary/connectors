@@ -1,7 +1,12 @@
 ---
 properties:
-  created_at:
-    format: date-time
+  id:
+    type: integer
+  url:
+    type:
+      - "null"
+      - string
+  title:
     type:
       - "null"
       - string
@@ -9,9 +14,16 @@ properties:
     type:
       - "null"
       - string
+  position:
+    type:
+      - "null"
+      - integer
   filter:
     properties:
       all:
+        type:
+          - "null"
+          - array
         items:
           properties:
             field:
@@ -30,10 +42,10 @@ properties:
                 - boolean
           type:
             - object
+      any:
         type:
           - "null"
           - array
-      any:
         items:
           properties:
             field:
@@ -51,25 +63,15 @@ properties:
                 - integer
           type:
             - object
-        type:
-          - "null"
-          - array
     type:
       - "null"
       - object
-  id:
-    type: integer
   policy_metrics:
+    type:
+      - "null"
+      - array
     items:
       properties:
-        business_hours:
-          type:
-            - "null"
-            - boolean
-        metric:
-          type:
-            - "null"
-            - string
         priority:
           type:
             - "null"
@@ -78,30 +80,36 @@ properties:
           type:
             - "null"
             - integer
+        business_hours:
+          type:
+            - "null"
+            - boolean
+        metric:
+          type:
+            - "null"
+            - string
       type:
         - "null"
         - object
-    type:
-      - "null"
-      - array
-  position:
-    type:
-      - "null"
-      - integer
-  title:
+  created_at:
     type:
       - "null"
       - string
-  updated_at:
     format: date-time
+  updated_at:
     type:
       - "null"
       - string
-  url:
-    type:
-      - "null"
-      - string
-required:
-  - id
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 type:
   - object
+required:
+  - id
+x-infer-schema: true

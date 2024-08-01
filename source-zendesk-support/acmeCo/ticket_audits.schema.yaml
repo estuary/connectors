@@ -1,25 +1,57 @@
 ---
+type:
+  - object
+required:
+  - id
 properties:
-  author_id:
-    type:
-      - "null"
-      - integer
-  created_at:
-    format: date-time
-    type:
-      - "null"
-      - string
   events:
+    type:
+      - "null"
+      - array
     items:
+      type:
+        - "null"
+        - object
       properties:
         attachments:
+          type:
+            - "null"
+            - array
           items:
             properties:
-              content_type:
+              id:
+                type:
+                  - "null"
+                  - integer
+              size:
+                type:
+                  - "null"
+                  - integer
+              url:
                 type:
                   - "null"
                   - string
+              inline:
+                type:
+                  - "null"
+                  - boolean
+              height:
+                type:
+                  - "null"
+                  - integer
+              width:
+                type:
+                  - "null"
+                  - integer
               content_url:
+                type:
+                  - "null"
+                  - string
+              mapped_content_url:
+                type:
+                  - "null"
+                  - string
+              content_type:
                 type:
                   - "null"
                   - string
@@ -27,57 +59,13 @@ properties:
                 type:
                   - "null"
                   - string
-              height:
-                type:
-                  - "null"
-                  - integer
-              id:
-                type:
-                  - "null"
-                  - integer
-              inline:
-                type:
-                  - "null"
-                  - boolean
-              mapped_content_url:
-                type:
-                  - "null"
-                  - string
-              size:
-                type:
-                  - "null"
-                  - integer
               thumbnails:
                 items:
                   properties:
-                    content_type:
-                      type:
-                        - "null"
-                        - string
-                    content_url:
-                      type:
-                        - "null"
-                        - string
-                    file_name:
-                      type:
-                        - "null"
-                        - string
-                    height:
-                      type:
-                        - "null"
-                        - integer
                     id:
                       type:
                         - "null"
                         - integer
-                    inline:
-                      type:
-                        - "null"
-                        - boolean
-                    mapped_content_url:
-                      type:
-                        - "null"
-                        - string
                     size:
                       type:
                         - "null"
@@ -86,78 +74,53 @@ properties:
                       type:
                         - "null"
                         - string
+                    inline:
+                      type:
+                        - "null"
+                        - boolean
+                    height:
+                      type:
+                        - "null"
+                        - integer
                     width:
                       type:
                         - "null"
                         - integer
+                    content_url:
+                      type:
+                        - "null"
+                        - string
+                    mapped_content_url:
+                      type:
+                        - "null"
+                        - string
+                    content_type:
+                      type:
+                        - "null"
+                        - string
+                    file_name:
+                      type:
+                        - "null"
+                        - string
                   type:
                     - "null"
                     - object
                 type:
                   - "null"
                   - array
-              url:
-                type:
-                  - "null"
-                  - string
-              width:
-                type:
-                  - "null"
-                  - integer
             type:
               - "null"
               - object
-          type:
-            - "null"
-            - array
-        audit_id:
-          type:
-            - "null"
-            - integer
-        author_id:
-          type:
-            - "null"
-            - integer
-        body:
-          type:
-            - "null"
-            - string
         created_at:
-          format: date-time
           type:
             - "null"
             - string
+          format: date-time
         data:
+          type:
+            - "null"
+            - object
           properties:
-            answered_by_id:
-              type:
-                - "null"
-                - integer
-            answered_by_name:
-              type:
-                - "null"
-                - string
-            call_duration:
-              type:
-                - "null"
-                - number
-            from:
-              type:
-                - "null"
-                - string
-            recording_url:
-              type:
-                - "null"
-                - string
-            started_at:
-              format: date-time
-              type:
-                - "null"
-                - string
-            to:
-              type:
-                - "null"
-                - string
             transcription_status:
               type:
                 - "null"
@@ -166,66 +129,40 @@ properties:
               type:
                 - "null"
                 - string
-          type:
-            - "null"
-            - object
-        field_name:
-          type:
-            - "null"
-            - string
+            to:
+              type:
+                - "null"
+                - string
+            call_duration:
+              type:
+                - "null"
+                - number
+            answered_by_name:
+              type:
+                - "null"
+                - string
+            recording_url:
+              type:
+                - "null"
+                - string
+            started_at:
+              type:
+                - "null"
+                - string
+              format: date-time
+            answered_by_id:
+              type:
+                - "null"
+                - integer
+            from:
+              type:
+                - "null"
+                - string
         formatted_from:
           type:
             - "null"
             - string
         formatted_to:
-          type:
-            - "null"
-            - string
-        html_body:
-          type:
-            - "null"
-            - string
-        id:
-          type:
-            - "null"
-            - integer
-        macro_deleted:
-          type:
-            - "null"
-            - boolean
-        macro_id:
-          type:
-            - "null"
-            - string
-        macro_title:
-          type:
-            - "null"
-            - string
-        plain_body:
-          type:
-            - "null"
-            - string
-        previous_value:
-          type:
-            - "null"
-            - string
-        public:
-          type:
-            - "null"
-            - boolean
-        recipients:
-          items:
-            type:
-              - "null"
-              - integer
-          type:
-            - "null"
-            - array
-        resource:
-          type:
-            - "null"
-            - string
-        subject:
           type:
             - "null"
             - string
@@ -237,22 +174,38 @@ properties:
           type:
             - "null"
             - boolean
-        type:
+        html_body:
           type:
             - "null"
             - string
+        subject:
+          type:
+            - "null"
+            - string
+        field_name:
+          type:
+            - "null"
+            - string
+        audit_id:
+          type:
+            - "null"
+            - integer
         value:
           oneOf:
-            - items:
+            - type: array
+              items:
                 type:
                   - "null"
                   - string
-              type: array
-            - additionalProperties: true
+            - type: object
               properties: {}
-              type: object
+              additionalProperties: true
             - type: string
             - type: "null"
+        author_id:
+          type:
+            - "null"
+            - integer
         via:
           properties:
             channel:
@@ -261,55 +214,6 @@ properties:
                 - string
             source:
               properties:
-                from:
-                  properties:
-                    address:
-                      type:
-                        - "null"
-                        - string
-                    deleted:
-                      type:
-                        - "null"
-                        - boolean
-                    id:
-                      type:
-                        - "null"
-                        - integer
-                    name:
-                      type:
-                        - "null"
-                        - string
-                    original_recipients:
-                      items:
-                        type:
-                          - "null"
-                          - string
-                      type:
-                        - "null"
-                        - array
-                    revision_id:
-                      type:
-                        - "null"
-                        - integer
-                    subject:
-                      type:
-                        - "null"
-                        - string
-                    ticket_id:
-                      type:
-                        - "null"
-                        - integer
-                    title:
-                      type:
-                        - "null"
-                        - string
-                  type:
-                    - "null"
-                    - object
-                rel:
-                  type:
-                    - "null"
-                    - string
                 to:
                   properties:
                     address:
@@ -323,94 +227,181 @@ properties:
                   type:
                     - "null"
                     - object
+                from:
+                  properties:
+                    title:
+                      type:
+                        - "null"
+                        - string
+                    address:
+                      type:
+                        - "null"
+                        - string
+                    subject:
+                      type:
+                        - "null"
+                        - string
+                    deleted:
+                      type:
+                        - "null"
+                        - boolean
+                    name:
+                      type:
+                        - "null"
+                        - string
+                    original_recipients:
+                      items:
+                        type:
+                          - "null"
+                          - string
+                      type:
+                        - "null"
+                        - array
+                    id:
+                      type:
+                        - "null"
+                        - integer
+                    ticket_id:
+                      type:
+                        - "null"
+                        - integer
+                    revision_id:
+                      type:
+                        - "null"
+                        - integer
+                  type:
+                    - "null"
+                    - object
+                rel:
+                  type:
+                    - "null"
+                    - string
               type:
                 - "null"
                 - object
           type:
             - "null"
             - object
-      type:
-        - "null"
-        - object
+        type:
+          type:
+            - "null"
+            - string
+        macro_id:
+          type:
+            - "null"
+            - string
+        body:
+          type:
+            - "null"
+            - string
+        recipients:
+          type:
+            - "null"
+            - array
+          items:
+            type:
+              - "null"
+              - integer
+        macro_deleted:
+          type:
+            - "null"
+            - boolean
+        plain_body:
+          type:
+            - "null"
+            - string
+        id:
+          type:
+            - "null"
+            - integer
+        previous_value:
+          type:
+            - "null"
+            - string
+        macro_title:
+          type:
+            - "null"
+            - string
+        public:
+          type:
+            - "null"
+            - boolean
+        resource:
+          type:
+            - "null"
+            - string
+  author_id:
     type:
       - "null"
-      - array
-  id:
-    type: integer
+      - integer
   metadata:
+    type:
+      - "null"
+      - object
     properties:
       custom:
-        additionalProperties: true
-        properties: {}
         type:
           - "null"
           - object
-      flags:
+        properties: {}
+        additionalProperties: true
+      trusted:
+        type:
+          - "null"
+          - boolean
+      notifications_suppressed_for:
+        type:
+          - "null"
+          - array
         items:
           type:
             - "null"
             - integer
+      flags_options:
         type:
           - "null"
-          - array
-      flags_options:
+          - object
         properties:
-          "11":
+          "2":
+            type:
+              - "null"
+              - object
             properties:
+              trusted:
+                type:
+                  - "null"
+                  - boolean
+          "11":
+            type:
+              - "null"
+              - object
+            properties:
+              trusted:
+                type:
+                  - "null"
+                  - boolean
               message:
+                type:
+                  - "null"
+                  - object
                 properties:
                   user:
                     type:
                       - "null"
                       - string
-                type:
-                  - "null"
-                  - object
-              trusted:
-                type:
-                  - "null"
-                  - boolean
-            type:
-              - "null"
-              - object
-          "2":
-            properties:
-              trusted:
-                type:
-                  - "null"
-                  - boolean
-            type:
-              - "null"
-              - object
+      flags:
         type:
           - "null"
-          - object
-      notifications_suppressed_for:
+          - array
         items:
           type:
             - "null"
             - integer
+      system:
         type:
           - "null"
-          - array
-      system:
+          - object
         properties:
-          client:
-            type:
-              - "null"
-              - string
-          ip_address:
-            type:
-              - "null"
-              - string
-          json_email_identifier:
-            type:
-              - "null"
-              - string
-          latitude:
-            type:
-              - "null"
-              - number
           location:
             type:
               - "null"
@@ -427,84 +418,61 @@ properties:
             type:
               - "null"
               - string
-        type:
-          - "null"
-          - object
-      trusted:
-        type:
-          - "null"
-          - boolean
+          ip_address:
+            type:
+              - "null"
+              - string
+          json_email_identifier:
+            type:
+              - "null"
+              - string
+          client:
+            type:
+              - "null"
+              - string
+          latitude:
+            type:
+              - "null"
+              - number
+  id:
+    type: integer
+  created_at:
     type:
       - "null"
-      - object
+      - string
+    format: date-time
   ticket_id:
     type:
       - "null"
       - integer
   via:
+    type:
+      - "null"
+      - object
     properties:
       channel:
         type:
           - "null"
           - string
       source:
+        type:
+          - "null"
+          - object
         properties:
           from:
+            type:
+              - "null"
+              - object
             properties:
-              address:
-                type:
-                  - "null"
-                  - string
-              deleted:
-                type:
-                  - "null"
-                  - boolean
-              id:
-                type:
-                  - "null"
-                  - integer
-              name:
-                type:
-                  - "null"
-                  - string
-              original_recipients:
-                items:
-                  type:
-                    - "null"
-                    - string
+              ticket_ids:
                 type:
                   - "null"
                   - array
-              subject:
-                type:
-                  - "null"
-                  - string
-              ticket_id:
-                type:
-                  - "null"
-                  - integer
-              ticket_ids:
                 items:
                   type:
                     - "null"
                     - integer
-                type:
-                  - "null"
-                  - array
-              title:
-                type:
-                  - "null"
-                  - string
-            type:
-              - "null"
-              - object
-          rel:
-            type:
-              - "null"
-              - string
-          to:
-            properties:
-              address:
+              subject:
                 type:
                   - "null"
                   - string
@@ -512,16 +480,56 @@ properties:
                 type:
                   - "null"
                   - string
+              address:
+                type:
+                  - "null"
+                  - string
+              original_recipients:
+                type:
+                  - "null"
+                  - array
+                items:
+                  type:
+                    - "null"
+                    - string
+              id:
+                type:
+                  - "null"
+                  - integer
+              ticket_id:
+                type:
+                  - "null"
+                  - integer
+              deleted:
+                type:
+                  - "null"
+                  - boolean
+              title:
+                type:
+                  - "null"
+                  - string
+          to:
             type:
               - "null"
               - object
-        type:
-          - "null"
-          - object
-    type:
-      - "null"
-      - object
-required:
-  - id
-type:
-  - object
+            properties:
+              name:
+                type:
+                  - "null"
+                  - string
+              address:
+                type:
+                  - "null"
+                  - string
+          rel:
+            type:
+              - "null"
+              - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

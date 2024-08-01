@@ -1,7 +1,7 @@
 {
   "properties": {
     "id": {
-      "type": ["integer"]
+      "type": "integer"
     },
     "url": {
       "type": ["null", "string"]
@@ -45,7 +45,7 @@
                 "type": ["null", "string"]
               },
               "value": {
-                "type": ["null", "string"]
+                "type": ["null", "string", "integer"]
               }
             },
             "type": ["object"]
@@ -83,5 +83,6 @@
       "format": "date-time"
     }
   },
-  "type": ["object"]
+  "type": ["object"],
+  "required": ["id"]
 }

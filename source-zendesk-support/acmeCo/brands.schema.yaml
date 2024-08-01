@@ -1,22 +1,43 @@
 ---
+type:
+  - object
+required:
+  - id
 properties:
-  active:
+  id:
+    type: integer
+  name:
     type:
       - "null"
-      - boolean
+      - string
+  logo:
+    type:
+      - "null"
+      - object
   brand_url:
     type:
       - "null"
       - string
-  created_at:
-    format: date-time
+  host_mapping:
     type:
       - "null"
       - string
-  default:
+  subdomain:
     type:
       - "null"
-      - boolean
+      - string
+  url:
+    type:
+      - "null"
+      - string
+  ticket_form_ids:
+    type:
+      - "null"
+      - array
+  signature_template:
+    type:
+      - "null"
+      - string
   has_help_center:
     type:
       - "null"
@@ -25,46 +46,33 @@ properties:
     type:
       - "null"
       - string
-  host_mapping:
+  active:
     type:
       - "null"
-      - string
-  id:
-    type: integer
+      - boolean
+  default:
+    type:
+      - "null"
+      - boolean
   is_deleted:
     type:
       - "null"
       - boolean
-  logo:
-    type:
-      - "null"
-      - object
-  name:
+  created_at:
     type:
       - "null"
       - string
-  signature_template:
-    type:
-      - "null"
-      - string
-  subdomain:
-    type:
-      - "null"
-      - string
-  ticket_form_ids:
-    type:
-      - "null"
-      - array
-  updated_at:
     format: date-time
+  updated_at:
     type:
       - "null"
       - string
-  url:
-    type:
-      - "null"
-      - string
-required:
-  - id
-type:
-  - object
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

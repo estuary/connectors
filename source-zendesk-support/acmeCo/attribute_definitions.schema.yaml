@@ -1,6 +1,15 @@
 ---
+type: object
+required:
+  - subject
 properties:
-  condition:
+  title:
+    type:
+      - "null"
+      - string
+  subject:
+    type: string
+  type:
     type:
       - "null"
       - string
@@ -12,62 +21,61 @@ properties:
     type:
       - "null"
       - boolean
-  operators:
-    items:
-      properties:
-        terminal:
-          type:
-            - "null"
-            - boolean
-        title:
-          type:
-            - "null"
-            - string
-        value:
-          type:
-            - "null"
-            - string
-      type:
-        - "null"
-        - object
-    type:
-      - "null"
-      - array
   repeatable:
     type:
       - "null"
       - boolean
-  subject:
-    type: string
-  title:
+  operators:
     type:
       - "null"
-      - string
-  type:
-    type:
-      - "null"
-      - string
-  values:
+      - array
     items:
+      type:
+        - "null"
+        - object
       properties:
-        enabled:
-          type:
-            - "null"
-            - boolean
-        title:
-          type:
-            - "null"
-            - string
         value:
           type:
             - "null"
             - string
-      type:
-        - "null"
-        - object
+        title:
+          type:
+            - "null"
+            - string
+        terminal:
+          type:
+            - "null"
+            - boolean
+  values:
     type:
       - "null"
       - array
-required:
-  - subject
-type: object
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        value:
+          type:
+            - "null"
+            - string
+        title:
+          type:
+            - "null"
+            - string
+        enabled:
+          type:
+            - "null"
+            - boolean
+  condition:
+    type:
+      - "null"
+      - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true
