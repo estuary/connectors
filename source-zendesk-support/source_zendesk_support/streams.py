@@ -22,7 +22,7 @@ import pytz
 import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
-from airbyte_cdk.sources.streams.http import HttpStream
+from airbyte_cdk.sources.streams.http import HttpStream, HttpSubStream
 from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
 from airbyte_cdk.sources.streams.http.availability_strategy import HttpAvailabilityStrategy
 from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException
@@ -198,11 +198,11 @@ class BaseSourceZendeskSupportStream(HttpStream, ABC):
                     yield record
 
     def should_retry(self, response: requests.Response) -> bool:
-        if response.status_code == 403:
+        if response.status_code == 403 or response.status_code == 404:
             try:
                 error = response.json().get("error")
             except requests.exceptions.JSONDecodeError:
-                error = {"title": "Forbidden", "message": "Received empty JSON response"}
+                error = {"title": f"{response.reason}", "message": "Received empty JSON response"}
             self.logger.error(f"Skipping stream {self.name}: Check permissions, error message: {error}.")
             setattr(self, "raise_on_http_errors", False)
             return False
@@ -549,6 +549,8 @@ class OrganizationMemberships(SourceZendeskSupportCursorPaginationStream):
     """OrganizationMemberships stream: https://developer.zendesk.com/api-reference/ticketing/organizations/organization_memberships/"""
 
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        if self._ignore_pagination:
+            return None
         meta = response.json().get("meta", {})
         return meta.get("after_cursor") if meta.get("has_more", False) else None
 
@@ -677,6 +679,8 @@ class TicketMetrics(SourceZendeskSupportCursorPaginationStream):
         """
         https://developer.zendesk.com/documentation/api-basics/pagination/paginating-through-lists-using-cursor-pagination/#when-to-stop-paginating
         """
+        if self._ignore_pagination:
+            return None
         meta = response.json().get("meta", {})
         return meta.get("after_cursor") if meta.get("has_more", False) else None
 
@@ -790,3 +794,141 @@ class UserSettingsStream(SourceZendeskSupportFullRefreshStream):
         for resp in self.read_records(SyncMode.full_refresh):
             return resp
         raise SourceZendeskException("not found settings")
+
+
+class AccountAttributes(SourceZendeskSupportFullRefreshStream):
+    """Account attributes: https://developer.zendesk.com/api-reference/ticketing/ticket-management/skill_based_routing/#list-account-attributes"""
+
+    response_list_name = "attributes"
+
+    def path(self, *args, **kwargs) -> str:
+        return "routing/attributes"
+    
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
+
+
+class AttributeDefinitions(SourceZendeskSupportFullRefreshStream):
+    """Attribute definitions: https://developer.zendesk.com/api-reference/ticketing/ticket-management/skill_based_routing/#list-routing-attribute-definitions"""
+
+    primary_key = "subject"
+
+    def path(self, *args, **kwargs) -> str:
+        return "routing/attributes/definitions"
+
+    def parse_response(self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs) -> Iterable[Mapping]:
+        defs_all = response.json()["definitions"]["conditions_all"]
+        for d in defs_all:
+            d["condition"] = "all"
+            yield d
+
+        defs_any = response.json()["definitions"]["conditions_any"]
+        for d in defs_any:
+            d["condition"] = "any"
+            yield d
+
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
+
+
+class TicketSkips(SourceZendeskSupportCursorPaginationStream):
+    """Ticket skips: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_skips/"""
+
+    response_list_name = "skips"
+
+    def path(self, **kwargs):
+        return "skips.json"
+
+    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        if self._ignore_pagination:
+            return None
+        meta = response.json().get("meta", {})
+        return meta.get("after_cursor") if meta.get("has_more", False) else None
+
+    def request_params(self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+        params = {
+            "start_time": self.check_stream_state(stream_state),
+            "page[size]": self.page_size,
+        }
+
+        if next_page_token:
+            params.pop("start_time", None)
+            params["page[after]"] = next_page_token
+
+        return params
+
+
+class Posts(SourceZendeskSupportCursorPaginationStream):
+    """Posts: https://developer.zendesk.com/api-reference/help_center/help-center-api/posts/#list-posts"""
+
+    # Turn on caching to improve performance for streams that have Posts as their parent. 
+    # See https://github.com/airbytehq/airbyte/blob/master/docs/connector-development/cdk-python/http-streams.md#nested-streams--caching
+    use_cache = True
+
+    cursor_field = "updated_at"
+
+    def path(self, **kwargs):
+        return "community/posts"
+
+
+class PostComments(SourceZendeskSupportFullRefreshStream, HttpSubStream):
+    """Post comments: https://developer.zendesk.com/api-reference/help_center/help-center-api/post_comments/"""
+
+    response_list_name = "comments"
+
+    def __init__(self, **kwargs):
+        parent = Posts(**kwargs)
+        super().__init__(parent=parent, **kwargs)
+
+    def path(
+            self, 
+            *, 
+            stream_state: Mapping[str, Any] = None, 
+            stream_slice: Mapping[str, Any] = None, 
+            next_page_token: Mapping[str, Any] = None,
+        ) -> str:
+            post_id = stream_slice.get("parent").get("id")
+            return f"community/posts/{post_id}/comments"
+
+
+class PostVotes(SourceZendeskSupportFullRefreshStream, HttpSubStream):
+    """Post votes: https://developer.zendesk.com/api-reference/help_center/help-center-api/votes/"""
+
+    response_list_name = "votes"
+
+    def __init__(self, **kwargs):
+        parent = Posts(**kwargs)
+        super().__init__(parent=parent, **kwargs)
+    
+    def path(
+        self,
+        *,
+        stream_state: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
+    ) -> str:
+        post_id = stream_slice.get("parent").get("id")
+        return f"community/posts/{post_id}/votes"
+
+
+class PostCommentVotes(SourceZendeskSupportFullRefreshStream, HttpSubStream):
+    """Post comment votes: https://developer.zendesk.com/api-reference/help_center/help-center-api/votes/"""
+
+    response_list_name = "votes"
+
+    def __init__(self, **kwargs):
+        parent = PostComments(**kwargs)
+        super().__init__(parent=parent, **kwargs)
+
+    def path(
+        self,
+        *,
+        stream_state: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
+    ) -> str:
+        post_id = stream_slice.get("parent").get("post_id")
+        comment_id = stream_slice.get("parent").get("id")
+        return f"community/posts/{post_id}/comments/{comment_id}/votes"
