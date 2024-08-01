@@ -15,15 +15,18 @@ Binding 0:
           "$anchor": "TestAlterTable_AddUnsignedColumn_57413089",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             },
             "uintval": {
+              "description": "(source type: bigint unsigned)",
               "type": [
                 "integer",
                 "null"

@@ -15,9 +15,11 @@ Binding 0:
           "$anchor": "TestUsertypes_domain_68961947",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "value": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"

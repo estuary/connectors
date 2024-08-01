@@ -239,6 +239,10 @@ type sqlserverTextColumnType struct {
 	FullType  string // The full type of the column, such as `varchar(32)` for example
 }
 
+func (t sqlserverTextColumnType) String() string {
+	return t.FullType
+}
+
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
 // matching up the constraint type with the column names/positions correctly.

@@ -15,12 +15,14 @@ Binding 0:
           "$anchor": "TestAlterTable_AddEnumColumn_30213486",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "enumcol": {
+              "description": "(source type: enum)",
               "enum": [
                 "",
                 "sm",
@@ -34,7 +36,8 @@ Binding 0:
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             }
           }
         }

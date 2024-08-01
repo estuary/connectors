@@ -15,6 +15,7 @@ Binding 0:
           "$anchor": "TestEnumEmptyString_29144777",
           "properties": {
             "category": {
+              "description": "(source type: enum)",
               "enum": [
                 "",
                 "",
@@ -29,7 +30,8 @@ Binding 0:
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             }
           }
         }
