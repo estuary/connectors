@@ -1,14 +1,38 @@
 ---
 properties:
-  allow_attachments:
+  organization_id:
+    type:
+      - "null"
+      - integer
+  requester_id:
+    type:
+      - "null"
+      - integer
+  problem_id:
+    type:
+      - "null"
+      - integer
+  is_public:
     type:
       - "null"
       - boolean
-  allow_channelback:
+  description:
     type:
       - "null"
-      - boolean
-  assignee_id:
+      - string
+  follower_ids:
+    items:
+      type:
+        - "null"
+        - integer
+    type:
+      - "null"
+      - array
+  submitter_id:
+    type:
+      - "null"
+      - integer
+  generated_timestamp:
     type:
       - "null"
       - integer
@@ -16,6 +40,20 @@ properties:
     type:
       - "null"
       - integer
+  id:
+    type: integer
+  group_id:
+    type:
+      - "null"
+      - integer
+  type:
+    type:
+      - "null"
+      - string
+  recipient:
+    type:
+      - "null"
+      - string
   collaborator_ids:
     items:
       type:
@@ -24,11 +62,36 @@ properties:
     type:
       - "null"
       - array
+  tags:
+    items:
+      type:
+        - "null"
+        - string
+    type:
+      - "null"
+      - array
+  has_incidents:
+    type:
+      - "null"
+      - boolean
   created_at:
-    format: date-time
     type:
       - "null"
       - string
+    format: date-time
+  raw_subject:
+    type:
+      - "null"
+      - string
+  status:
+    type:
+      - "null"
+      - string
+  updated_at:
+    type:
+      - "null"
+      - string
+    format: date-time
   custom_fields:
     items:
       properties:
@@ -46,39 +109,23 @@ properties:
     type:
       - "null"
       - array
-  custom_status_id:
-    type:
-      - "null"
-      - integer
-  description:
+  url:
     type:
       - "null"
       - string
+  allow_channelback:
+    type:
+      - "null"
+      - boolean
+  allow_attachments:
+    type:
+      - "null"
+      - boolean
   due_at:
+    type:
+      - "null"
+      - string
     format: date-time
-    type:
-      - "null"
-      - string
-  email_cc_ids:
-    items:
-      type:
-        - "null"
-        - integer
-    type:
-      - "null"
-      - array
-  external_id:
-    type:
-      - "null"
-      - string
-  follower_ids:
-    items:
-      type:
-        - "null"
-        - integer
-    type:
-      - "null"
-      - array
   followup_ids:
     items:
       type:
@@ -87,208 +134,58 @@ properties:
     type:
       - "null"
       - array
-  forum_topic_id:
-    type:
-      - "null"
-      - integer
-  from_messaging_channel:
-    type:
-      - "null"
-      - boolean
-  generated_timestamp:
-    type:
-      - "null"
-      - integer
-  group_id:
-    type:
-      - "null"
-      - integer
-  has_incidents:
-    type:
-      - "null"
-      - boolean
-  id:
-    type: integer
-  is_public:
-    type:
-      - "null"
-      - boolean
-  organization_id:
-    type:
-      - "null"
-      - integer
   priority:
     type:
       - "null"
       - string
-  problem_id:
+  assignee_id:
     type:
       - "null"
       - integer
-  raw_subject:
-    type:
-      - "null"
-      - string
-  recipient:
-    type:
-      - "null"
-      - string
-  requester_id:
-    type:
-      - "null"
-      - integer
-  satisfaction_rating:
-    properties:
-      assignee_id:
-        type:
-          - "null"
-          - integer
-      comment:
-        type:
-          - "null"
-          - string
-      created_at:
-        format: date-time
-        type:
-          - "null"
-          - string
-      group_id:
-        type:
-          - "null"
-          - integer
-      id:
-        type:
-          - "null"
-          - integer
-      reason:
-        type:
-          - "null"
-          - string
-      reason_id:
-        type:
-          - "null"
-          - integer
-      requester_id:
-        type:
-          - "null"
-          - integer
-      score:
-        type:
-          - "null"
-          - string
-      ticket_id:
-        type:
-          - "null"
-          - integer
-      updated_at:
-        format: date-time
-        type:
-          - "null"
-          - string
-      url:
-        type:
-          - "null"
-          - string
-    type:
-      - "null"
-      - object
-      - string
-  sharing_agreement_ids:
-    items:
-      type:
-        - "null"
-        - integer
-    type:
-      - "null"
-      - array
-  status:
-    type:
-      - "null"
-      - string
   subject:
     type:
       - "null"
       - string
-  submitter_id:
-    type:
-      - "null"
-      - integer
-  tags:
-    items:
-      type:
-        - "null"
-        - string
-    type:
-      - "null"
-      - array
-  ticket_form_id:
-    type:
-      - "null"
-      - integer
-  type:
-    type:
-      - "null"
-      - string
-  updated_at:
-    format: date-time
-    type:
-      - "null"
-      - string
-  url:
+  external_id:
     type:
       - "null"
       - string
   via:
+    type:
+      - "null"
+      - object
     properties:
       channel:
         type:
           - "null"
           - string
       source:
+        type:
+          - "null"
+          - object
         properties:
           from:
+            type:
+              - "null"
+              - object
             properties:
-              address:
-                type:
-                  - "null"
-                  - string
-              deleted:
-                type:
-                  - "null"
-                  - boolean
-              facebook_id:
-                type:
-                  - "null"
-                  - string
-              formatted_phone:
-                type:
-                  - "null"
-                  - string
-              id:
-                type:
-                  - "null"
-                  - integer
               name:
                 type:
                   - "null"
                   - string
+              address:
+                type:
+                  - "null"
+                  - string
               original_recipients:
+                type:
+                  - "null"
+                  - array
                 items:
                   type:
                     - "null"
                     - string
-                type:
-                  - "null"
-                  - array
-              phone:
-                type:
-                  - "null"
-                  - string
-              profile_url:
-                type:
-                  - "null"
-                  - string
-              revision_id:
+              ticket_id:
                 type:
                   - "null"
                   - integer
@@ -296,7 +193,7 @@ properties:
                 type:
                   - "null"
                   - string
-              ticket_id:
+              id:
                 type:
                   - "null"
                   - integer
@@ -304,6 +201,14 @@ properties:
                 type:
                   - "null"
                   - string
+              deleted:
+                type:
+                  - "null"
+                  - boolean
+              revision_id:
+                type:
+                  - "null"
+                  - integer
               topic_id:
                 type:
                   - "null"
@@ -312,28 +217,15 @@ properties:
                 type:
                   - "null"
                   - string
+              profile_url:
+                type:
+                  - "null"
+                  - string
               username:
                 type:
                   - "null"
                   - string
-            type:
-              - "null"
-              - object
-          rel:
-            type:
-              - "null"
-              - string
-          to:
-            properties:
-              address:
-                type:
-                  - "null"
-                  - string
-              email_ccs:
-                type:
-                  - "null"
-                  - string
-              facebook_id:
+              phone:
                 type:
                   - "null"
                   - string
@@ -341,11 +233,24 @@ properties:
                 type:
                   - "null"
                   - string
+              facebook_id:
+                type:
+                  - "null"
+                  - string
+          to:
+            type:
+              - "null"
+              - object
+            properties:
               name:
                 type:
                   - "null"
                   - string
-              phone:
+              address:
+                type:
+                  - "null"
+                  - string
+              email_ccs:
                 type:
                   - "null"
                   - string
@@ -357,16 +262,119 @@ properties:
                 type:
                   - "null"
                   - string
+              phone:
+                type:
+                  - "null"
+                  - string
+              formatted_phone:
+                type:
+                  - "null"
+                  - string
+              facebook_id:
+                type:
+                  - "null"
+                  - string
+          rel:
             type:
               - "null"
-              - object
-        type:
-          - "null"
-          - object
+              - string
+  ticket_form_id:
+    type:
+      - "null"
+      - integer
+  satisfaction_rating:
     type:
       - "null"
       - object
-required:
-  - id
+      - string
+    properties:
+      id:
+        type:
+          - "null"
+          - integer
+      assignee_id:
+        type:
+          - "null"
+          - integer
+      group_id:
+        type:
+          - "null"
+          - integer
+      reason_id:
+        type:
+          - "null"
+          - integer
+      requester_id:
+        type:
+          - "null"
+          - integer
+      ticket_id:
+        type:
+          - "null"
+          - integer
+      updated_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      created_at:
+        type:
+          - "null"
+          - string
+        format: date-time
+      url:
+        type:
+          - "null"
+          - string
+      score:
+        type:
+          - "null"
+          - string
+      reason:
+        type:
+          - "null"
+          - string
+      comment:
+        type:
+          - "null"
+          - string
+  sharing_agreement_ids:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - integer
+  email_cc_ids:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - integer
+  forum_topic_id:
+    type:
+      - "null"
+      - integer
+  custom_status_id:
+    type:
+      - "null"
+      - integer
+  from_messaging_channel:
+    type:
+      - "null"
+      - boolean
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
 type:
   - object
+required:
+  - id
+x-infer-schema: true

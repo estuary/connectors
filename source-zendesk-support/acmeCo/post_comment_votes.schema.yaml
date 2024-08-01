@@ -1,36 +1,27 @@
 ---
-type: object
+$schema: "https://json-schema.org/draft-07/schema#"
+title: Votes
+type:
+  - object
 required:
   - id
 properties:
-  id:
-    type: integer
-  assignee_id:
-    type:
-      - "null"
-      - integer
-  group_id:
-    type:
-      - "null"
-      - integer
-  reason_id:
-    type:
-      - "null"
-      - integer
-  requester_id:
-    type:
-      - "null"
-      - integer
-  ticket_id:
-    type:
-      - "null"
-      - integer
-  updated_at:
+  created_at:
     type:
       - "null"
       - string
     format: date-time
-  created_at:
+  id:
+    type: integer
+  item_id:
+    type:
+      - "null"
+      - integer
+  item_type:
+    type:
+      - "null"
+      - string
+  updated_at:
     type:
       - "null"
       - string
@@ -39,18 +30,14 @@ properties:
     type:
       - "null"
       - string
-  score:
+  user_id:
     type:
       - "null"
-      - string
-  reason:
+      - integer
+  value:
     type:
       - "null"
-      - string
-  comment:
-    type:
-      - "null"
-      - string
+      - integer
   _meta:
     type: object
     properties:

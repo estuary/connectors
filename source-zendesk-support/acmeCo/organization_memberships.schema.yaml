@@ -1,30 +1,13 @@
 ---
-type: object
-required:
-  - id
 properties:
-  id:
-    type: integer
-  assignee_id:
+  default:
     type:
       - "null"
-      - integer
-  group_id:
+      - boolean
+  url:
     type:
       - "null"
-      - integer
-  reason_id:
-    type:
-      - "null"
-      - integer
-  requester_id:
-    type:
-      - "null"
-      - integer
-  ticket_id:
-    type:
-      - "null"
-      - integer
+      - string
   updated_at:
     type:
       - "null"
@@ -35,22 +18,24 @@ properties:
       - "null"
       - string
     format: date-time
-  url:
+  id:
+    type: integer
+  user_id:
+    type:
+      - "null"
+      - integer
+  organization_id:
+    type:
+      - "null"
+      - integer
+  organization_name:
     type:
       - "null"
       - string
-  score:
+  view_tickets:
     type:
       - "null"
-      - string
-  reason:
-    type:
-      - "null"
-      - string
-  comment:
-    type:
-      - "null"
-      - string
+      - boolean
   _meta:
     type: object
     properties:
@@ -58,4 +43,8 @@ properties:
         type: integer
     required:
       - row_id
+type:
+  - object
+required:
+  - id
 x-infer-schema: true

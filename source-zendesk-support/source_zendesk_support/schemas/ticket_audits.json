@@ -1,87 +1,13 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
+  "required": ["id"],
   "properties": {
     "events": {
       "type": ["null", "array"],
       "items": {
         "type": ["null", "object"],
         "properties": {
-          "attachments": {
-            "items": {
-              "properties": {
-                "id": {
-                  "type": ["null", "integer"]
-                },
-                "size": {
-                  "type": ["null", "integer"]
-                },
-                "url": {
-                  "type": ["null", "string"]
-                },
-                "inline": {
-                  "type": ["null", "boolean"]
-                },
-                "height": {
-                  "type": ["null", "integer"]
-                },
-                "width": {
-                  "type": ["null", "integer"]
-                },
-                "content_url": {
-                  "type": ["null", "string"]
-                },
-                "mapped_content_url": {
-                  "type": ["null", "string"]
-                },
-                "content_type": {
-                  "type": ["null", "string"]
-                },
-                "file_name": {
-                  "type": ["null", "string"]
-                },
-                "thumbnails": {
-                  "items": {
-                    "properties": {
-                      "id": {
-                        "type": ["null", "integer"]
-                      },
-                      "size": {
-                        "type": ["null", "integer"]
-                      },
-                      "url": {
-                        "type": ["null", "string"]
-                      },
-                      "inline": {
-                        "type": ["null", "boolean"]
-                      },
-                      "height": {
-                        "type": ["null", "integer"]
-                      },
-                      "width": {
-                        "type": ["null", "integer"]
-                      },
-                      "content_url": {
-                        "type": ["null", "string"]
-                      },
-                      "mapped_content_url": {
-                        "type": ["null", "string"]
-                      },
-                      "content_type": {
-                        "type": ["null", "string"]
-                      },
-                      "file_name": {
-                        "type": ["null", "string"]
-                      }
-                    },
-                    "type": ["null", "object"]
-                  },
-                  "type": ["null", "array"]
-                }
-              },
-              "type": ["null", "object"]
-            },
-            "type": ["null", "array"]
-          },
+          "attachments": { "$ref": "attachments.json" },
           "created_at": {
             "type": ["null", "string"],
             "format": "date-time"
@@ -271,91 +197,9 @@
     "author_id": {
       "type": ["null", "integer"]
     },
-    "metadata": {
-      "type": ["null", "object"],
-      "properties": {
-        "custom": {
-          "type": ["null", "object"],
-          "properties": {},
-          "additionalProperties": true
-        },
-        "trusted": {
-          "type": ["null", "boolean"]
-        },
-        "notifications_suppressed_for": {
-          "type": ["null", "array"],
-          "items": {
-            "type": ["null", "integer"]
-          }
-        },
-        "flags_options": {
-          "type": ["null", "object"],
-          "properties": {
-            "2": {
-              "type": ["null", "object"],
-              "properties": {
-                "trusted": {
-                  "type": ["null", "boolean"]
-                }
-              }
-            },
-            "11": {
-              "type": ["null", "object"],
-              "properties": {
-                "trusted": {
-                  "type": ["null", "boolean"]
-                },
-                "message": {
-                  "type": ["null", "object"],
-                  "properties": {
-                    "user": {
-                      "type": ["null", "string"]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "flags": {
-          "type": ["null", "array"],
-          "items": {
-            "type": ["null", "integer"]
-          }
-        },
-        "system": {
-          "type": ["null", "object"],
-          "properties": {
-            "location": {
-              "type": ["null", "string"]
-            },
-            "longitude": {
-              "type": ["null", "number"]
-            },
-            "message_id": {
-              "type": ["null", "string"]
-            },
-            "raw_email_identifier": {
-              "type": ["null", "string"]
-            },
-            "ip_address": {
-              "type": ["null", "string"]
-            },
-            "json_email_identifier": {
-              "type": ["null", "string"]
-            },
-            "client": {
-              "type": ["null", "string"]
-            },
-            "latitude": {
-              "type": ["null", "number"]
-            }
-          }
-        }
-      }
-    },
+    "metadata": { "$ref": "metadata.json" },
     "id": {
-      "type": ["null", "integer"]
+      "type": "integer"
     },
     "created_at": {
       "type": ["null", "string"],
