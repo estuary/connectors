@@ -76,6 +76,7 @@ jobs:
           - source-firestore
           - source-gcs
           - source-google-drive
+          - source-google-pubsub
           - source-hello-world
           - source-http-file
           - source-http-ingest
