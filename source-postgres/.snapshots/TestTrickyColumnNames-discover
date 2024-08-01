@@ -15,9 +15,11 @@ Binding 0:
           "$anchor": "TestTrickycolumnnames_39256824",
           "properties": {
             "Meta/\"wtf\"~ID": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
@@ -149,13 +151,15 @@ Binding 1:
           "$anchor": "TestTrickycolumnnames_42531495",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "table": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }

@@ -54,9 +54,12 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 				require.Len(t, skimmed.Definitions, 1)
 
 				for _, tbl := range skimmed.Definitions {
-					var expectParsed, actualParsed interface{}
+					var expectParsed, actualParsed any
 					require.NoError(t, json.Unmarshal([]byte(tc.ExpectType), &expectParsed))
 					require.NoError(t, json.Unmarshal(tbl.Properties["b"], &actualParsed))
+					if m, ok := actualParsed.(map[string]any); ok {
+						delete(m, "description")
+					}
 					require.Equal(t, expectParsed, actualParsed)
 				}
 			})

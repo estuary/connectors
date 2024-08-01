@@ -15,13 +15,15 @@ Binding 0:
           "$anchor": "TestDiscoveryCapitalization_AaAaA",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
@@ -149,13 +151,15 @@ Binding 1:
           "$anchor": "TestDiscoverycapitalization_bbbbb",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
@@ -283,13 +287,15 @@ Binding 2:
           "$anchor": "TestDiscoverycapitalization_ccccc",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
