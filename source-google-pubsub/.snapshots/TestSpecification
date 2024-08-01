@@ -9,9 +9,9 @@
         "description": "Google Cloud Project ID that contains the PubSub topics.",
         "order": 0
       },
-      "googleCredentials": {
+      "credentialsJson": {
         "type": "string",
-        "title": "Credentials",
+        "title": "Service Account JSON",
         "description": "Google Cloud Service Account JSON credentials to use for authentication.",
         "multiline": true,
         "order": 1,
@@ -27,7 +27,7 @@
     "type": "object",
     "required": [
       "projectId",
-      "googleCredentials"
+      "credentialsJson"
     ],
     "title": "Source Google PubSub Spec"
   },

@@ -13,7 +13,7 @@ import (
 
 type config struct {
 	ProjectID          string `json:"projectId" jsonschema:"title=Project ID,description=Google Cloud Project ID that contains the PubSub topics." jsonschema_extras:"order=0"`
-	CredentialsJSON    string `json:"googleCredentials" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials to use for authentication." jsonschema_extras:"secret=true,multiline=true,order=1"`
+	CredentialsJSON    string `json:"credentialsJson" jsonschema:"title=Service Account JSON,description=Google Cloud Service Account JSON credentials to use for authentication." jsonschema_extras:"secret=true,multiline=true,order=1"`
 	SubscriptionPrefix string `json:"subscriptionPrefix,omitempty" jsonschema:"title=Subscription Prefix,description=Prefix to prepend to the PubSub topics subscription names. Subscription names will be in the form of <prefix>_EstuaryFlow_<random string> if a prefix is provided vs. EstuaryFlow_<random string> if no prefix is provided." jsonschema_extras:"order=2"`
 }
 
