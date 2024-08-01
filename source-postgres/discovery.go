@@ -452,7 +452,7 @@ type postgresCompositeType struct{}
 
 func (t postgresCompositeType) String() string { return "composite" }
 func (t postgresCompositeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
-	return columnSchema{jsonType: "string"}, nil
+	return columnSchema{}, nil
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
