@@ -733,21 +733,23 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 		}
 		msg.ts = ts.UnixMilli()
 
-		logrus.WithFields(logrus.Fields{
-			"sql":       msg.sql,
-			"undoSql":   msg.undoSql,
-			"op":        msg.op,
-			"tableName": msg.tableName,
-			"owner":     msg.owner,
-			"ts":        msg.ts,
-			"status":    msg.status,
-			"info":      msg.info,
-			"startSCN":  msg.startSCN,
-			"endSCN":    msg.endSCN,
-			"ssn":       msg.ssn,
-			"rsid":      msg.rsID,
-			"csf":       msg.csf,
-		}).Trace("received message")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithFields(logrus.Fields{
+				"sql":       msg.sql,
+				"undoSql":   msg.undoSql,
+				"op":        msg.op,
+				"tableName": msg.tableName,
+				"owner":     msg.owner,
+				"ts":        msg.ts,
+				"status":    msg.status,
+				"info":      msg.info,
+				"startSCN":  msg.startSCN,
+				"endSCN":    msg.endSCN,
+				"ssn":       msg.ssn,
+				"rsid":      msg.rsID,
+				"csf":       msg.csf,
+			}).Trace("received message")
+		}
 
 		// last message indicated a continuation of SQL_REDO and SQL_UNDO values
 		// so this row's sqls will be appended to the last
