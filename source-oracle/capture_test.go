@@ -153,6 +153,27 @@ func TestNullValues(t *testing.T) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestStringKey(t *testing.T) {
+	var unique = "18110541"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	// Integer keys are output as string, format: integer by default
+	var tableName = tb.CreateTable(ctx, t, unique, "(id integer)")
+
+	tb.Insert(ctx, t, tableName, [][]any{{"1"}, {"2"}, {"9"}, {"10"}})
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{{"3"}, {"4"}, {"5"}, {"99"}, {"11"}, {"101"}})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestLongStrings(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
