@@ -181,6 +181,7 @@ jobs:
             "source-mongodb"
             ]'), matrix.connector)
         run: |
+          set +e # Show logs even if startup fails
           docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
           docker logs ${{ matrix.connector }}-db-1
 
