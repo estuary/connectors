@@ -261,8 +261,12 @@ func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error)
 	case time.Time:
 		return key.Format(sortableRFC3339Nano), nil
 	case string:
-		return key, nil
-	case int64:
+		if colType.format == "integer" {
+			// prepend zeros so that string represented numbers are lexicographically consistent
+			for i := int16(len(key)); i < colType.precision; i++ {
+				key = "0" + key
+			}
+		}
 		return key, nil
 	default:
 		return key, nil
