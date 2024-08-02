@@ -274,14 +274,18 @@ SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_typ
     ON (t.owner = c.owner AND t.table_name = c.table_name AND t.column_name = c.column_name)`
 
 type oracleColumnType struct {
-	original string
-	length   int
-	scale    int16
-	t        reflect.Type
-	format   string
-	jsonType string
-	nullable bool
+	original  string
+	length    int
+	scale     int16
+	precision int16
+	t         reflect.Type
+	format    string
+	jsonType  string
+	nullable  bool
 }
+
+// SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
+const defaultNumericPrecision = 38
 
 func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
 	var pks = make(map[string][]string)
@@ -318,26 +322,28 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		if isNullableStr == "Y" {
 			sc.IsNullable = true
 		}
+		var precision int16
+		if dataPrecision.Valid {
+			precision = dataPrecision.Int16
+		} else {
+			precision = defaultNumericPrecision
+		}
 
 		var t reflect.Type
 		var format string
 		var jsonType string
-		if dataType == "NUMBER" && (dataScale.Valid && dataScale.Int16 == 0 && dataPrecision.Valid && dataPrecision.Int16 <= 18) {
+		if dataType == "NUMBER" && (dataScale.Valid && dataScale.Int16 == 0 && precision <= 18) {
 			t = reflect.TypeFor[int64]()
 			jsonType = "integer"
 		} else if slices.Contains([]string{"NUMBER", "DOUBLE", "FLOAT"}, dataType) {
-			if isPrimaryKey || dataPrecision.Int16 == 0 || dataPrecision.Int16 > 18 {
+			if isPrimaryKey || precision > 18 {
 				t = reflect.TypeFor[string]()
-				format = "number"
+				format = "integer"
 				jsonType = "string"
 			} else {
 				t = reflect.TypeFor[float64]()
 				jsonType = "number"
 			}
-		} else if slices.Contains([]string{"INTEGER", "SMALLINT"}, dataType) {
-			t = reflect.TypeFor[string]()
-			format = "number"
-			jsonType = "string"
 		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
 			t = reflect.TypeFor[string]()
 			jsonType = "string"
@@ -359,13 +365,14 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		}
 
 		sc.DataType = oracleColumnType{
-			original: dataType,
-			scale:    dataScale.Int16,
-			length:   dataLength,
-			t:        t,
-			format:   format,
-			jsonType: jsonType,
-			nullable: sc.IsNullable,
+			original:  dataType,
+			scale:     dataScale.Int16,
+			precision: precision,
+			length:    dataLength,
+			t:         t,
+			format:    format,
+			jsonType:  jsonType,
+			nullable:  sc.IsNullable,
 		}
 
 		if isPrimaryKey {
