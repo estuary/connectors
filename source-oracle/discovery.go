@@ -123,6 +123,8 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 	}).Trace("translateRecordField")
 	var out = reflect.New(dataType.t).Interface()
 	switch v := val.(type) {
+	case nil:
+		return nil, nil
 	case string:
 		if dataType.jsonType != "string" {
 			if err := json.Unmarshal([]byte(v), out); err != nil {
