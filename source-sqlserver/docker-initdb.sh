@@ -1,4 +1,5 @@
 #!/bin/sh
+set -ex
 /opt/mssql/bin/sqlservr &
 DBPID="$!"
 
@@ -37,7 +38,7 @@ WAITFOR DELAY '00:00:02';
 GO
 EXEC sys.sp_cdc_start_job @job_type = 'capture';
 GO
-  " | /opt/mssql-tools/bin/sqlcmd -U sa -P gf6w6dkD
+  " | /opt/mssql-tools18/bin/sqlcmd -C -U sa -P gf6w6dkD
   echo "[initdb] Database initialization complete!"
   touch /var/opt/mssql/initdb-performed
 else
