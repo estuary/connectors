@@ -263,9 +263,8 @@ func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error)
 	case string:
 		if colType.format == "integer" {
 			// prepend zeros so that string represented numbers are lexicographically consistent
-			for i := int16(len(key)); i < colType.precision; i++ {
-				key = "0" + key
-			}
+			var leadingZeros = strings.Repeat("0", int(colType.precision)-len(key))
+			key = leadingZeros + key
 		}
 		return key, nil
 	default:
