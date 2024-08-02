@@ -168,7 +168,7 @@ func scanToMap(rows *sql.Rows, cols []string, colTypes map[string]oracleColumnTy
 		return nil, fmt.Errorf("scanning row: %w", err)
 	}
 
-	var fields = make(map[string]any)
+	var fields = make(map[string]any, len(cols))
 	for idx, col := range cols {
 		fields[col] = fieldsArr[idx]
 	}
