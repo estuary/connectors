@@ -115,12 +115,6 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		return val, nil
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"col":               column,
-		"val":               val,
-		"dataType.jsonType": dataType.jsonType,
-		"dataType.t":        dataType.t,
-	}).Trace("translateRecordField")
 	var out = reflect.New(dataType.t).Interface()
 	switch v := val.(type) {
 	case nil:
