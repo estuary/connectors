@@ -50,6 +50,8 @@ func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 			copy(enc[10:12], key[4:6])
 			copy(enc[12:16], key[0:4])
 			return tuple.Tuple{uniqueIdentifierTag, enc}, nil
+		case "numeric", "decimal", "money", "smallmoney":
+			return string(key), nil
 		}
 	case string:
 		if textInfo, ok := ktype.(*sqlserverTextColumnType); ok && predictableCollation(textInfo) {
