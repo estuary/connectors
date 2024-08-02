@@ -478,6 +478,118 @@ async def fetch_backfill_usage_records(
     else:
         return
 
+async def fetch_incremental_discounts(
+    cls,
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator:
+    """ Note: Stripe's data is always served in reverse-chronological order.
+    fetch_incremental works by accessing stripe's Events API
+    Each Resource that contains a valid Event Type is passed here.
+    It works by calling the Events API, parsing the Events result
+    and validating the incoming model class.
+    If the document was created after the last log_cursor, 
+    yield this document and later yield the newest log_cursor.
+    """
+    iterating = True
+
+    url = f"{API}/events"
+    parameters = {"type": cls.TYPES, "limit": 100}
+    max_ts = log_cursor
+
+    _cls: Any = cls  # Silence mypy false-positive
+
+    while iterating:
+        result = EventResult.model_validate_json(
+        await http.request(log, url, method="GET", params=parameters)
+    )
+        for results in result.data:
+            if _s_to_dt(results.created) > log_cursor:
+                max_ts = _s_to_dt(results.created)
+                doc = _cls.model_validate(results.data.object)
+                if _cls.NAME == "InvoiceItems":
+                    if type(doc.discounts) == str:
+                        doc.discounts = [doc.discounts]
+                    yield doc
+                elif _cls.NAME == "SubscriptionItems":
+                    for item in doc.items.data:
+                        if type(item.discounts) == str:
+                            item.discounts = [item.discounts]
+                    yield doc 
+            elif _s_to_dt(results.created) < log_cursor:
+                iterating = False
+                break
+        if result.has_more is True:
+            parameters["starting_after"] = result.data[-1].id
+        else:
+            break
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
+
+async def fetch_backfill_discounts(
+    cls,
+    stop_date,
+    http: HTTPSession,
+    log: Logger,
+    page: str | None,
+    cutoff: datetime,
+)-> AsyncGenerator:
+    """ Note: Stripe's data is always served in reverse-chronological order.
+    fetch_backfill works by accessing the stream own data API
+    provided by stripe. These API's endpoints works by using pagination,
+    with the response schema being the same on most cases (some edge-cases
+    added extra fields, so BackfillResult model allows for extras).
+    It works by calling each individual stream endpoint and parsing each result,
+    created before the cutoff, with its model.
+
+    If a document is equal-to or older-than the stop_date, this means we've reached the limit
+    set by the user, and the stream halts. 
+
+    """
+
+    url = f"{API}/{cls.SEARCH_NAME}"
+    parameters = {"limit": 100}
+
+    if page:
+        parameters["starting_after"] = page
+
+    _cls: Any = cls  # Silence mypy false-positive
+    result = BackfillResult[_cls].model_validate_json(
+        await http.request(log, url, method="GET", params=parameters)
+    )
+
+    for doc in result.data:
+        if _s_to_dt(doc.created) == stop_date:
+            if _cls.NAME == "InvoiceItems":
+                if type(doc.discounts) == str:
+                    doc.discounts = [doc.discounts]
+                yield doc
+                return
+            elif _cls.NAME == "SubscriptionItems":
+                for item in doc.items.data:
+                    if type(item.discounts) == str:
+                        item.discounts = [item.discounts]
+                yield doc
+                return
+        elif _s_to_dt(doc.created) < stop_date:
+            return
+        elif _s_to_dt(doc.created) < cutoff:
+            if _cls.NAME == "InvoiceItems":
+                if type(doc.discounts) == str:
+                    doc.discounts = [doc.discounts]
+                yield doc
+                return
+            elif _cls.NAME == "SubscriptionItems":
+                for item in doc.items.data:
+                    if type(item.discounts) == str:
+                        item.discounts = [item.discounts]
+                yield doc
+                return
+    if result.has_more:
+        yield result.data[-1].id
+    else:
+        return
 
 def _s_to_dt(s: int) -> datetime:
     return datetime.fromtimestamp(s,tz=UTC)

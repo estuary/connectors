@@ -54,6 +54,7 @@
             "country": "BR",
             "currency": "brl",
             "default_for_currency": true,
+            "financial_account": null,
             "fingerprint": "FfkcPo9saEcVWPmL",
             "future_requirements": {
               "currently_due": [],
@@ -245,6 +246,7 @@
             "country": "BR",
             "currency": "brl",
             "default_for_currency": true,
+            "financial_account": null,
             "fingerprint": "FfkcPo9saEcVWPmL",
             "future_requirements": {
               "currently_due": [],
@@ -773,7 +775,7 @@
         "some-interesting": "piece-of-information"
       },
       "name": "My Cool Customer",
-      "next_invoice_sequence": 66,
+      "next_invoice_sequence": 92,
       "object": "customer",
       "phone": null,
       "preferred_locales": [],
