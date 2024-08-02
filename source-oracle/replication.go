@@ -393,6 +393,8 @@ func decodeValue(colInfo sqlcapture.ColumnInfo, expr sqlparser.Expr, colName str
 	switch v := expr.(type) {
 	case *sqlparser.Literal:
 		return v.Val, nil
+	case *sqlparser.NullVal:
+		return nil, nil
 	case *sqlparser.OrExpr:
 		// Oracle's string concatenation using pipes || is parsed as an OrExpr
 		// UNISTR('literal string')

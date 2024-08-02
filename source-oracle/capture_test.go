@@ -95,6 +95,64 @@ func TestAllTypes(t *testing.T) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestNullValues(t *testing.T) {
+	var unique = "18110541"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var typesAndValues = [][]any{
+		[]any{"nvchar2", "NVARCHAR2(2000)", NewRawTupleValue("NULL")},
+		[]any{"vcahr2", "VARCHAR2(2000)", NewRawTupleValue("NULL")},
+		[]any{"single_nchar", "NCHAR", NewRawTupleValue("NULL")},
+		[]any{"vchar", "VARCHAR(2000)", NewRawTupleValue("NULL")},
+		[]any{"num", "NUMBER(38, 9)", NewRawTupleValue("NULL")},
+		[]any{"num19", "NUMBER(19, 0)", NewRawTupleValue("NULL")},
+		[]any{"num15", "NUMBER(15, 0)", NewRawTupleValue("NULL")},
+		[]any{"small_int", "SMALLINT", NewRawTupleValue("NULL")},
+		[]any{"integ", "INTEGER", NewRawTupleValue("NULL")},
+		[]any{"double_precision", "DOUBLE PRECISION", NewRawTupleValue("NULL")},
+		[]any{"float_126", "FLOAT(126)", NewRawTupleValue("NULL")},
+		[]any{"real_num", "REAL", NewRawTupleValue("NULL")},
+		[]any{"dateonly", "DATE", NewRawTupleValue("NULL")},
+		[]any{"datetime", "DATE", NewRawTupleValue("NULL")},
+		[]any{"ts", "TIMESTAMP", NewRawTupleValue("NULL")},
+		[]any{"ts_nine", "TIMESTAMP(9)", NewRawTupleValue("NULL")},
+		[]any{"ts_tz", "TIMESTAMP WITH TIME ZONE", NewRawTupleValue("NULL")},
+		[]any{"ts_tz_nine", "TIMESTAMP(9) WITH TIME ZONE", NewRawTupleValue("NULL")},
+		[]any{"ts_local_tz", "TIMESTAMP WITH LOCAL TIME ZONE", NewRawTupleValue("NULL")},
+		[]any{"ts_local_tz_nine", "TIMESTAMP(9) WITH LOCAL TIME ZONE", NewRawTupleValue("NULL")},
+		[]any{"interval_year", "INTERVAL YEAR(4) TO MONTH", NewRawTupleValue("NULL")},
+		[]any{"interval_day", "INTERVAL DAY TO SECOND", NewRawTupleValue("NULL")},
+		[]any{"r", "RAW(1000)", NewRawTupleValue("NULL")},
+	}
+
+	var columnDefs = "("
+	var vals []any
+	for idx, tv := range typesAndValues {
+		if idx > 0 {
+			columnDefs += ", "
+		}
+		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
+		vals = append(vals, tv[2])
+		idx += 1
+	}
+	columnDefs += ")"
+	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)
+
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestLongStrings(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
