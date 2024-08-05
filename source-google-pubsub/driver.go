@@ -156,9 +156,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 	group.Go(func() error {
 		return e.runtimeAckWorker(groupCtx)
 	})
-	group.Go(func() error {
-		return e.emitWorker(groupCtx)
-	})
 
 	for idx, binding := range open.Capture.Bindings {
 		idx := idx

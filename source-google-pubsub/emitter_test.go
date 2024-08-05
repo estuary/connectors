@@ -32,9 +32,6 @@ func TestEmitter(t *testing.T) {
 	group.Go(func() error {
 		return emitter.runtimeAckWorker(groupCtx)
 	})
-	group.Go(func() error {
-		return emitter.emitWorker(groupCtx)
-	})
 
 	// Emit some messages concurrently with many goroutines.
 	numMessages := 50_000
