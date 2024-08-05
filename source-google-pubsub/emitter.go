@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -35,9 +36,9 @@ type emitMessage struct {
 // kind of strategy is at-least-once, since the connector could crash between
 // emitting the document and sending the PubSub acknowledgement.
 type emitter struct {
-	stream       *boilerplate.PullOutput
-	pendingAcks  chan runtimeAck
-	emitMessages chan emitMessage
+	mu          sync.Mutex
+	stream      *boilerplate.PullOutput
+	pendingAcks chan runtimeAck
 }
 
 func newEmitter(stream *boilerplate.PullOutput) *emitter {
@@ -50,12 +51,18 @@ func newEmitter(stream *boilerplate.PullOutput) *emitter {
 		// practically may only limit how many documents the runtime batches
 		// together into a single checkpoint, since the connector will pause
 		// when the channel is full.
-		pendingAcks:  make(chan runtimeAck, 50_000),
-		emitMessages: make(chan emitMessage),
+		pendingAcks: make(chan runtimeAck, 50_000),
 	}
 }
 
 func (e *emitter) emit(ctx context.Context, m emitMessage) (runtimeAck, error) {
+	// Runtime acknowledgement signals must be sequenced in the same order as
+	// output documents, so this operation is done under a lock to prevent races
+	// between sequencing the acknowledgement signal and outputting the
+	// document.
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	ack := make(runtimeAck)
 
 	// Add the runtime acknowledgement signal channel to the `pendingAcks`
@@ -67,14 +74,11 @@ func (e *emitter) emit(ctx context.Context, m emitMessage) (runtimeAck, error) {
 	case e.pendingAcks <- ack:
 	}
 
-	// Now send the message for serialization and output the runtime. This must
-	// be done after the acknowledgement signal is queued to prevent races with
-	// receiving runtime acknowledgements before there are any signal channels
-	// to close.
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case e.emitMessages <- m:
+	// Now output the message.
+	if doc, err := makeDoc(m); err != nil {
+		return nil, fmt.Errorf("making document: %w", err)
+	} else if err := e.stream.DocumentsAndCheckpoint(emptyCheckpoint, true, m.binding, doc); err != nil {
+		return nil, fmt.Errorf("emitting document: %w", err)
 	}
 
 	return ack, nil
@@ -108,23 +112,6 @@ func (e *emitter) runtimeAckWorker(ctx context.Context) error {
 			}
 		}
 
-	}
-}
-
-// emitWorker reads messages from the channel and serializes those into
-// documents which are then output to the runtime.
-func (e *emitter) emitWorker(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case m := <-e.emitMessages:
-			if doc, err := makeDoc(m); err != nil {
-				return fmt.Errorf("making document: %w", err)
-			} else if err := e.stream.DocumentsAndCheckpoint(emptyCheckpoint, true, m.binding, doc); err != nil {
-				return fmt.Errorf("emitting document: %w", err)
-			}
-		}
 	}
 }
 
