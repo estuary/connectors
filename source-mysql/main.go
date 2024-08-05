@@ -246,10 +246,11 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	// Normal database connection used for table scanning
 	var conn *client.Conn
 	var err error
-	var withTLS = func(c *client.Conn) {
+	var withTLS = func(c *client.Conn) error {
 		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
 		// if set makes this false and sets 'ServerName' so it will be verified properly.
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+		return nil
 	}
 	if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); err == nil {
 		logrus.WithField("addr", address).Debug("connected with TLS")
