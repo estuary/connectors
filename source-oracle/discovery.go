@@ -264,17 +264,24 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		var t reflect.Type
 		var format string
 		var jsonType string
-		if dataType == "NUMBER" && (dataScale.Valid && dataScale.Int16 == 0 && precision <= 18) {
-			t = reflect.TypeFor[int64]()
-			jsonType = "integer"
-		} else if slices.Contains([]string{"NUMBER", "DOUBLE", "FLOAT"}, dataType) {
-			if isPrimaryKey || precision > 18 {
+		var isInteger = dataScale.Valid && dataScale.Int16 == 0
+		if dataType == "NUMBER" && (isInteger || isPrimaryKey) {
+			if precision <= 18 {
+				t = reflect.TypeFor[int64]()
+				jsonType = "integer"
+			} else {
 				t = reflect.TypeFor[string]()
 				format = "integer"
 				jsonType = "string"
-			} else {
+			}
+		} else if slices.Contains([]string{"FLOAT", "NUMBER"}, dataType) {
+			if precision <= 18 {
 				t = reflect.TypeFor[float64]()
 				jsonType = "number"
+			} else {
+				t = reflect.TypeFor[string]()
+				format = "number"
+				jsonType = "string"
 			}
 		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
 			t = reflect.TypeFor[string]()
