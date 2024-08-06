@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unicode/utf16"
 
@@ -82,7 +81,6 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		db:   db,
 		conn: conn,
 
-		ackSCN:        uint64(startSCN),
 		lastTxnEndSCN: startSCN + 1,
 	}
 
@@ -223,8 +221,7 @@ type replicationStream struct {
 	redoFiles    []redoFile // list of redo files
 	redoSequence int
 
-	ackSCN        uint64 // The most recently Ack'd SCN, passed to startReplication or updated via CommitSCN.
-	lastTxnEndSCN int    // End SCN (record + 1) of the last completed transaction.
+	lastTxnEndSCN int // End SCN (record + 1) of the last completed transaction.
 
 	// The 'active tables' set, guarded by a mutex so it can be modified from
 	// the main goroutine while it's read by the replication goroutine.
@@ -818,12 +815,6 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // Acknowledge informs the ReplicationStream that all messages up to the specified
 // SCN have been persisted
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	logrus.WithField("cursor", cursor).Debug("advancing acknowledged SCN")
-	var scn, err = strconv.Atoi(cursor)
-	if err != nil {
-		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
-	}
-	atomic.StoreUint64(&s.ackSCN, uint64(scn))
 	return nil
 }
 
