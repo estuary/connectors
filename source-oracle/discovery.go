@@ -8,18 +8,10 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	infinityTimestamp         = "9999-12-31T23:59:59Z"
-	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
-	RFC3339TimeFormat         = "15:04:05.999999999Z07:00"
-	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
 )
 
 // DiscoverTables queries the database for information about tables available for capture.
@@ -58,8 +50,6 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 	}
 
 	for streamID, key := range primaryKeys {
-		// The `getColumns()` query implements the "exclude system schemas" logic,
-		// so here we ignore primary key information for tables we don't care about.
 		var info, ok = tableMap[streamID]
 		if !ok {
 			continue
@@ -84,21 +74,11 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 	return tableMap, nil
 }
 
-func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnNames []string) bool {
-	for _, columnName := range columnNames {
-		if columnsInfo[columnName].IsNullable {
-			return false
-		}
-	}
-	return true
-}
-
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
 	var col = column.DataType.(oracleColumnType)
 
-	var jsonType *jsonschema.Schema
-	jsonType = col.toJSONSchemaType()
+	var jsonType = col.toJSONSchemaType()
 
 	// Pass-through Oracle column description
 	if column.Description != nil {
@@ -115,28 +95,27 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		return val, nil
 	}
 
-	var out = reflect.New(dataType.t).Interface()
 	switch v := val.(type) {
 	case nil:
 		return nil, nil
 	case string:
 		if dataType.jsonType != "string" {
+			var out = reflect.New(dataType.t).Interface()
 			if err := json.Unmarshal([]byte(v), out); err != nil {
 				return nil, err
 			}
+			return out, nil
 		} else {
-			out = val
+			return val, nil
 		}
 	default:
-		var rv = reflect.ValueOf(val)
-		if rv.CanConvert(dataType.t) {
-			out = rv.Convert(dataType.t).Interface()
-		} else {
-			out = val
-		}
 	}
 
-	return out, nil
+	var rv = reflect.ValueOf(val)
+	if rv.CanConvert(dataType.t) {
+		return rv.Convert(dataType.t).Interface(), nil
+	}
+	return val, nil
 }
 
 func (ct *oracleColumnType) toJSONSchemaType() *jsonschema.Schema {
@@ -174,47 +153,6 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 		f[id] = translated
 	}
 	return nil
-}
-
-func oversizePlaceholderJSON(orig []byte) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
-}
-
-func formatRFC3339(t time.Time) (any, error) {
-	if t.Year() < 0 || t.Year() > 9999 {
-		// We could in theory clamp excessively large years to positive infinity, but this
-		// is of limited usefulness since these are never real dates, they're mostly just
-		// dumb typos like `20221` and so we might as well normalize errors consistently.
-		return negativeInfinityTimestamp, nil
-	}
-	return t.Format(time.RFC3339Nano), nil
-}
-
-type columnSchema struct {
-	contentEncoding string
-	format          string
-	nullable        bool
-	jsonType        string
-}
-
-func (s columnSchema) toType() *jsonschema.Schema {
-	var out = &jsonschema.Schema{
-		Format: s.format,
-		Extras: make(map[string]interface{}),
-	}
-
-	if s.contentEncoding != "" {
-		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
-	}
-
-	if s.jsonType == "" {
-		// No type constraint.
-	} else if s.nullable {
-		out.Extras["type"] = []string{s.jsonType, "null"} // Use variadic form.
-	} else {
-		out.Type = s.jsonType
-	}
-	return out
 }
 
 const queryDiscoverTables = `
@@ -291,7 +229,7 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		ownersMap[t.Schema] = true
 	}
 	var owners []string
-	for k, _ := range ownersMap {
+	for k := range ownersMap {
 		owners = append(owners, k)
 	}
 	var ownersCondition = " WHERE t.owner IN ('" + strings.Join(owners, "','") + "')"

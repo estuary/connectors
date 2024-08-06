@@ -46,12 +46,7 @@ const OUT_TS_FORMAT = "2006-01-02T15:04:05.999999999"
 const OUT_TSTZ_FORMAT = time.RFC3339Nano
 
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
-	dbConn, err := sql.Open("oracle", db.config.ToURI())
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database: %w", err)
-	}
-
-	conn, err := dbConn.Conn(ctx)
+	conn, err := db.conn.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
@@ -209,9 +204,7 @@ func (s *oracleSource) Common() sqlcapture.SourceCommon {
 }
 
 // A replicationStream represents the process of receiving Oracle
-// logminer events, and translating changes into a more friendly representation. There
-// is no built-in concurrency, so Process() must be called reasonably
-// soon after StartReplication() in order to not time out.
+// logminer events, and translating changes into a more friendly representation.
 type replicationStream struct {
 	db   *oracleDatabase
 	conn *sql.Conn // The Oracle connection
@@ -243,7 +236,10 @@ const pollInterval = 10 * time.Second
 // replicationStream before it stops receiving further events from Oracle.
 // In normal use it's a constant, it's just a variable so that tests are more
 // likely to exercise blocking sends and backpressure.
-var replicationBufferSize = 16 * 1024 // Assuming change events average ~2kB then 16k * 2kB = 32MB
+// This buffer has been set to a fairly small value, because larger buffers can
+// cause OOM kills when the incoming data rate exceeds the rate at which we're
+// serializing data and getting it into Gazette journals.
+var replicationBufferSize = 16
 
 func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return s.events
@@ -276,11 +272,12 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 // run is the main loop of the replicationStream which loops message
 // receiving and relaying
 func (s *replicationStream) run(ctx context.Context) error {
+	var poll = time.NewTicker(pollInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(pollInterval):
+		case <-poll.C:
 		}
 
 		var err = s.poll(ctx)
@@ -808,10 +805,10 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
+	defer s.tables.Unlock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns
 	s.tables.discovery[streamID] = discovery
-	s.tables.Unlock()
 	return nil
 }
 
