@@ -41,7 +41,7 @@ func TestAllTypes(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
 	var typesAndValues = [][]any{
-		[]any{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ 🔥️'')"},
+		[]any{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
 		[]any{"vcahr2", "VARCHAR2(2000)", "varchar2 value"},
 		[]any{"single_nchar", "NCHAR", "a"},
 		[]any{"vchar", "VARCHAR(2000)", "varchar value"},
