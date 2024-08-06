@@ -8,9 +8,13 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -292,4 +296,63 @@ func TestManyTables(t *testing.T) {
 		tb.Insert(ctx, t, tableNames[i], [][]any{{4, fmt.Sprintf("table %d row four", i)}, {5, fmt.Sprintf("table %d row five", i)}})
 	}
 	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestCaptureInstanceCleanup(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "71329622"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	// Run the capture once to dispense with any backfills
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	cs.Capture(ctx, t, nil)
+	sqlcapture.TestShutdownAfterCaughtUp = false
+
+	// Launch the ongoing capture in a separate thread
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	defer cancelCapture()
+	var captureDone atomic.Bool
+	go func(ctx context.Context) {
+		cs.Capture(captureCtx, t, nil)
+		captureDone.Store(true)
+	}(captureCtx)
+
+	// Traffic generator in a separate thread
+	var trafficCtx, cancelTraffic = context.WithCancel(ctx)
+	defer cancelTraffic()
+	var trafficDone atomic.Bool
+	go func(ctx context.Context) {
+		for i := 0; i < 10; i++ {
+			tb.Insert(ctx, t, tableName, [][]any{
+				{i*100 + 1, fmt.Sprintf("iteration %d row one", i)},
+				{i*100 + 2, fmt.Sprintf("iteration %d row two", i)},
+				{i*100 + 3, fmt.Sprintf("iteration %d row three", i)},
+				{i*100 + 4, fmt.Sprintf("iteration %d row four", i)},
+			})
+			time.Sleep(1 * time.Second)
+		}
+		time.Sleep(5 * time.Second)
+		trafficDone.Store(true)
+	}(trafficCtx)
+
+	// Wait until the traffic generator shuts down and then cancel the capture
+	for !trafficDone.Load() {
+		time.Sleep(100 * time.Millisecond)
+	}
+	cancelCapture()
+	for !captureDone.Load() {
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Query the number of rows in the change table after everything finishes
+	var changeTableRows int
+	var changeTableName = fmt.Sprintf("cdc.%s_test_%s_%s_CT", *testSchemaName, strings.TrimPrefix(t.Name(), "Test"), uniqueID)
+	require.NoError(t, tb.control.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", changeTableName)).Scan(&changeTableRows))
+
+	// Validate test snapshot plus change table row count
+	var summary = cs.Summary()
+	cs.Reset()
+	summary += fmt.Sprintf("\n# Capture Instance Contained %d Rows At Finish", changeTableRows)
+	cupaloy.SnapshotT(t, summary)
 }
