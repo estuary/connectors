@@ -9,7 +9,7 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-#RUN go mod download
+RUN go mod download
 
 COPY go                  ./go
 COPY source-boilerplate  ./source-boilerplate

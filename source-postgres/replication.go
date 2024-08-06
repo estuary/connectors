@@ -167,9 +167,7 @@ func (s *postgresSource) Common() sqlcapture.SourceCommon {
 
 // A replicationStream represents the process of receiving PostgreSQL
 // Logical Replication events, managing keepalives and status updates,
-// and translating changes into a more friendly representation. There
-// is no built-in concurrency, so Process() must be called reasonably
-// soon after StartReplication() in order to not time out.
+// and translating changes into a more friendly representation.
 type replicationStream struct {
 	db       *postgresDatabase
 	conn     *pgconn.PgConn // The PostgreSQL replication connection
@@ -654,10 +652,10 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
+	defer s.tables.Unlock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns
 	s.tables.discovery[streamID] = discovery
-	s.tables.Unlock()
 	return nil
 }
 

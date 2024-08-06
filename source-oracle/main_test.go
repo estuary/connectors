@@ -243,9 +243,6 @@ func TestCapitalizedTables(t *testing.T) {
 	})
 	require.NoError(t, err)
 	cs.Bindings = []*flow.CaptureSpec_Binding{{
-		// Because we're explicitly constructing the collection spec here this test accidentally
-		// exercises the "legacy collection without a /_meta/source/txid property" case, so we
-		// may as well leave it like that.
 		Collection:         flow.CollectionSpec{Name: flow.Collection("acmeCo/test/users")},
 		ResourceConfigJson: resourceSpecJSON,
 		ResourcePath:       []string{tb.config.User, "USERS"},
