@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	//cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -102,7 +101,7 @@ type advancedConfig struct {
 	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID            uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
-	DictionaryMode    string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to extract."`
+	DictionaryMode    string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to extract.,enum=extract,enum=online"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -248,6 +247,7 @@ func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error)
 	if colType.jsonType == "integer" {
 		return key.(int64), nil
 	} else if colType.jsonType == "number" {
+		// Sanity check, should not happen
 		return nil, fmt.Errorf("unsupported %q primary key with scale %d", colType.original, colType.scale)
 	}
 
