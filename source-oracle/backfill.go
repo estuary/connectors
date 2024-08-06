@@ -88,7 +88,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	}
 	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
-	var prevRowID string // Used when processing keyless backfill results to sanity-check ordering
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		fields, err := scanToMap(rows, cols, columnTypes)
@@ -101,16 +100,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
 			rowKey = []byte(rowid)
-
-			// Sanity check that rows are returned in ascending RowID order within a given backfill chunk
-			// Note that base64 strings are not lexicographically ordered and have a different ordering, hence
-			// the custom function
-			if result, err := compareBase64(rowid, prevRowID); err != nil {
-				return false, err
-			} else if result == -1 {
-				return false, fmt.Errorf("internal error: ROWID ordering sanity check failed: %v <= %v", rowid, prevRowID)
-			}
-			prevRowID = rowid
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {

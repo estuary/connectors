@@ -363,26 +363,34 @@ func decodeUnistr(input string) (string, error) {
 	for i := 0; i < len(input); i++ {
 		var c = input[i]
 		// 92 = \ (backslash)
-		if c == 92 && len(input) > i+4 {
-			var codeStrOne = fmt.Sprintf("%s", input[i+1:i+5])
-			var codeOne, err = strconv.ParseInt(codeStrOne, 16, 32)
-			if err != nil {
-				return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+1, err)
-			}
-			if utf16.IsSurrogate(rune(codeOne)) {
-				var codeStrTwo = fmt.Sprintf("%s", input[i+6:i+10])
-				var codeTwo, err = strconv.ParseInt(codeStrTwo, 16, 32)
+		if c == 92 {
+			// two backslashes following each other is just an escaped backslash
+			if len(input) > i+1 && input[i+1] == 92 {
+				val += string(c)
+				i += 1
+			} else if len(input) > i+4 {
+				var codeStrOne = fmt.Sprintf("%s", input[i+1:i+5])
+				var codeOne, err = strconv.ParseInt(codeStrOne, 16, 32)
 				if err != nil {
-					return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+6, err)
+					return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+1, err)
 				}
-				i += 5
+				if utf16.IsSurrogate(rune(codeOne)) {
+					var codeStrTwo = fmt.Sprintf("%s", input[i+6:i+10])
+					var codeTwo, err = strconv.ParseInt(codeStrTwo, 16, 32)
+					if err != nil {
+						return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+6, err)
+					}
+					i += 5
 
-				val += string(utf16.DecodeRune(rune(codeOne), rune(codeTwo)))
+					val += string(utf16.DecodeRune(rune(codeOne), rune(codeTwo)))
+				} else {
+					val += string(rune(codeOne))
+				}
+
+				i += 4
 			} else {
-				val += string(rune(codeOne))
+				val += string(c)
 			}
-
-			i += 4
 		} else {
 			val += string(c)
 		}

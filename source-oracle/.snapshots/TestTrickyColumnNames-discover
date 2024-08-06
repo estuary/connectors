@@ -22,7 +22,7 @@ Binding 0:
             },
             "`Meta/'wtf'~ID`": {
               "type": "string",
-              "format": "number"
+              "format": "integer"
             }
           }
         }
@@ -152,7 +152,7 @@ Binding 1:
             },
             "table": {
               "type": "string",
-              "format": "number"
+              "format": "integer"
             }
           }
         }
