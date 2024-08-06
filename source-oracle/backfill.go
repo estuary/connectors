@@ -89,13 +89,14 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var resultRows int // Count of rows received within the current backfill chunk
 	var rowOffset = state.BackfilledCount
 	logEntry.Debug("translating query rows to change events")
+
+	var fields = make(map[string]any, len(cols)-1)
+	var rowid string
+
 	for rows.Next() {
-		fields, err := scanToMap(rows, cols, columnTypes)
-		if err != nil {
+		if rowid, err = scanToMap(rows, cols, fields); err != nil {
 			return false, err
 		}
-		var rowid = fields["ROWID"].(string)
-		delete(fields, "ROWID")
 
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
@@ -141,28 +142,28 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	return backfillComplete, nil
 }
 
-func scanToMap(rows *sql.Rows, cols []string, colTypes map[string]oracleColumnType) (map[string]any, error) {
+func scanToMap(rows *sql.Rows, cols []string, fields map[string]any) (string, error) {
 	var fieldsArr = make([]any, len(cols))
-	var fieldsPtr = make([]any, len(cols))
+	var rowid string
 	for idx, col := range cols {
 		if col == "ROWID" {
-			var rowid = ""
 			fieldsArr[idx] = &rowid
 		} else {
 			fieldsArr[idx] = new(any)
 		}
-		fieldsPtr[idx] = &fieldsArr[idx]
 	}
-	if err := rows.Scan(fieldsPtr...); err != nil {
-		return nil, fmt.Errorf("scanning row: %w", err)
+	if err := rows.Scan(fieldsArr...); err != nil {
+		return "", fmt.Errorf("scanning row: %w", err)
 	}
 
-	var fields = make(map[string]any, len(cols))
 	for idx, col := range cols {
-		fields[col] = fieldsArr[idx]
+		if col == "ROWID" {
+			continue
+		}
+		fields[col] = *(fieldsArr[idx].(*any))
 	}
 
-	return fields, nil
+	return rowid, nil
 }
 
 // -1 means a < b
