@@ -39,7 +39,7 @@ Binding 0:
               ]
             },
             "INTEG": {
-              "format": "number",
+              "format": "integer",
               "type": [
                 "string",
                 "null"
@@ -71,7 +71,7 @@ Binding 0:
               ]
             },
             "NUM19": {
-              "format": "number",
+              "format": "integer",
               "type": [
                 "string",
                 "null"
@@ -103,7 +103,7 @@ Binding 0:
               ]
             },
             "SMALL_INT": {
-              "format": "number",
+              "format": "integer",
               "type": [
                 "string",
                 "null"
