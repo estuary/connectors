@@ -160,7 +160,7 @@ func scanToMap(rows *sql.Rows, cols []string, colTypes map[string]oracleColumnTy
 			var rowid = ""
 			fieldsArr[idx] = &rowid
 		} else {
-			fieldsArr[idx] = reflect.Zero(colTypes[col].t).Interface()
+			fieldsArr[idx] = new(any)
 		}
 		fieldsPtr[idx] = &fieldsArr[idx]
 	}
@@ -352,13 +352,12 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query stri
 		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
 		return
 	}
-	colTypes, err := rows.ColumnTypes()
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var fields = logrus.Fields{"streamID": streamID}
 		var fieldsPtr = make([]any, len(cols))
 		for idx, col := range cols {
-			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
+			fields[col] = new(any)
 			fieldsPtr[idx] = fields[col]
 		}
 

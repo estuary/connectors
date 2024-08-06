@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -173,15 +172,11 @@ func (tb *testBackend) Query(ctx context.Context, t testing.TB, fatal bool, quer
 	if err != nil {
 		t.Fatalf("unable to get columns: %v", err)
 	}
-	colTypes, err := rows.ColumnTypes()
-	if err != nil {
-		t.Fatalf("unable to get columns: %v", err)
-	}
 	for rows.Next() {
 		var fields = make(map[string]any)
 		var fieldsPtr = make([]any, len(cols))
 		for idx, col := range cols {
-			fields[col] = reflect.New(colTypes[idx].ScanType()).Interface()
+			fields[col] = new(any)
 			fieldsPtr[idx] = fields[col]
 		}
 		if err := rows.Scan(fieldsPtr...); err != nil {

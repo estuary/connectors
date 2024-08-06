@@ -121,8 +121,15 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 		return fmt.Errorf("querying archive log files destination: %w", err)
 	}
 
-	var liveLogFiles = "SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE# FROM V$LOGFILE LF, V$LOG L LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE# WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED' AND L.NEXT_CHANGE# >= :1 AND LF.MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#"
-	var archivedLogFiles = "SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE# FROM V$ARCHIVED_LOG A WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND A.NAME NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) AND DEST_ID IN (" + strconv.Itoa(localDestID) + ")"
+	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE# FROM V$LOGFILE LF, V$LOG L
+		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
+		WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED' AND L.NEXT_CHANGE# >= :1 AND LF.MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS)
+		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
+
+	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE# FROM V$ARCHIVED_LOG A
+    WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
+    A.NAME NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) AND DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
+
 	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
 	rows, err := s.conn.QueryContext(ctx, fullQuery, startSCN)
 	if err != nil {
@@ -632,11 +639,16 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
 	}
 
+	var columnTypes = make(map[string]oracleColumnType)
+	for name, column := range discovery.Columns {
+		columnTypes[name] = column.DataType.(oracleColumnType)
+	}
+
 	var rowKey []byte
 	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, after, nil, encodeKeyFDB)
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
 	} else {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, before, nil, encodeKeyFDB)
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
@@ -700,7 +712,9 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var rows, err = s.conn.QueryContext(ctx, "SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')", s.lastTxnEndSCN)
+	var rows, err = s.conn.QueryContext(ctx, `SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS
+    WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND
+    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')`, s.lastTxnEndSCN)
 	if err != nil {
 		return nil, fmt.Errorf("logminer query: %w", err)
 	}
