@@ -13,7 +13,7 @@ import (
 var pgDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("JSON"),

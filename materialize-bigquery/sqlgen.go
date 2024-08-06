@@ -67,7 +67,7 @@ var bqDialect = func() sql.Dialect {
 			sql.ARRAY:          sql.MapStatic("STRING", jsonConverter),
 			sql.BINARY:         sql.MapStatic("STRING"),
 			sql.BOOLEAN:        sql.MapStatic("BOOL"),
-			sql.INTEGER:        sql.MapStatic("INT64"),
+			sql.INTEGER:        sql.MapStatic("INT64", boilerplate.CheckedInt64),
 			sql.NUMBER:         sql.MapStatic("FLOAT64"),
 			sql.OBJECT:         sql.MapStatic("STRING", jsonConverter),
 			sql.MULTIPLE:       sql.MapStatic("JSON", boilerplate.ToJsonBytes),

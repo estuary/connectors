@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -12,29 +11,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
-
-// strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to
-// an integer. The sqlserver driver doesn't appear to have any way to provide an integer value
-// larger than 8 bytes as a parameter (such as may go in a NUMERIC(38,0) column). The value provided
-// must always be an integer that fits in an int64.
-func strToInt() boilerplate.ElementConverter {
-	return boilerplate.StringCastConverter(func(str string) (interface{}, error) {
-		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
-		// per JSON specification so we must handle this possibility here. Anything after the
-		// decimal is discarded on the assumption that Flow has validated the data and verified that
-		// the decimal component is all 0's.
-		if idx := strings.Index(str, "."); idx != -1 {
-			str = str[:idx]
-		}
-
-		out, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
-		}
-
-		return out, nil
-	})
-}
 
 var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	var stringType = "varchar"
@@ -49,14 +25,14 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BIT"),
 			sql.OBJECT:         sql.MapStatic(textType, boilerplate.ToJsonString),
 			sql.ARRAY:          sql.MapStatic(textType, boilerplate.ToJsonString),
 			sql.BINARY:         sql.MapStatic(textType),
 			sql.MULTIPLE:       sql.MapStatic(textType, boilerplate.ToJsonString),
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", strToInt()),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
 			// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", boilerplate.StrToFloat(nil, nil, nil)),
 			sql.STRING: sql.MapString(sql.StringMappings{

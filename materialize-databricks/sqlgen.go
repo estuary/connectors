@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -20,6 +22,23 @@ func translateFlowField(f string) string {
 	return columnSanitizerRegexp.ReplaceAllString(f, "_")
 }
 
+var strToInt boilerplate.ElementConverter = boilerplate.StringCastConverter(func(str string) (interface{}, error) {
+	// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
+	// per JSON specification so we must handle this possibility here. Anything after the
+	// decimal is discarded on the assumption that Flow has validated the data and verified that
+	// the decimal component is all 0's.
+	if idx := strings.Index(str, "."); idx != -1 {
+		str = str[:idx]
+	}
+
+	out, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
+	}
+
+	return out, nil
+})
+
 // databricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
 var databricksDialect = func() sql.Dialect {
@@ -36,11 +55,11 @@ var databricksDialect = func() sql.Dialect {
 			sql.ARRAY:          jsonMapper,
 			sql.BINARY:         sql.MapStatic("BINARY"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
 			sql.NUMBER:         sql.MapStatic("DOUBLE"),
 			sql.OBJECT:         jsonMapper,
 			sql.MULTIPLE:       jsonMapper,
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", boilerplate.StrToInt),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
 			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "Inf", "-Inf")),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
