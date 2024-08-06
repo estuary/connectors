@@ -216,10 +216,9 @@ type replicationStream struct {
 	db   *oracleDatabase
 	conn *sql.Conn // The Oracle connection
 
-	cancel   context.CancelFunc            // Cancel function for the replication goroutine's context
-	errCh    chan error                    // Error channel for the final exit status of the replication goroutine
-	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
-	eventBuf []sqlcapture.DatabaseEvent    // A buffer used in between 'receiveMessage' and the output channel
+	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
+	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
+	events chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
 
 	redoFiles    []redoFile // list of redo files
 	redoSequence int
@@ -254,7 +253,7 @@ func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 
 func (s *replicationStream) StartReplication(ctx context.Context) error {
 	var streamCtx, streamCancel = context.WithCancel(ctx)
-	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
+	s.events = make(chan sqlcapture.DatabaseEvent)
 	s.errCh = make(chan error)
 	s.cancel = streamCancel
 
@@ -302,21 +301,6 @@ func (s *replicationStream) run(ctx context.Context) error {
 
 func (s *replicationStream) poll(ctx context.Context) error {
 	for {
-		// If there's already a change event which needs to be sent to the consumer,
-		// try to do so until/unless the context expires first.
-		if s.eventBuf != nil {
-			for _, ev := range s.eventBuf {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case s.events <- ev:
-					continue
-				}
-			}
-
-			s.eventBuf = nil
-		}
-
 		switched, err := s.redoFileSwitched(ctx)
 		if err != nil {
 			return err
@@ -337,19 +321,16 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			return fmt.Errorf("receive messages: %w", err)
 		}
 
-		s.eventBuf = make([]sqlcapture.DatabaseEvent, len(msgs)+1)
-		for i, msg := range msgs {
+		for _, msg := range msgs {
 			event, err := s.decodeMessage(msg)
 			if err != nil {
 				return fmt.Errorf("error decoding message: %w", err)
 			}
 
-			// Once a message arrives, decode it and buffer the result until the next
-			// time this function is invoked.
-			s.eventBuf[i] = event
+			s.events <- event
 		}
 
-		s.eventBuf[len(s.eventBuf)-1] = &sqlcapture.FlushEvent{
+		s.events <- &sqlcapture.FlushEvent{
 			Cursor: strconv.Itoa(s.lastTxnEndSCN),
 		}
 	}
