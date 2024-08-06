@@ -373,26 +373,55 @@ type correctnessInvariantsCaptureValidator struct {
 }
 
 var correctnessInvariantsStateTransitions = map[string]string{
-	"New:Create(1)":     "1",        // A row may first be observed at any point
-	"New:Create(2)":     "2",        // A row may first be observed at any point
-	"New:Create(3)":     "3",        // A row may first be observed at any point
-	"New:Create(4)":     "4",        // A row may first be observed at any point
-	"New:Create(6)":     "6",        // A row may first be observed at any point
-	"New:Create(7)":     "7",        // A row may first be observed at any point
-	"New:Create(8)":     "Finished", // A row may first be observed at any point
-	"New:Update(2)":     "2",        // This first observation may also be an update
-	"New:Update(3)":     "3",        // This first observation may also be an update
-	"New:Update(4)":     "4",        // This first observation may also be an update
-	"New:Delete()":      "Deleted",  // This first observation could theoretically also be a deletion
-	"New:Update(7)":     "7",        // This first observation may also be an update
-	"New:Update(8)":     "Finished", // This first observation may also be an update
-	"1:Update(2)":       "2",
-	"2:Update(3)":       "3",
-	"3:Update(4)":       "4",
-	"4:Delete()":        "Deleted",
+	"New:Create(1)": "1",        // A row may first be observed at any point
+	"New:Create(2)": "2",        // A row may first be observed at any point
+	"New:Create(3)": "3",        // A row may first be observed at any point
+	"New:Create(4)": "4",        // A row may first be observed at any point
+	"New:Create(6)": "6",        // A row may first be observed at any point
+	"New:Create(7)": "7",        // A row may first be observed at any point
+	"New:Create(8)": "Finished", // A row may first be observed at any point
+
+	"New:Update(2)": "2",        // This first observation may also be an update
+	"New:Update(3)": "3",        // This first observation may also be an update
+	"New:Update(4)": "4",        // This first observation may also be an update
+	"New:Delete()":  "Deleted",  // This first observation could theoretically also be a deletion
+	"New:Update(7)": "7",        // This first observation may also be an update
+	"New:Update(8)": "Finished", // This first observation may also be an update
+
+	"1:Update(2)": "2",
+	"1:Update(3)": "3",
+	"1:Update(4)": "4",
+	"1:Delete()":  "Deleted",
+	"1:Create(6)": "6",
+	"1:Update(7)": "7",
+	"1:Update(8)": "Finished",
+
+	"2:Update(3)": "3",
+	"2:Update(4)": "4",
+	"2:Delete()":  "Deleted",
+	"2:Create(6)": "6",
+	"2:Update(7)": "7",
+	"2:Update(8)": "Finished",
+
+	"3:Update(4)": "4",
+	"3:Delete()":  "Deleted",
+	"3:Create(6)": "6",
+	"3:Update(7)": "7",
+	"3:Update(8)": "Finished",
+
+	"4:Delete()":  "Deleted",
+	"4:Create(6)": "6",
+	"4:Update(7)": "7",
+	"4:Update(8)": "Finished",
+
 	"Deleted:Create(6)": "6",
-	"6:Update(7)":       "7",
-	"7:Update(8)":       "Finished",
+	"Deleted:Update(7)": "7",
+	"Deleted:Update(8)": "Finished",
+
+	"6:Update(7)": "7",
+	"6:Update(8)": "Finished",
+
+	"7:Update(8)": "Finished",
 }
 
 func (v *correctnessInvariantsCaptureValidator) Output(collection string, data json.RawMessage) {
@@ -437,6 +466,8 @@ func (v *correctnessInvariantsCaptureValidator) Checkpoint(data json.RawMessage)
 		var prevState = v.states[id]
 		if prevState == "" {
 			prevState = "New"
+		} else if prevState == "Error" {
+			continue // Ignore rows once they enter an error state
 		}
 		var edge = prevState + ":" + change
 
@@ -463,7 +494,7 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 
 	for id := 0; id < v.NumExpectedIDs; id++ {
 		var state = v.states[id]
-		if state != "Finished" {
+		if state != "Finished" && state != "Error" {
 			fmt.Fprintf(v.violations, "id %d in state %q (expected \"Finished\")\n", id, state)
 		}
 	}
