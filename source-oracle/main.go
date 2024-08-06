@@ -180,7 +180,7 @@ func (c *Config) ToURI() string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
-	uri.RawQuery = "PREFETCH_ROWS=500"
+	uri.RawQuery = "PREFETCH_ROWS=1000"
 	return uri.String()
 }
 
