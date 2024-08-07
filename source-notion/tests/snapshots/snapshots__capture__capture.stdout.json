@@ -4,8 +4,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 0
       },
       "avatar_url": null,
       "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
@@ -20,8 +19,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 1
       },
       "avatar_url": null,
       "bot": {
@@ -42,8 +40,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 0
       },
       "archived": false,
       "cover": null,
@@ -135,8 +132,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 1
       },
       "archived": false,
       "cover": null,
@@ -193,8 +189,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 2,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 2
       },
       "archived": false,
       "cover": null,
@@ -253,8 +248,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 4,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 4
       },
       "archived": false,
       "cover": null,
@@ -329,8 +323,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 0
       },
       "archived": false,
       "cover": null,
@@ -389,8 +382,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 3,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 3
       },
       "archived": false,
       "cover": null,
@@ -471,8 +463,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 1
       },
       "archived": false,
       "created_by": {
@@ -505,8 +496,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 2,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 2
       },
       "archived": false,
       "created_by": {
@@ -557,8 +547,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 5,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 5
       },
       "archived": false,
       "created_by": {
@@ -610,8 +599,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 0
       },
       "archived": false,
       "created_by": {
@@ -662,8 +650,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 4,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 4
       },
       "archived": false,
       "created_by": {
@@ -715,8 +702,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 6,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 6
       },
       "archived": false,
       "created_by": {
@@ -749,8 +735,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 7,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 7
       },
       "archived": false,
       "created_by": {
@@ -783,8 +768,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 3,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+        "row_id": 3
       },
       "archived": false,
       "code": {
