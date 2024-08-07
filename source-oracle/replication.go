@@ -275,9 +275,6 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 // run is the main loop of the replicationStream which loops message
 // receiving and relaying
 func (s *replicationStream) run(ctx context.Context) error {
-	s.events <- &sqlcapture.FlushEvent{
-		Cursor: strconv.Itoa(s.lastTxnEndSCN),
-	}
 	var poll = time.NewTicker(pollInterval)
 	for {
 		select {
