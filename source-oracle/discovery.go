@@ -26,6 +26,12 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
 
+	objectMapping, err := getTableObjectMappings(ctx, db.conn, tables)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get table object identifiers: %w", err)
+	}
+	db.tableObjectMapping = objectMapping
+
 	// Aggregate column and primary key information into DiscoveryInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding DiscoveryInfo.
@@ -157,7 +163,7 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 
 const queryDiscoverTables = `
   SELECT DISTINCT(NVL(IOT_NAME, TABLE_NAME)) AS table_name, owner FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
-` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
+`
 
 func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
 	logrus.Debug("listing all tables in the database")
@@ -190,6 +196,49 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 		return nil, err
 	}
 	return tables, nil
+}
+
+const queryTableObjectIdentifiers = `SELECT OWNER, OBJECT_NAME, OBJECT_ID, DATA_OBJECT_ID FROM ALL_OBJECTS WHERE OBJECT_TYPE='TABLE'`
+
+func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) (map[string]string, error) {
+	logrus.Debug("fetching object identifiers for tables")
+	var mapping = make(map[string]string, len(tables))
+
+	var ownersMap = make(map[string]bool)
+	for _, t := range tables {
+		ownersMap[t.Schema] = true
+	}
+	var owners []string
+	for k := range ownersMap {
+		owners = append(owners, k)
+	}
+	var ownersCondition = " AND owner IN ('" + strings.Join(owners, "','") + "')"
+
+	var rows, err = conn.QueryContext(ctx, queryTableObjectIdentifiers+ownersCondition)
+	if err != nil {
+		return nil, fmt.Errorf("fetching table identifiers: %w", err)
+	}
+	defer rows.Close()
+
+	var owner, tableName string
+	var objectID, dataObjectID int
+	for rows.Next() {
+		if err := rows.Scan(&owner, &tableName, &objectID, &dataObjectID); err != nil {
+			return nil, fmt.Errorf("scanning table object identifier row: %w", err)
+		}
+
+		var streamID = sqlcapture.JoinStreamID(owner, tableName)
+		var fullID = joinObjectID(objectID, dataObjectID)
+		mapping[fullID] = streamID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return mapping, nil
+}
+
+func joinObjectID(objectID, dataObjectID int) string {
+	return fmt.Sprintf("%d.%d", objectID, dataObjectID)
 }
 
 const queryDiscoverColumns = `
@@ -264,8 +313,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		var t reflect.Type
 		var format string
 		var jsonType string
-		var isInteger = dataScale.Valid && dataScale.Int16 == 0
-		if dataType == "NUMBER" && (isInteger || isPrimaryKey) {
+		var isInteger = dataScale.Int16 == 0
+		if dataType == "NUMBER" && isInteger {
 			if precision <= 18 {
 				t = reflect.TypeFor[int64]()
 				jsonType = "integer"
@@ -316,6 +365,9 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		if isPrimaryKey {
 			var streamID = sqlcapture.JoinStreamID(sc.TableSchema, sc.TableName)
+			if format == "number" {
+				return nil, nil, fmt.Errorf("floating point numbers cannot be primary keys: %s.%s", streamID, sc.Name)
+			}
 
 			pks[streamID] = append(pks[streamID], sc.Name)
 		}
