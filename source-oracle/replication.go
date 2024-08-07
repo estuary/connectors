@@ -81,7 +81,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		db:   db,
 		conn: conn,
 
-		lastTxnEndSCN: startSCN + 1,
+		lastTxnEndSCN: startSCN,
 	}
 
 	if err = stream.startLogminer(ctx, startSCN); err != nil {
@@ -275,6 +275,9 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 // run is the main loop of the replicationStream which loops message
 // receiving and relaying
 func (s *replicationStream) run(ctx context.Context) error {
+	s.events <- &sqlcapture.FlushEvent{
+		Cursor: strconv.Itoa(s.lastTxnEndSCN),
+	}
 	var poll = time.NewTicker(pollInterval)
 	for {
 		select {
@@ -698,9 +701,13 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var rows, err = s.conn.QueryContext(ctx, `SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS
+	var query = fmt.Sprintf(`SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND
-    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')`, s.lastTxnEndSCN)
+    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
+    FETCH NEXT %d ROWS ONLY`, s.db.config.Advanced.BackfillChunkSize)
+
+	var rows, err = s.conn.QueryContext(ctx, query, s.lastTxnEndSCN)
+
 	if err != nil {
 		return nil, fmt.Errorf("logminer query: %w", err)
 	}
