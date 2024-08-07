@@ -13,7 +13,7 @@ Binding 0:
           "$anchor": "FLOW_TEST_LOGMINERTT32386",
           "properties": {
             "A": {
-              "format": "number",
+              "format": "integer",
               "type": [
                 "string",
                 "null"

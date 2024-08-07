@@ -16,7 +16,7 @@ Binding 0:
           "properties": {
             "A": {
               "type": "string",
-              "format": "number"
+              "format": "integer"
             },
             "B": {
               "type": [
