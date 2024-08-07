@@ -51,15 +51,18 @@ func (m timestampTypeMapping) valid() bool {
 var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.ARRAY:          sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
-			sql.BINARY:         sql.MapStatic("STRING"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:        sql.MapStatic("INTEGER"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE"),
-			sql.OBJECT:         sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
-			sql.MULTIPLE:       sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("INTEGER", boilerplate.StrToInt), // Equivalent to NUMBER(38,0)
-			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "inf", "-inf")),
+			sql.ARRAY:    sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
+			sql.BINARY:   sql.MapStatic("STRING"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:  sql.MapStatic("INTEGER"),
+			sql.NUMBER:   sql.MapStatic("DOUBLE"),
+			sql.OBJECT:   sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
+			sql.MULTIPLE: sql.MapStatic("VARIANT", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("INTEGER", boilerplate.StrToInt), // Equivalent to NUMBER(38,0)
+				sql.StringLenStep(39, "STRING", boilerplate.ToStr),
+			),
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "inf", "-inf")),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.ProjectionMapper{

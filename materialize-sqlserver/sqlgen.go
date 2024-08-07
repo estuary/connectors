@@ -25,14 +25,17 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
-			sql.BOOLEAN:        sql.MapStatic("BIT"),
-			sql.OBJECT:         sql.MapStatic(textType, boilerplate.ToJsonString),
-			sql.ARRAY:          sql.MapStatic(textType, boilerplate.ToJsonString),
-			sql.BINARY:         sql.MapStatic(textType),
-			sql.MULTIPLE:       sql.MapStatic(textType, boilerplate.ToJsonString),
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.INTEGER:  sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:  sql.MapStatic("BIT"),
+			sql.OBJECT:   sql.MapStatic(textType, boilerplate.ToJsonString),
+			sql.ARRAY:    sql.MapStatic(textType, boilerplate.ToJsonString),
+			sql.BINARY:   sql.MapStatic(textType),
+			sql.MULTIPLE: sql.MapStatic(textType, boilerplate.ToJsonString),
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("INTEGER", boilerplate.CheckedInt64),
+				sql.StringLenStep(19, textType, boilerplate.ToStr), // The maximum length of a signed 64-bit integer is 19 characters.
+			),
 			// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", boilerplate.StrToFloat(nil, nil, nil)),
 			sql.STRING: sql.MapString(sql.StringMappings{

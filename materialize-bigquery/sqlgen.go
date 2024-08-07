@@ -64,14 +64,17 @@ var jsonConverter boilerplate.ElementConverter = func(te tuple.TupleElement) (in
 var bqDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.ARRAY:          sql.MapStatic("STRING", jsonConverter),
-			sql.BINARY:         sql.MapStatic("STRING"),
-			sql.BOOLEAN:        sql.MapStatic("BOOL"),
-			sql.INTEGER:        sql.MapStatic("INT64", boilerplate.CheckedInt64),
-			sql.NUMBER:         sql.MapStatic("FLOAT64"),
-			sql.OBJECT:         sql.MapStatic("STRING", jsonConverter),
-			sql.MULTIPLE:       sql.MapStatic("JSON", boilerplate.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("BIGNUMERIC(38,0)", boilerplate.StrToInt),
+			sql.ARRAY:    sql.MapStatic("STRING", jsonConverter),
+			sql.BINARY:   sql.MapStatic("STRING"),
+			sql.BOOLEAN:  sql.MapStatic("BOOL"),
+			sql.INTEGER:  sql.MapStatic("INT64", boilerplate.CheckedInt64),
+			sql.NUMBER:   sql.MapStatic("FLOAT64"),
+			sql.OBJECT:   sql.MapStatic("STRING", jsonConverter),
+			sql.MULTIPLE: sql.MapStatic("JSON", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("BIGNUMERIC(38,0)", boilerplate.StrToInt),
+				sql.StringLenStep(39, "STRING", boilerplate.ToStr),
+			),
 			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
 			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", boilerplate.StrToFloat("NaN", "Infinity", "-Infinity")),
 			sql.STRING: sql.MapString(sql.StringMappings{

@@ -32,14 +32,17 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
-			sql.ARRAY:          sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
-			sql.BINARY:         sql.MapStatic("TEXT"),
-			sql.MULTIPLE:       sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(38,0)", boilerplate.StrToInt),
+			sql.INTEGER:  sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
+			sql.ARRAY:    sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
+			sql.BINARY:   sql.MapStatic("TEXT"),
+			sql.MULTIPLE: sql.MapStatic("SUPER", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("NUMERIC(38,0)", boilerplate.StrToInt),
+				sql.StringLenStep(39, "TEXT", boilerplate.ToStr),
+			),
 			// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
 			// There's some indication that others have resorted to mapping these to NULL:
 			// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios

@@ -3,6 +3,7 @@ package sql
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -126,6 +127,54 @@ func MapPrimaryKey(pkMapper, delegate ProjectionMapper) ProjectionMapper {
 			return pkMapper(p)
 		}
 		return delegate(p)
+	}
+}
+
+// StringLenStep creates a stringStep with the given startAt and mapper.
+// Typically startAt should be the number of digits that the smaller type could
+// hold + 1.
+func StringLenStep(startAt int, ddl string, converter ...boilerplate.ElementConverter) stringStep {
+	return stringStep{
+		startAt: startAt,
+		mapper:  MapStatic(ddl, converter...),
+	}
+}
+
+type stringStep struct {
+	startAt int
+	mapper  ProjectionMapper
+}
+
+// MapOnStringMaxLength determines the projection mapper to use based on the
+// maximum length of the field per its string inference. The default mapper is
+// used if there is no maximum length available from inference. Multiple "steps"
+// can be provided, and the ProjectionMapper from the smallest step per its
+// startAt will be used. The default applies to all projections that do not have
+// an inferred maximum length greater than or equal to any of the steps.
+func MapOnStringMaxLength(defaultMapper ProjectionMapper, steps ...stringStep) ProjectionMapper {
+	if !sort.SliceIsSorted(steps, func(i, j int) bool {
+		return steps[i].startAt < steps[j].startAt
+	}) {
+		panic("MapOnStringMaxLengths steps must be sorted by StartAt")
+	}
+
+	if len(steps) == 0 {
+		panic("MapOnStringMaxLengths must have at least one step")
+	}
+
+	return func(p boilerplate.Projection) (string, boilerplate.ElementConverter) {
+		var maxLength int
+		if p.Inference.String_ != nil {
+			maxLength = int(p.Inference.String_.MaxLength)
+		}
+
+		for i := len(steps) - 1; i >= 0; i-- {
+			if maxLength >= steps[i].startAt {
+				return steps[i].mapper(p)
+			}
+		}
+
+		return defaultMapper(p)
 	}
 }
 

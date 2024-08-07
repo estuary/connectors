@@ -46,14 +46,17 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON"),
-			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         sql.MapStatic("LONGTEXT"),
-			sql.MULTIPLE:       sql.MapStatic("JSON", boilerplate.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(65,0)", boilerplate.StrToInt),
+			sql.INTEGER:  sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("JSON"),
+			sql.ARRAY:    sql.MapStatic("JSON"),
+			sql.BINARY:   sql.MapStatic("LONGTEXT"),
+			sql.MULTIPLE: sql.MapStatic("JSON", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("NUMERIC(65,0)", boilerplate.StrToInt),
+				sql.StringLenStep(66, "LONGTEXT", boilerplate.ToStr),
+			),
 			// We encode as CSV and must send MySQL string sentinels.
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", boilerplate.StrToFloat("NaN", "+inf", "-inf")),
 			sql.STRING: sql.MapString(sql.StringMappings{

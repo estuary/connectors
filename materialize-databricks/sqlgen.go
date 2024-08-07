@@ -52,15 +52,18 @@ var databricksDialect = func() sql.Dialect {
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.ARRAY:          jsonMapper,
-			sql.BINARY:         sql.MapStatic("BINARY"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
-			sql.NUMBER:         sql.MapStatic("DOUBLE"),
-			sql.OBJECT:         jsonMapper,
-			sql.MULTIPLE:       jsonMapper,
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
-			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "Inf", "-Inf")),
+			sql.ARRAY:    jsonMapper,
+			sql.BINARY:   sql.MapStatic("BINARY"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:  sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.NUMBER:   sql.MapStatic("DOUBLE"),
+			sql.OBJECT:   jsonMapper,
+			sql.MULTIPLE: jsonMapper,
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("NUMERIC(38,0)", boilerplate.StrToInt),
+				sql.StringLenStep(39, "STRING", boilerplate.ToStr),
+			),
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "Inf", "-Inf")),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.ProjectionMapper{
@@ -77,6 +80,7 @@ var databricksDialect = func() sql.Dialect {
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"long"}, Validate: sql.IntegerCompatible},
 		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"decimal"}, Validate: sql.NumericCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
 		sql.ColValidation{Types: []string{"binary"}, Validate: sql.BinaryCompatible},

@@ -11,14 +11,21 @@ import (
 var duckDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:        sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
-			sql.NUMBER:         sql.MapStatic("DOUBLE"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON", boilerplate.ToJsonBytes),
-			sql.ARRAY:          sql.MapStatic("JSON", boilerplate.ToJsonBytes),
-			sql.BINARY:         sql.MapStatic("VARCHAR"),
-			sql.MULTIPLE:       sql.MapStatic("JSON", boilerplate.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("HUGEINT", boilerplate.StrToInt),
+			sql.INTEGER:  sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.NUMBER:   sql.MapStatic("DOUBLE"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("JSON", boilerplate.ToJsonBytes),
+			sql.ARRAY:    sql.MapStatic("JSON", boilerplate.ToJsonBytes),
+			sql.BINARY:   sql.MapStatic("VARCHAR"),
+			sql.MULTIPLE: sql.MapStatic("JSON", boilerplate.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapOnStringMaxLength(
+				sql.MapStatic("HUGEINT", boilerplate.StrToInt),
+				// A 96-bit integer is 39 characters long, but not all 39 digit
+				// integers will fit in one. Practically speaking the cutoff at
+				// 39 will cause all integers with more than 32 digits to be
+				// materialized as strings.
+				sql.StringLenStep(39, "STRING", boilerplate.ToStr),
+			),
 			// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", boilerplate.StrToFloat("NaN", "Infinity", "-Infinity")),
 			sql.STRING: sql.MapString(sql.StringMappings{
