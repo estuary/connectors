@@ -708,9 +708,10 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 	defer rows.Close()
 
 	var msgs []logminerMessage
-	var counter = 0
+	var totalMessages = 0
+
 	for rows.Next() {
-		counter++
+		totalMessages++
 		var lastMsg *logminerMessage
 
 		if len(msgs) > 0 {
@@ -764,13 +765,6 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 			continue
 		}
 
-		// If this change event is on a table we're not capturing, skip doing any
-		// further processing on it.
-		var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
-		if !s.tableActive(streamID) {
-			continue
-		}
-
 		// If logminer can't find the dictionary for a SQL statement (e.g. if using online mode and a schema change has occurred)
 		// then we get SQL statements like this:
 		// insert into "UNKNOWN"."OBJ# 45522"("COL 1","COL 2","COL 3","COL 4") values (HEXTORAW('45465f4748'),HEXTORAW('546563686e6963616c20577269746572'), HEXTORAW('c229'),HEXTORAW('c3020b'));
@@ -782,6 +776,13 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 			return nil, fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.info, msg.tableName, msg.sql)
 		}
 
+		// If this change event is on a table we're not capturing, skip doing any
+		// further processing on it.
+		var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
+		if !s.tableActive(streamID) {
+			continue
+		}
+
 		msgs = append(msgs, msg)
 	}
 
@@ -790,7 +791,8 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"count": counter,
+		"totalMessages":    totalMessages,
+		"relevantMessages": len(msgs),
 	}).Debug("received messages")
 
 	return msgs, nil
