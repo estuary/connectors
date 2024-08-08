@@ -73,7 +73,7 @@ $defs:
       discounts:
         anyOf:
           - items:
-              type: object
+              type: string
             type: array
           - type: "null"
         default: ~

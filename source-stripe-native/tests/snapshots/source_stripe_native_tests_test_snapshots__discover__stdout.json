@@ -597,6 +597,20 @@
           "title": "Id",
           "type": "string"
         },
+        "discounts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Discounts"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -604,6 +618,7 @@
       },
       "required": [
         "id",
+        "discounts",
         "created"
       ],
       "title": "InvoiceItems",
@@ -1522,7 +1537,7 @@
               "anyOf": [
                 {
                   "items": {
-                    "type": "object"
+                    "type": "string"
                   },
                   "type": "array"
                 },
