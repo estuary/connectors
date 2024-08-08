@@ -122,13 +122,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
-	if suffix != "" {
-		tableName += "_" + suffix
-	}
-	for _, str := range []string{"/", "=", "(", ")"} {
-		tableName = strings.ReplaceAll(tableName, str, "_")
-	}
+	var tableName = tb.TableName(t, suffix)
 	var quotedTableName = fmt.Sprintf("[%s].[%s]", *testSchemaName, tableName)
 
 	log.WithFields(log.Fields{"table": quotedTableName, "cols": tableDef}).Debug("creating test table")
@@ -151,6 +145,18 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	})
 
 	return quotedTableName
+}
+
+func (tb *testBackend) TableName(t testing.TB, suffix string) string {
+	t.Helper()
+	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
+	if suffix != "" {
+		tableName += "_" + suffix
+	}
+	for _, str := range []string{"/", "=", "(", ")"} {
+		tableName = strings.ReplaceAll(tableName, str, "_")
+	}
+	return tableName
 }
 
 // Insert adds all provided rows to the specified table in a single transaction.
@@ -299,60 +305,84 @@ func TestManyTables(t *testing.T) {
 }
 
 func TestCaptureInstanceCleanup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "71329622"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	for _, tc := range []struct {
+		Name     string
+		UniqueID string
+		WithDBO  bool
+	}{
+		{"WithDBO", "71329622", true},
+		{"WithoutDBO", "72928064", false},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var fullTableName = tb.CreateTable(ctx, t, tc.UniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+			var changeTableName = fmt.Sprintf("cdc.%s_%s_CT", *testSchemaName, tb.TableName(t, tc.UniqueID))
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(tc.UniqueID))
+			cs.EndpointSpec.(*Config).Advanced.AutomaticChangeTableCleanup = true
 
-	// Run the capture once to dispense with any backfills
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	cs.Capture(ctx, t, nil)
-	sqlcapture.TestShutdownAfterCaughtUp = false
+			// The db_owner permission is required to automatically clean up change tables,
+			// and we need to test both with and without to verify that the capture correctly
+			// handles the lack of this permission.
+			if tc.WithDBO {
+				tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner ADD MEMBER %s", *dbCaptureUser))
+				t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner DROP MEMBER %s", *dbCaptureUser)) })
+			}
 
-	// Launch the ongoing capture in a separate thread
-	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	defer cancelCapture()
-	var captureDone atomic.Bool
-	go func(ctx context.Context) {
-		cs.Capture(captureCtx, t, nil)
-		captureDone.Store(true)
-	}(captureCtx)
+			// Run the capture once to dispense with any backfills
+			sqlcapture.TestShutdownAfterCaughtUp = true
+			cs.Capture(ctx, t, nil)
+			cs.Reset() // Reset validator/error state
+			sqlcapture.TestShutdownAfterCaughtUp = false
 
-	// Traffic generator in a separate thread
-	var trafficCtx, cancelTraffic = context.WithCancel(ctx)
-	defer cancelTraffic()
-	var trafficDone atomic.Bool
-	go func(ctx context.Context) {
-		for i := 0; i < 10; i++ {
-			tb.Insert(ctx, t, tableName, [][]any{
-				{i*100 + 1, fmt.Sprintf("iteration %d row one", i)},
-				{i*100 + 2, fmt.Sprintf("iteration %d row two", i)},
-				{i*100 + 3, fmt.Sprintf("iteration %d row three", i)},
-				{i*100 + 4, fmt.Sprintf("iteration %d row four", i)},
-			})
-			time.Sleep(1 * time.Second)
-		}
-		time.Sleep(cdcCleanupInterval + 2*time.Second)
-		trafficDone.Store(true)
-	}(trafficCtx)
+			// Launch the ongoing capture in a separate thread
+			var captureCtx, cancelCapture = context.WithCancel(ctx)
+			defer cancelCapture()
+			var captureDone atomic.Bool
+			go func(ctx context.Context) {
+				cs.Capture(captureCtx, t, nil)
+				captureDone.Store(true)
+			}(captureCtx)
 
-	// Wait until the traffic generator shuts down and then cancel the capture
-	for !trafficDone.Load() {
-		time.Sleep(100 * time.Millisecond)
+			// Traffic generator in a separate thread
+			var trafficCtx, cancelTraffic = context.WithCancel(ctx)
+			defer cancelTraffic()
+			var trafficDone atomic.Bool
+			go func(ctx context.Context) {
+				for i := 0; i < 10; i++ {
+					tb.Insert(ctx, t, fullTableName, [][]any{
+						{i*100 + 1, fmt.Sprintf("iteration %d row one", i)},
+						{i*100 + 2, fmt.Sprintf("iteration %d row two", i)},
+						{i*100 + 3, fmt.Sprintf("iteration %d row three", i)},
+						{i*100 + 4, fmt.Sprintf("iteration %d row four", i)},
+					})
+					time.Sleep(1 * time.Second)
+				}
+				time.Sleep(cdcCleanupInterval + 2*time.Second)
+				trafficDone.Store(true)
+			}(trafficCtx)
+
+			// Wait until the traffic generator shuts down and then cancel the capture
+			for !trafficDone.Load() {
+				time.Sleep(100 * time.Millisecond)
+			}
+			cancelCapture()
+			for !captureDone.Load() {
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			// Query the number of rows in the change table after everything finishes
+			var changeTableRows int
+			require.NoError(t, tb.control.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", changeTableName)).Scan(&changeTableRows))
+
+			// Validate test snapshot plus change table row count
+			var summary = cs.Summary()
+			cs.Reset()
+			summary += fmt.Sprintf("\n# Capture Instance Contained %d Rows At Finish", changeTableRows)
+			cupaloy.SnapshotT(t, summary)
+		})
 	}
-	cancelCapture()
-	for !captureDone.Load() {
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	// Query the number of rows in the change table after everything finishes
-	var changeTableRows int
-	var changeTableName = fmt.Sprintf("cdc.%s_test_%s_%s_CT", *testSchemaName, strings.TrimPrefix(t.Name(), "Test"), uniqueID)
-	require.NoError(t, tb.control.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", changeTableName)).Scan(&changeTableRows))
-
-	// Validate test snapshot plus change table row count
-	var summary = cs.Summary()
-	cs.Reset()
-	summary += fmt.Sprintf("\n# Capture Instance Contained %d Rows At Finish", changeTableRows)
-	cupaloy.SnapshotT(t, summary)
 }
