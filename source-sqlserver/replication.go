@@ -22,6 +22,13 @@ import (
 
 var replicationBufferSize = 4 * 1024 // Assuming change events average ~2kB then 4k * 2kB = 8MB
 
+const (
+	cdcPollingWorkers  = 4                      // Number of parallel worker threads to execute CDC polling operations
+	cdcCleanupWorkers  = 16                     // Number of parallel worker threads to execute table cleanup operations
+	cdcPollingInterval = 500 * time.Millisecond // How frequently to perform CDC polling
+	cdcCleanupInterval = 15 * time.Second       // How frequently to perform CDC table cleanup
+)
+
 // LSN is just a type alias for []byte to make the code that works with LSN values a bit clearer.
 type LSN = []byte
 
@@ -77,6 +84,11 @@ type sqlserverReplicationStream struct {
 	tables struct {
 		sync.RWMutex
 		info map[string]*tableReplicationInfo
+	}
+
+	cleanup struct {
+		sync.RWMutex
+		ackLSN LSN // The latest LSN to be acknowledged by Flow
 	}
 }
 
@@ -163,7 +175,20 @@ func (rs *sqlserverReplicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 }
 
 func (rs *sqlserverReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	return nil // Nothing to do here, SQL Server CDC retention is primarily time-based
+	log.WithField("cursor", cursor).Debug("acknowledged up to cursor")
+	if cursor == "" {
+		return nil
+	}
+
+	var cursorLSN, err = base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return fmt.Errorf("error decoding cursor %q: %w", cursor, err)
+	}
+
+	rs.cleanup.Lock()
+	rs.cleanup.ackLSN = cursorLSN
+	rs.cleanup.Unlock()
+	return nil
 }
 
 func (rs *sqlserverReplicationStream) Close(ctx context.Context) error {
@@ -173,11 +198,11 @@ func (rs *sqlserverReplicationStream) Close(ctx context.Context) error {
 }
 
 func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
-	// TODO(wgd): Make the polling interval part of advanced connector config.
-	// A polling interval of 500ms is the default value that Debezium SQL Server uses.
-	const pollInterval = 500 * time.Millisecond
-	var poll = time.NewTicker(pollInterval)
+	var poll = time.NewTicker(cdcPollingInterval)
+	var cleanup = time.NewTicker(cdcCleanupInterval)
 	defer poll.Stop()
+	defer cleanup.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -186,6 +211,11 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 			if err := rs.pollChanges(ctx); err != nil {
 				log.WithField("err", err).Error("error polling change tables")
 				return fmt.Errorf("error requesting CDC events: %w", err)
+			}
+		case <-cleanup.C:
+			if err := rs.cleanupChangeTables(ctx); err != nil {
+				log.WithField("err", err).Error("error cleaning up change tables")
+				return fmt.Errorf("error cleaning up change tables: %w", err)
 			}
 		}
 	}
@@ -232,7 +262,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 				"instance":       info.CaptureInstance,
 				"instanceMaxLSN": instanceMaxLSN,
 				"pollFromLSN":    rs.fromLSN,
-			}).Debug("skipping poll for unchanged capture instance")
+			}).Trace("skipping poll for unchanged capture instance")
 			continue
 		}
 
@@ -250,12 +280,6 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	}
 	rs.tables.RUnlock()
 
-	// cdcPollingWorkers controls the number of parallel CDC polling queries which can
-	// be running simultaneously.
-	//
-	// TODO(wgd): Make this configurable?
-	var cdcPollingWorkers = 4
-
 	// Execute all polling operations in the work queue
 	var workers, workerContext = errgroup.WithContext(ctx)
 	workers.SetLimit(cdcPollingWorkers)
@@ -272,12 +296,54 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		return err
 	}
 
-	log.WithField("lsn", toLSN).Trace("flushed up to LSN")
+	var cursor = base64.StdEncoding.EncodeToString(toLSN)
+	log.WithField("cursor", cursor).Debug("checkpoint at cursor")
 	rs.events <- &sqlcapture.FlushEvent{
-		Cursor: base64.StdEncoding.EncodeToString(toLSN),
+		Cursor: cursor,
 	}
 	rs.fromLSN = toLSN
 
+	return nil
+}
+
+func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) error {
+	// Query the start LSN of every capture instance
+	var instanceMinLSNs, err = cdcGetInstanceMinLSNs(ctx, rs.conn)
+	if err != nil {
+		return fmt.Errorf("error querying capture instance start LSNs: %w", err)
+	}
+
+	// Figure out what the latest acknowledged LSN is
+	rs.cleanup.RLock()
+	var ackedLSN = rs.cleanup.ackLSN
+	rs.cleanup.RUnlock()
+
+	// Make a list of capture instances which can be usefully cleaned up
+	var cleanupInstances []string
+	rs.tables.RLock()
+	for _, info := range rs.tables.info {
+		var startLSN, ok = instanceMinLSNs[info.CaptureInstance]
+		if ok && bytes.Compare(startLSN, ackedLSN) < 0 {
+			cleanupInstances = append(cleanupInstances, info.CaptureInstance)
+		}
+	}
+	rs.tables.RUnlock()
+
+	// Execute cleanup operations in parallel
+	var workers, workerContext = errgroup.WithContext(ctx)
+	workers.SetLimit(cdcCleanupWorkers)
+	for _, instanceName := range cleanupInstances {
+		var instanceName = instanceName // Copy to avoid loop+closure issues
+		workers.Go(func() error {
+			if err := cdcCleanupChangeTable(workerContext, rs.conn, instanceName, ackedLSN); err != nil {
+				return fmt.Errorf("error cleaning change table %q: %w", instanceName, err)
+			}
+			return nil
+		})
+	}
+	if err := workers.Wait(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -485,6 +551,53 @@ func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []st
 		results[instanceName] = instanceMaxLSN
 	}
 	return results, rows.Err()
+}
+
+// cdcGetInstanceMinLSNs queries the minimum change event LSN for all capture instances.
+func cdcGetInstanceMinLSNs(ctx context.Context, conn *sql.DB) (map[string]LSN, error) {
+	var query = `SELECT capture_instance, start_lsn FROM cdc.change_tables;`
+
+	rows, err := conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	var results = make(map[string]LSN)
+	for rows.Next() {
+		var instanceName string
+		var startLSN LSN
+		if err := rows.Scan(&instanceName, &startLSN); err != nil {
+			return nil, fmt.Errorf("error scanning result: %w", err)
+		}
+		log.WithFields(log.Fields{
+			"instance": instanceName,
+			"lsn":      startLSN,
+		}).Trace("queried start LSN for capture instance")
+		results[instanceName] = startLSN
+	}
+	return results, rows.Err()
+}
+
+func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName string, belowLSN LSN) error {
+	log.WithFields(log.Fields{
+		"instance": instanceName,
+		"lsn":      fmt.Sprintf("%X", belowLSN),
+	}).Debug("cleaning change table")
+
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, "BEGIN DECLARE @retcode AS INT = 0; ")
+	fmt.Fprintf(query, "EXEC @retcode = sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = 0x%X; ", belowLSN)
+	fmt.Fprintf(query, "SELECT @retcode; END")
+
+	var retcode int
+	if err := conn.QueryRowContext(ctx, query.String(), instanceName).Scan(&retcode); err != nil {
+		return fmt.Errorf("error executing CDC cleanup on instance %q below LSN %X: %w", instanceName, belowLSN, err)
+	}
+	if retcode != 0 {
+		return fmt.Errorf("error executing CDC cleanup on instance %q below LSN %X: return code %d", instanceName, belowLSN, retcode)
+	}
+	return nil
 }
 
 func splitStreamID(streamID string) (string, string) {
