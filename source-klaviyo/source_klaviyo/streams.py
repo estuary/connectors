@@ -357,12 +357,15 @@ class Events(IncrementalKlaviyoStream):
 
     def _prepare_campaign(self):
 
-        urls = ["https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')","https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'sms')"]
+        urls = ["https://a.klaviyo.com/api/campaigns/?filter=and(equals(messages.channel,'email'),equals(archived,true))",
+                "https://a.klaviyo.com/api/campaigns/?filter=and(equals(messages.channel,'sms'),equals(archived,true))",
+                "https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')",
+                "https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'sms')"]
         campaign_ids = set()
 
-        iterate = True
         try:
             for url in urls:
+                iterate = True
                 while iterate:
                     data = requests.get(url, headers=self.request_headers()).json()
                     if len(data["data"]) == 0:
