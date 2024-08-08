@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"text/template"
@@ -32,7 +33,11 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 	mapper := sql.NewDDLMapper(
 		map[sql.FlatType]sql.ProjectionMapper{
-			sql.INTEGER:  sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+			sql.INTEGER: sql.MapOnIntegerMax(
+				sql.MapStatic("BIGINT", boilerplate.CheckedInt64),
+				// TODO: Do we need to remove fractional 0's here?
+				sql.IntegerMaxStep(math.MaxInt64+1, "NUMERIC(38,0)"),
+			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:   sql.MapStatic("SUPER", boilerplate.ToJsonBytes),

@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"sort"
@@ -130,19 +131,13 @@ func MapPrimaryKey(pkMapper, delegate ProjectionMapper) ProjectionMapper {
 	}
 }
 
-// StringLenStep creates a stringStep with the given startAt and mapper.
-// Typically startAt should be the number of digits that the smaller type could
-// hold + 1.
-func StringLenStep(startAt int, ddl string, converter ...boilerplate.ElementConverter) stringStep {
-	return stringStep{
+// StringLenStep creates a maxStep with the given startAt and mapper. Typically
+// startAt should be the number of digits that the smaller type could hold + 1.
+func StringLenStep(startAt uint32, ddl string, converter ...boilerplate.ElementConverter) maxStep[uint32] {
+	return maxStep[uint32]{
 		startAt: startAt,
 		mapper:  MapStatic(ddl, converter...),
 	}
-}
-
-type stringStep struct {
-	startAt int
-	mapper  ProjectionMapper
 }
 
 // MapOnStringMaxLength determines the projection mapper to use based on the
@@ -151,25 +146,72 @@ type stringStep struct {
 // can be provided, and the ProjectionMapper from the smallest step per its
 // startAt will be used. The default applies to all projections that do not have
 // an inferred maximum length greater than or equal to any of the steps.
-func MapOnStringMaxLength(defaultMapper ProjectionMapper, steps ...stringStep) ProjectionMapper {
+func MapOnStringMaxLength(defaultMapper ProjectionMapper, steps ...maxStep[uint32]) ProjectionMapper {
+	return mapOnMax(
+		func(p boilerplate.Projection) uint32 {
+			if p.Inference.String_ != nil {
+				return p.Inference.String_.MaxLength
+			}
+			return 0
+		},
+		defaultMapper,
+		steps...,
+	)
+}
+
+// StringLenStep creates a maxStep with the given startAt and mapper. Typically
+// startAt should be the size of the integer that the smaller type could hold +
+// 1.
+func IntegerMaxStep(startAt float64, ddl string, converter ...boilerplate.ElementConverter) maxStep[float64] {
+	return maxStep[float64]{
+		startAt: startAt,
+		mapper:  MapStatic(ddl, converter...),
+	}
+}
+
+// MapOnIntegerMax determines the projection mapper to use based on the maximum
+// of the field per its string numeric. The default mapper is used if there is
+// no maximum available from inference. Multiple "steps" can be provided, and
+// the ProjectionMapper from the smallest step per its startAt will be used. The
+// default applies to all projections that do not have an inferred maximum
+// greater than or equal to any of the steps.
+func MapOnIntegerMax(defaultMapper ProjectionMapper, steps ...maxStep[float64]) ProjectionMapper {
+	return mapOnMax(
+		func(p boilerplate.Projection) float64 {
+			if p.Inference.Numeric != nil {
+				return p.Inference.Numeric.Maximum
+			}
+			return 0
+		},
+		defaultMapper,
+		steps...,
+	)
+}
+
+type maxStep[T cmp.Ordered] struct {
+	startAt T
+	mapper  ProjectionMapper
+}
+
+func mapOnMax[T cmp.Ordered](
+	getInferenceMax func(p boilerplate.Projection) T,
+	defaultMapper ProjectionMapper,
+	steps ...maxStep[T],
+) ProjectionMapper {
 	if !sort.SliceIsSorted(steps, func(i, j int) bool {
 		return steps[i].startAt < steps[j].startAt
 	}) {
-		panic("MapOnStringMaxLengths steps must be sorted by StartAt")
+		panic("steps must be sorted by StartAt")
 	}
 
 	if len(steps) == 0 {
-		panic("MapOnStringMaxLengths must have at least one step")
+		panic("must have at least one step")
 	}
 
 	return func(p boilerplate.Projection) (string, boilerplate.ElementConverter) {
-		var maxLength int
-		if p.Inference.String_ != nil {
-			maxLength = int(p.Inference.String_.MaxLength)
-		}
-
+		inferenceMax := getInferenceMax(p)
 		for i := len(steps) - 1; i >= 0; i-- {
-			if maxLength >= steps[i].startAt {
+			if inferenceMax >= steps[i].startAt {
 				return steps[i].mapper(p)
 			}
 		}
