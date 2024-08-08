@@ -22,6 +22,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteCDCEnabled,
+		db.prerequisiteChangeTableCleanup,
 		db.prerequisiteWatermarksTable,
 		db.prerequisiteWatermarksCaptureInstance,
 		db.prerequisiteMaximumLSN,
@@ -129,6 +130,23 @@ func isCDCEnabled(ctx context.Context, conn *sql.DB, dbName string) (bool, error
 		return false, fmt.Errorf("unable to query CDC status of database %q: %w", dbName, err)
 	}
 	return cdcEnabled, nil
+}
+
+func (db *sqlserverDatabase) prerequisiteChangeTableCleanup(ctx context.Context) error {
+	// If automatic change-table cleanup is not in use there is nothing to verify here.
+	if !db.config.Advanced.AutomaticChangeTableCleanup {
+		return nil
+	}
+
+	var isMember *int
+	if err := db.conn.QueryRowContext(ctx, "SELECT IS_ROLEMEMBER('db_owner');", db.config.User).Scan(&isMember); err != nil {
+		return fmt.Errorf("error querying role membership: %w", err)
+	} else if isMember == nil {
+		return fmt.Errorf("error querying role membership: null result for db_owner check") // should never happen
+	} else if *isMember != 1 {
+		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
+	}
+	return nil
 }
 
 func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
