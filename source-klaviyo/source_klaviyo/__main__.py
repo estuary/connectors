@@ -10,6 +10,6 @@ asyncio.run(
     shim_airbyte_cdk.CaptureShim(
         delegate=SourceKlaviyo(),
         oauth2=None,
-        schema_inference=False,
+        schema_inference=True,
     ).serve()
 )
