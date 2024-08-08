@@ -313,8 +313,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		var t reflect.Type
 		var format string
 		var jsonType string
-		var isInteger = dataScale.Valid && dataScale.Int16 == 0
-		if dataType == "NUMBER" && (isInteger || isPrimaryKey) {
+		var isInteger = dataScale.Int16 == 0
+		if dataType == "NUMBER" && isInteger {
 			if precision <= 18 {
 				t = reflect.TypeFor[int64]()
 				jsonType = "integer"
@@ -365,6 +365,9 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		if isPrimaryKey {
 			var streamID = sqlcapture.JoinStreamID(sc.TableSchema, sc.TableName)
+			if format == "number" {
+				return nil, nil, fmt.Errorf("floating point numbers cannot be primary keys: %s.%s", streamID, sc.Name)
+			}
 
 			pks[streamID] = append(pks[streamID], sc.Name)
 		}

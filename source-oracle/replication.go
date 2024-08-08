@@ -803,6 +803,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 			"totalMessages":        totalMessages,
 			"relevantMessages":     len(msgs),
 			"replicationChunkSize": replicationChunkSize,
+			"offset":               offset,
 		}).Debug("received messages")
 
 		if len(msgs) >= replicationChunkSize || totalMessages < replicationChunkSize {
