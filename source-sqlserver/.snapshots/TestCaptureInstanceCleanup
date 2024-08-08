@@ -46,4 +46,4 @@
 # ================================
 {"bindingStateV1":{"dbo%2Ftest_CaptureInstanceCleanup_71329622":{"backfilled":0,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 
-# Capture Instance Contained 40 Rows At Finish
+# Capture Instance Contained 4 Rows At Finish

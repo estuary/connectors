@@ -827,8 +827,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 		"count":  count,
 		"cursor": cursor,
 	}).Debug("acknowledged up to cursor")
-	replStream.Acknowledge(ctx, cursor)
-	return nil
+	return replStream.Acknowledge(ctx, cursor)
 }
 
 type StreamID = string
