@@ -307,16 +307,21 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 }
 
 func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) error {
+	// If the user hasn't requested automatic change table cleanup, do nothing
+	if !rs.cfg.Advanced.AutomaticChangeTableCleanup {
+		return nil
+	}
+
+	// Read the latest cleanup metadata
+	rs.cleanup.RLock()
+	var ackedLSN = rs.cleanup.ackLSN
+	rs.cleanup.RUnlock()
+
 	// Query the start LSN of every capture instance
 	var instanceMinLSNs, err = cdcGetInstanceMinLSNs(ctx, rs.conn)
 	if err != nil {
 		return fmt.Errorf("error querying capture instance start LSNs: %w", err)
 	}
-
-	// Figure out what the latest acknowledged LSN is
-	rs.cleanup.RLock()
-	var ackedLSN = rs.cleanup.ackLSN
-	rs.cleanup.RUnlock()
 
 	// Make a list of capture instances which can be usefully cleaned up
 	var cleanupInstances []string
@@ -335,10 +340,7 @@ func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) e
 	for _, instanceName := range cleanupInstances {
 		var instanceName = instanceName // Copy to avoid loop+closure issues
 		workers.Go(func() error {
-			if err := cdcCleanupChangeTable(workerContext, rs.conn, instanceName, ackedLSN); err != nil {
-				return fmt.Errorf("error cleaning change table %q: %w", instanceName, err)
-			}
-			return nil
+			return cdcCleanupChangeTable(workerContext, rs.conn, instanceName, ackedLSN)
 		})
 	}
 	if err := workers.Wait(); err != nil {
@@ -580,22 +582,11 @@ func cdcGetInstanceMinLSNs(ctx context.Context, conn *sql.DB) (map[string]LSN, e
 }
 
 func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName string, belowLSN LSN) error {
-	log.WithFields(log.Fields{
-		"instance": instanceName,
-		"lsn":      fmt.Sprintf("%X", belowLSN),
-	}).Debug("cleaning change table")
+	log.WithFields(log.Fields{"instance": instanceName, "lsn": fmt.Sprintf("%X", belowLSN)}).Debug("cleaning change table")
 
-	var query = new(strings.Builder)
-	fmt.Fprintf(query, "BEGIN DECLARE @retcode AS INT = 0; ")
-	fmt.Fprintf(query, "EXEC @retcode = sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = 0x%X; ", belowLSN)
-	fmt.Fprintf(query, "SELECT @retcode; END")
-
-	var retcode int
-	if err := conn.QueryRowContext(ctx, query.String(), instanceName).Scan(&retcode); err != nil {
-		return fmt.Errorf("error executing CDC cleanup on instance %q below LSN %X: %w", instanceName, belowLSN, err)
-	}
-	if retcode != 0 {
-		return fmt.Errorf("error executing CDC cleanup on instance %q below LSN %X: return code %d", instanceName, belowLSN, retcode)
+	var query = fmt.Sprintf("EXEC sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = 0x%X; ", belowLSN)
+	if _, err := conn.ExecContext(ctx, query, instanceName); err != nil {
+		return fmt.Errorf("error cleaning capture instance %q below LSN %X: %w", instanceName, belowLSN, err)
 	}
 	return nil
 }
