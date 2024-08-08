@@ -270,7 +270,11 @@ func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error)
 		if colType.format == "integer" {
 			// prepend zeros so that string represented numbers are lexicographically consistent
 			var leadingZeros = strings.Repeat("0", int(colType.precision)-len(key))
-			key = leadingZeros + key
+			if key[0] == '-' {
+				key = "-" + leadingZeros + key[1:]
+			} else {
+				key = leadingZeros + key
+			}
 		}
 		return key, nil
 	default:

@@ -731,7 +731,11 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 				return nil, err
 			}
 
-			s.lastTxnEndSCN = msg.SCN + 1
+			// Although the query is inclusive, we do not +1 here since
+			// it is possible for there to be multiple rows with the same SCN
+			// and to be cautious we use the SCN as-is. This may lead to duplicate events being captured
+			// on restart, but it saves us from missing events
+			s.lastTxnEndSCN = msg.SCN
 
 			if undoSql.Valid {
 				msg.UndoSQL = undoSql.String
