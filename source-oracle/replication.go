@@ -311,8 +311,6 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			}
 		}
 
-		// In the absence of a buffered message, go try to receive another from
-		// the database.
 		msgs, err := s.receiveMessages(ctx)
 		if err != nil {
 			return fmt.Errorf("receive messages: %w", err)
@@ -698,10 +696,9 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var query = fmt.Sprintf(`SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS
+	var query = `SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND
-    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
-    FETCH NEXT %d ROWS ONLY`, s.db.config.Advanced.BackfillChunkSize)
+    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')`
 
 	var rows, err = s.conn.QueryContext(ctx, query, s.lastTxnEndSCN)
 
@@ -711,7 +708,9 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 	defer rows.Close()
 
 	var msgs []logminerMessage
+	var counter = 0
 	for rows.Next() {
+		counter++
 		var lastMsg *logminerMessage
 
 		if len(msgs) > 0 {
@@ -789,6 +788,10 @@ func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMess
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"count": counter,
+	}).Debug("received messages")
 
 	return msgs, nil
 }
