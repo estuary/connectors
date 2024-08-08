@@ -84,10 +84,6 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		lastTxnEndSCN: startSCN,
 	}
 
-	if err = stream.startLogminer(ctx, startSCN); err != nil {
-		return nil, fmt.Errorf("starting logminer: %w", err)
-	}
-
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.keyColumns = make(map[string][]string)
 	stream.tables.discovery = make(map[string]*sqlcapture.DiscoveryInfo)
@@ -96,11 +92,18 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 
 func (s *replicationStream) endLogminer(ctx context.Context) error {
 	if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.END_LOGMNR; END;"); err != nil {
+		// ORA-01307: no LogMiner session is currently active
+		if strings.Contains(err.Error(), "ORA-01307") {
+			return nil
+		}
 		return fmt.Errorf("ending logminer session: %w", err)
 	}
 
 	return nil
 }
+
+// We process a maximum number of files for each run to avoid timeouts when querying from logminer
+const maxLogFilesSession = 40
 
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error {
 	logrus.WithField("startSCN", startSCN).Debug("adding log files")
@@ -128,7 +131,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     A.NAME NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) AND DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
-	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
+	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + fmt.Sprintf(" ORDER BY SEQUENCE# FETCH NEXT %d ROWS ONLY", maxLogFilesSession)
 	rows, err := s.conn.QueryContext(ctx, fullQuery, startSCN)
 	if err != nil {
 		return fmt.Errorf("fetching log file list: %w", err)
@@ -377,7 +380,7 @@ func decodeUnistr(input string) (string, error) {
 
 // decode SQL values extracted from the sql queries returned by logminer and parsed by sqlparser, into values
 // to be used in the document
-func decodeValue(colInfo sqlcapture.ColumnInfo, expr sqlparser.Expr, colName string, originalSql string) (any, error) {
+func decodeValue(expr sqlparser.Expr) (any, error) {
 	switch v := expr.(type) {
 	case *sqlparser.Literal:
 		return v.Val, nil
@@ -410,12 +413,11 @@ func decodeValue(colInfo sqlcapture.ColumnInfo, expr sqlparser.Expr, colName str
 		// Used for DATE values
 		case "TO_DATE":
 			var val = v.Exprs[0].(*sqlparser.Literal).Val
-			if t, err := time.Parse(PARSE_DATE_FORMAT, val); err != nil {
+			t, err := time.Parse(PARSE_DATE_FORMAT, val)
+			if err != nil {
 				return nil, fmt.Errorf("invalid date %q: %w", val, err)
-			} else {
-				return t.Format(OUT_DATE_FORMAT), nil
 			}
-			return val, nil
+			return t.Format(OUT_DATE_FORMAT), nil
 		case "TO_TIMESTAMP":
 			var val = v.Exprs[0].(*sqlparser.Literal).Val
 
@@ -469,23 +471,23 @@ func decodeValue(colInfo sqlcapture.ColumnInfo, expr sqlparser.Expr, colName str
 }
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
-	var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
+	var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return nil, err
 	}
-	ast, err := parser.Parse(msg.sql)
+	ast, err := parser.Parse(msg.SQL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sql query %q: %w", msg.sql, err)
+		return nil, fmt.Errorf("parsing sql query %q: %w", msg.SQL, err)
 	}
-	undoAST, err := parser.Parse(msg.undoSql)
+	undoAST, err := parser.Parse(msg.UndoSQL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing undo sql query %q: %w", msg.undoSql, err)
+		return nil, fmt.Errorf("parsing undo sql query %q: %w", msg.UndoSQL, err)
 	}
 	var after, before map[string]any
 
 	var op sqlcapture.ChangeOp
-	switch msg.op {
+	switch msg.Op {
 	case opInsert:
 		after = make(map[string]any)
 		op = sqlcapture.InsertOp
@@ -504,7 +506,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		for i, col := range insert.Columns {
 			var key = col.String()
 
-			value, err := decodeValue(s.tables.discovery[streamID].Columns[key], vs[i], col.String(), msg.sql)
+			value, err := decodeValue(vs[i])
 			if err != nil {
 				return nil, fmt.Errorf("decoding value %s=%v: %w", key, values[0][i], err)
 			}
@@ -597,7 +599,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			return true, nil
 		})
 	default:
-		return nil, fmt.Errorf("unexpected operation code %d", msg.op)
+		return nil, fmt.Errorf("unexpected operation code %d", msg.Op)
 	}
 
 	discovery, ok := s.tables.discovery[streamID]
@@ -642,12 +644,12 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 
 	var sourceInfo = &oracleSource{
 		SourceCommon: sqlcapture.SourceCommon{
-			Millis:   msg.ts,
-			Schema:   msg.owner,
+			Millis:   msg.Timestamp,
+			Schema:   msg.Owner,
 			Snapshot: false,
-			Table:    msg.tableName,
+			Table:    msg.TableName,
 		},
-		SCN:   msg.startSCN,
+		SCN:   msg.SCN,
 		RowID: rowid,
 	}
 
@@ -659,8 +661,6 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		After:     after,
 	}
 
-	s.lastTxnEndSCN = msg.startSCN + 1
-
 	return event, nil
 }
 
@@ -671,19 +671,21 @@ func unquote(s string) string {
 }
 
 type logminerMessage struct {
-	startSCN  int
-	endSCN    int
-	op        int
-	sql       string
-	undoSql   string
-	tableName string
-	owner     string
-	ts        int64
-	status    int
-	info      string
-	rsID      string
-	ssn       int
-	csf       int
+	SCN          int
+	EndSCN       int
+	Op           int
+	SQL          string
+	UndoSQL      string
+	TableName    string
+	Owner        string
+	Timestamp    int64
+	Status       int
+	Info         string
+	RSID         string
+	SSN          int
+	CSF          int
+	ObjectID     int
+	DataObjectID int
 }
 
 const (
@@ -696,104 +698,115 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) ([]logminerMessage, error) {
-	var query = `SELECT START_SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF FROM V$LOGMNR_CONTENTS
-    WHERE OPERATION_CODE IN (1, 2, 3) AND START_SCN >= :scn AND
-    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')`
-
-	var rows, err = s.conn.QueryContext(ctx, query, s.lastTxnEndSCN)
-
-	if err != nil {
-		return nil, fmt.Errorf("logminer query: %w", err)
-	}
-	defer rows.Close()
-
 	var msgs []logminerMessage
-	var counter = 0
-	for rows.Next() {
-		counter++
-		var lastMsg *logminerMessage
+	var replicationChunkSize = s.db.config.Advanced.IncrementalChunkSize
+	var offset = 0
 
-		if len(msgs) > 0 {
-			lastMsg = &msgs[len(msgs)-1]
+	for {
+		var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
+      FROM V$LOGMNR_CONTENTS
+      WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
+      SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
+      OFFSET %d ROWS FETCH NEXT %d ROWS ONLY`, offset, replicationChunkSize)
+		var rows, err = s.conn.QueryContext(ctx, query, s.lastTxnEndSCN)
+		if err != nil {
+			return nil, fmt.Errorf("logminer query: %w", err)
+		}
+		defer rows.Close()
+
+		var totalMessages = 0
+		for rows.Next() {
+			totalMessages++
+			var lastMsg *logminerMessage
+
+			if len(msgs) > 0 {
+				lastMsg = &msgs[len(msgs)-1]
+			}
+
+			var msg logminerMessage
+			var ts time.Time
+			var undoSql sql.NullString
+			var info sql.NullString
+			if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &msg.SQL, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
+				return nil, err
+			}
+
+			s.lastTxnEndSCN = msg.SCN + 1
+
+			if undoSql.Valid {
+				msg.UndoSQL = undoSql.String
+			}
+
+			if info.Valid {
+				msg.Info = info.String
+			}
+			msg.Timestamp = ts.UnixMilli()
+
+			logrus.WithFields(logrus.Fields{
+				"msg": msg,
+			}).Trace("received message")
+
+			// last message indicated a continuation of SQL_REDO and SQL_UNDO values
+			// so this row's sqls will be appended to the last
+			if lastMsg != nil && lastMsg.CSF == 1 {
+				// sanity check the (SSN, RSID) tuple matches between the rows
+				if lastMsg.SSN != msg.SSN || lastMsg.RSID != msg.RSID {
+					return nil, fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.SSN, lastMsg.RSID, msg.SSN, msg.RSID)
+				}
+				lastMsg.SQL += msg.SQL
+				lastMsg.UndoSQL += msg.UndoSQL
+				lastMsg.CSF = msg.CSF
+				continue
+			}
+
+			// If this change event is on a table we're not capturing, skip doing any
+			// further processing on it.
+			var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
+			if !s.tableActive(streamID) {
+				var isKnownTable = false
+				// conditions for tables that has been dropped, check their object identifier against discovered tables
+				if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
+					if _, ok := s.db.tableObjectMapping[joinObjectID(msg.ObjectID, msg.DataObjectID)]; ok {
+						// This is a known table to us, a dictionary mismatch on this row is an error
+						isKnownTable = true
+					}
+				}
+
+				if !isKnownTable {
+					continue
+				}
+			}
+
+			// If logminer can't find the dictionary for a SQL statement (e.g. if using online mode and a schema change has occurred)
+			// then we get SQL statements like this:
+			// insert into "UNKNOWN"."OBJ# 45522"("COL 1","COL 2","COL 3","COL 4") values (HEXTORAW('45465f4748'),HEXTORAW('546563686e6963616c20577269746572'), HEXTORAW('c229'),HEXTORAW('c3020b'));
+			// we additionally get status=2 for these records. Status 2 means the SQL statement is not valid for redoing.
+			// Some versions of Oracle report STATUS=2 for LONG column types, but have an empty info column, whereas when
+			// status=2 and there is some reason for the error in the info column (usually "Dictionary Mismatch") we consider
+			// the case to be one of dictionary mismatch
+			if msg.Status == 2 && msg.Info != "" {
+				return nil, fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.Info, msg.TableName, msg.SQL)
+			}
+
+			msgs = append(msgs, msg)
 		}
 
-		var msg logminerMessage
-		var ts time.Time
-		var undoSql sql.NullString
-		var info sql.NullString
-		if err := rows.Scan(&msg.startSCN, &ts, &msg.op, &msg.sql, &undoSql, &msg.tableName, &msg.owner, &msg.status, &info, &msg.rsID, &msg.ssn, &msg.csf); err != nil {
+		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		if undoSql.Valid {
-			msg.undoSql = undoSql.String
+
+		logrus.WithFields(logrus.Fields{
+			"totalMessages":        totalMessages,
+			"relevantMessages":     len(msgs),
+			"replicationChunkSize": replicationChunkSize,
+		}).Debug("received messages")
+
+		if len(msgs) >= replicationChunkSize || totalMessages < replicationChunkSize {
+			return msgs, nil
 		}
 
-		if info.Valid {
-			msg.info = info.String
-		}
-		msg.ts = ts.UnixMilli()
-
-		if logrus.IsLevelEnabled(logrus.TraceLevel) {
-			logrus.WithFields(logrus.Fields{
-				"sql":       msg.sql,
-				"undoSql":   msg.undoSql,
-				"op":        msg.op,
-				"tableName": msg.tableName,
-				"owner":     msg.owner,
-				"ts":        msg.ts,
-				"status":    msg.status,
-				"info":      msg.info,
-				"startSCN":  msg.startSCN,
-				"endSCN":    msg.endSCN,
-				"ssn":       msg.ssn,
-				"rsid":      msg.rsID,
-				"csf":       msg.csf,
-			}).Trace("received message")
-		}
-
-		// last message indicated a continuation of SQL_REDO and SQL_UNDO values
-		// so this row's sqls will be appended to the last
-		if lastMsg != nil && lastMsg.csf == 1 {
-			// sanity check the (SSN, RSID) tuple matches between the rows
-			if lastMsg.ssn != msg.ssn || lastMsg.rsID != msg.rsID {
-				return nil, fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.ssn, lastMsg.rsID, msg.ssn, msg.rsID)
-			}
-			lastMsg.sql += msg.sql
-			lastMsg.undoSql += msg.undoSql
-			lastMsg.csf = msg.csf
-			continue
-		}
-
-		// If this change event is on a table we're not capturing, skip doing any
-		// further processing on it.
-		var streamID = sqlcapture.JoinStreamID(msg.owner, msg.tableName)
-		if !s.tableActive(streamID) {
-			continue
-		}
-
-		// If logminer can't find the dictionary for a SQL statement (e.g. if using online mode and a schema change has occurred)
-		// then we get SQL statements like this:
-		// insert into "UNKNOWN"."OBJ# 45522"("COL 1","COL 2","COL 3","COL 4") values (HEXTORAW('45465f4748'),HEXTORAW('546563686e6963616c20577269746572'), HEXTORAW('c229'),HEXTORAW('c3020b'));
-		// we additionally get status=2 for these records. Status 2 means the SQL statement is not valid for redoing.
-		// Some versions of Oracle report STATUS=2 for LONG column types, but have an empty info column, whereas when
-		// status=2 and there is some reason for the error in the info column (usually "Dictionary Mismatch") we consider
-		// the case to be one of dictionary mismatch
-		if msg.status == 2 && msg.info != "" {
-			return nil, fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.info, msg.tableName, msg.sql)
-		}
-
-		msgs = append(msgs, msg)
+		offset += totalMessages
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"count": counter,
-	}).Debug("received messages")
-
-	return msgs, nil
 }
 
 func (s *replicationStream) tableActive(streamID string) bool {

@@ -96,12 +96,13 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	SkipBackfills     string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	WatermarksTable   string   `json:"watermarksTable,omitempty" jsonschema:"default=USER.FLOW_WATERMARKS,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
-	NodeID            uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
-	DictionaryMode    string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to extract.,enum=extract,enum=online"`
+	SkipBackfills        string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	WatermarksTable      string   `json:"watermarksTable,omitempty" jsonschema:"default=USER.FLOW_WATERMARKS,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=1000,description=The number of rows which should be fetched from the database in a single incremental query."`
+	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
+	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to extract.,enum=extract,enum=online"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -140,6 +141,9 @@ func (c *Config) SetDefaults(name string) {
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
+	}
+	if c.Advanced.IncrementalChunkSize <= 0 {
+		c.Advanced.IncrementalChunkSize = 1000
 	}
 
 	if c.Advanced.NodeID == 0 {
@@ -194,12 +198,13 @@ func configSchema() json.RawMessage {
 }
 
 type oracleDatabase struct {
-	config          *Config
-	conn            *sql.DB
-	tunnel          *networkTunnel.SshTunnel
-	explained       map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
-	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
-	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
+	config             *Config
+	conn               *sql.DB
+	tunnel             *networkTunnel.SshTunnel
+	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
+	tablesPublished    map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
+	tableObjectMapping map[string]sqlcapture.StreamID   // A mapping from objectID.dataObjectID to streamID
 }
 
 func (db *oracleDatabase) isRDS() bool {
