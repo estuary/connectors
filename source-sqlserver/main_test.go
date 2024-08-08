@@ -332,7 +332,7 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 			})
 			time.Sleep(1 * time.Second)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(cdcCleanupInterval + 2*time.Second)
 		trafficDone.Store(true)
 	}(trafficCtx)
 
