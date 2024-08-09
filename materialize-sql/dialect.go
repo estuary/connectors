@@ -111,7 +111,7 @@ var _ = Dialect{
 	Placeholderer:   PlaceholderFn(func(index int) string { return "" }),
 	Literaler:       LiteralFn(func(s string) string { return "" }),
 	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
-	TypeMapper:      &NullableMapper{},
+	TypeMapper:      DDLMapper{},
 	ColumnValidator: ColumnValidator{},
 }
 
