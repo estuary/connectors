@@ -253,6 +253,14 @@ func newTransactor(
 		return nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
 
+	// Override statement_timeout with a session-level setting to never timeout
+	// statements.
+	if _, err := d.load.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
+		return nil, fmt.Errorf("load set statement_timeout: %w", err)
+	} else if _, err := d.store.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
+		return nil, fmt.Errorf("store set statement_timeout: %w", err)
+	}
+
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)

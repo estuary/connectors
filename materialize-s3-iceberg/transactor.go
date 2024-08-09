@@ -218,7 +218,11 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue // no data for this binding
 		}
 
-		ll := log.WithField("table", pathToFQN(b.path))
+		ll := log.WithFields(log.Fields{
+			"table":             pathToFQN(b.path),
+			"previousCheckoint": state.PreviousCheckpoint,
+			"currentCheckpoint": state.CurrentCheckpoint,
+		})
 
 		ll.Info("starting appendFiles for table")
 		if err := t.catalog.appendFiles(b.path, state.FilePaths, state.PreviousCheckpoint, state.CurrentCheckpoint); err != nil {

@@ -485,8 +485,8 @@ func TestCaptureOversizedFields(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = new(st.ChecksumValidator)
 
-	var largeText = strings.Repeat("data", 4194304)         // 16MiB string
-	var largeJSON = fmt.Sprintf(`{"text":"%s"}`, largeText) // ~16MiB JSON object
+	var largeText = strings.Repeat("data", 4194304)          // 16MiB string
+	var largeJSON = fmt.Sprintf(`{"text": "%s"}`, largeText) // ~16MiB JSON object
 	tb.Insert(ctx, t, tableName, [][]any{
 		{0, largeText, []byte(largeText), largeJSON, largeJSON},
 		{1, largeText, []byte(largeText), largeJSON, largeJSON},

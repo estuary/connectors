@@ -16,9 +16,11 @@ Binding 0:
           "properties": {
             "logdate": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "description": "(source type: non-nullable date)"
             },
             "value": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"

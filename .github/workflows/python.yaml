@@ -20,6 +20,7 @@ on:
       - "source-klaviyo/**"
       - "source-recharge/**"
       - "source-stripe-native/**"
+      - "source-zendesk-support/**"
       - "source-iterable/**"
   pull_request:
     branches: [main]
@@ -42,6 +43,7 @@ on:
       - "source-klaviyo/**"
       - "source-recharge/**"
       - "source-stripe-native/**"
+      - "source-zendesk-support/**"
       - "source-iterable/**"
 
 concurrency:
@@ -117,6 +119,10 @@ jobs:
           - name: source-stripe-native
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-zendesk-support
+            type: capture
+            version: v2
             usage_rate: "1.0"
           - name: source-iterable
             type: capture

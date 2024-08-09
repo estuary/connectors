@@ -1,0 +1,21 @@
+aws_access_key_id_sops: ENC[AES256_GCM,data:/oA/7d65KFw1riN4GWnKvOrVkQE=,iv:3Atq33S2DFf8I0MFXaDLtBjy86J0RFUikwRyNa8Y76I=,tag:BlJ3aIT+LYcKEbBv0P7yDw==,type:str]
+aws_secret_access_key_sops: ENC[AES256_GCM,data:KZXuhZM//ohrHRgR8CwcP7icYRHhFpkd2jBoAZl7CYyDU+5v67Ph2g==,iv:ZyOXVJD17oE2bAJhk+D/Y8OXpBQTqBUlu+TASvn2PvE=,tag:Su5/HkbCS84TtUPvHc5Iug==,type:str]
+bucket: estuary-iceberg-test
+region: us-east-2
+prefix: test-data
+namespace: iceberg-test
+upload_interval: PT5M
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-07-10T20:22:33Z"
+    mac: ENC[AES256_GCM,data:crPG9r9KWvYlJl9vlnLv1PH1oUwq5SIXXEy6jkwgQlwCSrMRfj9tQh9ja2ZQ68UERORNWlYQA0O1sfcJ0ETip1t6kQtcyMrZDfTdOQcLis57RkP9Y5KK8RTgHnRyIle4P+cabPIeEJ4FGusrymvkv6aNGgk0f++Qk6i4Ajag2ew=,iv:lI1xXqmQbZBqkzEc5LdZWhFtH17s3UlWIuMjVcfS9SU=,tag:IUBHTMC6qk1cBLfif6tcfA==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1

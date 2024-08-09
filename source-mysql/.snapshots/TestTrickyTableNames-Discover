@@ -15,10 +15,12 @@ Binding 0:
           "$anchor": "TestUsErS!@#$",
           "properties": {
             "data": {
-              "type": "string"
+              "type": "string",
+              "description": "(source type: non-nullable text)"
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             }
           }
         }

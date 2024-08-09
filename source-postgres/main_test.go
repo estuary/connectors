@@ -15,8 +15,8 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/estuary/flow/go/protocols/flow"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -63,7 +63,7 @@ func postgresTestBackend(t testing.TB) *testBackend {
 		"user": *dbControlUser,
 		"addr": *dbAddress,
 	}).Info("opening control connection")
-	var pool, err = pgxpool.Connect(ctx, controlURI)
+	var pool, err = pgxpool.New(ctx, controlURI)
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 

@@ -211,7 +211,18 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, cerrors.NewUserError(nil, errs.Error())
 	}
 
-	catalog := newGlueCatalog(cfg, req.LastMaterialization)
+	var resources []resource
+	var resourcePaths [][]string
+	for _, binding := range req.Bindings {
+		res := newResource(cfg)
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+		resources = append(resources, res)
+		resourcePaths = append(resourcePaths, res.path())
+	}
+
+	catalog := newGlueCatalog(cfg, resourcePaths, req.LastMaterialization)
 
 	is, err := catalog.infoSchema()
 	if err != nil {
@@ -223,11 +234,8 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	validator := boilerplate.NewValidator(icebergConstrainter{}, is, 255, true)
 
 	var out []*pm.Response_Validated_Binding
-	for _, binding := range req.Bindings {
-		res := newResource(cfg)
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
+	for idx, binding := range req.Bindings {
+		res := resources[idx]
 
 		constraints, err := validator.ValidateBinding(
 			res.path(),
@@ -257,7 +265,12 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	catalog := newGlueCatalog(cfg, req.LastMaterialization)
+	var resourcePaths [][]string
+	for _, b := range req.Materialization.Bindings {
+		resourcePaths = append(resourcePaths, b.ResourcePath)
+	}
+
+	catalog := newGlueCatalog(cfg, resourcePaths, req.LastMaterialization)
 
 	existingNamespaces, err := catalog.listNamespaces()
 	if err != nil {
@@ -292,6 +305,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		return nil, nil, fmt.Errorf("unmarshalling endpoint config: %w", err)
 	}
 
+	var resourcePaths [][]string
 	var bindings []binding
 	for _, b := range open.Materialization.Bindings {
 		res := newResource(cfg)
@@ -299,6 +313,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 			return nil, nil, fmt.Errorf("unmarshalling resource config: %w", err)
 		}
 
+		resourcePaths = append(resourcePaths, res.path())
 		bindings = append(bindings, binding{
 			path:       b.ResourcePath,
 			pqSchema:   schemaWithOptions(b.FieldSelection.AllFields(), b.Collection),
@@ -323,7 +338,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	}
 
 	return &transactor{
-		catalog:        newGlueCatalog(cfg, open.Materialization),
+		catalog:        newGlueCatalog(cfg, resourcePaths, open.Materialization),
 		bindings:       bindings,
 		bucket:         cfg.Bucket,
 		prefix:         cfg.Prefix,

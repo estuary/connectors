@@ -82,6 +82,12 @@
             "type": "array",
             "title": "Discovery Schema Selection",
             "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+          },
+          "min_backfill_xid": {
+            "type": "string",
+            "title": "Minimum Backfill XID",
+            "description": "Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases.",
+            "pattern": "^[0-9]+$"
           }
         },
         "additionalProperties": false,

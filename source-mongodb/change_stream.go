@@ -32,7 +32,12 @@ func makeEventDocument(ev changeEvent, resourceBindingInfo map[string]bindingInf
 	}
 
 	var doc map[string]any
-	meta := make(map[string]any)
+	meta := map[string]any{
+		sourceProperty: sourceMeta{
+			DB:         binding.resource.Database,
+			Collection: binding.resource.Collection,
+		},
+	}
 	if ev.FullDocumentBeforeChange != nil {
 		meta[beforeProperty] = ev.FullDocumentBeforeChange
 	}
@@ -126,6 +131,7 @@ func (c *capture) initializeStreams(
 				"ns":                       1,
 				"clusterTime":              1,
 				"fullDocumentBeforeChange": 1,
+				"splitEvent":               1,
 			}}},
 		}
 
@@ -150,6 +156,7 @@ func (c *capture) initializeStreams(
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
 		if requestPreImages {
 			opts = opts.SetFullDocumentBeforeChange(options.WhenAvailable)
+			pl = append(pl, bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}) // must be the last stage in the pipeline
 		}
 
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
@@ -280,9 +287,23 @@ func (c *capture) tryStream(
 ) error {
 	for s.ms.TryNext(ctx) {
 		var ev changeEvent
-		if err := s.ms.Decode(&ev); err != nil {
-			return fmt.Errorf("change stream decoding document: %w", err)
-		} else if err := c.handleEvent(ev, s.db, s.ms.ResumeToken()); err != nil {
+
+		splitRaw := s.ms.Current.Lookup("splitEvent")
+		if !splitRaw.IsZero() {
+			// This change event is split across multiple change stream event
+			// "fragments". Each of the fragments in the sequence must be read
+			// and combined.
+			if err := readFragments(ctx, s, &ev); err != nil {
+				return fmt.Errorf("assembling event from change stream event segments: %w", err)
+			}
+		} else {
+			// This change event is not split.
+			if err := s.ms.Decode(&ev); err != nil {
+				return fmt.Errorf("change stream decoding document: %w", err)
+			}
+		}
+
+		if err := c.handleEvent(ev, s.db, s.ms.ResumeToken()); err != nil {
 			return err
 		}
 
@@ -325,6 +346,44 @@ func (c *capture) tryStream(
 	c.mu.Lock()
 	c.state.DatabaseResumeTokens[s.db] = tok
 	c.mu.Unlock()
+
+	return nil
+}
+
+type splitEvent struct {
+	Fragment int `bson:"fragment"`
+	Of       int `bson:"of"`
+}
+
+func readFragments(
+	ctx context.Context,
+	s changeStream,
+	ev *changeEvent,
+) error {
+	// Fragments are repeatedly unmarshalled into a single change event since no
+	// two fragments have overlapping top-level properties - MongoDB only splits
+	// on top-level document fields.
+	lastFragment := 0
+	for {
+		// Upon entering this loop, the change stream must already have been
+		// advanced to a split change event. For the duration of the loop it is
+		// an error if an event is not split, since we only want to read to
+		// "end" of the current set of fragments.
+		var se splitEvent
+		if splitRaw, err := s.ms.Current.LookupErr("splitEvent"); err != nil {
+			return fmt.Errorf("finding splitEvent in document fragment: %w", err)
+		} else if err := splitRaw.Unmarshal(&se); err != nil {
+			return err
+		} else if lastFragment += 1; lastFragment != se.Fragment { // cheap sanity check
+			return fmt.Errorf("expected fragment %d but got %d", lastFragment, se.Fragment)
+		} else if err := s.ms.Decode(ev); err != nil {
+			return fmt.Errorf("decoding fragment: %w", err)
+		} else if se.Fragment == se.Of { // done reading fragments
+			break
+		} else if !s.ms.Next(ctx) { // advance to the next fragment, blocking until it is available (note: TryNext cannot be used)
+			return fmt.Errorf("advancing change stream: %w", s.ms.Err())
+		}
+	}
 
 	return nil
 }

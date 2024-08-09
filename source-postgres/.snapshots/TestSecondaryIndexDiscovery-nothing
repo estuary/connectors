@@ -13,22 +13,26 @@ Binding 0:
           "$anchor": "TestSecondaryindexdiscovery_nothing_g14307",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "k1": {
+              "description": "(source type: int4)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "k2": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "k3": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
