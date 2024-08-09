@@ -39,8 +39,42 @@ var schemaOptions = []enc.ParquetSchemaOption{
 	enc.WithParquetUUIDAsString(),
 }
 
-func schemaWithOptions(fields []string, collection pf.CollectionSpec) enc.ParquetSchema {
-	return enc.FieldsToParquetSchema(fields, collection, schemaOptions...)
+type fieldConfig struct {
+	// IgnoreStringFormat can be set to true to indicate that the field should
+	// be materialized as a string, disregarding any format annotations.
+	IgnoreStringFormat bool `json:"ignoreStringFormat"`
+}
+
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (enc.ParquetSchema, error) {
+	out := []enc.ParquetSchemaElement{}
+
+	for _, f := range fields {
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fieldConfigJsonMap[f])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+
+	return out, nil
+}
+
+func projectionToParquetSchemaElement(p pf.Projection, rawFieldConfig json.RawMessage) (enc.ParquetSchemaElement, error) {
+	if rawFieldConfig != nil {
+		var parsedFieldConfig fieldConfig
+		if err := json.Unmarshal(rawFieldConfig, &parsedFieldConfig); err != nil {
+			return enc.ParquetSchemaElement{}, err
+		}
+
+		if parsedFieldConfig.IgnoreStringFormat {
+			if p.Inference.String_ == nil {
+				return enc.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
+			}
+			p.Inference.String_.Format = ""
+		}
+	}
+
+	return enc.ProjectionToParquetSchemaElement(p, schemaOptions...), nil
 }
 
 func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
@@ -110,14 +144,22 @@ func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *
 }
 
 func (icebergConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
-	s := enc.ProjectionToParquetSchemaElement(*proposed, schemaOptions...)
+	s, err := projectionToParquetSchemaElement(*proposed, fc)
+	if err != nil {
+		return false, err
+	}
+
 	t := parquetTypeToIcebergType(s.DataType)
 
 	return strings.EqualFold(existing.Type, string(t)), nil
 }
 
 func (icebergConstrainter) DescriptionForType(p *pf.Projection, fc json.RawMessage) (string, error) {
-	s := enc.ProjectionToParquetSchemaElement(*p, schemaOptions...)
+	s, err := projectionToParquetSchemaElement(*p, fc)
+	if err != nil {
+		return "", err
+	}
+
 	t := parquetTypeToIcebergType(s.DataType)
 
 	return string(t), nil
