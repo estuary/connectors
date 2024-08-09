@@ -2,78 +2,17 @@
   {
     "documentSchema": {
       "properties": {
-        "createdAt": {
-          "type": [
-            "null",
-            "integer"
-          ]
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
         },
-        "id": {
-          "type": "integer"
-        },
-        "listType": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "lists",
-    "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
-      "stream": "lists",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "properties": {
-        "email": {
-          "type": "string"
-        },
-        "listId": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "email",
-        "listId"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/email",
-      "/listId"
-    ],
-    "recommendedName": "list_users",
-    "resourceConfig": {
-      "cursorField": [
-        "email",
-        "listId"
-      ],
-      "stream": "list_users",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "properties": {
         "campaignState": {
           "type": [
             "null",
@@ -183,19 +122,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "campaigns",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "campaigns",
       "syncMode": "full_refresh"
     }
@@ -203,6 +137,58 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "data": {
+          "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "id": {
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns_metrics",
+    "resourceConfig": {
+      "stream": "campaigns_metrics",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "channelType": {
           "type": [
             "null",
@@ -225,19 +211,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "channels",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "channels",
       "syncMode": "full_refresh"
     }
@@ -245,6 +226,68 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "listType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "lists",
+    "resourceConfig": {
+      "stream": "lists",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "channelId": {
           "type": [
             "null",
@@ -261,19 +304,14 @@
           ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/id"
     ],
     "recommendedName": "message_types",
     "resourceConfig": {
-      "cursorField": [
-        "id"
-      ],
       "stream": "message_types",
       "syncMode": "full_refresh"
     }
@@ -281,23 +319,29 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "name": {
           "type": "string"
         }
       },
-      "required": [
-        "name"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/name"
+      "/_meta/row_id"
     ],
     "recommendedName": "metadata",
     "resourceConfig": {
-      "cursorField": [
-        "name"
-      ],
       "stream": "metadata",
       "syncMode": "full_refresh"
     }
@@ -305,6 +349,93 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "clientTemplateId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "creatorUserId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "messageTypeId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/templateId"
+    ],
+    "recommendedName": "templates",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "templates",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "accepts_marketing": {
           "type": [
             "null",
@@ -935,10 +1066,8 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/email"
@@ -955,174 +1084,50 @@
   {
     "documentSchema": {
       "properties": {
-        "_type": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "createdAt": {
-          "format": "date-time",
-          "type": "string"
-        },
-        "data": {
-          "type": [
-            "null",
-            "object"
-          ]
-        },
-        "email": {
-          "type": "string"
-        },
-        "itblInternal": {
+        "_meta": {
           "properties": {
-            "documentCreatedAt": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "documentUpdatedAt": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
-        },
-        "userId": {
-          "type": [
-            "null",
-            "string"
-          ]
-        }
-      },
-      "required": [
-        "email",
-        "createdAt"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/email",
-      "/createdAt"
-    ],
-    "recommendedName": "events",
-    "resourceConfig": {
-      "cursorField": [
-        "email",
-        "createdAt"
-      ],
-      "stream": "events",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "disable": true,
-    "documentSchema": {
-      "properties": {
-        "data": {
-          "properties": {
-            "id": {
+            "row_id": {
               "type": "integer"
             }
           },
           "required": [
-            "id"
+            "row_id"
           ],
           "type": "object"
+        },
+        "email": {
+          "type": "string"
+        },
+        "listId": {
+          "type": "integer"
         }
       },
-      "required": [
-        "data"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/data/id"
+      "/listId"
     ],
-    "recommendedName": "campaigns_metrics",
+    "recommendedName": "list_users",
     "resourceConfig": {
-      "cursorField": [
-        "data/id"
-      ],
-      "stream": "campaigns_metrics",
+      "stream": "list_users",
       "syncMode": "full_refresh"
     }
   },
   {
     "documentSchema": {
       "properties": {
-        "campaignId": {
-          "type": "integer"
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
         },
-        "clientTemplateId": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "createdAt": {
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "creatorUserId": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "messageTypeId": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "templateId": {
-          "type": "number"
-        },
-        "updatedAt": {
-          "type": [
-            "null",
-            "integer"
-          ]
-        }
-      },
-      "required": [
-        "templateId"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/templateId"
-    ],
-    "recommendedName": "templates",
-    "resourceConfig": {
-      "cursorField": [
-        "createdAt"
-      ],
-      "stream": "templates",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "properties": {
         "campaignId": {
           "type": [
             "null",
@@ -1183,11 +1188,8 @@
           ]
         }
       },
-      "required": [
-        "messageId",
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/messageId",
@@ -1205,6 +1207,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "campaignId": {
           "type": [
             "null",
@@ -1313,11 +1326,8 @@
           ]
         }
       },
-      "required": [
-        "messageId",
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/messageId",
@@ -1335,6 +1345,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "campaignId": {
           "type": [
             "null",
@@ -1395,11 +1416,8 @@
           ]
         }
       },
-      "required": [
-        "messageId",
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/messageId",
@@ -1417,6 +1435,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "campaignId": {
           "type": [
             "null",
@@ -1507,11 +1536,8 @@
           ]
         }
       },
-      "required": [
-        "messageId",
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/messageId",
@@ -1529,6 +1555,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "campaignId": {
           "type": [
             "null",
@@ -1755,9 +1792,8 @@
             }
           },
           "type": [
-            "string",
-            "object",
-            "null"
+            "null",
+            "object"
           ]
         },
         "userId": {
@@ -1767,13 +1803,8 @@
           ]
         }
       },
-      "required": [
-        "messageId",
-        "email"
-      ],
-      "type": [
-        "object"
-      ]
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/messageId",
@@ -1791,6 +1822,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "campaignId": {
           "type": [
             "null",
@@ -2029,13 +2071,8 @@
           ]
         }
       },
-      "required": [
-        "messageId",
-        "email"
-      ],
-      "type": [
-        "object"
-      ]
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/messageId",
@@ -2053,6 +2090,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "createdAt": {
           "format": "date-time",
           "type": "string"
@@ -2121,11 +2169,8 @@
           ]
         }
       },
-      "required": [
-        "email",
-        "createdAt"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/email",
@@ -2143,6 +2188,17 @@
   {
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "campaignId": {
           "type": [
             "null",
@@ -2238,10 +2294,8 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
       "/email"
@@ -2256,9 +2310,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2267,10 +2331,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2310,13 +2371,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "push_send",
     "resourceConfig": {
@@ -2328,9 +2388,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2339,10 +2409,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2382,13 +2449,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "push_send_skip",
     "resourceConfig": {
@@ -2400,9 +2466,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2411,10 +2487,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2454,13 +2527,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "push_open",
     "resourceConfig": {
@@ -2472,9 +2544,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2483,10 +2565,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2526,13 +2605,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "push_uninstall",
     "resourceConfig": {
@@ -2544,9 +2622,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2555,10 +2643,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2598,13 +2683,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "push_bounce",
     "resourceConfig": {
@@ -2616,9 +2700,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2627,10 +2721,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2670,13 +2761,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "web_push_send",
     "resourceConfig": {
@@ -2688,9 +2778,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2699,10 +2799,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2742,13 +2839,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "web_push_click",
     "resourceConfig": {
@@ -2760,9 +2856,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2771,10 +2877,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2814,13 +2917,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "web_push_send_skip",
     "resourceConfig": {
@@ -2832,9 +2934,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2843,10 +2955,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2886,13 +2995,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_send",
     "resourceConfig": {
@@ -2904,9 +3012,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2915,10 +3033,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -2958,13 +3073,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_open",
     "resourceConfig": {
@@ -2976,9 +3090,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -2987,10 +3111,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3030,13 +3151,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_click",
     "resourceConfig": {
@@ -3048,9 +3168,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3059,10 +3189,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3102,13 +3229,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_close",
     "resourceConfig": {
@@ -3120,9 +3246,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3131,10 +3267,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3174,13 +3307,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_delete",
     "resourceConfig": {
@@ -3192,9 +3324,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3203,10 +3345,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3246,13 +3385,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_delivery",
     "resourceConfig": {
@@ -3264,9 +3402,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3275,10 +3423,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3318,13 +3463,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "in_app_send_skip",
     "resourceConfig": {
@@ -3336,9 +3480,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3347,10 +3501,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3390,13 +3541,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "inbox_session",
     "resourceConfig": {
@@ -3408,9 +3558,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3419,10 +3579,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3462,13 +3619,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "inbox_message_impression",
     "resourceConfig": {
@@ -3480,9 +3636,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3491,10 +3657,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3534,13 +3697,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "sms_send",
     "resourceConfig": {
@@ -3552,9 +3714,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3563,10 +3735,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3606,13 +3775,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "sms_bounce",
     "resourceConfig": {
@@ -3624,9 +3792,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3635,10 +3813,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3678,13 +3853,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "sms_click",
     "resourceConfig": {
@@ -3696,9 +3870,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3707,10 +3891,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3750,13 +3931,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "sms_received",
     "resourceConfig": {
@@ -3768,9 +3948,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3779,10 +3969,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3822,13 +4009,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "sms_send_skip",
     "resourceConfig": {
@@ -3840,9 +4026,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3851,10 +4047,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3894,13 +4087,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "sms_usage_info",
     "resourceConfig": {
@@ -3912,9 +4104,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3923,10 +4125,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -3966,13 +4165,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "purchase",
     "resourceConfig": {
@@ -3984,9 +4182,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -3995,10 +4203,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -4038,13 +4243,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "custom_event",
     "resourceConfig": {
@@ -4056,9 +4260,19 @@
     }
   },
   {
-    "disable": true,
     "documentSchema": {
       "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
         "_type": {
           "type": [
             "null",
@@ -4067,10 +4281,7 @@
         },
         "createdAt": {
           "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "data": {
           "type": [
@@ -4110,13 +4321,12 @@
           ]
         }
       },
-      "required": [
-        "email"
-      ],
-      "type": "object"
+      "type": "object",
+      "x-infer-schema": true
     },
     "key": [
-      "/email"
+      "/email",
+      "/createdAt"
     ],
     "recommendedName": "hosted_unsubscribe_click",
     "resourceConfig": {
@@ -4125,6 +4335,80 @@
       ],
       "stream": "hosted_unsubscribe_click",
       "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ],
+    "recommendedName": "events",
+    "resourceConfig": {
+      "stream": "events",
+      "syncMode": "full_refresh"
     }
   }
 ]
