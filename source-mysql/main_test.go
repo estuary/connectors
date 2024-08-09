@@ -88,6 +88,8 @@ type testBackend struct {
 	config  Config
 }
 
+func (tb *testBackend) UpperCaseMode() bool { return false }
+
 func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })

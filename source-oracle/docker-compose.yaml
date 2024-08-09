@@ -1,0 +1,28 @@
+services:
+  db:
+    image: 'gvenzl/oracle-free:23.2'
+    platform: 'linux/amd64'
+    ports:
+      - "1521:1521"
+    environment:
+      {
+        "ORACLE_PASSWORD": "adminpassword",
+        "ORACLE_DATABASE": "PDB1,PDB2",
+        "APP_USER": "FLOW",
+        "APP_USER_PASSWORD": "FLOW123"
+      }
+    healthcheck:
+      test: "healthcheck.sh"
+      interval: 10s
+    networks:
+      - flow-test
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  oracle_data: {}

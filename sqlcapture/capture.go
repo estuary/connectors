@@ -551,6 +551,9 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 		if event, ok := event.(*ChangeEvent); ok {
 			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
 				var actual = event.After["watermark"]
+				if actual == nil {
+					actual = event.After["WATERMARK"]
+				}
 				logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
 				if actual == watermark {
 					watermarkReached = true
@@ -835,5 +838,5 @@ type StreamID = string
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) StreamID {
-	return strings.ToLower(namespace + "." + stream)
+	return namespace + "." + stream
 }

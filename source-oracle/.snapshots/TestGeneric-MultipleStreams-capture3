@@ -1,0 +1,5 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT14930049":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"FLOW_TEST_LOGMINER%2FT26016615":{"backfilled":0,"mode":"Ignore"},"FLOW_TEST_LOGMINER%2FT30084965":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+

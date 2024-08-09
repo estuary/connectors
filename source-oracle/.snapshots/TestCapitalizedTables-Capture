@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/users": 2 Documents
+# ================================
+{"DATA":"Alice","ID":"1","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"USERS","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"Bob","ID":"2","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"USERS","row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FUSERS":{"backfilled":2,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+

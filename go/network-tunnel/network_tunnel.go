@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -28,9 +29,9 @@ type SshTunnel struct {
 	cancel      context.CancelFunc
 }
 
-func (c *SshConfig) CreateTunnel() SshTunnel {
+func (c *SshConfig) CreateTunnel() *SshTunnel {
 	var ctx, cancel = context.WithCancel(context.Background())
-	return SshTunnel{
+	return &SshTunnel{
 		Config:      c,
 		ctx:         ctx,
 		cancel:      cancel,
@@ -40,7 +41,7 @@ func (c *SshConfig) CreateTunnel() SshTunnel {
 }
 
 // Start tunnel and wait until READY signal
-func (t SshTunnel) Start() error {
+func (t *SshTunnel) Start() error {
 	if t.Cmd != nil {
 		return errors.New("This tunnel has already been started.")
 	}
@@ -80,6 +81,9 @@ func (t SshTunnel) Start() error {
 		"--local-port", t.Config.LocalPort,
 		"--log.level", logLevel,
 	)
+	// Assign process gid to this process and its children
+	// so we can kill them together in the end
+	t.Cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	stdout, err := t.Cmd.StdoutPipe()
 	if err != nil {
@@ -114,7 +118,12 @@ func (t SshTunnel) Start() error {
 	return nil
 }
 
-func (t SshTunnel) Stop() {
+func (t *SshTunnel) Stop() {
+	if t.Cmd != nil {
+		// Using the negative pid signals kill to a process group.
+		// This ensures the children of the process are also killed
+		syscall.Kill(-t.Cmd.Process.Pid, syscall.SIGKILL)
+	}
 	t.cancel()
 	// cleanup key file
 	if t.tmpFileName != "" {

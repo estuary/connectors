@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT14930049":{"backfilled":3,"key_columns":["ID"],"mode":"Active"},"FLOW_TEST_LOGMINER%2FT26016615":{"backfilled":0,"key_columns":["ID"],"mode":"Pending"},"FLOW_TEST_LOGMINER%2FT30084965":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+# ================================
+# Captures Terminated With Errors
+# ================================
+error performing backfill: error scanning table "FLOW_TEST_LOGMINER.T26016615": error processing change event: scan key ordering failure: last="\x025\x00", next="\x0210\x00"
+

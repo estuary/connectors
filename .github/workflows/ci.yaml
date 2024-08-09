@@ -85,6 +85,7 @@ jobs:
           - source-mongodb
           - source-mysql
           - source-mysql-batch
+          - source-oracle
           - source-postgres
           - source-postgres-batch
           - source-redshift-batch

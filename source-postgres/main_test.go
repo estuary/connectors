@@ -88,6 +88,8 @@ type testBackend struct {
 	config  Config        // Default capture configuration for test captures
 }
 
+func (tb *testBackend) UpperCaseMode() bool { return false }
+
 func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	t.Helper()
 
