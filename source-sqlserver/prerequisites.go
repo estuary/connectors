@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -180,6 +181,11 @@ func (db *sqlserverDatabase) prerequisiteWatermarksCaptureInstance(ctx context.C
 	return db.prerequisiteTableCaptureInstance(ctx, schema, table)
 }
 
+func splitStreamID(streamID string) (string, string) {
+	var bits = strings.SplitN(streamID, ".", 2)
+	return bits[0], bits[1]
+}
+
 func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
 	// By writing a watermark here we ensure that there is at least one change event for
 	// the agent process to observe, and thus the "get max LSN" query should eventually
@@ -211,16 +217,17 @@ func (db *sqlserverDatabase) prerequisiteTableCaptureInstance(ctx context.Contex
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	var logEntry = log.WithField("table", streamID)
 
-	// TODO(wgd): It's rather inefficient to redo the 'list instances' work for each table.
-	var captureInstances, err = listCaptureInstances(ctx, db.conn)
+	// TODO(wgd): It's inefficient to redo the 'list instances' work for each table,
+	// consider caching this across all prerequisite validation calls.
+	var captureInstances, err = cdcListCaptureInstances(ctx, db.conn)
 	if err != nil {
 		return fmt.Errorf("unable to query capture instances for table %q: %w", streamID, err)
 	}
 
 	// If the table has at least one preexisting capture instance then we're happy
-	var instanceNames = captureInstances[streamID]
-	if len(instanceNames) > 0 {
-		logEntry.WithField("instances", instanceNames).Debug("table has capture instances")
+	var instancesForStream = captureInstances[streamID]
+	if len(instancesForStream) > 0 {
+		logEntry.WithField("instances", instancesForStream).Debug("table has capture instances")
 		return nil
 	}
 
@@ -232,43 +239,4 @@ func (db *sqlserverDatabase) prerequisiteTableCaptureInstance(ctx context.Contex
 		return nil
 	}
 	return fmt.Errorf("table %q has no capture instances and user %q cannot create one", streamID, db.config.User)
-}
-
-// listCaptureInstances queries SQL Server system tables and returns a map from stream IDs
-// to the capture instance name, if a capture instance exists which matches the configured
-// naming pattern.
-func listCaptureInstances(ctx context.Context, conn *sql.DB) (map[string][]string, error) {
-	log.Trace("listing capture instances")
-	// This query will enumerate all "capture instances" currently present, along with the
-	// schema/table names identifying the source table.
-	const query = `SELECT sch.name, tbl.name, ct.capture_instance
-	                 FROM cdc.change_tables AS ct
-					 JOIN sys.tables AS tbl ON ct.source_object_id = tbl.object_id
-					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id;`
-	var rows, err = conn.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("error listing CDC instances: %w", err)
-	}
-	defer rows.Close()
-
-	// Process result rows from the above query
-	var captureInstances = make(map[string][]string)
-	for rows.Next() {
-		var schemaName, tableName, instanceName string
-		if err := rows.Scan(&schemaName, &tableName, &instanceName); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
-		// In SQL Server, every source table may have up to two "capture instances" associated with it.
-		// If a capture instance exists which satisfies the configured naming pattern, then that's one
-		// that we should use (and thus if the pattern is "flow_<schema>_<table>" we can be fairly sure
-		// not to collide with any other uses of CDC on this database).
-		var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
-		log.WithFields(log.Fields{
-			"stream":   streamID,
-			"instance": instanceName,
-		}).Trace("discovered capture instance")
-		captureInstances[streamID] = append(captureInstances[streamID], instanceName)
-	}
-	return captureInstances, nil
 }
