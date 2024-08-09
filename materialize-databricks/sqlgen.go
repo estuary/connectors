@@ -1,15 +1,12 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
@@ -22,24 +19,6 @@ func translateFlowField(f string) string {
 	return columnSanitizerRegexp.ReplaceAllString(f, "_")
 }
 
-var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
-	switch ii := te.(type) {
-	case []byte:
-		return string(ii), nil
-	case json.RawMessage:
-		return string(ii), nil
-	case nil:
-		return nil, nil
-	default:
-		var m, err = json.Marshal(te)
-		if err != nil {
-			return nil, fmt.Errorf("cannot marshal %#v to json", te)
-		}
-
-		return string(json.RawMessage(m)), nil
-	}
-}
-
 // databricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
 var databricksDialect = func() sql.Dialect {
@@ -48,55 +27,30 @@ var databricksDialect = func() sql.Dialect {
 	// Databricks supports JSON extraction using the : operator, this seems like
 	// a simpler method for persisting JSON values:
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
-	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter))
-
-	type customDDLFieldConfig struct {
-		DDL string `json:"DDL,omitempty"`
-	}
-
-	var customDDLMapper = func(mapper sql.TypeMapper) sql.FieldConfigMapper[customDDLFieldConfig] {
-		return sql.FieldConfigMapper[customDDLFieldConfig]{
-			Delegate: mapper,
-			Map: func(m *sql.MappedType, config customDDLFieldConfig) error {
-				if config.DDL != "" {
-					m.DDL = config.DDL
-				}
-
-				return nil
-			},
-		}
-	}
+	var jsonMapper = sql.MapStatic("STRING", sql.ToJsonString)
 
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:    jsonMapper,
-		sql.BINARY:   sql.NewStaticMapper("BINARY"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  customDDLMapper(sql.NewStaticMapper("BIGINT")),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
-		sql.OBJECT:   jsonMapper,
-		sql.MULTIPLE: jsonMapper,
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("STRING"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.ARRAY:          jsonMapper,
+			sql.BINARY:         sql.MapStatic("BINARY"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE"),
+			sql.OBJECT:         jsonMapper,
+			sql.MULTIPLE:       jsonMapper,
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.StrToInt),
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.StrToFloat("NaN", "Inf", "-Inf")),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("STRING"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("TIMESTAMP"),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Inf", "-Inf"))),
-				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMP"),
-			},
+			}),
 		},
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
