@@ -508,7 +508,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 
 			value, err := decodeValue(vs[i])
 			if err != nil {
-				return nil, fmt.Errorf("decoding value %s=%v: %w", key, values[0][i], err)
+				return nil, fmt.Errorf("insert sql statement %q, key %q: %w", msg.SQL, key, err)
 			}
 			after[key] = value
 		}
@@ -547,7 +547,10 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var key = unquote(sqlparser.String(n.Left))
-				var value = n.Right.(*sqlparser.Literal).Val
+				value, err := decodeValue(n.Right)
+				if err != nil {
+					return false, fmt.Errorf("update sql statement %q, key %q: %w", msg.SQL, key, err)
+				}
 				after[key] = value
 			}
 
@@ -569,7 +572,10 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var key = unquote(sqlparser.String(n.Left))
-				var value = n.Right.(*sqlparser.Literal).Val
+				value, err := decodeValue(n.Right)
+				if err != nil {
+					return false, fmt.Errorf("update sql undo statement %q, key %q: %w", msg.UndoSQL, key, err)
+				}
 				before[key] = value
 			}
 
@@ -592,7 +598,10 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var key = unquote(sqlparser.String(n.Left))
-				var value = n.Right.(*sqlparser.Literal).Val
+				value, err := decodeValue(n.Right)
+				if err != nil {
+					return false, fmt.Errorf("delete sql statement %q, key %q: %w", msg.SQL, key, err)
+				}
 				before[key] = value
 			}
 
