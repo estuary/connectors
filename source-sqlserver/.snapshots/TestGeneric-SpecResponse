@@ -63,6 +63,12 @@
             "title": "Automatic Change Table Cleanup",
             "description": "When set the connector will delete CDC change table entries as soon as they are persisted into Flow. Requires DBO permissions to use.",
             "default": false
+          },
+          "capture_instance_management": {
+            "type": "boolean",
+            "title": "Automatic Capture Instance Management",
+            "description": "When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use.",
+            "default": false
           }
         },
         "additionalProperties": false,
