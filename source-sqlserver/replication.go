@@ -93,9 +93,8 @@ type sqlserverReplicationStream struct {
 }
 
 type tableReplicationInfo struct {
-	CaptureInstance string
-	KeyColumns      []string
-	ColumnTypes     map[string]any
+	KeyColumns  []string
+	ColumnTypes map[string]any
 }
 
 func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
@@ -120,23 +119,6 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	log.WithField("table", streamID).Trace("activate table")
 
-	// TODO(wgd): It's rather inefficient to redo the 'list instances' work every time a
-	// table gets activated.
-	var captureInstances, err = listCaptureInstances(ctx, rs.conn)
-	if err != nil {
-		return err
-	}
-
-	var instanceNames = captureInstances[streamID]
-	var instanceName string
-	if len(instanceNames) > 0 {
-		// TODO(wgd): We should support using whichever capture instance is newer, here
-		// to enable schema migrations in the recommended SQL Server way.
-		instanceName = instanceNames[0]
-	} else {
-		return fmt.Errorf("no capture instance for table %q", streamID)
-	}
-
 	var columnTypes = make(map[string]any)
 	for columnName, columnInfo := range discovery.Columns {
 		columnTypes[columnName] = columnInfo.DataType
@@ -144,12 +126,11 @@ func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamI
 
 	rs.tables.Lock()
 	rs.tables.info[streamID] = &tableReplicationInfo{
-		CaptureInstance: instanceName,
-		KeyColumns:      keyColumns,
-		ColumnTypes:     columnTypes,
+		KeyColumns:  keyColumns,
+		ColumnTypes: columnTypes,
 	}
 	rs.tables.Unlock()
-	log.WithFields(log.Fields{"stream": streamID, "instance": instanceName}).Debug("activated table")
+	log.WithFields(log.Fields{"stream": streamID}).Debug("activated table")
 	return nil
 }
 
@@ -232,21 +213,47 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		return nil
 	}
 
-	// Make a list of capture instances that we might want to poll, and then query the
-	// database to determine the most recent change LSN for each capture instance.
-	var captureInstances []string
-	rs.tables.RLock()
-	for _, info := range rs.tables.info {
-		captureInstances = append(captureInstances, info.CaptureInstance)
+	// Enumerate all capture instances currently available on the server, then query
+	// the database for the highest LSN in every instance's change table.
+	captureInstances, err := cdcListCaptureInstances(ctx, rs.conn)
+	if err != nil {
+		return fmt.Errorf("error listing CDC instances: %w", err)
 	}
-	captureInstanceMaxLSNs, err := cdcGetInstanceMaxLSNs(ctx, rs.conn, captureInstances)
+	var captureInstanceNames []string
+	for _, instancesForStream := range captureInstances {
+		for _, instance := range instancesForStream {
+			captureInstanceNames = append(captureInstanceNames, instance.Name)
+		}
+	}
+	captureInstanceMaxLSNs, err := cdcGetInstanceMaxLSNs(ctx, rs.conn, captureInstanceNames)
 	if err != nil {
 		return fmt.Errorf("failed to query maximum LSNs for capture instances: %w", err)
 	}
 
 	// Put together a work queue of CDC polling operations to perform
 	var queue []*tablePollInfo
+	rs.tables.RLock()
 	for streamID, info := range rs.tables.info {
+		// Figure out which capture instance to use for the current polling cycle.
+		// The logic goes like this:
+		//   - In general we always want to use the newest capture instance, according
+		//     to the `create_date` column of the `cdc.change_tables` metadata.
+		//   - But if the newest capture instance was just created since our last
+		//     polling cycle, then our current 'FromLSN' point will be earlier than
+		//     that instance covers, and we shouldn't use it yet.
+		var instance *captureInstanceInfo
+		for _, candidate := range captureInstances[streamID] {
+			if bytes.Compare(candidate.StartLSN, rs.fromLSN) > 0 {
+				continue // Can't use this one yet, the StartLSN is newer than our current FromLSN
+			}
+			if instance == nil || candidate.CreateDate.After(instance.CreateDate) {
+				instance = candidate
+			}
+		}
+		if instance == nil {
+			return fmt.Errorf("no valid capture instances for stream %q: considered %d candidates", streamID, len(captureInstances[streamID]))
+		}
+
 		// Skip polling a particular capture instance if its maximum LSN is less than or
 		// equal to our 'fromLSN' value for this polling operation, as this means that it
 		// doesn't have any new changes for us.
@@ -256,22 +263,21 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		// lexicographically before any other value, so the comparison here also covers the
 		// case of a CDC instance which doesn't need to be polled because it has no changes
 		// at all.
-		var instanceMaxLSN, ok = captureInstanceMaxLSNs[info.CaptureInstance]
+		var instanceMaxLSN, ok = captureInstanceMaxLSNs[instance.Name]
 		if ok && bytes.Compare(instanceMaxLSN, rs.fromLSN) <= 0 {
 			log.WithFields(log.Fields{
-				"instance":       info.CaptureInstance,
+				"instance":       instance.Name,
 				"instanceMaxLSN": instanceMaxLSN,
 				"pollFromLSN":    rs.fromLSN,
 			}).Trace("skipping poll for unchanged capture instance")
 			continue
 		}
 
-		var schemaName, tableName = splitStreamID(streamID)
 		queue = append(queue, &tablePollInfo{
 			StreamID:     streamID,
-			SchemaName:   schemaName,
-			TableName:    tableName,
-			InstanceName: info.CaptureInstance,
+			SchemaName:   instance.TableSchema,
+			TableName:    instance.TableName,
+			InstanceName: instance.Name,
 			KeyColumns:   info.KeyColumns,
 			ColumnTypes:  info.ColumnTypes,
 			FromLSN:      rs.fromLSN,
@@ -317,19 +323,20 @@ func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) e
 	var ackedLSN = rs.cleanup.ackLSN
 	rs.cleanup.RUnlock()
 
-	// Query the start LSN of every capture instance
-	var instanceMinLSNs, err = cdcGetInstanceMinLSNs(ctx, rs.conn)
+	// Enumerate all capture instances currently available on the server.
+	captureInstances, err := cdcListCaptureInstances(ctx, rs.conn)
 	if err != nil {
-		return fmt.Errorf("error querying capture instance start LSNs: %w", err)
+		return fmt.Errorf("error listing CDC instances: %w", err)
 	}
 
-	// Make a list of capture instances which can be usefully cleaned up
+	// Make a list of capture instances from our streams which can be usefully cleaned up
 	var cleanupInstances []string
 	rs.tables.RLock()
-	for _, info := range rs.tables.info {
-		var startLSN, ok = instanceMinLSNs[info.CaptureInstance]
-		if ok && bytes.Compare(startLSN, ackedLSN) < 0 {
-			cleanupInstances = append(cleanupInstances, info.CaptureInstance)
+	for streamID := range rs.tables.info {
+		for _, instance := range captureInstances[streamID] {
+			if bytes.Compare(instance.StartLSN, ackedLSN) < 0 {
+				cleanupInstances = append(cleanupInstances, instance.Name)
+			}
 		}
 	}
 	rs.tables.RUnlock()
@@ -350,7 +357,7 @@ func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) e
 }
 
 type tablePollInfo struct {
-	StreamID     string
+	StreamID     sqlcapture.StreamID
 	SchemaName   string
 	TableName    string
 	InstanceName string
@@ -483,15 +490,6 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	return nil
 }
 
-func cdcGetMinLSN(ctx context.Context, conn *sql.DB, instanceName string) (LSN, error) {
-	var minLSN LSN
-	const query = `SELECT sys.fn_cdc_get_min_lsn(@p1);`
-	if err := conn.QueryRowContext(ctx, query, instanceName).Scan(&minLSN); err != nil {
-		return nil, fmt.Errorf("error querying minimum LSN for %q: %w", instanceName, err)
-	}
-	return minLSN, nil
-}
-
 func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) (LSN, error) {
 	var maxLSN LSN
 	const query = `SELECT sys.fn_cdc_get_max_lsn();`
@@ -502,6 +500,50 @@ func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) (LSN, error) {
 		return nil, fmt.Errorf("invalid result from 'sys.fn_cdc_get_max_lsn()', agent process likely not running")
 	}
 	return maxLSN, nil
+}
+
+type captureInstanceInfo struct {
+	Name                   string
+	TableSchema, TableName string
+	StartLSN               LSN
+	CreateDate             time.Time
+}
+
+// cdcListCaptureInstances queries SQL Server system tables and returns a map from stream IDs
+// to capture instance information.
+func cdcListCaptureInstances(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]*captureInstanceInfo, error) {
+	// This query will enumerate all "capture instances" currently present, along with the
+	// schema/table names identifying the source table.
+	const query = `SELECT ct.capture_instance, sch.name, tbl.name, ct.start_lsn, ct.create_date
+	                 FROM cdc.change_tables AS ct
+					 JOIN sys.tables AS tbl ON ct.source_object_id = tbl.object_id
+					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id;`
+	var rows, err = conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	// Process result rows from the above query
+	var captureInstances = make(map[sqlcapture.StreamID][]*captureInstanceInfo)
+	for rows.Next() {
+		var info captureInstanceInfo
+		if err := rows.Scan(&info.Name, &info.TableSchema, &info.TableName, &info.StartLSN, &info.CreateDate); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		// In SQL Server, every source table may have up to two "capture instances" associated with it.
+		// If a capture instance exists which satisfies the configured naming pattern, then that's one
+		// that we should use (and thus if the pattern is "flow_<schema>_<table>" we can be fairly sure
+		// not to collide with any other uses of CDC on this database).
+		var streamID = sqlcapture.JoinStreamID(info.TableSchema, info.TableName)
+		log.WithFields(log.Fields{
+			"stream":   streamID,
+			"instance": info.Name,
+		}).Trace("discovered capture instance")
+		captureInstances[streamID] = append(captureInstances[streamID], &info)
+	}
+	return captureInstances, rows.Err()
 }
 
 // cdcGetInstanceMaxLSNs queries the maximum change event LSN for each listed capture instance.
@@ -555,32 +597,6 @@ func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []st
 	return results, rows.Err()
 }
 
-// cdcGetInstanceMinLSNs queries the minimum change event LSN for all capture instances.
-func cdcGetInstanceMinLSNs(ctx context.Context, conn *sql.DB) (map[string]LSN, error) {
-	var query = `SELECT capture_instance, start_lsn FROM cdc.change_tables;`
-
-	rows, err := conn.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
-	}
-	defer rows.Close()
-
-	var results = make(map[string]LSN)
-	for rows.Next() {
-		var instanceName string
-		var startLSN LSN
-		if err := rows.Scan(&instanceName, &startLSN); err != nil {
-			return nil, fmt.Errorf("error scanning result: %w", err)
-		}
-		log.WithFields(log.Fields{
-			"instance": instanceName,
-			"lsn":      startLSN,
-		}).Trace("queried start LSN for capture instance")
-		results[instanceName] = startLSN
-	}
-	return results, rows.Err()
-}
-
 func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName string, belowLSN LSN) error {
 	log.WithFields(log.Fields{"instance": instanceName, "lsn": fmt.Sprintf("%X", belowLSN)}).Debug("cleaning change table")
 
@@ -589,11 +605,6 @@ func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName strin
 		return fmt.Errorf("error cleaning capture instance %q below LSN %X: %w", instanceName, belowLSN, err)
 	}
 	return nil
-}
-
-func splitStreamID(streamID string) (string, string) {
-	var bits = strings.SplitN(streamID, ".", 2)
-	return bits[0], bits[1]
 }
 
 func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
