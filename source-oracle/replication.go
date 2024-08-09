@@ -161,7 +161,6 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		// need any more log files. If we don't include a dictionary end file, we risk having an incomplete
 		// dictionary
 		if f.FirstChange >= endSCN && f.DictEnd == "YES" {
-			logrus.Debug("breaking log files loop")
 			break
 		}
 	}
