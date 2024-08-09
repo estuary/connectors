@@ -9,7 +9,6 @@ airbyte-cdk = "^0.52"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 pydantic = "==1.10.14"
 python = "^3.11"
-pendulum = "2.1.2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

@@ -18,6 +18,7 @@ from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException, UserDefinedBackoffException
 from airbyte_cdk.sources.utils.schema_helpers import ResourceSchemaLoader
 from pendulum.datetime import DateTime
+from datetime import datetime
 from requests import HTTPError, codes
 from requests.exceptions import ChunkedEncodingError
 from source_iterable.slice_generators import AdjustableSliceGenerator, RangeSliceGenerator, StreamSlice
@@ -157,6 +158,7 @@ class IterableExportStream(IterableStream, IncrementalMixin, ABC):
         self._start_date = pendulum.parse(start_date)
         self._end_date = end_date and pendulum.parse(end_date)
         self.stream_params = {"dataTypeName": self.data_field}
+        self._state = {}
 
     def path(self, **kwargs) -> str:
         return "export/data.json"
@@ -401,7 +403,7 @@ class Campaigns(IterableStream):
 
 class CampaignsMetrics(IterableStream):
     name = "campaigns_metrics"
-    primary_key = "data/id"
+    primary_key = "id"
     data_field = None
 
     def __init__(self, start_date: str, end_date: Optional[str] = None, **kwargs):
@@ -441,7 +443,7 @@ class CampaignsMetrics(IterableStream):
         records = self._parse_csv_string_to_dict(content)
 
         for record in records:
-            yield {"data": record}
+            yield {"data": record, "id": record['id']}
 
     @staticmethod
     def _parse_csv_string_to_dict(csv_string: str) -> List[Dict[str, Any]]:
@@ -567,6 +569,63 @@ class EmailOpen(IterableExportStreamAdjustableRange):
 class EmailSend(IterableExportStreamAdjustableRange):
     data_field = "emailSend"
     primary_key = ["messageId", "email"]
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: List[str],
+        stream_slice: StreamSlice,
+        stream_state: Mapping[str, Any] = None,
+    ) -> Iterable[Mapping[str, Any]]:
+        start_time = pendulum.now()
+        for _ in range(self.CHUNKED_ENCODING_ERROR_RETRIES):
+            try:
+
+                self.logger.info(
+                    f"Processing slice of {(stream_slice.end_date - stream_slice.start_date).total_days()} days for stream {self.name}"
+                )
+                for record in super().read_records(
+                    sync_mode=sync_mode,
+                    cursor_field=cursor_field,
+                    stream_slice=stream_slice,
+                    stream_state=stream_state,
+                ):
+                    now = pendulum.now()
+                    self._adjustable_generator.adjust_range(now - start_time)
+                    if record.get("transactionalData") and type(record["transactionalData"]) is str:
+                        record["transactionalData"] = json.loads(record["transactionalData"])
+
+                    if record.get("createdAt") and type(record.get("createdAt")) is str:
+                        record["createdAt"] = datetime.strptime(record["createdAt"], "%Y-%m-%d %H:%M:%S %z")
+                    
+                    if record.get("itblInternal"):
+                        if record["itblInternal"].get("documentCreatedAt") and type(record["itblInternal"]["documentCreatedAt"]) is str:
+                            record["itblInternal"]["documentCreatedAt"] = datetime.strptime(record["itblInternal"]["documentCreatedAt"], "%Y-%m-%d %H:%M:%S %z")
+                            
+                        if record["itblInternal"].get("documentUpdatedAt") and type(record["itblInternal"]["documentCreatedAt"]) is str:
+                            record["itblInternal"]["documentUpdatedAt"] = datetime.strptime(record["itblInternal"]["documentUpdatedAt"], "%Y-%m-%d %H:%M:%S %z")
+
+                    if record.get("transactionalData",{}).get("createdAt") and type(record["transactionalData"]["createdAt"]) is str:
+                        record["transactionalData"]["createdAt"] = datetime.strptime(record["transactionalData"]["createdAt"], "%Y-%m-%d %H:%M:%S %z")
+                    
+                    if record.get("transactionalData",{}).get("eventUpdatedAt") and type(record["transactionalData"]["eventUpdatedAt"]) is str:
+                        record["transactionalData"]["eventUpdatedAt"] = datetime.strptime(record["transactionalData"]["eventUpdatedAt"], "%Y-%m-%d %H:%M:%S %z")
+                    
+                    if record.get("transactionalData",{}).get("itblInternal"):
+                        if record["transactionalData"]["itblInternal"].get("documentCreatedAt") and type(record["transactionalData"]["itblInternal"]["documentCreatedAt"]) is str:
+                            record["transactionalData"]["itblInternal"]["documentCreatedAt"] = datetime.strptime(record["transactionalData"]["itblInternal"]["documentCreatedAt"], "%Y-%m-%d %H:%M:%S %z")
+                            
+                        if record["transactionalData"]["itblInternal"].get("documentUpdatedAt") and type(record["transactionalData"]["itblInternal"]["documentUpdatedAt"]) is str:
+                            record["transactionalData"]["itblInternal"]["documentUpdatedAt"] = datetime.strptime(record["transactionalData"]["itblInternal"]["documentUpdatedAt"], "%Y-%m-%d %H:%M:%S %z")
+
+                    yield record
+                    start_time = now
+                break
+            except ChunkedEncodingError:
+                self.logger.warn("ChunkedEncodingError occurred, decrease days range and try again")
+                stream_slice = self._adjustable_generator.reduce_range()
+        else:
+            raise Exception(f"ChunkedEncodingError: Reached maximum number of retires: {self.CHUNKED_ENCODING_ERROR_RETRIES}")
 
 
 class EmailSendSkip(IterableExportStreamAdjustableRange):
@@ -744,7 +803,15 @@ class Users(IterableExportStreamRanged):
     primary_key = "email"
 
 
-class AccessCheck(ListUsers):
+    def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
+        for record in super().read_records(**kwargs):
+            self.state = self._get_updated_state(self.state, record)
+            if record.get("signupDate"):
+                record["signupDate"] = datetime.strptime(record["signupDate"], "%Y-%m-%d %H:%M:%S %z")
+            yield record
+
+
+class AccessCheck(Users):
     # since 401 error is failed silently in all the streams,
     # we need another class to distinguish an empty stream from 401 response
     def check_unauthorized_key(self, response: requests.Response) -> bool:

@@ -10,8 +10,12 @@ collections:
         data:
           properties:
             id:
-              type: integer
+              type:
+                - "null"
+                - integer
           type: object
+        id:
+          type: integer
         _meta:
           type: object
           properties:
@@ -22,7 +26,7 @@ collections:
       type: object
       x-infer-schema: true
     key:
-      - /data~1id
+      - /id
   acmeCo/channels:
     schema:
       properties:
@@ -201,7 +205,7 @@ collections:
     schema:
       properties:
         id:
-          type: number
+          type: integer
         name:
           type:
             - "null"

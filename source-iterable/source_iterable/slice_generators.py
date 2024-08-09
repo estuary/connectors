@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
 import pendulum
-from pendulum.datetime import DateTime, Period
+from pendulum.datetime import DateTime
 
 
 @dataclass
@@ -124,7 +124,7 @@ class AdjustableSliceGenerator(SliceGenerator):
     # Default is True so for first slice it would length would be INITIAL_RANGE_DAYS (30 days)
     _range_adjusted = True
 
-    def adjust_range(self, previous_request_time: Period):
+    def adjust_range(self, previous_request_time):
         """
         Calculate next slice length in days based on previous slice length and
         processing time.

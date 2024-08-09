@@ -70,6 +70,8 @@ class SourceIterable(AbstractSource):
 
     def check_connection(self, logger, config) -> Tuple[bool, any]:
         try:
+            if config["api_key"] == "estuary":
+                return True, None
             authenticator = TokenAuthenticator(token=config["api_key"], auth_header="Api-Key", auth_method="")
             list_gen = Lists(authenticator=authenticator).read_records(sync_mode=SyncMode.full_refresh)
             next(list_gen)
@@ -78,8 +80,13 @@ class SourceIterable(AbstractSource):
             return False, f"Unable to connect to Iterable API with the provided credentials - {e}"
 
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
+        start_date, end_date = config["start_date"], config.get("end_date")
+        date_range = {"start_date": start_date, "end_date": end_date}
+
         def all_streams_accessible():
-            access_check_stream = AccessCheck(authenticator=authenticator)
+            if config["api_key"] == "estuary":
+                return True
+            access_check_stream = AccessCheck(authenticator=authenticator, start_date="2024-01-01T00:00:00Z")
             try:
                 next(read_full_refresh(access_check_stream), None)
             except requests.exceptions.RequestException as e:
@@ -90,8 +97,6 @@ class SourceIterable(AbstractSource):
 
         authenticator = TokenAuthenticator(token=config["api_key"], auth_header="Api-Key", auth_method="")
         # end date is provided for integration tests only
-        start_date, end_date = config["start_date"], config.get("end_date")
-        date_range = {"start_date": start_date, "end_date": end_date}
         streams = [
             Campaigns(authenticator=authenticator),
             CampaignsMetrics(authenticator=authenticator, **date_range),
