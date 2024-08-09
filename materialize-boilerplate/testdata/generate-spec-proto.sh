@@ -8,8 +8,8 @@ if [[ $# < 1 ]]; then
     exit 1
 fi
 
-command -v flowctl-go >/dev/null 2>&1 || {
-    echo >&2 "flowctl-go must be available via PATH, aborting."
+command -v flowctl >/dev/null 2>&1 || {
+    echo >&2 "flowctl must be available via PATH, aborting."
     exit 1
 }
 
@@ -29,7 +29,7 @@ function cleanup {
 trap cleanup EXIT
 
 flowctl raw build \
-    --build-id test-build \
+    --build-id 12345 \
     --db-path ${TEMP_DIR}/build.db \
     --source $1
 
