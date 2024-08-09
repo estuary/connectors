@@ -3885,7 +3885,7 @@
       "stream": "tickets",
       "syncMode": "incremental",
       "cursorField": [
-        "updated_at"
+        "after_cursor"
       ]
     },
     "documentSchema": {
@@ -4468,7 +4468,7 @@
       "stream": "users",
       "syncMode": "incremental",
       "cursorField": [
-        "updated_at"
+        "after_cursor"
       ]
     },
     "documentSchema": {
