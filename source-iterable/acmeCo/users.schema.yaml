@@ -434,7 +434,5 @@ properties:
         type: integer
     required:
       - row_id
-type:
-  - "null"
-  - object
+type: object
 x-infer-schema: true

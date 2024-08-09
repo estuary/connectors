@@ -333,5 +333,5 @@
       "format": "date-time"
     }
   },
-  "type": ["null", "object"]
+  "type": "object"
 }
