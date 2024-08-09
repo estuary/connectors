@@ -1,65 +1,45 @@
 package main
 
 import (
-	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	sql "github.com/estuary/connectors/materialize-sql"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
 var testDialect = rsDialect(false)
 
 func TestSQLGeneration(t *testing.T) {
-	var spec *pf.MaterializationSpec
-	var specJson, err = os.ReadFile("testdata/spec.json")
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(specJson, &spec))
+	var templates = renderTemplates(testDialect)
 
-	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
-		Schema: "a-schema",
-		Table:  "target_table",
-		Delta:  false,
-	})
-	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
-		Schema: "",
-		Table:  "Delta Updates",
-		Delta:  true,
-	})
-	shape2.Document = nil // TODO(johnny): this is a bit gross.
+	snap, tables := sql.RunSqlGenTests(
+		t,
+		testDialect,
+		func(table string, delta bool) sql.Resource {
+			return tableConfig{
+				Table:  table,
+				Schema: "a-schema",
+				Delta:  delta,
+			}
+		},
+		sql.TestTemplates{
+			TableTemplates: []*template.Template{
+				templates.createTargetTable,
+				templates.createStoreTable,
+				templates.mergeInto,
+				templates.loadQuery,
+				templates.createDeleteTable,
+				templates.deleteQuery,
+			},
+			TplUpdateFence: templates.updateFence,
+		},
+	)
 
-	table1, err := sqlDriver.ResolveTable(shape1, testDialect)
-	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, testDialect)
-	require.NoError(t, err)
-
-	templates := renderTemplates(testDialect)
-
-	var snap strings.Builder
-
-	for _, tpl := range []*template.Template{
-		templates.createTargetTable,
-		templates.createStoreTable,
-		templates.mergeInto,
-		templates.loadQuery,
-		templates.createDeleteTable,
-		templates.deleteQuery,
-	} {
-		for _, tbl := range []sqlDriver.Table{table1, table2} {
-			var testcase = tbl.Identifier + " " + tpl.Name()
-
-			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(&snap, &tbl))
-			snap.WriteString("--- End " + testcase + " ---\n\n")
-		}
-	}
-
-	for _, tbl := range []sqlDriver.Table{table1, table2} {
+	for _, tbl := range tables {
 		tpl := templates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -68,11 +48,11 @@ func TestSQLGeneration(t *testing.T) {
 		}
 
 		snap.WriteString("--- Begin " + testcase + " (no varchar length) ---")
-		require.NoError(t, tpl.Execute(&snap, data))
+		require.NoError(t, tpl.Execute(snap, data))
 		snap.WriteString("--- End " + testcase + " (no varchar length) ---\n\n")
 	}
 
-	for _, tbl := range []sqlDriver.Table{table1, table2} {
+	for _, tbl := range tables {
 		tpl := templates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -82,22 +62,9 @@ func TestSQLGeneration(t *testing.T) {
 		}
 
 		snap.WriteString("--- Begin " + testcase + " (with varchar length) ---")
-		require.NoError(t, tpl.Execute(&snap, data))
+		require.NoError(t, tpl.Execute(snap, data))
 		snap.WriteString("--- End " + testcase + " (with varchar length) ---\n\n")
 	}
-
-	var fence = sqlDriver.Fence{
-		TablePath:       sqlDriver.TablePath{"path", "To", "checkpoints"},
-		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-		Fence:           123,
-		Materialization: pf.Materialization("some/Materialization"),
-		KeyBegin:        0x00112233,
-		KeyEnd:          0xffeeddcc,
-	}
-
-	snap.WriteString("--- Begin Fence Update ---")
-	require.NoError(t, templates.updateFence.Execute(&snap, fence))
-	snap.WriteString("--- End Fence Update ---\n\n")
 
 	var copyParams = copyFromS3Params{
 		Target: "my_temp_table",
@@ -119,14 +86,14 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---")
-	require.NoError(t, templates.copyFromS3.Execute(&snap, copyParams))
+	require.NoError(t, templates.copyFromS3.Execute(snap, copyParams))
 	snap.WriteString("--- End Copy From S3 Without Case Sensitive Identifier or Truncation ---\n\n")
 
 	copyParams.CaseSensitiveIdentifierEnabled = true
 	copyParams.TruncateColumns = true
 
 	snap.WriteString("--- Begin Copy From S3 With Case Sensitive Identifiers and Truncation ---")
-	require.NoError(t, templates.copyFromS3.Execute(&snap, copyParams))
+	require.NoError(t, templates.copyFromS3.Execute(snap, copyParams))
 	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---")
 
 	cupaloy.SnapshotT(t, snap.String())

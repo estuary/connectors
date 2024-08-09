@@ -1,61 +1,105 @@
---- Begin target_table createTargetTable ---
+--- Begin key_value createTargetTable ---
 
-CREATE TABLE IF NOT EXISTS target_table (
-		key1 BIGINT NOT NULL COMMENT 'Key One Title
-Key One Description
-auto-generated projection of JSON at: /key1 with inferred types: [integer]',
-		`key!2` BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]',
-		`Camel_Case` BIGINT COMMENT 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]',
-		`a Time` DATETIME(6) COMMENT 'auto-generated projection of JSON at: /a Time with inferred types: [string]',
-		`array` JSON COMMENT 'This is an array!
-auto-generated projection of JSON at: /array with inferred types: [array]',
-		lower_case BIGINT COMMENT 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]',
-		`value` LONGTEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
+CREATE TABLE IF NOT EXISTS key_value (
+		key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
+		key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
+		`key!binary` LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
+		`array` JSON COMMENT 'auto-generated projection of JSON at: /array with inferred types: [array]',
+		`binary` LONGTEXT COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
+		`boolean` BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
+		flow_published_at DATETIME(6) NOT NULL COMMENT 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',
+		`integer` BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
+		multiple JSON COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]',
+		`number` DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
+		object JSON COMMENT 'auto-generated projection of JSON at: /object with inferred types: [object]',
+		`string` LONGTEXT COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
+		`stringInteger` NUMERIC(65,0) COMMENT 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]',
+		`stringNumber` DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]',
 		flow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',
 
-		PRIMARY KEY (key1, `key!2`)
+		PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection key/value';
---- End target_table createTargetTable ---
+--- End key_value createTargetTable ---
 
---- Begin `Delta Updates` createTargetTable ---
+--- Begin delta_updates createTargetTable ---
 
-CREATE TABLE IF NOT EXISTS `Delta Updates` (
+CREATE TABLE IF NOT EXISTS delta_updates (
 		`theKey` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
 		`aValue` BIGINT COMMENT 'A super-awesome value.
-auto-generated projection of JSON at: /aValue with inferred types: [integer]'
+auto-generated projection of JSON at: /aValue with inferred types: [integer]',
+		flow_published_at DATETIME(6) NOT NULL COMMENT 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection delta/updates';
---- End `Delta Updates` createTargetTable ---
+--- End delta_updates createTargetTable ---
 
---- Begin target_table createLoadTable ---
+--- Begin key_value createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 		key1 BIGINT NOT NULL,
-		`key!2` BOOLEAN NOT NULL
+		key2 BOOLEAN NOT NULL,
+		`key!binary` LONGTEXT NOT NULL
 	,
-		PRIMARY KEY (key1, `key!2`)
+		PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
---- End target_table createLoadTable ---
+--- End key_value createLoadTable ---
 
---- Begin `Delta Updates` createLoadTable ---
+--- Begin delta_updates createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 		`theKey` VARCHAR(256) NOT NULL
 	,
 		PRIMARY KEY (`theKey`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
---- End `Delta Updates` createLoadTable ---
+--- End delta_updates createLoadTable ---
 
---- Begin target_table truncateTempTable ---
+--- Begin key_value createUpdateTable ---
+
+CREATE TEMPORARY TABLE flow_temp_update_table_0 (
+		key1 BIGINT NOT NULL,
+		key2 BOOLEAN NOT NULL,
+		`key!binary` LONGTEXT NOT NULL,
+		`array` JSON,
+		`binary` LONGTEXT,
+		`boolean` BOOLEAN,
+		flow_published_at DATETIME(6) NOT NULL,
+		`integer` BIGINT,
+		multiple JSON,
+		`number` DOUBLE PRECISION,
+		object JSON,
+		`string` LONGTEXT,
+		`stringInteger` NUMERIC(65,0),
+		`stringNumber` DOUBLE PRECISION,
+		flow_document JSON NOT NULL
+	,
+	PRIMARY KEY (key1, key2, `key!binary`)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
+--- End key_value createUpdateTable ---
+
+--- Begin delta_updates createUpdateTable ---
+
+CREATE TEMPORARY TABLE flow_temp_update_table_1 (
+		`theKey` VARCHAR(256) NOT NULL,
+		`aValue` BIGINT,
+		flow_published_at DATETIME(6) NOT NULL
+	,
+	PRIMARY KEY (`theKey`)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
+--- End delta_updates createUpdateTable ---
+
+--- Begin key_value truncateTempTable ---
 
 TRUNCATE flow_temp_load_table_0;
---- End target_table truncateTempTable ---
+--- End key_value truncateTempTable ---
 
---- Begin `Delta Updates` truncateTempTable ---
+--- Begin delta_updates truncateTempTable ---
 
 TRUNCATE flow_temp_load_table_1;
---- End `Delta Updates` truncateTempTable ---
+--- End delta_updates truncateTempTable ---
 
---- Begin target_table loadLoad ---
+--- Begin key_value loadLoad ---
 
 LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_0 CHARACTER SET utf8mb4
 	FIELDS
@@ -66,11 +110,12 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_
 		TERMINATED BY '\n'
 (
 		key1,
-		`key!2`
+		key2,
+		`key!binary`
 );
---- End target_table loadLoad ---
+--- End key_value loadLoad ---
 
---- Begin `Delta Updates` loadLoad ---
+--- Begin delta_updates loadLoad ---
 
 LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_1 CHARACTER SET utf8mb4
 	FIELDS
@@ -82,27 +127,28 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_
 (
 		`theKey`
 );
---- End `Delta Updates` loadLoad ---
+--- End delta_updates loadLoad ---
 
---- Begin target_table loadQuery ---
+--- Begin key_value loadQuery ---
 
 SELECT 0, r.flow_document
 	FROM flow_temp_load_table_0 AS l
-	JOIN target_table AS r
+	JOIN key_value AS r
 		 ON  l.key1 = r.key1
-		 AND l.`key!2` = r.`key!2`
+		 AND l.key2 = r.key2
+		 AND l.`key!binary` = r.`key!binary`
 
---- End target_table loadQuery ---
+--- End key_value loadQuery ---
 
---- Begin `Delta Updates` loadQuery ---
+--- Begin delta_updates loadQuery ---
 
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
---- End `Delta Updates` loadQuery ---
+--- End delta_updates loadQuery ---
 
---- Begin target_table insertLoad ---
+--- Begin key_value insertLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE target_table CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -111,19 +157,26 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE target_table 
 		TERMINATED BY '\n'
 (
 		key1,
-		`key!2`,
-		`Camel_Case`,
-		`a Time`,
+		key2,
+		`key!binary`,
 		`array`,
-		lower_case,
-		`value`,
+		`binary`,
+		`boolean`,
+		flow_published_at,
+		`integer`,
+		multiple,
+		`number`,
+		object,
+		`string`,
+		`stringInteger`,
+		`stringNumber`,
 		flow_document
 );
---- End target_table insertLoad ---
+--- End key_value insertLoad ---
 
---- Begin `Delta Updates` insertLoad ---
+--- Begin delta_updates insertLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE `Delta Updates` CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE delta_updates CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -132,11 +185,12 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE `Delta Update
 		TERMINATED BY '\n'
 (
 		`theKey`,
-		`aValue`
+		`aValue`,
+		flow_published_at
 );
---- End `Delta Updates` insertLoad ---
+--- End delta_updates insertLoad ---
 
---- Begin target_table updateLoad ---
+--- Begin key_value updateLoad ---
 
 LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_0 CHARACTER SET utf8mb4
 	FIELDS
@@ -147,17 +201,24 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 		TERMINATED BY '\n'
 (
 		key1,
-		`key!2`,
-		`Camel_Case`,
-		`a Time`,
+		key2,
+		`key!binary`,
 		`array`,
-		lower_case,
-		`value`,
+		`binary`,
+		`boolean`,
+		flow_published_at,
+		`integer`,
+		multiple,
+		`number`,
+		object,
+		`string`,
+		`stringInteger`,
+		`stringNumber`,
 		flow_document
 );
---- End target_table updateLoad ---
+--- End key_value updateLoad ---
 
---- Begin `Delta Updates` updateLoad ---
+--- Begin delta_updates updateLoad ---
 
 LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_1 CHARACTER SET utf8mb4
 	FIELDS
@@ -168,74 +229,92 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 		TERMINATED BY '\n'
 (
 		`theKey`,
-		`aValue`
+		`aValue`,
+		flow_published_at
 );
---- End `Delta Updates` updateLoad ---
+--- End delta_updates updateLoad ---
 
---- Begin target_table updateReplace ---
+--- Begin key_value updateReplace ---
 
-REPLACE INTO target_table
+REPLACE INTO key_value
 (
 		key1,
-		`key!2`,
-		`Camel_Case`,
-		`a Time`,
+		key2,
+		`key!binary`,
 		`array`,
-		lower_case,
-		`value`,
+		`binary`,
+		`boolean`,
+		flow_published_at,
+		`integer`,
+		multiple,
+		`number`,
+		object,
+		`string`,
+		`stringInteger`,
+		`stringNumber`,
 		flow_document
 )
 SELECT
 		key1,
-		`key!2`,
-		`Camel_Case`,
-		`a Time`,
+		key2,
+		`key!binary`,
 		`array`,
-		lower_case,
-		`value`,
+		`binary`,
+		`boolean`,
+		flow_published_at,
+		`integer`,
+		multiple,
+		`number`,
+		object,
+		`string`,
+		`stringInteger`,
+		`stringNumber`,
 		flow_document
 FROM flow_temp_update_table_0;
---- End target_table updateReplace ---
+--- End key_value updateReplace ---
 
---- Begin `Delta Updates` updateReplace ---
+--- Begin delta_updates updateReplace ---
 
-REPLACE INTO `Delta Updates`
+REPLACE INTO delta_updates
 (
 		`theKey`,
-		`aValue`
+		`aValue`,
+		flow_published_at
 )
 SELECT
 		`theKey`,
-		`aValue`
+		`aValue`,
+		flow_published_at
 FROM flow_temp_update_table_1;
---- End `Delta Updates` updateReplace ---
+--- End delta_updates updateReplace ---
 
---- Begin target_table truncateUpdateTable ---
+--- Begin key_value truncateUpdateTable ---
 
 TRUNCATE flow_temp_update_table_0;
---- End target_table truncateUpdateTable ---
+--- End key_value truncateUpdateTable ---
 
---- Begin `Delta Updates` truncateUpdateTable ---
+--- Begin delta_updates truncateUpdateTable ---
 
 TRUNCATE flow_temp_update_table_1;
---- End `Delta Updates` truncateUpdateTable ---
+--- End delta_updates truncateUpdateTable ---
 
---- Begin target_table deleteQuery ---
+--- Begin key_value deleteQuery ---
 
-DELETE original FROM target_table original, flow_temp_delete_table_0 temp
+DELETE original FROM key_value original, flow_temp_delete_table_0 temp
 WHERE
 		original.key1 = temp.key1 AND 
-		original.`key!2` = temp.`key!2`;
---- End target_table deleteQuery ---
+		original.key2 = temp.key2 AND 
+		original.`key!binary` = temp.`key!binary`;
+--- End key_value deleteQuery ---
 
---- Begin `Delta Updates` deleteQuery ---
+--- Begin delta_updates deleteQuery ---
 
-DELETE original FROM `Delta Updates` original, flow_temp_delete_table_1 temp
+DELETE original FROM delta_updates original, flow_temp_delete_table_1 temp
 WHERE
 		original.`theKey` = temp.`theKey`;
---- End `Delta Updates` deleteQuery ---
+--- End delta_updates deleteQuery ---
 
---- Begin target_table deleteLoad ---
+--- Begin key_value deleteLoad ---
 
 LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_0 CHARACTER SET utf8mb4
 	FIELDS
@@ -246,11 +325,12 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_del
 		TERMINATED BY '\n'
 (
 		key1,
-		`key!2`
+		key2,
+		`key!binary`
 );
---- End target_table deleteLoad ---
+--- End key_value deleteLoad ---
 
---- Begin `Delta Updates` deleteLoad ---
+--- Begin delta_updates deleteLoad ---
 
 LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_1 CHARACTER SET utf8mb4
 	FIELDS
@@ -262,39 +342,39 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_del
 (
 		`theKey`
 );
---- End `Delta Updates` deleteLoad ---
+--- End delta_updates deleteLoad ---
 
---- Begin target_table truncateDeleteTable ---
+--- Begin key_value truncateDeleteTable ---
 
 TRUNCATE flow_temp_delete_table_0;
---- End target_table truncateDeleteTable ---
+--- End key_value truncateDeleteTable ---
 
---- Begin `Delta Updates` truncateDeleteTable ---
+--- Begin delta_updates truncateDeleteTable ---
 
 TRUNCATE flow_temp_delete_table_1;
---- End `Delta Updates` truncateDeleteTable ---
+--- End delta_updates truncateDeleteTable ---
 
 --- Begin alter table add columns and drop not nulls ---
 
-ALTER TABLE target_table
+ALTER TABLE key_value
 	ADD COLUMN first_new_column STRING,
 	ADD COLUMN second_new_column BOOL,
-	MODIFY first_required_column STRING,
-	MODIFY second_required_column BOOL;
+	MODIFY first_required_column string,
+	MODIFY second_required_column bool;
 --- End alter table add columns and drop not nulls ---
 
 --- Begin alter table add columns ---
 
-ALTER TABLE target_table
+ALTER TABLE key_value
 	ADD COLUMN first_new_column STRING,
 	ADD COLUMN second_new_column BOOL;
 --- End alter table add columns ---
 
 --- Begin alter table drop not nulls ---
 
-ALTER TABLE target_table
-	MODIFY first_required_column STRING,
-	MODIFY second_required_column BOOL;
+ALTER TABLE key_value
+	MODIFY first_required_column string,
+	MODIFY second_required_column bool;
 --- End alter table drop not nulls ---
 
 --- Begin Fence Install ---
@@ -302,7 +382,7 @@ ALTER TABLE target_table
 with
 -- Increment the fence value of _any_ checkpoint which overlaps our key range.
 update_covered as (
-	update `path`.`To`.checkpoints
+	update `path`.`to`.checkpoints
 		set   fence = fence + 1
 		where materialization = 'some/Materialization'
 		and   key_end >= 1122867
@@ -320,7 +400,7 @@ best_match as (
 ),
 -- Install a new checkpoint if best_match is not an exact match.
 install_new as (
-	insert into `path`.`To`.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
+	insert into `path`.`to`.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
 		-- Case: best_match is a non-empty covering span but not an exact match
 		select 'some/Materialization', 1122867, 4293844428, fence, checkpoint
 			from best_match where key_begin != 1122867 or key_end != 4293844428
@@ -336,13 +416,14 @@ select fence, decode(checkpoint, 'base64') from best_match
 limit 1
 ;
 --- End Fence Install ---
---- Begin Fence Update ---
 
-UPDATE `path`.`To`.checkpoints
+--- Begin Fence Update ---
+UPDATE `path`.`to`.checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
 	WHERE materialization = 'some/Materialization'
 	AND   key_begin = 1122867
 	AND   key_end   = 4293844428
 	AND   fence     = 123;
 --- End Fence Update ---
+
 

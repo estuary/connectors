@@ -1,49 +1,91 @@
---- Begin `a-schema`.target_table loadQuery ---
-SELECT 0, `a-schema`.target_table.flow_document
-	FROM `a-schema`.target_table
+--- Begin `a-schema`.key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS `a-schema`.key_value (
+  key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
+  key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
+  `key!binary` BINARY NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
+  array STRING COMMENT 'auto-generated projection of JSON at: /array with inferred types: [array]',
+  binary BINARY COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
+  boolean BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
+  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',
+  integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
+  multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]',
+  number DOUBLE COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
+  object STRING COMMENT 'auto-generated projection of JSON at: /object with inferred types: [object]',
+  string STRING COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
+  `stringInteger` BIGINT COMMENT 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]',
+  `stringNumber` DOUBLE COMMENT 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]',
+  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'
+) COMMENT 'Generated for materialization test/sqlite of collection key/value';
+--- End `a-schema`.key_value createTargetTable ---
+
+--- Begin `a-schema`.delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS `a-schema`.delta_updates (
+  `theKey` STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+  `aValue` BIGINT COMMENT 'A super-awesome value.
+auto-generated projection of JSON at: /aValue with inferred types: [integer]',
+  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
+) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
+--- End `a-schema`.delta_updates createTargetTable ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE `a-schema`.key_value ADD COLUMN
+	first_new_column STRING,
+	second_new_column BOOL;
+--- End alter table add columns ---
+
+--- Begin `a-schema`.key_value loadQuery ---
+SELECT 0, `a-schema`.key_value.flow_document
+	FROM `a-schema`.key_value
 	JOIN (
 		(
 			SELECT
-			key1, key2
+			key1, key2, `key!binary`
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1, key2
+			key1, key2, `key!binary`
 			FROM json.`file2`
 		)
 	) AS r
-	ON `a-schema`.target_table.key1 = r.key1 AND `a-schema`.target_table.key2 = unbase64(r.key2)
---- End `a-schema`.target_table loadQuery ---
+	ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key2 = r.key2 AND `a-schema`.key_value.`key!binary` = unbase64(r.`key!binary`)
+--- End `a-schema`.key_value loadQuery ---
 
---- Begin `a-schema`.target_table mergeInto ---
-	MERGE INTO `a-schema`.target_table AS l
+--- Begin `a-schema`.key_value mergeInto ---
+	MERGE INTO `a-schema`.key_value AS l
 	USING (
 		(
 			SELECT
-			key1::BIGINT, unbase64(key2)::BINARY as key2, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+			key1::BIGINT, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::BIGINT, multiple::STRING, number::DOUBLE, object::STRING, string::STRING, `stringInteger`::BIGINT, `stringNumber`::DOUBLE, flow_document::STRING
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1::BIGINT, unbase64(key2)::BINARY as key2, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+			key1::BIGINT, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::BIGINT, multiple::STRING, number::DOUBLE, object::STRING, string::STRING, `stringInteger`::BIGINT, `stringNumber`::DOUBLE, flow_document::STRING
 			FROM json.`file2`
 		)
 	) AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
+	ON l.key1 = r.key1 AND l.key2 = r.key2 AND l.`key!binary` = r.`key!binary`
 	WHEN MATCHED AND r.flow_document='"delete"' THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET l.binary = r.binary, l.boolean = r.boolean, l.integer = r.integer, l.`unsigned-integer` = r.`unsigned-integer`, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
+		UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.multiple = r.multiple, l.number = r.number, l.object = r.object, l.string = r.string, l.`stringInteger` = r.`stringInteger`, l.`stringNumber` = r.`stringNumber`, l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
-		INSERT (key1, key2, binary, boolean, integer, `unsigned-integer`, number, string, flow_document)
-		VALUES (r.key1, r.key2, r.binary, r.boolean, r.integer, r.`unsigned-integer`, r.number, r.string, r.flow_document);
---- End `a-schema`.target_table mergeInto ---
+		INSERT (key1, key2, `key!binary`, array, binary, boolean, flow_published_at, integer, multiple, number, object, string, `stringInteger`, `stringNumber`, flow_document)
+		VALUES (r.key1, r.key2, r.`key!binary`, r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.multiple, r.number, r.object, r.string, r.`stringInteger`, r.`stringNumber`, r.flow_document);
+--- End `a-schema`.key_value mergeInto ---
 
---- Begin `a-schema`.target_table copyIntoDirect ---
-	COPY INTO `a-schema`.target_table FROM (
+--- Begin `a-schema`.key_value copyIntoDirect ---
+	COPY INTO `a-schema`.key_value FROM (
     SELECT
-		key1::BIGINT, unbase64(key2)::BINARY as key2, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, integer::BIGINT, `unsigned-integer`::DECIMAL(20), number::DOUBLE, string::STRING, flow_document::STRING
+		key1::BIGINT, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::BIGINT, multiple::STRING, number::DOUBLE, object::STRING, string::STRING, `stringInteger`::BIGINT, `stringNumber`::DOUBLE, flow_document::STRING
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
@@ -51,52 +93,38 @@ SELECT 0, `a-schema`.target_table.flow_document
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
---- End `a-schema`.target_table copyIntoDirect ---
+--- End `a-schema`.key_value copyIntoDirect ---
 
---- Begin `a-schema`.target_table createTargetTable ---
-CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
-  key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
-  key2 BINARY NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [string]',
-  binary BINARY COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
-  boolean BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
-  integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
-  `unsigned-integer` DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /unsigned-integer with inferred types: [integer]',
-  number DOUBLE COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
-  string STRING COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
-  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'
-) COMMENT 'Generated for materialization test/sqlite of collection key/value';
---- End `a-schema`.target_table createTargetTable ---
-
---- Begin `default`.`Delta_Updates` loadQuery ---
+--- Begin `a-schema`.delta_updates loadQuery ---
 SELECT -1, ""
---- End `default`.`Delta_Updates` loadQuery ---
+--- End `a-schema`.delta_updates loadQuery ---
 
---- Begin `default`.`Delta_Updates` mergeInto ---
-	MERGE INTO `default`.`Delta_Updates` AS l
+--- Begin `a-schema`.delta_updates mergeInto ---
+	MERGE INTO `a-schema`.delta_updates AS l
 	USING (
 		(
 			SELECT
-			`theKey`::STRING, `aValue`::BIGINT
+			`theKey`::STRING, `aValue`::BIGINT, flow_published_at::TIMESTAMP
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			`theKey`::STRING, `aValue`::BIGINT
+			`theKey`::STRING, `aValue`::BIGINT, flow_published_at::TIMESTAMP
 			FROM json.`file2`
 		)
 	) AS r
 	ON l.`theKey` = r.`theKey`
 	WHEN MATCHED THEN
-		UPDATE SET l.`aValue` = r.`aValue`
+		UPDATE SET l.`aValue` = r.`aValue`, l.flow_published_at = r.flow_published_at
 	WHEN NOT MATCHED THEN
-		INSERT (`theKey`, `aValue`)
-		VALUES (r.`theKey`, r.`aValue`);
---- End `default`.`Delta_Updates` mergeInto ---
+		INSERT (`theKey`, `aValue`, flow_published_at)
+		VALUES (r.`theKey`, r.`aValue`, r.flow_published_at);
+--- End `a-schema`.delta_updates mergeInto ---
 
---- Begin `default`.`Delta_Updates` copyIntoDirect ---
-	COPY INTO `default`.`Delta_Updates` FROM (
+--- Begin `a-schema`.delta_updates copyIntoDirect ---
+	COPY INTO `a-schema`.delta_updates FROM (
     SELECT
-		`theKey`::STRING, `aValue`::BIGINT
+		`theKey`::STRING, `aValue`::BIGINT, flow_published_at::TIMESTAMP
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
@@ -104,44 +132,6 @@ SELECT -1, ""
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
---- End `default`.`Delta_Updates` copyIntoDirect ---
-
---- Begin `default`.`Delta_Updates` createTargetTable ---
-CREATE TABLE IF NOT EXISTS `default`.`Delta_Updates` (
-  `theKey` STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
-  `aValue` BIGINT COMMENT 'A super-awesome value.
-auto-generated projection of JSON at: /aValue with inferred types: [integer]'
-) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
---- End `default`.`Delta_Updates` createTargetTable ---
-
---- Begin alter table add columns ---
-ALTER TABLE `a-schema`.target_table ADD COLUMN
-	first_new_column STRING,
-	second_new_column BOOL;
---- End alter table add columns ---
-
---- Begin target_table_no_values_materialized mergeInto ---
-	MERGE INTO ``.target_table_no_values_materialized AS l
-	USING (
-		(
-			SELECT
-			key1::BIGINT, key2::BOOLEAN, flow_document::STRING
-			FROM json.`file2`
-		)
-		 UNION ALL (
-			SELECT
-			key1::BIGINT, key2::BOOLEAN, flow_document::STRING
-			FROM json.`file3`
-		)
-	) AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
-	WHEN MATCHED AND r.flow_document='"delete"' THEN
-		DELETE
-	WHEN MATCHED THEN
-		UPDATE SET l.flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
-		INSERT (key1, key2, flow_document)
-		VALUES (r.key1, r.key2, r.flow_document);
---- End target_table_no_values_materialized mergeInto ---
+--- End `a-schema`.delta_updates copyIntoDirect ---
 
 

@@ -1,87 +1,104 @@
---- Begin projectID.dataset.target_table tempTableName ---
-flow_temp_table_0--- End projectID.dataset.target_table tempTableName ---
-
---- Begin projectID.dataset.target_table createTargetTable ---
-CREATE TABLE IF NOT EXISTS projectID.dataset.target_table (
+--- Begin projectID.dataset.key_value createTargetTable ---
+CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
 		key1 INT64 NOT NULL,
 		key2 BOOL NOT NULL,
-		boolean BOOL NOT NULL,
-		integer INT64 NOT NULL,
-		string STRING NOT NULL,
-		`defAULT` STRING,
+		key_binary STRING NOT NULL,
+		`array` STRING,
+		binary STRING,
+		boolean BOOL,
+		flow_published_at TIMESTAMP NOT NULL,
+		integer INT64,
+		multiple JSON,
 		number FLOAT64,
-		person_place_ STRING,
-		source_name STRING,
-		`with-dash` STRING,
+		object STRING,
+		string STRING,
+		stringInteger BIGNUMERIC(38,0),
+		stringNumber FLOAT64,
 		flow_document STRING NOT NULL
 )
-CLUSTER BY key1, key2, boolean, integer;
---- End projectID.dataset.target_table createTargetTable ---
+CLUSTER BY key1, key2, key_binary;
+--- End projectID.dataset.key_value createTargetTable ---
 
---- Begin projectID.dataset.target_table loadQuery ---
+--- Begin projectID.dataset.delta_updates createTargetTable ---
+CREATE TABLE IF NOT EXISTS projectID.dataset.delta_updates (
+		theKey STRING NOT NULL,
+		aValue INT64,
+		flow_published_at TIMESTAMP NOT NULL
+)
+CLUSTER BY theKey;
+--- End projectID.dataset.delta_updates createTargetTable ---
+
+--- Begin projectID.dataset.key_value loadQuery ---
 SELECT 0, l.flow_document
-	FROM projectID.dataset.target_table AS l
+	FROM projectID.dataset.key_value AS l
 	JOIN flow_temp_table_0 AS r
 		 ON l.key1 = r.c0
 		 AND l.key2 = r.c1
-		 AND l.boolean = r.c2
-		 AND l.integer = r.c3
-		 AND l.string = r.c4
+		 AND l.key_binary = r.c2
 
---- End projectID.dataset.target_table loadQuery ---
+--- End projectID.dataset.key_value loadQuery ---
 
---- Begin projectID.dataset.target_table storeInsert ---
-INSERT INTO projectID.dataset.target_table (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
-SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 FROM flow_temp_table_0;
---- End projectID.dataset.target_table storeInsert ---
+--- Begin projectID.dataset.delta_updates loadQuery ---
 
---- Begin projectID.dataset.target_table storeUpdate ---
-MERGE INTO projectID.dataset.target_table AS l
+SELECT -1, NULL LIMIT 0
+
+--- End projectID.dataset.delta_updates loadQuery ---
+
+--- Begin projectID.dataset.key_value storeInsert ---
+INSERT INTO projectID.dataset.key_value (key1, key2, key_binary, `array`, binary, boolean, flow_published_at, integer, multiple, number, object, string, stringInteger, stringNumber, flow_document)
+SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14 FROM flow_temp_table_0;
+--- End projectID.dataset.key_value storeInsert ---
+
+--- Begin projectID.dataset.delta_updates storeInsert ---
+INSERT INTO projectID.dataset.delta_updates (theKey, aValue, flow_published_at)
+SELECT c0, c1, c2 FROM flow_temp_table_1;
+--- End projectID.dataset.delta_updates storeInsert ---
+
+--- Begin projectID.dataset.key_value storeUpdate ---
+MERGE INTO projectID.dataset.key_value AS l
 USING flow_temp_table_0 AS r
-ON l.key1 = r.c0 AND l.key2 = r.c1 AND l.boolean = r.c2 AND l.integer = r.c3 AND l.string = r.c4
-WHEN MATCHED AND r.c10='"delete"' THEN
+ON l.key1 = r.c0 AND l.key2 = r.c1 AND l.key_binary = r.c2
+WHEN MATCHED AND r.c14='"delete"' THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.`defAULT` = r.c5, l.number = r.c6, l.person_place_ = r.c7, l.source_name = r.c8, l.`with-dash` = r.c9, l.flow_document = r.c10
+	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.flow_published_at = r.c6, l.integer = r.c7, l.multiple = r.c8, l.number = r.c9, l.object = r.c10, l.string = r.c11, l.stringInteger = r.c12, l.stringNumber = r.c13, l.flow_document = r.c14
 WHEN NOT MATCHED THEN
-	INSERT (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
-	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10);
---- End projectID.dataset.target_table storeUpdate ---
+	INSERT (key1, key2, key_binary, `array`, binary, boolean, flow_published_at, integer, multiple, number, object, string, stringInteger, stringNumber, flow_document)
+	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14);
+--- End projectID.dataset.key_value storeUpdate ---
+
+--- Begin projectID.dataset.delta_updates storeUpdate ---
+MERGE INTO projectID.dataset.delta_updates AS l
+USING flow_temp_table_1 AS r
+ON l.theKey = r.c0
+WHEN MATCHED THEN
+	UPDATE SET l.aValue = r.c1, l.flow_published_at = r.c2
+WHEN NOT MATCHED THEN
+	INSERT (theKey, aValue, flow_published_at)
+	VALUES (r.c0, r.c1, r.c2);
+--- End projectID.dataset.delta_updates storeUpdate ---
 
 --- Begin alter table add columns and drop not nulls ---
-ALTER TABLE projectID.dataset.target_table
+ALTER TABLE projectID.dataset.key_value
 	ADD COLUMN first_new_column STRING,
 	ADD COLUMN second_new_column BOOL;
 
-ALTER TABLE projectID.dataset.target_table
+ALTER TABLE projectID.dataset.key_value
 	ALTER COLUMN first_required_column DROP NOT NULL,
 	ALTER COLUMN second_required_column DROP NOT NULL;
 --- End alter table add columns and drop not nulls ---
 
 --- Begin alter table add columns ---
-ALTER TABLE projectID.dataset.target_table
+ALTER TABLE projectID.dataset.key_value
 	ADD COLUMN first_new_column STRING,
 	ADD COLUMN second_new_column BOOL;
 --- End alter table add columns ---
 
 --- Begin alter table drop not nulls ---
-ALTER TABLE projectID.dataset.target_table
+ALTER TABLE projectID.dataset.key_value
 	ALTER COLUMN first_required_column DROP NOT NULL,
 	ALTER COLUMN second_required_column DROP NOT NULL;
 --- End alter table drop not nulls ---
-
---- Begin target_table_no_values_materialized storeUpdate ---
-MERGE INTO projectID.dataset.target_table_no_values_materialized AS l
-USING flow_temp_table_1 AS r
-ON l.key1 = r.c0 AND l.key2 = r.c1
-WHEN MATCHED AND r.c2='"delete"' THEN
-	DELETE
-WHEN MATCHED THEN
-	UPDATE SET l.flow_document = r.c2
-WHEN NOT MATCHED THEN
-	INSERT (key1, key2, flow_document)
-	VALUES (r.c0, r.c1, r.c2);
---- End target_table_no_values_materialized storeUpdate ---
 
 --- Begin Fence Install ---
 
@@ -99,7 +116,7 @@ DECLARE curCheckpoint STRING;
 BEGIN TRANSACTION;
 
 -- Increment the fence value of _any_ checkpoint which overlaps our key range.
-UPDATE project.dataset.checkpoints
+UPDATE path.`to`.checkpoints
 	SET fence=fence+1
 	WHERE materialization = vMaterialization
 	AND key_end >= vKeyBegin
@@ -108,7 +125,7 @@ UPDATE project.dataset.checkpoints
 -- Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
 SET (curFence, curKeyBegin, curKeyEnd, curCheckpoint) = (
 	SELECT AS STRUCT fence, key_begin, key_end, checkpoint
-		FROM project.dataset.checkpoints
+		FROM path.`to`.checkpoints
 		WHERE materialization = vMaterialization
 		AND key_begin <= vKeyBegin
 		AND key_end >= vKeyEnd
@@ -127,7 +144,7 @@ END IF;
 -- If any of the key positions don't line up, create a new fence.
 -- Either it's new or we are starting a split shard.
 IF vKeyBegin <> curKeyBegin OR vKeyEnd <> curKeyEnd THEN
-	INSERT INTO project.dataset.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
+	INSERT INTO path.`to`.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
 	VALUES (vMaterialization, vKeyBegin, vKeyEnd, curFence, curCheckpoint);
 END IF;
 
@@ -136,21 +153,22 @@ COMMIT TRANSACTION;
 -- Get the current value
 SELECT curFence AS fence, curCheckpoint AS checkpoint;
 --- End Fence Install ---
---- Begin Fence Update ---
 
+--- Begin Fence Update ---
 IF (
 	SELECT fence
-	FROM project.dataset.checkpoints
+	FROM path.`to`.checkpoints
 	WHERE materialization='some/Materialization' AND key_begin=1122867 AND key_end=4293844428 AND fence=123
 ) IS NULL THEN
 	RAISE USING MESSAGE = 'This instance was fenced off by another';
 END IF;
 
-UPDATE project.dataset.checkpoints
+UPDATE path.`to`.checkpoints
 	SET checkpoint='AAECAwQFBgcICQ=='
 	WHERE materialization='some/Materialization'
 	AND key_begin=1122867
 	AND key_end=4293844428
 	AND fence=123;
 --- End Fence Update ---
+
 

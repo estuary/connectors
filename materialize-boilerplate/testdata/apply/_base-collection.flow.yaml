@@ -10,6 +10,3 @@ collections:
         optionalVal2: { type: integer }
       required: [key, requiredVal1, requiredVal2]
     key: [/key]
-
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }

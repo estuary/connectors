@@ -5,12 +5,30 @@ collections:
       properties:
         key1: { type: integer }
         key2: { type: boolean }
+        key!binary: { type: string, contentEncoding: base64 }
+        array: { type: array }
+        object: { type: object }
+        binary: { type: string, contentEncoding: base64 }
         boolean: { type: boolean }
-        integer: { type: integer }
-        number: { type: number }
+        multiple: { type: [integer, object, boolean] }
         string: { type: string }
-      required: [key1, key2]
-    key: [/key1, /key2]
+        integer: { type: integer }
+        stringInteger: { type: [integer, string], format: integer }
+        number: { type: number }
+        stringNumber: { type: [number, string], format: number }
+      required: [key1, key2, key!binary]
+    key: [/key1, /key2, /key!binary]
+
+  delta/updates:
+    schema:
+      type: object
+      properties:
+        theKey: { type: string }
+        aValue:
+          type: integer
+          description: A super-awesome value.
+      required: [theKey]
+    key: [/theKey]
 
 materializations:
   test/sqlite:
@@ -21,6 +39,11 @@ materializations:
     bindings:
       - source: key/value
         resource: { table: key_value }
+        fields:
+          recommended: true
+          include:
+            object: {}
+            multiple: {}
 
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }
+      - source: delta/updates
+        resource: { table: delta_updates }
