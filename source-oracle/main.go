@@ -99,7 +99,7 @@ type advancedConfig struct {
 	SkipBackfills        string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	WatermarksTable      string   `json:"watermarksTable,omitempty" jsonschema:"default=USER.FLOW_WATERMARKS,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=1000,description=The number of rows which should be fetched from the database in a single incremental query."`
+	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=10000,description=The number of rows which should be fetched from the database in a single incremental query."`
 	IncrementalSCNRange  int      `json:"incremental_scn_range,omitempty" jsonschema:"title=Incremental SCN Range,default=20000,description=The SCN range captured at every iteration."`
 	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
@@ -144,7 +144,7 @@ func (c *Config) SetDefaults(name string) {
 		c.Advanced.BackfillChunkSize = 50000
 	}
 	if c.Advanced.IncrementalChunkSize <= 0 {
-		c.Advanced.IncrementalChunkSize = 1000
+		c.Advanced.IncrementalChunkSize = 10000
 	}
 	if c.Advanced.IncrementalSCNRange <= 0 {
 		c.Advanced.IncrementalSCNRange = 20000
