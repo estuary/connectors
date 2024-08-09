@@ -29,6 +29,3 @@ materializations:
             key: {}
             goodField: {}
             firstBadField: {}
-
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }
