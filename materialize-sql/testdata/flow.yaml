@@ -16,6 +16,8 @@ collections:
         stringInteger: { type: [integer, string], format: integer }
         number: { type: number }
         stringNumber: { type: [number, string], format: number }
+        numberCastToString: { type: [number, string], format: number }
+        integerWithUserDDL: { type: integer }
       required: [key1, key2, key!binary]
     key: [/key1, /key2, /key!binary]
 
@@ -44,6 +46,8 @@ materializations:
           include:
             object: {}
             multiple: {}
+            numberCastToString: { castToString: true }
+            integerWithUserDDL: { DDL: "DECIMAL(20)" }
 
       - source: delta/updates
         resource: { table: delta_updates }

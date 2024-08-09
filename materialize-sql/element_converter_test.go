@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"encoding/json"
 	"math/big"
 	"testing"
 
@@ -34,7 +35,7 @@ func TestStdStrToInt(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := StdStrToInt()(tt.input)
+			got, err := StrToInt(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got.(*big.Int).Int64())
 		})
@@ -68,7 +69,7 @@ func TestClampDatetime(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := ClampDatetime()(tt.input)
+			got, err := ClampDatetime(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -98,9 +99,41 @@ func TestClampDate(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := ClampDate()(tt.input)
+			got, err := ClampDate(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func TestToJsonString(t *testing.T) {
+	for _, tt := range []struct {
+		input any
+		want  any
+	}{
+		{
+			input: []byte("{\"hello\": \"world\"}"),
+			want:  "{\"hello\": \"world\"}",
+		},
+		{
+			input: nil,
+			want:  nil,
+		},
+		{
+			input: true,
+			want:  "true",
+		},
+		{
+			input: 12.34,
+			want:  "12.34",
+		},
+		{
+			input: json.RawMessage([]byte("{\"hello\": \"world\"}")),
+			want:  "{\"hello\": \"world\"}",
+		},
+	} {
+		got, err := ToJsonString(tt.input)
+		require.NoError(t, err)
+		require.Equal(t, tt.want, got)
 	}
 }
