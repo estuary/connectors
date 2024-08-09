@@ -418,12 +418,23 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 	var replicationChunkSize = s.db.config.Advanced.IncrementalChunkSize
 	var offset = 0
 
+	var tablesCondition = ""
+	var i = 0
+	for _, mapping := range s.db.otherMapping {
+		if i > 0 {
+			tablesCondition += " OR "
+		}
+		tablesCondition += fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping[0], mapping[1])
+		i++
+	}
+
 	for {
 		var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
       FROM V$LOGMNR_CONTENTS
       WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
       SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
-      OFFSET %d ROWS FETCH NEXT %d ROWS ONLY`, offset, replicationChunkSize)
+      AND (%s)
+      OFFSET %d ROWS FETCH NEXT %d ROWS ONLY`, tablesCondition, offset, replicationChunkSize)
 		var rows, err = s.conn.QueryContext(ctx, query, s.lastTxnEndSCN)
 		if err != nil {
 			return fmt.Errorf("logminer query: %w", err)
