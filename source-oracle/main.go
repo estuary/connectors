@@ -209,6 +209,7 @@ type oracleDatabase struct {
 	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tablesPublished    map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
 	tableObjectMapping map[string]sqlcapture.StreamID   // A mapping from objectID.dataObjectID to streamID
+	otherMapping       map[string][]int                 // A mapping from streamID to objectID, dataObjectID
 }
 
 func (db *oracleDatabase) isRDS() bool {
