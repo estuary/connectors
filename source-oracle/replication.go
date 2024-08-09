@@ -100,11 +100,10 @@ func (s *replicationStream) endLogminer(ctx context.Context) error {
 }
 
 // We process a maximum number of files for each run to avoid timeouts when querying from logminer
-//const maxLogFilesSession = 40
-
-func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error {
+func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int) error {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
+		"endSCN":   endSCN,
 		"sequence": s.redoSequence,
 	}).Debug("adding log files")
 
@@ -122,12 +121,12 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 		return fmt.Errorf("querying archive log files destination: %w", err)
 	}
 
-	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE# FROM V$LOGFILE LF, V$LOG L
+	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#, 'N' as DICT_END FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
-		WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED' AND L.NEXT_CHANGE# >= :1 AND LF.MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS)
+    WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED' AND L.NEXT_CHANGE# >= :1 AND LF.MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS)
 		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
 
-	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE# FROM V$ARCHIVED_LOG A
+	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.DICTIONARY_END as DICT_END FROM V$ARCHIVED_LOG A
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     A.NAME NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) AND DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
@@ -142,7 +141,10 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 	var redoFiles []redoFile
 	for rows.Next() {
 		var f redoFile
-		if err := rows.Scan(&f.status, &f.file, &f.sequence); err != nil {
+		var firstChange int
+		var dictEnd string
+
+		if err := rows.Scan(&f.status, &f.file, &f.sequence, &firstChange, &dictEnd); err != nil {
 			return fmt.Errorf("scanning log file record: %w", err)
 		}
 
@@ -154,6 +156,13 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 
 		if f.sequence > redoSequence {
 			redoSequence = f.sequence
+		}
+
+		// once we hit a log file that has passed endSCN and it signifies a dictEnd, we know we don't
+		// need any more log files. If we don't include a dictionary end file, we risk having an incomplete
+		// dictionary
+		if firstChange >= endSCN && dictEnd == "YES" {
+			break
 		}
 
 		redoFiles = append(redoFiles, f)
@@ -168,14 +177,12 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN int) error
 			return fmt.Errorf("adding logfile %q (%s) to logminer: %w", f.file, f.status, err)
 		}
 	}
-
-	s.redoFiles = redoFiles
 	s.redoSequence = redoSequence
 
 	return nil
 }
 
-func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) error {
+func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int) error {
 	var dictionaryOption = ""
 	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
@@ -183,13 +190,16 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN int) err
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG"
 	}
 
-	if err := s.addLogFiles(ctx, startSCN); err != nil {
+	if err := s.addLogFiles(ctx, startSCN, endSCN); err != nil {
 		return err
 	}
 
-	logrus.WithField("startSCN", startSCN).Debug("starting logminer")
-	var startQuery = fmt.Sprintf("BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY %s); END;", dictionaryOption)
-	if _, err := s.conn.ExecContext(ctx, startQuery, startSCN); err != nil {
+	logrus.WithFields(logrus.Fields{
+		"startSCN": startSCN,
+		"endSCN":   endSCN,
+	}).Debug("starting logminer")
+	var startQuery = fmt.Sprintf("BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,ENDSCN=>:end,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY %s); END;", dictionaryOption)
+	if _, err := s.conn.ExecContext(ctx, startQuery, startSCN, endSCN); err != nil {
 		return fmt.Errorf("starting logminer: %w", err)
 	}
 
@@ -221,7 +231,7 @@ type replicationStream struct {
 	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
 	decodeCh chan logminerMessage          // Messages received from Logminer are sent to this channel to be decoded and then sent to events channel
 
-	redoFiles    []redoFile // list of redo files
+	// sequence# of the last redo log file read, used to check if new log files have appeared
 	redoSequence int
 
 	lastTxnEndSCN int // End SCN (record + 1) of the last completed transaction.
@@ -308,7 +318,9 @@ func (s *replicationStream) run(ctx context.Context) error {
 
 func (s *replicationStream) poll(ctx context.Context) error {
 	for {
-		logrus.Debug("poll loop")
+		var startSCN = s.lastTxnEndSCN
+		var endSCN = startSCN + s.db.config.Advanced.IncrementalSCNRange
+
 		switched, err := s.redoFileSwitched(ctx)
 		if err != nil {
 			return err
@@ -317,7 +329,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		if switched {
 			if err := s.endLogminer(ctx); err != nil {
 				return err
-			} else if err := s.startLogminer(ctx, s.lastTxnEndSCN); err != nil {
+			} else if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
 				return err
 			}
 		}
@@ -326,6 +338,12 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("receive messages: %w", err)
 		}
+
+		// Although the query is inclusive, we do not +1 here since
+		// it is possible for there to be multiple rows with the same SCN
+		// and to be cautious we use the SCN as-is. This may lead to duplicate events being captured
+		// on restart, but it saves us from missing events
+		s.lastTxnEndSCN = endSCN
 
 		s.decodeCh <- logminerMessage{Op: opFlush}
 	}
@@ -345,7 +363,6 @@ func (s *replicationStream) decodeMessageWorker(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case s.events <- &sqlcapture.FlushEvent{Cursor: strconv.Itoa(s.lastTxnEndSCN)}:
-				logrus.WithField("scn", s.lastTxnEndSCN).Debug("flushing")
 				continue
 			}
 		}
@@ -355,18 +372,12 @@ func (s *replicationStream) decodeMessageWorker(ctx context.Context) error {
 			return err
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"msg": msg,
-		}).Debug("sending decoded message")
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case s.events <- event:
 			continue
 		}
-		logrus.WithFields(logrus.Fields{
-			"msg": msg,
-		}).Debug("sent decoded message")
 	}
 }
 
@@ -435,12 +446,6 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 			if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &msg.SQL, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
 				return err
 			}
-
-			// Although the query is inclusive, we do not +1 here since
-			// it is possible for there to be multiple rows with the same SCN
-			// and to be cautious we use the SCN as-is. This may lead to duplicate events being captured
-			// on restart, but it saves us from missing events
-			s.lastTxnEndSCN = msg.SCN
 
 			if undoSql.Valid {
 				msg.UndoSQL = undoSql.String
