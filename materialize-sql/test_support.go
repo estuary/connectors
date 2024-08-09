@@ -3,14 +3,20 @@ package sql
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
+
+//go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/flow.yaml
 
 // snapshotPath is a common set of test snapshots that may be used by SQL materialization connectors
 // that produce standard snapshots.
@@ -142,4 +148,145 @@ func RunFenceTestCases(
 			0, 1000,
 			100, 800)
 	})
+}
+
+//go:embed testdata/generated_specs
+var testFS embed.FS
+
+// TestTemplates is the set of templates that may be rendered for testing.
+// TableTemplates is required but the rest are optional.
+type TestTemplates struct {
+	// TableTemplates are all templates that take a Table as input for
+	// rendering.
+	TableTemplates []*template.Template
+	// TplAddColumns is a template that adds one or more columns to a table.
+	TplAddColumns *template.Template
+	// TplDropNotNulls is a template that drops one or more NOT NULL
+	// constraints.
+	TplDropNotNulls *template.Template
+	// TplCombinedAlter is a template that combines adding columns and dropping
+	// NOT NULL constraints.
+	TplCombinedAlter *template.Template
+	// TplInstallFence is a template that installs a fence.
+	TplInstallFence *template.Template
+	// TplUpdateFence is a template that updates a fence.
+	TplUpdateFence *template.Template
+}
+
+// RunSqlGenTests runs a standardized materialization spec against the provided
+// templates. The snapshot builder and generated tables are returned so that
+// callers can run additional tests if needed.
+func RunSqlGenTests(
+	t *testing.T,
+	dialect Dialect,
+	newResource func(table string, deltaUpdates bool) Resource,
+	templates TestTemplates,
+) (*strings.Builder, []Table) {
+	specBytes, err := testFS.ReadFile("testdata/generated_specs/flow.proto")
+	require.NoError(t, err)
+	var spec pf.MaterializationSpec
+	require.NoError(t, spec.Unmarshal(specBytes))
+
+	tables := []Table{}
+	for idx, delta := range []bool{false, true} {
+		shape := BuildTableShape(&spec, idx, newResource(spec.Bindings[idx].ResourcePath[0], delta))
+
+		if idx == 1 {
+			// The delta updates case.
+			shape.Document = nil
+		}
+
+		table, err := ResolveTable(shape, dialect)
+		require.NoError(t, err)
+		tables = append(tables, table)
+	}
+
+	var snap strings.Builder
+
+	for _, tpl := range templates.TableTemplates {
+		for _, tbl := range tables {
+			var testcase = tbl.Identifier + " " + tpl.Name()
+			snap.WriteString("--- Begin " + testcase + " ---\n")
+			require.NoError(t, tpl.Execute(&snap, &tbl))
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
+	}
+
+	addCols := []Column{
+		{Identifier: "first_new_column", MappedType: MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", MappedType: MappedType{NullableDDL: "BOOL"}},
+	}
+	dropNotNulls := []boilerplate.EndpointField{
+		{
+			Name:               "first_required_column",
+			Nullable:           true,
+			Type:               "string",
+			CharacterMaxLength: 0,
+		},
+		{
+			Name:               "second_required_column",
+			Nullable:           true,
+			Type:               "bool",
+			CharacterMaxLength: 0,
+		},
+	}
+
+	for _, testcase := range []struct {
+		name         string
+		addColumns   []Column
+		dropNotNulls []boilerplate.EndpointField
+		tpl          *template.Template
+	}{
+		{
+			name:         "alter table add columns and drop not nulls",
+			addColumns:   addCols,
+			dropNotNulls: dropNotNulls,
+			tpl:          templates.TplCombinedAlter,
+		},
+		{
+			name:       "alter table add columns",
+			addColumns: addCols,
+			tpl:        templates.TplAddColumns,
+		},
+		{
+			name:         "alter table drop not nulls",
+			dropNotNulls: dropNotNulls,
+			tpl:          templates.TplDropNotNulls,
+		},
+	} {
+		if testcase.tpl == nil {
+			continue
+		}
+
+		snap.WriteString("--- Begin " + testcase.name + " ---\n")
+		require.NoError(t, testcase.tpl.Execute(&snap, TableAlter{
+			Table:        tables[0],
+			AddColumns:   testcase.addColumns,
+			DropNotNulls: testcase.dropNotNulls,
+		}))
+		snap.WriteString("--- End " + testcase.name + " ---\n\n")
+	}
+
+	var fence = Fence{
+		TablePath:       TablePath{"path", "to", "checkpoints"},
+		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+		Fence:           123,
+		Materialization: pf.Materialization("some/Materialization"),
+		KeyBegin:        0x00112233,
+		KeyEnd:          0xffeeddcc,
+	}
+
+	if tpl := templates.TplInstallFence; tpl != nil {
+		snap.WriteString("--- Begin Fence Install ---\n")
+		require.NoError(t, tpl.Execute(&snap, fence))
+		snap.WriteString("--- End Fence Install ---\n\n")
+	}
+
+	if tpl := templates.TplUpdateFence; tpl != nil {
+		snap.WriteString("--- Begin Fence Update ---")
+		require.NoError(t, tpl.Execute(&snap, fence))
+		snap.WriteString("--- End Fence Update ---\n\n")
+	}
+
+	return &snap, tables
 }
