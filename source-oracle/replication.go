@@ -126,12 +126,12 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 
 	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#,'NO' as DICT_START, 'NO' as DICT_END FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
-    WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED' AND L.NEXT_CHANGE# >= :1 AND LF.MEMBER NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS)
+    WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED'
 		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
 
 	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END FROM V$ARCHIVED_LOG A
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
-    A.NAME NOT IN (SELECT FILENAME FROM V$LOGMNR_LOGS) AND DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
+    DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
 	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + fmt.Sprintf(" ORDER BY SEQUENCE#")
 	rows, err := s.conn.QueryContext(ctx, fullQuery, startSCN)
@@ -149,7 +149,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 			return fmt.Errorf("scanning log file record: %w", err)
 		}
 
-		logrus.WithField("file", f).Debug("adding log file")
+		logrus.WithField("file", fmt.Sprintf("%+v", f)).Debug("adding log file")
 
 		if f.Sequence > redoSequence {
 			redoSequence = f.Sequence
@@ -161,6 +161,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		// need any more log files. If we don't include a dictionary end file, we risk having an incomplete
 		// dictionary
 		if f.FirstChange >= endSCN && f.DictEnd == "YES" {
+			logrus.Debug("breaking log files loop")
 			break
 		}
 	}
