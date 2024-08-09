@@ -1,0 +1,275 @@
+---
+collections:
+  acmeCo/account_attributes:
+    schema:
+      type:
+        - object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        name:
+          type:
+            - "null"
+            - string
+        created_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        updated_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        url:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/attribute_definitions:
+    schema: attribute_definitions.schema.yaml
+    key:
+      - /subject
+  acmeCo/audit_logs:
+    schema: audit_logs.schema.yaml
+    key:
+      - /id
+  acmeCo/brands:
+    schema: brands.schema.yaml
+    key:
+      - /id
+  acmeCo/custom_roles:
+    schema: custom_roles.schema.yaml
+    key:
+      - /id
+  acmeCo/group_memberships:
+    schema:
+      properties:
+        default:
+          type:
+            - "null"
+            - boolean
+        url:
+          type:
+            - "null"
+            - string
+        user_id:
+          type:
+            - "null"
+            - integer
+        updated_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        group_id:
+          type:
+            - "null"
+            - integer
+        created_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type:
+        - object
+      required:
+        - id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/groups:
+    schema:
+      type:
+        - object
+      required:
+        - id
+      properties:
+        name:
+          type:
+            - "null"
+            - string
+        created_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        url:
+          type:
+            - "null"
+            - string
+        updated_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        deleted:
+          type:
+            - "null"
+            - boolean
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/macros:
+    schema: macros.schema.yaml
+    key:
+      - /id
+  acmeCo/organization_memberships:
+    schema: organization_memberships.schema.yaml
+    key:
+      - /id
+  acmeCo/organizations:
+    schema: organizations.schema.yaml
+    key:
+      - /id
+  acmeCo/post_comment_votes:
+    schema: post_comment_votes.schema.yaml
+    key:
+      - /id
+  acmeCo/post_comments:
+    schema: post_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/post_votes:
+    schema: post_votes.schema.yaml
+    key:
+      - /id
+  acmeCo/posts:
+    schema: posts.schema.yaml
+    key:
+      - /id
+  acmeCo/satisfaction_ratings:
+    schema: satisfaction_ratings.schema.yaml
+    key:
+      - /id
+  acmeCo/schedules:
+    schema: schedules.schema.yaml
+    key:
+      - /id
+  acmeCo/sla_policies:
+    schema: sla_policies.schema.yaml
+    key:
+      - /id
+  acmeCo/tags:
+    schema:
+      type:
+        - object
+      required:
+        - name
+      properties:
+        count:
+          type:
+            - "null"
+            - integer
+        name:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /name
+  acmeCo/ticket_audits:
+    schema: ticket_audits.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_comments:
+    schema: ticket_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_fields:
+    schema: ticket_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_forms:
+    schema: ticket_forms.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_metric_events:
+    schema:
+      properties:
+        metric:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        time:
+          type:
+            - "null"
+            - string
+        instance_id:
+          type:
+            - "null"
+            - integer
+        ticket_id:
+          type:
+            - "null"
+            - integer
+        type:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type:
+        - object
+      required:
+        - id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/ticket_metrics:
+    schema: ticket_metrics.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_skips:
+    schema: ticket_skips.schema.yaml
+    key:
+      - /id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id

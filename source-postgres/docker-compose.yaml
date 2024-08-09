@@ -3,7 +3,7 @@ version: "3.7"
 services:
   db:
     image: 'postgres:latest'
-    command: [ "postgres", "-c", "wal_level=logical" ]
+    command: [ "postgres", "-c", "wal_level=logical", "-c", "timezone=PST8PDT" ]
     ports:
       - "5432:5432"
     environment:

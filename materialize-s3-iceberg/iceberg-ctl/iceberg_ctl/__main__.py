@@ -101,20 +101,49 @@ class IcebergColumn(BaseModel):
 
 @run.command()
 @click.pass_context
-def info_schema(ctx: Context):
+@click.argument("resource-paths", type=str)
+def info_schema(
+    ctx: Context,
+    resource_paths: str,
+):
+    '''
+    Get a list of all pre-existing tables and columns in destination.
+
+    The resource-paths argument is a JSON array of tuples of the form
+    (namespace, table).
+    
+    For efficiency, we only list tables that are included in the list of
+    resources for the materialization. For the purposes of computing apply
+    actions and validation constraints, we don't care about tables other than
+    these, and attempting to list their information can really slow things down
+    if there are a lot of non-related pre-existing namespaces and tables.
+    '''
+
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
     tables: dict[str, list[IcebergColumn]] = {}
+    find_paths = TypeAdapter(list[tuple[str, str]]).validate_json(resource_paths)
+    find_namespaces = set(path[0] for path in find_paths)
+    find_tables: dict[str, list[str]] = {}
+    for path in find_paths:
+        find_tables.setdefault(path[0], []).append(path[1])
 
     for ns in catalog.list_namespaces():
+        if ns[0] not in find_namespaces:
+            # Namespace is not relevant for the list of tables and namespaces
+            # are care about.
+            continue
+
         for tbl in catalog.list_tables(ns):
+            if tbl[1] not in find_tables[tbl[0]]:
+                # Table is not relevant for the list of tables and namespaces
+                # are care about.
+                continue
+
             loaded = catalog.load_table(tbl)
 
-            # The first component of the "name" is always first argument to constructing the
-            # catalog, which is not useful to us. The second component is the namespace, and the
-            # third component is the table name.
-            tables[f"{loaded.name()[1]}.{loaded.name()[2]}"] = [
+            tables[f"{tbl[0]}.{tbl[1]}"] = [
                 IcebergColumn(
                     name=f.name,
                     nullable=not f.required,
@@ -302,11 +331,18 @@ def append_files(
     # append the same files concurrently. In principal Iceberg catalogs support the atomic
     # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
     # at a lower level than PyIceberg currently makes available.
-
     tbl.add_files(
         file_paths.split(","), snapshot_properties={"checkpoint": next_checkpoint}
     )
 
+    # TODO(whb): This additional checking should not really be necessary, but is
+    # included for now to assist in troubleshooting potential errors.
+    tbl = catalog.load_table(table)
+    snap = tbl.current_snapshot()
+    assert snap is not None
+    assert snap.summary is not None
+    cp = snap.summary["checkpoint"]
+    print(f"set checkpoint to {cp}")
 
 if __name__ == "__main__":
     run(auto_envvar_prefix="ICEBERG")

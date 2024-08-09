@@ -18,6 +18,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	truncateColumnThreshold = 8 * 1024 * 1024 // Arbitrarily selected value
+)
+
 func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	var tables, err = getTables(ctx, db.conn)
@@ -284,8 +288,14 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				}
 				return acc, nil
 			case "binary", "varbinary":
+				if len(val) > truncateColumnThreshold {
+					val = val[:truncateColumnThreshold]
+				}
 				return val, nil
 			case "blob", "tinyblob", "mediumblob", "longblob":
+				if len(val) > truncateColumnThreshold {
+					val = val[:truncateColumnThreshold]
+				}
 				return val, nil
 			case "time":
 				// The MySQL client library parsing logic for TIME columns is
@@ -301,6 +311,9 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 					// The empty string is technically invalid JSON but null should be
 					// a reasonable translation.
 					return nil, nil
+				}
+				if len(val) > truncateColumnThreshold {
+					val = oversizePlaceholderJSON(val)
 				}
 				if !json.Valid(val) {
 					// If the contents of a JSON column are malformed and non-empty we
@@ -350,9 +363,16 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				return t.UTC().Format(time.RFC3339Nano), nil
 			}
 		}
+		if len(val) > truncateColumnThreshold {
+			val = val[:truncateColumnThreshold]
+		}
 		return string(val), nil
 	}
 	return val, nil
+}
+
+func oversizePlaceholderJSON(orig []byte) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
 }
 
 func normalizeMySQLTimestamp(ts string) string {
@@ -466,6 +486,13 @@ type mysqlColumnType struct {
 	Type       string   `json:"type" mapstructure:"type"`                   // The basic name of the column type.
 	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"`         // The list of values which an enum (or set) column can contain.
 	Unsigned   bool     `json:"unsigned,omitempty" mapstructure:"unsigned"` // True IFF an integer type is unsigned
+}
+
+func (t *mysqlColumnType) String() string {
+	if t.Unsigned {
+		return t.Type + " unsigned"
+	}
+	return t.Type
 }
 
 func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, error) {

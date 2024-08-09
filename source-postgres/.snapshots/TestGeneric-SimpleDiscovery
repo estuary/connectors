@@ -15,18 +15,22 @@ Binding 0:
           "$anchor": "TestGeneric_simplediscovery_49210954",
           "properties": {
             "a": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "b": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "c": {
-              "type": "number"
+              "type": "number",
+              "description": "(source type: non-nullable float4)"
             },
             "d": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"

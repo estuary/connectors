@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -114,10 +114,10 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			var ctid = fields["ctid"].(pgtype.TID)
 			delete(fields, "ctid")
 
-			rowKey, err = ctid.EncodeText(db.conn.ConnInfo(), nil)
-			if err != nil {
-				return false, fmt.Errorf("internal error: failed to encode ctid %#v: %w", ctid, err)
+			if !ctid.Valid {
+				return false, fmt.Errorf("internal error: invalid ctid value %#v", ctid)
 			}
+			rowKey = []byte(fmt.Sprintf("(%d,%d)", ctid.BlockNumber, ctid.OffsetNumber))
 
 			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
 			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
@@ -200,6 +200,9 @@ func (db *postgresDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, sch
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
 	fmt.Fprintf(query, ` WHERE ctid > $1`)
+	if db.config.Advanced.MinimumBackfillXID != "" {
+		fmt.Fprintf(query, ` AND (((xmin::text::bigint - %s::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3`, db.config.Advanced.MinimumBackfillXID)
+	}
 	fmt.Fprintf(query, ` LIMIT %d;`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
@@ -220,11 +223,20 @@ func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []s
 		args = append(args, fmt.Sprintf("$%d", idx+1))
 	}
 
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
+	if !start {
+		whereClauses = append(whereClauses, fmt.Sprintf(`(%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", ")))
+	}
+	if db.config.Advanced.MinimumBackfillXID != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf(`(((xmin::text::bigint - %s::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3`, db.config.Advanced.MinimumBackfillXID))
+	}
+
 	// Construct the query itself
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
-	if !start {
-		fmt.Fprintf(query, ` WHERE (%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", "))
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
 	fmt.Fprintf(query, ` ORDER BY %s`, strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)

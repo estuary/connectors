@@ -95,12 +95,19 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 					"error": err,
 					"type":  column.DataType,
 				}).Debug("error translating column type to JSON schema")
-				properties[column.Name] = &jsonschema.Schema{
-					Description: fmt.Sprintf("using catch-all schema: %v", err),
+				jsonType = &jsonschema.Schema{
+					Description: fmt.Sprintf("using catch-all schema (%v)", err),
 				}
-			} else {
-				properties[column.Name] = jsonType
 			}
+			if jsonType.Description != "" {
+				jsonType.Description += " "
+			}
+			var nullabilityDescription = ""
+			if !column.IsNullable {
+				nullabilityDescription = "non-nullable "
+			}
+			jsonType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, column.DataType)
+			properties[column.Name] = jsonType
 		}
 
 		// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline

@@ -13,21 +13,25 @@ Binding 0:
           "$anchor": "TestGeneric_KeylessDiscovery_t32386",
           "properties": {
             "a": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "b": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "c": {
-              "type": "number"
+              "type": "number",
+              "description": "(source type: non-nullable double)"
             },
             "d": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"

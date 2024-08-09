@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import itertools
 import json
 from datetime import UTC, datetime, timedelta
@@ -235,6 +236,7 @@ async def fetch_changes(
     fetch_recent: FetchRecentFn,
     http: HTTPSession,
     object_name: str,
+    fallback_to_search_api: bool,
     # Remainder is common.FetchChangesFn:
     log: Logger,
     log_cursor: LogCursor,
@@ -245,6 +247,7 @@ async def fetch_changes(
     # as `log_cursor`, or no pages remain.
     recent: list[tuple[datetime, str]] = []
     next_page: PageCursor = None
+    using_fallback = False
 
     while True:
         iter, next_page = await fetch_recent(log, http, log_cursor, next_page)
@@ -257,6 +260,25 @@ async def fetch_changes(
 
         if not next_page:
             break
+
+        if fallback_to_search_api and not using_fallback and len(recent) >= 9_900:
+            log.info(f"falling back to Search API to return more than 10,000 recent records")
+
+            # Some fetch_recent functions are limited to a maximum number of
+            # recent records. After that point we can use the Search API to fill
+            # in the rest. The Search API is slower and has consistency problems
+            # with very recent data so it is generally not used as the first
+            # option for capturing data, but falling back to it is preferable
+            # over doing an entire re-backfill.
+            using_fallback = True
+            next_page = None
+
+            # The datetime of the oldest of the retrieved records is used here
+            # as the inclusive upper limit for the Search API. There may be many
+            # records with the same "created at" timestamp and runs of these
+            # records may span the `use_search_api_limit` boundary. In this case
+            # we will capture some of the same records twice.
+            fetch_recent = functools.partial(fetch_recent_search_objects, object_name, min(r[0] for r in recent))
 
     recent.sort()  # Oldest updates first.
 
@@ -351,10 +373,9 @@ async def fetch_recent_tickets(
     return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 
 
-# TODO(whb): As we add more object types that might need to use the search API for getting recent
-# changes, this function will probably make sense to generalize.
-async def fetch_recent_custom_objects(
+async def fetch_recent_search_objects(
     object_name: str,
+    until: datetime | None,
     log: Logger,
     http: HTTPSession,
     since: datetime,
@@ -362,17 +383,19 @@ async def fetch_recent_custom_objects(
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
-    # The search API has known inconsistencies with very recent data.
-    horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
-    if horizon <= since:
-        return [], None
+    if not until:
+        # Fetch up until the present time. The search API has known
+        # inconsistencies with very recent data, so a small offset is applied.
+        until = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
+        if until <= since:
+            return [], None
 
     input = {
         "filters": [
             {
                 "propertyName": "hs_lastmodifieddate",
                 "operator": "BETWEEN",
-                "highValue": horizon.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                "highValue": until.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                 "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             },
         ],
@@ -447,8 +470,10 @@ async def fetch_recent_email_events(
     assert isinstance(log_cursor, datetime)
 
     url = f"{HUB}/email/public/v1/events"
-    # The email events API has known inconsistencies with very recent data.
-    horizon = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
+    # The email events API has known inconsistencies with recent data. Empirical
+    # evidence suggests that values as short as 5 minutes are too recent, but 1
+    # hour of delay will work.
+    horizon = datetime.now(tz=UTC) - timedelta(hours=1)
     if horizon <= log_cursor:
         return
 

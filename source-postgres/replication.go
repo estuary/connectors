@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -69,18 +69,20 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		// completely unable to produce a fatal error, and double-checking to make extra sure we don't
 		// accidentally dereference a null pointer doesn't really hurt anything.
 		logrus.WithField("slot", slot).Warn("replication slot has no metadata (and probably doesn't exist?)")
+	} else if slotInfo.Active {
+		logrus.WithField("slot", slot).Warn("replication slot is already active (is another capture already running against this database?)")
 	} else if slotInfo.WALStatus == "lost" {
 		logrus.WithField("slot", slot).Warn("replication slot was invalidated by the server, it must be deleted and all bindings backfilled")
 	} else if startLSN < slotInfo.ConfirmedFlushLSN {
 		logrus.WithFields(logrus.Fields{
 			"slot":         slot,
-			"confirmedLSN": slotInfo.ConfirmedFlushLSN,
-			"startLSN":     startLSN,
+			"confirmedLSN": slotInfo.ConfirmedFlushLSN.String(),
+			"startLSN":     startLSN.String(),
 		}).Warn("replication slot confirmed_flush_lsn greater than connector start LSN (this means it was probably deleted+recreated and all bindings need to be backfilled)")
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"startLSN":    startLSN,
+		"startLSN":    startLSN.String(),
 		"publication": publication,
 		"slot":        slot,
 	}).Info("starting replication")
@@ -103,6 +105,11 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
+	var typeMap = pgtype.NewMap()
+	if err := registerDatatypeTweaks(typeMap); err != nil {
+		return nil, err
+	}
+
 	var stream = &replicationStream{
 		db:       db,
 		conn:     conn,
@@ -113,7 +120,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		lastTxnEndLSN:   startLSN,
 		nextTxnFinalLSN: 0,
 		nextTxnMillis:   0,
-		connInfo:        pgtype.NewConnInfo(),
+		typeMap:         typeMap,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
@@ -175,6 +182,7 @@ type replicationStream struct {
 	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
 
 	ackLSN          uint64        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
+	previousAckLSN  pglogrepl.LSN // The last acknowledged LSN sent to the server in a Standby Status Update. Only used to reduce log spam at INFO level.
 	lastTxnEndLSN   pglogrepl.LSN // End LSN (record + 1) of the last completed transaction.
 	nextTxnFinalLSN pglogrepl.LSN // Final LSN of the commit currently being processed, or zero if between transactions.
 	nextTxnMillis   int64         // Unix timestamp (in millis) at which the change originally occurred.
@@ -185,9 +193,8 @@ type replicationStream struct {
 	// the DB.
 	standbyStatusDeadline time.Time
 
-	// connInfo is a sort of type registry used when decoding values
-	// from the database.
-	connInfo *pgtype.ConnInfo
+	// typeMap is a sort of type registry used when decoding values from the database.
+	typeMap *pgtype.Map
 
 	// relations keeps track of all "Relation Messages" from the database. These
 	// messages tell us about the integer ID corresponding to a particular table
@@ -566,28 +573,24 @@ func (s *replicationStream) decodeTuple(
 	return fields, nil
 }
 
-func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
-	var decoder pgtype.TextDecoder
-	if dt, ok := s.connInfo.DataTypeForOID(dataType); ok {
-		decoder, ok = dt.Value.(pgtype.TextDecoder)
-		if !ok {
-			decoder = &pgtype.GenericText{}
-		}
-	} else {
-		decoder = &pgtype.GenericText{}
+func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (any, error) {
+	var dt, ok = s.typeMap.TypeForOID(dataType)
+	if !ok {
+		// Replication values always use the text encoding, and in the absence of any specific
+		// data type mapping we want to treat them as generic text strings, which is just a cast.
+		return string(data), nil
 	}
-	if err := decoder.DecodeText(s.connInfo, data); err != nil {
-		if _, ok := err.(*time.ParseError); ok {
-			// The only known situations where a valid Postgres timestamp may fail to parse
-			// are when the year is greater than 9999 or less than 0. We don't support years
-			// outside of that range because timestamps are serialized to RFC3339, but generally
-			// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
-			// these all to the same error value is as good as any other option.
-			return negativeInfinityTimestamp, nil
-		}
-		return nil, err
+
+	var val, err = dt.Codec.DecodeValue(s.typeMap, dataType, pgtype.TextFormatCode, data)
+	// The only known situations where a valid Postgres timestamp may fail to parse
+	// are when the year is greater than 9999 or less than 0. We don't support years
+	// outside of that range because timestamps are serialized to RFC3339, but generally
+	// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
+	// these all to the same error value is as good as any other option.
+	if _, ok := err.(*time.ParseError); ok {
+		return negativeInfinityTimestamp, nil
 	}
-	return decoder.(pgtype.Value).Get(), nil
+	return val, err
 }
 
 // receiveMessage reads and parses the next replication message from the database,
@@ -675,7 +678,6 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	logrus.WithField("cursor", cursor).Debug("advancing acknowledged LSN")
 	var lsn, err = pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
@@ -686,7 +688,13 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) erro
 
 func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	var ackLSN = pglogrepl.LSN(atomic.LoadUint64(&s.ackLSN))
-	logrus.WithField("ackLSN", ackLSN).Debug("sending Standby Status Update")
+	if ackLSN != s.previousAckLSN {
+		// Log at info level whenever we're about to confirm a different LSN from last time.
+		logrus.WithField("ackLSN", ackLSN.String()).Info("advancing confirmed LSN")
+		s.previousAckLSN = ackLSN
+	} else {
+		logrus.WithField("ackLSN", ackLSN.String()).Debug("sending Standby Status Update")
+	}
 	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: ackLSN,
 	})

@@ -71,10 +71,12 @@ jobs:
         connector:
           - source-alpaca
           - source-bigquery-batch
+          - source-dropbox
           - source-dynamodb
           - source-firestore
           - source-gcs
           - source-google-drive
+          - source-google-pubsub
           - source-hello-world
           - source-http-file
           - source-http-ingest
@@ -179,6 +181,7 @@ jobs:
             "source-mongodb"
             ]'), matrix.connector)
         run: |
+          set +e # Show logs even if startup fails
           docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
           docker logs ${{ matrix.connector }}-db-1
 
@@ -260,7 +263,7 @@ jobs:
         run: python -m pip install databricks-sql-cli
 
       - name: Install duckdb
-        if: matrix.connector == 'materialize-motherduck'
+        if: matrix.connector == 'materialize-motherduck' || matrix.connector == 'materialize-s3-iceberg'
         uses: opt-nc/setup-duckdb-action@v1.0.7
         with:
           version: v0.10.3
@@ -280,7 +283,8 @@ jobs:
               "materialize-snowflake",
               "materialize-databricks",
               "materialize-bigquery",
-              "materialize-redshift"
+              "materialize-redshift",
+              "materialize-s3-iceberg"
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
