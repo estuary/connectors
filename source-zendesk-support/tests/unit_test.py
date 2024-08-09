@@ -214,23 +214,6 @@ def test_next_page_token(requests_mock):
     assert expected == output
 
 
-@pytest.mark.parametrize(
-    "stream_state, expected",
-    [
-        # valid state, expect the value of the state
-        ({"updated_at": "2022-04-01"}, 1648771200),
-        # invalid state, expect the start_date from STREAM_ARGS
-        ({"updated_at": ""}, 1622505600),
-        ({"updated_at": None}, 1622505600),
-        ({"missing_cursor": "2022-04-01"}, 1622505600),
-    ],
-    ids=["state present", "empty string in state", "state is None", "cursor is not in the state object"],
-)
-def test_check_stream_state(stream_state, expected):
-    result = Tickets(**STREAM_ARGS).check_stream_state(stream_state)
-    assert result == expected
-
-
 def test_request_params(requests_mock):
     expected = {"start_time": calendar.timegm(pendulum.parse(STREAM_ARGS.get("start_date")).utctimetuple()), "include": "comment_events"}
     stream_state = None
@@ -334,8 +317,8 @@ class TestAllStreams:
             (TicketForms, "ticket_forms"),
             (TicketMetrics, "ticket_metrics"),
             (TicketMetricEvents, "incremental/ticket_metric_events"),
-            (Tickets, "incremental/tickets.json"),
-            (Users, "incremental/users.json"),
+            (Tickets, "incremental/tickets/cursor"),
+            (Users, "incremental/users/cursor"),
             (Brands, "brands"),
             (CustomRoles, "custom_roles"),
             (Schedules, "business_hours/schedules.json"),
@@ -712,8 +695,8 @@ class TestSourceZendeskIncrementalExportStream:
     @pytest.mark.parametrize(
         "stream_cls, expected",
         [
-            (Users, "incremental/users.json"),
-            (Tickets, "incremental/tickets.json"),
+            (Users, "incremental/users/cursor"),
+            (Tickets, "incremental/tickets/cursor"),
         ],
         ids=[
             "Users",
@@ -886,7 +869,7 @@ class TestSourceZendeskSupportTicketEventsExportStream:
 
 def test_read_tickets_stream(requests_mock):
     requests_mock.get(
-        "https://subdomain.zendesk.com/api/v2/incremental/tickets.json",
+        "https://subdomain.zendesk.com/api/v2/incremental/tickets/cursor",
         json={
             "tickets": [
                 {"custom_fields": []},

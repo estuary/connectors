@@ -22,6 +22,7 @@ import pytz
 import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
+from airbyte_cdk.sources.streams.core import IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream, HttpSubStream
 from airbyte_cdk.sources.streams.http.auth.core import HttpAuthenticator
 from airbyte_cdk.sources.streams.http.availability_strategy import HttpAvailabilityStrategy
@@ -514,6 +515,80 @@ class SourceZendeskIncrementalExportStream(SourceZendeskSupportCursorPaginationS
             yield record
 
 
+class SourceZendeskSupportIncrementalCursorExportStream(SourceZendeskIncrementalExportStream, IncrementalMixin):
+    """
+    Incremental cursor export for Users and Tickets streams
+    Zendesk API docs: https://developer.zendesk.com/documentation/ticketing/managing-tickets/using-the-incremental-export-api/#cursor-based-incremental-exports
+    Airbyte Incremental Stream Docs: https://docs.airbyte.com/connector-development/cdk-python/incremental-stream for some background.
+    
+    Uses IncrementalMixin's state setter & getter to persist cursors between requests.
+    """
+
+    state_checkpoint_interval = 1000
+    _cursor_value = ""
+
+    @property
+    def cursor_field(self) -> str:
+        """Name of the field associated with the state"""
+        return "after_cursor"
+
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
+
+    def path(self, **kwargs) -> str:
+        return f"incremental/{self.response_list_name}/cursor"
+
+    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        if self._ignore_pagination:
+            return None
+
+        response_json = response.json()
+
+        pagination_complete = response_json.get(END_OF_STREAM_KEY, None)
+        if pagination_complete:
+            return None
+
+        cursor = response_json.get("after_cursor", None)
+        if cursor:
+            # Use the cursor from the most recent response to get the next page.
+            return {"cursor": cursor}
+
+    def request_params(
+        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
+        # Get the remaining pages if _ignore_pagination is false.
+        if next_page_token:
+            return next_page_token
+
+        # Get the latest cursor from state if this is the start of a sweep.
+        latest_cursor = self.state.get(self.cursor_field, None)
+        if latest_cursor:
+            return { "cursor": latest_cursor }
+
+        # Otherwise, this is the first request and we need to provide a `start_time`.
+        params = {"start_time": calendar.timegm(pendulum.parse(self._start_date).utctimetuple())}
+        # check "start_time" is not in the future
+        params["start_time"] = self.check_start_time_param(params["start_time"])
+
+        return params
+
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        response_json = response.json()
+
+        records = response_json.get(self.response_list_name, [])
+        for record in records:
+            yield record
+
+        cursor = response_json.get("after_cursor", None)
+        if cursor and len(records) != 0:
+            self.state = {self.cursor_field: cursor}
+
+
 class SourceZendeskSupportTicketEventsExportStream(SourceZendeskIncrementalExportStream):
     """Incremental Export from TicketEvents stream:
     https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-ticket-event-export
@@ -576,8 +651,8 @@ class AuditLogs(SourceZendeskSupportCursorPaginationStream):
     cursor_field = "created_at"
 
 
-class Users(SourceZendeskIncrementalExportStream):
-    """Users stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export"""
+class Users(SourceZendeskSupportIncrementalCursorExportStream):
+    """Users stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export-cursor-based"""
 
     response_list_name: str = "users"
 
@@ -586,8 +661,8 @@ class Organizations(SourceZendeskSupportStream):
     """Organizations stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/"""
 
 
-class Tickets(SourceZendeskIncrementalExportStream):
-    """Tickets stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-ticket-export-time-based"""
+class Tickets(SourceZendeskSupportIncrementalCursorExportStream):
+    """Tickets stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-ticket-export-cursor-based"""
 
     response_list_name: str = "tickets"
     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
