@@ -8,31 +8,21 @@ import (
 )
 
 var sqliteDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:   sql.NewStaticMapper("TEXT"),
-		sql.BINARY:  sql.NewStaticMapper("TEXT"),
-		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER: sql.NewStaticMapper("INTEGER"),
-		sql.NUMBER:  sql.NewStaticMapper("REAL"),
-		sql.OBJECT:  sql.NewStaticMapper("TEXT"),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("TEXT"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("TEXT"),
-					Delegate:   sql.NewStaticMapper("INTEGER"),
-				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("TEXT"),
-					Delegate:   sql.NewStaticMapper("REAL"),
-				},
-			},
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.ARRAY:          sql.MapStatic("TEXT"),
+			sql.BINARY:         sql.MapStatic("TEXT"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:        sql.MapStatic("INTEGER"),
+			sql.NUMBER:         sql.MapStatic("REAL"),
+			sql.OBJECT:         sql.MapStatic("TEXT"),
+			sql.MULTIPLE:       sql.MapStatic("TEXT"),
+			sql.STRING_INTEGER: sql.MapStatic("INTEGER"),
+			sql.STRING_NUMBER:  sql.MapStatic("REAL"),
+			sql.STRING:         sql.MapStatic("TEXT"),
 		},
-	}
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	return sql.Dialect{
 		// TableLocator and ColumnLocator are not used for sqlite, since sqlite re-creates all tables

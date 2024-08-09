@@ -11,27 +11,26 @@ import (
 )
 
 func newTestDialect() Dialect {
-	var mapper TypeMapper = ProjectionTypeMapper{
-		INTEGER:  NewStaticMapper("BIGINT"),
-		NUMBER:   NewStaticMapper("DOUBLE PRECISION"),
-		BOOLEAN:  NewStaticMapper("BOOLEAN"),
-		OBJECT:   NewStaticMapper("JSON"),
-		ARRAY:    NewStaticMapper("JSON"),
-		BINARY:   NewStaticMapper("BYTEA"),
-		MULTIPLE: NewStaticMapper("JSON"),
-		STRING: StringTypeMapper{
-			Fallback: NewStaticMapper("TEXT"),
-			WithFormat: map[string]TypeMapper{
-				"integer":   NewStaticMapper("NUMERIC"),
-				"number":    NewStaticMapper("DECIMAL"),
-				"date-time": NewStaticMapper("TIMESTAMPTZ"),
-			},
+	mapper := NewDDLMapper(
+		FlatTypeMappings{
+			ARRAY:          MapStatic("JSON"),
+			BINARY:         MapStatic("BYTEA"),
+			BOOLEAN:        MapStatic("BOOLEAN"),
+			INTEGER:        MapStatic("BIGINT"),
+			MULTIPLE:       MapStatic("JSON"),
+			NUMBER:         MapStatic("DOUBLE PRECISION"),
+			OBJECT:         MapStatic("JSON"),
+			STRING_INTEGER: MapStatic("NUMERIC"),
+			STRING_NUMBER:  MapStatic("DECIMAL"),
+			STRING: MapString(StringMappings{
+				Fallback: MapStatic("TEXT"),
+				WithFormat: map[string]MapProjectionFn{
+					"date-time": MapStatic("TIMESTAMPTZ"),
+				},
+			}),
 		},
-	}
-	mapper = NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		WithNotNullText("NOT NULL"),
+	)
 
 	cv := NewColumnValidator(
 		ColValidation{Types: []string{"json"}, Validate: JsonCompatible},

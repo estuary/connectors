@@ -8,39 +8,31 @@ import (
 )
 
 var duckDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:   sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.ARRAY:    sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:   sql.NewStaticMapper("VARCHAR"),
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("VARCHAR"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR"),
-					Delegate:   sql.NewStaticMapper("HUGEINT", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:         sql.MapStatic("JSON", sql.ToJsonBytes),
+			sql.ARRAY:          sql.MapStatic("JSON", sql.ToJsonBytes),
+			sql.BINARY:         sql.MapStatic("VARCHAR"),
+			sql.MULTIPLE:       sql.MapStatic("JSON", sql.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapStatic("HUGEINT", sql.StrToInt),
+			// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", sql.StrToFloat("NaN", "Infinity", "-Infinity")),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("VARCHAR"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE"),
+					"duration":  sql.MapStatic("INTERVAL"),
+					"time":      sql.MapStatic("TIME"),
+					"uuid":      sql.MapStatic("UUID"),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR"),
-					// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
-					Delegate: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
-				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMP WITH TIME ZONE"),
-				"duration":  sql.NewStaticMapper("INTERVAL"),
-				"time":      sql.NewStaticMapper("TIME"),
-				"uuid":      sql.NewStaticMapper("UUID"),
-			},
+			}),
 		},
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"bigint", "hugeint"}, Validate: sql.IntegerCompatible},

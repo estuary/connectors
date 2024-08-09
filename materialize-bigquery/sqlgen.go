@@ -49,6 +49,11 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	case json.RawMessage:
 		return string(ii), nil
 	case nil:
+		// TODO(whb): This actually materializes NULL values as empty strings in
+		// BigQuery. It's only used for objects and arrays, and we eventually
+		// want to have those materialized as JSON anyway, so I'm leaving this
+		// alone for now to maintain historical consistency in case somebody is
+		// relying on the pre-existing (incorrect, I would argue) behavior.
 		return string(json.RawMessage(nil)), nil
 	default:
 		return nil, fmt.Errorf("invalid type %#v for variant", te)
@@ -56,36 +61,28 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 var bqDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("STRING"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
-		sql.INTEGER:  sql.NewStaticMapper("INT64"),
-		sql.NUMBER:   sql.NewStaticMapper("FLOAT64"),
-		sql.OBJECT:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("STRING"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("BIGNUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.ARRAY:          sql.MapStatic("STRING", jsonConverter),
+			sql.BINARY:         sql.MapStatic("STRING"),
+			sql.BOOLEAN:        sql.MapStatic("BOOL"),
+			sql.INTEGER:        sql.MapStatic("INT64"),
+			sql.NUMBER:         sql.MapStatic("FLOAT64"),
+			sql.OBJECT:         sql.MapStatic("STRING", jsonConverter),
+			sql.MULTIPLE:       sql.MapStatic("JSON", sql.ToJsonBytes),
+			sql.STRING_INTEGER: sql.MapStatic("BIGNUMERIC(38,0)", sql.StrToInt),
+			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
+			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.StrToFloat("NaN", "Infinity", "-Infinity")),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("STRING"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("TIMESTAMP"),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
-					Delegate: sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
-				},
-				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
-				"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(sql.ClampDatetime())),
-			},
+			}),
 		},
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+		sql.WithNotNullText("NOT NULL"),
+	)
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
