@@ -25,6 +25,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteCDCEnabled,
 		db.prerequisiteChangeTableCleanup,
+		db.prerequisiteCaptureInstanceManagement,
 		db.prerequisiteWatermarksTable,
 		db.prerequisiteWatermarksCaptureInstance,
 		db.prerequisiteMaximumLSN,
@@ -140,15 +141,38 @@ func (db *sqlserverDatabase) prerequisiteChangeTableCleanup(ctx context.Context)
 		return nil
 	}
 
-	var isMember *int
-	if err := db.conn.QueryRowContext(ctx, "SELECT IS_ROLEMEMBER('db_owner');", db.config.User).Scan(&isMember); err != nil {
-		return fmt.Errorf("error querying role membership: %w", err)
-	} else if isMember == nil {
-		return fmt.Errorf("error querying role membership: null result for db_owner check") // should never happen
-	} else if *isMember != 1 {
+	if hasPermission, err := currentUserHasDBOwner(ctx, db.conn); err != nil {
+		return fmt.Errorf("error querying 'db_owner' role membership: %w", err)
+	} else if !hasPermission {
 		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
 	}
 	return nil
+}
+
+func (db *sqlserverDatabase) prerequisiteCaptureInstanceManagement(ctx context.Context) error {
+	// If automatic capture instance management is not in use there is nothing to verify here.
+	if !db.config.Advanced.AutomaticCaptureInstances {
+		return nil
+	}
+
+	if hasPermission, err := currentUserHasDBOwner(ctx, db.conn); err != nil {
+		return fmt.Errorf("error querying 'db_owner' role membership: %w", err)
+	} else if !hasPermission {
+		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
+	}
+	return nil
+}
+
+func currentUserHasDBOwner(ctx context.Context, conn *sql.DB) (bool, error) {
+	var isMember *int
+	if err := conn.QueryRowContext(ctx, "SELECT IS_ROLEMEMBER('db_owner');").Scan(&isMember); err != nil {
+		return false, err
+	} else if isMember == nil {
+		return false, fmt.Errorf("unexpected null result") // should never happen
+	} else if *isMember == 1 {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
