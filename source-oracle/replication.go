@@ -457,7 +457,6 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("logminer query: %w", err)
 		}
-		defer rows.Close()
 
 		var totalMessages = 0
 		var relevantMessages = 0
@@ -534,6 +533,8 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		}
 
 		if err := rows.Err(); err != nil {
+			return err
+		} else if err := rows.Close(); err != nil {
 			return err
 		}
 
