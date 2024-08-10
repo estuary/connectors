@@ -74,7 +74,6 @@ func TestAllTypes(t *testing.T) {
 		}
 		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
 		vals = append(vals, tv[2])
-		idx += 1
 	}
 	columnDefs += ")"
 	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)
@@ -132,7 +131,6 @@ func TestNullValues(t *testing.T) {
 		}
 		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
 		vals = append(vals, tv[2])
-		idx += 1
 	}
 	columnDefs += ")"
 	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)

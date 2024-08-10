@@ -137,7 +137,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
-	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + fmt.Sprintf(" ORDER BY SEQUENCE#")
+	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
 	rows, err := s.conn.QueryContext(ctx, fullQuery, startSCN)
 	if err != nil {
 		return fmt.Errorf("fetching log file list: %w", err)
@@ -251,21 +251,18 @@ func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return s.events
 }
 
-// replicationBufferSize controls how many change events can be buffered in the
-// replicationStream before it stops receiving further events from Oracle.
-// In normal use it's a constant, it's just a variable so that tests are more
-// likely to exercise blocking sends and backpressure.
+// decodeBufferSize controls how many change events can be buffered in the
+// decodeCh before it stops receiving further events
 // This buffer has been set to a fairly small value, because larger buffers can
-// cause OOM kills when the incoming data rate exceeds the rate at which we're
-// serializing data and getting it into Gazette journals.
-var replicationBufferSize = 16
+// cause OOM kills
+var decodeBufferSize = 16
 
 func (s *replicationStream) StartReplication(ctx context.Context) error {
 	var eg, egCtx = errgroup.WithContext(ctx)
 	var streamCtx, streamCancel = context.WithCancel(egCtx)
 	s.events = make(chan sqlcapture.DatabaseEvent)
 	s.errCh = make(chan error)
-	s.decodeCh = make(chan logminerMessage)
+	s.decodeCh = make(chan logminerMessage, decodeBufferSize)
 	s.cancel = streamCancel
 
 	eg.Go(func() error {
@@ -433,11 +430,11 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 
 	var tablesCondition = ""
 	var i = 0
-	for _, mapping := range s.db.otherMapping {
+	for _, mapping := range s.db.tableObjectMapping {
 		if i > 0 {
 			tablesCondition += " OR "
 		}
-		tablesCondition += fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping[0], mapping[1])
+		tablesCondition += fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping.objectID, mapping.dataObjectID)
 		i++
 	}
 	// TODO: use a single statement multiple times
