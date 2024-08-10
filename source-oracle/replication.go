@@ -251,18 +251,21 @@ func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return s.events
 }
 
-// decodeBufferSize controls how many change events can be buffered in the
-// decodeCh before it stops receiving further events
+// replicationBufferSize controls how many change events can be buffered in the
+// replicationStream before it stops receiving further events from Oracle.
+// In normal use it's a constant, it's just a variable so that tests are more
+// likely to exercise blocking sends and backpressure.
 // This buffer has been set to a fairly small value, because larger buffers can
-// cause OOM kills
-var decodeBufferSize = 16
+// cause OOM kills when the incoming data rate exceeds the rate at which we're
+// serializing data and getting it into Gazette journals.
+var replicationBufferSize = 16
 
 func (s *replicationStream) StartReplication(ctx context.Context) error {
 	var eg, egCtx = errgroup.WithContext(ctx)
 	var streamCtx, streamCancel = context.WithCancel(egCtx)
-	s.events = make(chan sqlcapture.DatabaseEvent)
+	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	s.errCh = make(chan error)
-	s.decodeCh = make(chan logminerMessage, decodeBufferSize)
+	s.decodeCh = make(chan logminerMessage, replicationBufferSize)
 	s.cancel = streamCancel
 
 	eg.Go(func() error {
