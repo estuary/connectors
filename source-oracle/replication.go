@@ -535,7 +535,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 			"offset":               offset,
 		}).Debug("received messages")
 
-		if relevantMessages >= replicationChunkSize || totalMessages < replicationChunkSize {
+		if totalMessages < replicationChunkSize {
 			return nil
 		}
 
