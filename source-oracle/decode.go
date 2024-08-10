@@ -120,13 +120,13 @@ func decodeUnistr(input string) (string, error) {
 				val += string(c)
 				i += 1
 			} else if len(input) > i+4 {
-				var codeStrOne = fmt.Sprintf("%s", input[i+1:i+5])
+				var codeStrOne = input[i+1 : i+5]
 				var codeOne, err = strconv.ParseInt(codeStrOne, 16, 32)
 				if err != nil {
 					return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+1, err)
 				}
 				if utf16.IsSurrogate(rune(codeOne)) {
-					var codeStrTwo = fmt.Sprintf("%s", input[i+6:i+10])
+					var codeStrTwo = input[i+6 : i+10]
 					var codeTwo, err = strconv.ParseInt(codeStrTwo, 16, 32)
 					if err != nil {
 						return "", fmt.Errorf("parsing unicode point at %q (%d): %w", input, i+6, err)
