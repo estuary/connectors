@@ -316,7 +316,16 @@ func (s *replicationStream) run(ctx context.Context) error {
 func (s *replicationStream) poll(ctx context.Context) error {
 	for {
 		var startSCN = s.lastTxnEndSCN
+		var currentSCN int
+		var row = s.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
+		if err := row.Scan(&currentSCN); err != nil {
+			return fmt.Errorf("fetching current SCN: %w", err)
+		}
 		var endSCN = startSCN + s.db.config.Advanced.IncrementalSCNRange
+
+		if currentSCN < endSCN {
+			endSCN = currentSCN
+		}
 
 		switched, err := s.redoFileSwitched(ctx)
 		if err != nil {
