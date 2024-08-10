@@ -20,11 +20,6 @@ func (db *oracleDatabase) SetupPrerequisites(ctx context.Context) []error {
 	return errs
 }
 
-const (
-	reqMajorVersion = 10
-	reqMinorVersion = 0
-)
-
 func (db *oracleDatabase) prerequisiteSupplementalLogging(ctx context.Context, owner, tableName string) error {
 	var row = db.conn.QueryRowContext(ctx, "SELECT SUPPLEMENTAL_LOG_DATA_ALL, SUPPLEMENTAL_LOG_DATA_MIN FROM V$DATABASE")
 	var all, min string

@@ -26,12 +26,11 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
 
-	objectMapping, otherMapping, err := getTableObjectMappings(ctx, db.conn, tables)
+	objectMapping, err := getTableObjectMappings(ctx, db.conn, tables)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table object identifiers: %w", err)
 	}
 	db.tableObjectMapping = objectMapping
-	db.otherMapping = otherMapping
 
 	// Aggregate column and primary key information into DiscoveryInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
@@ -201,10 +200,14 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 
 const queryTableObjectIdentifiers = `SELECT OWNER, OBJECT_NAME, OBJECT_ID, DATA_OBJECT_ID FROM ALL_OBJECTS WHERE OBJECT_TYPE='TABLE'`
 
-func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) (map[string]string, map[string][]int, error) {
+type tableObject struct {
+	objectID     int
+	dataObjectID int
+}
+
+func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) (map[string]tableObject, error) {
 	logrus.Debug("fetching object identifiers for tables")
-	var mapping = make(map[string]string, len(tables))
-	var otherMapping = make(map[string][]int, len(tables))
+	var mapping = make(map[string]tableObject, len(tables))
 	var ownersMap = make(map[string]bool)
 	for _, t := range tables {
 		ownersMap[t.Schema] = true
@@ -217,7 +220,7 @@ func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapt
 
 	var rows, err = conn.QueryContext(ctx, queryTableObjectIdentifiers+ownersCondition)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fetching table identifiers: %w", err)
+		return nil, fmt.Errorf("fetching table identifiers: %w", err)
 	}
 	defer rows.Close()
 
@@ -225,18 +228,16 @@ func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapt
 	var objectID, dataObjectID int
 	for rows.Next() {
 		if err := rows.Scan(&owner, &tableName, &objectID, &dataObjectID); err != nil {
-			return nil, nil, fmt.Errorf("scanning table object identifier row: %w", err)
+			return nil, fmt.Errorf("scanning table object identifier row: %w", err)
 		}
 
 		var streamID = sqlcapture.JoinStreamID(owner, tableName)
-		var fullID = joinObjectID(objectID, dataObjectID)
-		mapping[fullID] = streamID
-		otherMapping[streamID] = []int{objectID, dataObjectID}
+		mapping[streamID] = tableObject{objectID: objectID, dataObjectID: dataObjectID}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return mapping, otherMapping, nil
+	return mapping, nil
 }
 
 func joinObjectID(objectID, dataObjectID int) string {
