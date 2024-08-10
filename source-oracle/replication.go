@@ -440,15 +440,20 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		tablesCondition += fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping[0], mapping[1])
 		i++
 	}
+	// TODO: use a single statement multiple times
+	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
+    FROM V$LOGMNR_CONTENTS
+    WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
+    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
+    AND (%s)
+    OFFSET :offset ROWS FETCH NEXT %d ROWS ONLY`, tablesCondition, replicationChunkSize)
+	var stmt, err = s.conn.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("preparing logminer query: %w", err)
+	}
 
 	for {
-		var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
-      FROM V$LOGMNR_CONTENTS
-      WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
-      SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
-      AND (%s)
-      OFFSET %d ROWS FETCH NEXT %d ROWS ONLY`, tablesCondition, offset, replicationChunkSize)
-		var rows, err = s.conn.QueryContext(ctx, query, s.lastTxnEndSCN)
+		var rows, err = stmt.QueryContext(ctx, s.lastTxnEndSCN, offset)
 		if err != nil {
 			return fmt.Errorf("logminer query: %w", err)
 		}
