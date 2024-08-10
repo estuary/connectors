@@ -1,21 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/sirupsen/logrus"
 )
-
-var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
@@ -166,19 +161,6 @@ func scanToMap(rows *sql.Rows, cols []string, fields map[string]any) (string, er
 	return rowid, nil
 }
 
-// -1 means a < b
-// 0 means a == b
-// 1 means a > b
-func compareBase64(a, b string) (int, error) {
-	if abytes, err := base64.RawStdEncoding.DecodeString(a); err != nil {
-		return 0, fmt.Errorf("base64 decoding: %w", err)
-	} else if bbytes, err := base64.RawStdEncoding.DecodeString(b); err != nil {
-		return 0, fmt.Errorf("base64 decoding: %w", err)
-	} else {
-		return bytes.Compare(abytes, bbytes), nil
-	}
-}
-
 // WriteWatermark writes the provided string into the 'watermarks' table.
 func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
@@ -232,7 +214,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 	}
 
 	var out = fmt.Sprintf("TO_CHAR(%s", quoteColumnName(col.Name))
-	var format = ""
+	var format string
 	if strings.Contains(dataType, "TIME ZONE") && !strings.Contains(dataType, "LOCAL TIME ZONE") {
 		format = `'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"'`
 	} else if dataScale > 0 {
