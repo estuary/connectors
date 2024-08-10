@@ -274,7 +274,7 @@ func TestConfigURI(t *testing.T) {
 				valid = err.Error()
 			}
 			cfg.SetDefaults("test")
-			var uri = cfg.ToURI()
+			var uri = cfg.ToURI(1)
 			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
 		})
 	}

@@ -173,7 +173,7 @@ func (c *Config) SetDefaults(name string) {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *Config) ToURI() string {
+func (c *Config) ToURI(prefetchRows int) string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
@@ -188,7 +188,7 @@ func (c *Config) ToURI() string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
-	uri.RawQuery = fmt.Sprintf("PREFETCH_ROWS=%d", c.Advanced.BackfillChunkSize+1)
+	uri.RawQuery = fmt.Sprintf("PREFETCH_ROWS=%d", prefetchRows)
 	return uri.String()
 }
 
@@ -228,7 +228,7 @@ func (db *oracleDatabase) connect(ctx context.Context) error {
 		"dictionaryMode": db.config.Advanced.DictionaryMode,
 	}).Info("initializing connector")
 
-	var conn, err = sql.Open("oracle", db.config.ToURI())
+	var conn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.BackfillChunkSize+1))
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
