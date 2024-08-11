@@ -428,9 +428,6 @@ const (
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) error {
-	var replicationChunkSize = s.db.config.Advanced.IncrementalChunkSize
-	var offset = 0
-
 	var tablesCondition = ""
 	var i = 0
 	for _, mapping := range s.db.tableObjectMapping {
@@ -444,112 +441,104 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
     FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
     SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
-    AND (%s)
-    OFFSET :offset ROWS FETCH NEXT %d ROWS ONLY`, tablesCondition, replicationChunkSize)
+    AND (%s)`, tablesCondition)
+
 	var stmt, err = s.conn.PrepareContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("preparing logminer query: %w", err)
 	}
 
-	for {
-		var rows, err = stmt.QueryContext(ctx, s.lastTxnEndSCN, offset)
-		if err != nil {
-			return fmt.Errorf("logminer query: %w", err)
-		}
+	rows, err := stmt.QueryContext(ctx, s.lastTxnEndSCN)
+	if err != nil {
+		return fmt.Errorf("logminer query: %w", err)
+	}
 
-		var totalMessages = 0
-		var relevantMessages = 0
-		var lastMsg *logminerMessage
-		for rows.Next() {
-			totalMessages++
+	var totalMessages = 0
+	var relevantMessages = 0
+	var lastMsg *logminerMessage
+	for rows.Next() {
+		totalMessages++
 
-			var msg logminerMessage
-			var ts time.Time
-			var undoSql sql.NullString
-			var info sql.NullString
-			if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &msg.SQL, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
-				return err
-			}
-
-			if undoSql.Valid {
-				msg.UndoSQL = undoSql.String
-			}
-
-			if info.Valid {
-				msg.Info = info.String
-			}
-			msg.Timestamp = ts.UnixMilli()
-
-			logrus.WithFields(logrus.Fields{
-				"msg": msg,
-			}).Trace("received message")
-
-			// last message indicated a continuation of SQL_REDO and SQL_UNDO values
-			// so this row's sqls will be appended to the last
-			if lastMsg != nil && lastMsg.CSF == 1 {
-				// sanity check the (SSN, RSID) tuple matches between the rows
-				if lastMsg.SSN != msg.SSN || lastMsg.RSID != msg.RSID {
-					return fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.SSN, lastMsg.RSID, msg.SSN, msg.RSID)
-				}
-				lastMsg.SQL += msg.SQL
-				lastMsg.UndoSQL += msg.UndoSQL
-				lastMsg.CSF = msg.CSF
-				continue
-			}
-
-			// If this change event is on a table we're not capturing, skip doing any
-			// further processing on it.
-			var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
-			if !s.tableActive(streamID) {
-				var isKnownTable = false
-				// conditions for tables that has been dropped, check their object identifier against discovered tables
-				if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
-					if _, ok := s.db.tableObjectMapping[joinObjectID(msg.ObjectID, msg.DataObjectID)]; ok {
-						// This is a known table to us, a dictionary mismatch on this row is an error
-						isKnownTable = true
-					}
-				}
-
-				if !isKnownTable {
-					continue
-				}
-			}
-
-			// If logminer can't find the dictionary for a SQL statement (e.g. if using online mode and a schema change has occurred)
-			// then we get SQL statements like this:
-			// insert into "UNKNOWN"."OBJ# 45522"("COL 1","COL 2","COL 3","COL 4") values (HEXTORAW('45465f4748'),HEXTORAW('546563686e6963616c20577269746572'), HEXTORAW('c229'),HEXTORAW('c3020b'));
-			// we additionally get status=2 for these records. Status 2 means the SQL statement is not valid for redoing.
-			// Some versions of Oracle report STATUS=2 for LONG column types, but have an empty info column, whereas when
-			// status=2 and there is some reason for the error in the info column (usually "Dictionary Mismatch") we consider
-			// the case to be one of dictionary mismatch
-			if msg.Status == 2 && msg.Info != "" {
-				return fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.Info, msg.TableName, msg.SQL)
-			}
-
-			s.decodeCh <- msg
-			lastMsg = &msg
-			relevantMessages++
-		}
-
-		if err := rows.Err(); err != nil {
-			return err
-		} else if err := rows.Close(); err != nil {
+		var msg logminerMessage
+		var ts time.Time
+		var undoSql sql.NullString
+		var info sql.NullString
+		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &msg.SQL, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
 			return err
 		}
+
+		if undoSql.Valid {
+			msg.UndoSQL = undoSql.String
+		}
+
+		if info.Valid {
+			msg.Info = info.String
+		}
+		msg.Timestamp = ts.UnixMilli()
 
 		logrus.WithFields(logrus.Fields{
-			"totalMessages":        totalMessages,
-			"relevantMessages":     relevantMessages,
-			"replicationChunkSize": replicationChunkSize,
-			"offset":               offset,
-		}).Debug("received messages")
+			"msg": msg,
+		}).Trace("received message")
 
-		if totalMessages < replicationChunkSize {
-			return nil
+		// last message indicated a continuation of SQL_REDO and SQL_UNDO values
+		// so this row's sqls will be appended to the last
+		if lastMsg != nil && lastMsg.CSF == 1 {
+			// sanity check the (SSN, RSID) tuple matches between the rows
+			if lastMsg.SSN != msg.SSN || lastMsg.RSID != msg.RSID {
+				return fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.SSN, lastMsg.RSID, msg.SSN, msg.RSID)
+			}
+			lastMsg.SQL += msg.SQL
+			lastMsg.UndoSQL += msg.UndoSQL
+			lastMsg.CSF = msg.CSF
+			continue
 		}
 
-		offset += totalMessages
+		// If this change event is on a table we're not capturing, skip doing any
+		// further processing on it.
+		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
+		if !s.tableActive(streamID) {
+			var isKnownTable = false
+			// conditions for tables that has been dropped, check their object identifier against discovered tables
+			if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
+				if _, ok := s.db.tableObjectMapping[joinObjectID(msg.ObjectID, msg.DataObjectID)]; ok {
+					// This is a known table to us, a dictionary mismatch on this row is an error
+					isKnownTable = true
+				}
+			}
+
+			if !isKnownTable {
+				continue
+			}
+		}
+
+		// If logminer can't find the dictionary for a SQL statement (e.g. if using online mode and a schema change has occurred)
+		// then we get SQL statements like this:
+		// insert into "UNKNOWN"."OBJ# 45522"("COL 1","COL 2","COL 3","COL 4") values (HEXTORAW('45465f4748'),HEXTORAW('546563686e6963616c20577269746572'), HEXTORAW('c229'),HEXTORAW('c3020b'));
+		// we additionally get status=2 for these records. Status 2 means the SQL statement is not valid for redoing.
+		// Some versions of Oracle report STATUS=2 for LONG column types, but have an empty info column, whereas when
+		// status=2 and there is some reason for the error in the info column (usually "Dictionary Mismatch") we consider
+		// the case to be one of dictionary mismatch
+		if msg.Status == 2 && msg.Info != "" {
+			return fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.Info, msg.TableName, msg.SQL)
+		}
+
+		s.decodeCh <- msg
+		lastMsg = &msg
+		relevantMessages++
 	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	} else if err := rows.Close(); err != nil {
+		return err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"totalMessages":    totalMessages,
+		"relevantMessages": relevantMessages,
+	}).Debug("received messages")
+
+	return nil
 }
 
 func (s *replicationStream) tableActive(streamID string) bool {
