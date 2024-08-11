@@ -355,7 +355,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// on restart, but it saves us from missing events
 		s.lastTxnEndSCN = endSCN
 
-		s.decodeCh <- logminerMessage{Op: opFlush}
+		s.decodeCh <- logminerMessage{Op: opFlush, SCN: s.lastTxnEndSCN}
 	}
 }
 
@@ -372,7 +372,7 @@ func (s *replicationStream) decodeMessageWorker(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case s.events <- &sqlcapture.FlushEvent{Cursor: strconv.Itoa(s.lastTxnEndSCN)}:
+			case s.events <- &sqlcapture.FlushEvent{Cursor: strconv.Itoa(msg.SCN)}:
 				continue
 			}
 		}
