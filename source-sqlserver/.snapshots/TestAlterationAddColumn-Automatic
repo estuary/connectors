@@ -5,12 +5,12 @@
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_AlterationAddColumn_Automatic_81310450","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"two","id":2}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"three","id":3}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"six","id":6}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"seven","id":7}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"eight","id":8}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"nine","id":9}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"four","extra":"ccc","id":4}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"five","extra":"ddd","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"six","extra":"eee","id":6}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"seven","extra":"fff","id":7}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Dw=="}},"data":"eight","evenmore":"baz","extra":"ggg","id":8}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Dw=="}},"data":"nine","evenmore":"asdf","extra":"hhh","id":9}
 # ================================
 # Final State Checkpoint
 # ================================
