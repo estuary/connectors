@@ -26,7 +26,7 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlca
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
 
-	objectMapping, err := getTableObjectMappings(ctx, db.conn, tables)
+	objectMapping, err := getTableObjectMappings(ctx, db.config.Advanced.WatermarksTable, db.conn, tables)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table object identifiers: %w", err)
 	}
@@ -205,20 +205,25 @@ type tableObject struct {
 	dataObjectID int
 }
 
-func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) (map[string]tableObject, error) {
-	logrus.Debug("fetching object identifiers for tables")
-	var mapping = make(map[string]tableObject, len(tables))
-	var ownersMap = make(map[string]bool)
-	for _, t := range tables {
-		ownersMap[t.Schema] = true
-	}
-	var owners []string
-	for k := range ownersMap {
-		owners = append(owners, k)
-	}
-	var ownersCondition = " AND owner IN ('" + strings.Join(owners, "','") + "')"
+func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) (map[string]tableObject, error) {
+	var watermarksTableSplit = strings.Split(watermarksTable, ".")
+	var watermarkSchema = watermarksTableSplit[0]
+	var watermarkTableName = watermarksTableSplit[0]
 
-	var rows, err = conn.QueryContext(ctx, queryTableObjectIdentifiers+ownersCondition)
+	var mapping = make(map[string]tableObject, len(tables))
+	var tablesCondition = ""
+	for i, table := range tables {
+		if i > 0 {
+			tablesCondition += " OR "
+		}
+		tablesCondition += fmt.Sprintf("(OWNER = '%s' AND OBJECT_NAME = '%s')", table.Schema, table.Name)
+	}
+	tablesCondition += fmt.Sprintf(" OR (OWNER = '%s' AND OBJECT_NAME = '%s')", watermarkSchema, watermarkTableName)
+
+	var fullQuery = fmt.Sprintf("%s AND (%s)", queryTableObjectIdentifiers, tablesCondition)
+	logrus.WithField("query", fullQuery).Debug("fetching object identifiers for tables")
+
+	var rows, err = conn.QueryContext(ctx, fullQuery)
 	if err != nil {
 		return nil, fmt.Errorf("fetching table identifiers: %w", err)
 	}

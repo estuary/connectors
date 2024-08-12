@@ -334,13 +334,16 @@ func TestSchemaChanges(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{1930, "BB", "No Such State", 10000}})
 
 	tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName))
+	t.Run("insert-before", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY')", tableName))
-	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970", tableName))
+	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE year=1930", tableName))
+	t.Run("update", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE year = 1930", tableName))
+	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	tb.Insert(ctx, t, tableName, [][]any{{1940, "CC", "No Such State"}})
-
-	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	t.Run("insert-after", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestSchemaChangesOnlineDictionary(t *testing.T) {
