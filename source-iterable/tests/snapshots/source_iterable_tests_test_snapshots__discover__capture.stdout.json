@@ -1,0 +1,4414 @@
+[
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignState": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "createdByUserId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "endedAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "labels": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "listIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "messageMedium": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "recurringCampaignId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "sendSize": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "startAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "suppressionListIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updatedAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "updatedByUserId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workflowId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "stream": "campaigns",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "data": {
+          "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "id": {
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns_metrics",
+    "resourceConfig": {
+      "stream": "campaigns_metrics",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "channelType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "messageMedium": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "channels",
+    "resourceConfig": {
+      "stream": "channels",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "listType": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "lists",
+    "resourceConfig": {
+      "stream": "lists",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "channelId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "message_types",
+    "resourceConfig": {
+      "stream": "message_types",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ],
+    "recommendedName": "metadata",
+    "resourceConfig": {
+      "stream": "metadata",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "clientTemplateId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "creatorUserId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "messageTypeId": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/templateId"
+    ],
+    "recommendedName": "templates",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "templates",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "accepts_marketing": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "address1": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "addresses": {
+          "items": {
+            "properties": {
+              "address1": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "address2": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "city": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "company": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "country": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "country_code": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "country_name": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "default": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "first_name": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "id": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "last_name": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "name": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "province": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "province_code": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "zip": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "admin_graphql_api_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "aov": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "boughtSas": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "businessLines": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "city": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "country": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "default_address": {
+          "properties": {
+            "address1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "address2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "city": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "company": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country_code": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "default": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "phone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "province": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "province_code": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "zip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "emailAcquiredDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "emailListIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "emailSegmentStatus": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstCampaign": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstMedium": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstName": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstOrderCards": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "firstOrderDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstPurchaseDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "hasAccount": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "hasReminder": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "emailDomain": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "lastInteractionTs": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "lastName": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_order_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_order_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "ltr": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "mostRecentCampaign": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mostRecentEmailList": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mostRecentEmailSegment": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mostRecentMedium": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mostRecentOrderCards": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "mostRecentOrderDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mostRecentSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "orders_count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "profileUpdatedAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "secondMostRecentOrderCards": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "secondMostRecentOrderDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "secondOrderCards": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "secondOrderDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "signupDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "signupSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "state": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "subscribedMessageTypeIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "tax_exempt": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "thirdMostRecentOrderCards": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "thirdMostRecentOrderDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "thirdOrderCards": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "thirdOrderDate": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "totalOrders": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "total_spent": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "twelveMonthLtr": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "unsubscribedChannelIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "unsubscribedMessageTypeIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "verified_email": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "zip": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email"
+    ],
+    "recommendedName": "users",
+    "resourceConfig": {
+      "cursorField": [
+        "profileUpdatedAt"
+      ],
+      "stream": "users",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "email": {
+          "type": "string"
+        },
+        "listId": {
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/listId"
+    ],
+    "recommendedName": "list_users",
+    "resourceConfig": {
+      "stream": "list_users",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "recipientState": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/messageId",
+      "/email"
+    ],
+    "recommendedName": "email_bounce",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_bounce",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "city": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "contentId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "country": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "hrefIndex": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "ip": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "region": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "url": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userAgent": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userAgentDevice": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/messageId",
+      "/email"
+    ],
+    "recommendedName": "email_click",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_click",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "recipientState": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/messageId",
+      "/email"
+    ],
+    "recommendedName": "email_complaint",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_complaint",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "city": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "country": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "ip": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "region": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "userAgent": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userAgentDevice": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/messageId",
+      "/email"
+    ],
+    "recommendedName": "email_open",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_open",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "channelId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "contentId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageBusId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "messageTypeId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "transactionalData": {
+          "properties": {
+            "campaignId": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "categories": {
+              "items": {},
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "compare_at_price": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "createdAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "description": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "discount": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "email": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "eventName": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "eventUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "handle": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "imageUrl": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "inventory": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "itblInternal": {
+              "properties": {
+                "documentCreatedAt": {
+                  "format": "date-time",
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "documentUpdatedAt": {
+                  "format": "date-time",
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "price": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "product_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "product_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "sku": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "templateId": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "url": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "vendor": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/messageId",
+      "/email"
+    ],
+    "recommendedName": "email_send",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_send",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "channelId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "contentId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "messageTypeId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "reason": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "transactionalData": {
+          "properties": {
+            "campaignId": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "categories": {
+              "items": {},
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "compare_at_price": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "createdAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "description": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "discount": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "email": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "eventName": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "eventUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "handle": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "imageUrl": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "inventory": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "itblInternal": {
+              "properties": {
+                "documentCreatedAt": {
+                  "format": "date-time",
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "documentUpdatedAt": {
+                  "format": "date-time",
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "price": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "product_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "product_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "sku": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "templateId": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "url": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "vendor": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "string",
+            "object",
+            "null"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/messageId",
+      "/email"
+    ],
+    "recommendedName": "email_send_skip",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_send_skip",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "emailListId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "emailListIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "profileUpdatedAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "signupSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workflowId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "email_subscribe",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_subscribe",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "campaignId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "channelId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "channelIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "emailListId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "emailListIds": {
+          "items": {},
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "messageId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "templateId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "unsubSource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workflowId": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email"
+    ],
+    "recommendedName": "email_unsubscribe",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "email_unsubscribe",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "push_send",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "push_send",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "push_send_skip",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "push_send_skip",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "push_open",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "push_open",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "push_uninstall",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "push_uninstall",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "push_bounce",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "push_bounce",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "web_push_send",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "web_push_send",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "web_push_click",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "web_push_click",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "web_push_send_skip",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "web_push_send_skip",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_send",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_send",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_open",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_open",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_click",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_click",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_close",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_close",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_delete",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_delete",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_delivery",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_delivery",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "in_app_send_skip",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "in_app_send_skip",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "inbox_session",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "inbox_session",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "inbox_message_impression",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "inbox_message_impression",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "sms_send",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "sms_send",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "sms_bounce",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "sms_bounce",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "sms_click",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "sms_click",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "sms_received",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "sms_received",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "sms_send_skip",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "sms_send_skip",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "sms_usage_info",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "sms_usage_info",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "purchase",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "purchase",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "custom_event",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "custom_event",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email",
+      "/createdAt"
+    ],
+    "recommendedName": "hosted_unsubscribe_click",
+    "resourceConfig": {
+      "cursorField": [
+        "createdAt"
+      ],
+      "stream": "hosted_unsubscribe_click",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "itblInternal": {
+          "properties": {
+            "documentCreatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "documentUpdatedAt": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "userId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ],
+    "recommendedName": "events",
+    "resourceConfig": {
+      "stream": "events",
+      "syncMode": "full_refresh"
+    }
+  }
+]
