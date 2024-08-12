@@ -97,10 +97,24 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
-	if err := c.db.PingContext(ctx); err != nil {
+	cfg := conf.(*config)
+
+	dsn, err := cfg.toURI(tenant)
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
+	db, err := stdsql.Open("snowflake", dsn)
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
+	if err := db.PingContext(ctx); err != nil {
 		var sfError *sf.SnowflakeError
 		if errors.As(err, &sfError) {
 			switch sfError.Number {
@@ -110,7 +124,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 				// incorrect, but would be confusing for a user because we have a separate "Account"
 				// input field. We want to be specific here and report that it is the account
 				// identifier in the host URL.
-				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(c.cfg.Host, ".snowflakecomputing.com"))
+				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(cfg.Host, ".snowflakecomputing.com"))
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
 			case 390201:
@@ -118,7 +132,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 				// distinguish between that for the database, schema, or warehouse. The snowflake
 				// error message in these cases is fairly decent fortunately.
 			case 390189:
-				err = fmt.Errorf("role %q does not exist", c.cfg.Role)
+				err = fmt.Errorf("role %q does not exist", cfg.Role)
 			}
 		}
 
@@ -128,11 +142,11 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 		// the user and the configuration did not set a warehouse, this may be `null`, and the user
 		// needs to configure a specific warehouse to use.
 		var currentWarehouse *string
-		if err := c.db.QueryRowContext(ctx, "SELECT CURRENT_WAREHOUSE();").Scan(&currentWarehouse); err != nil {
+		if err := db.QueryRowContext(ctx, "SELECT CURRENT_WAREHOUSE();").Scan(&currentWarehouse); err != nil {
 			errs.Err(fmt.Errorf("checking for active warehouse: %w", err))
 		} else {
 			if currentWarehouse == nil {
-				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", c.cfg.User))
+				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.User))
 			}
 		}
 	}

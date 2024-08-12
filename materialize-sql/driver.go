@@ -27,6 +27,12 @@ type Driver struct {
 	ResourceSpecType Resource
 	// NewEndpoint returns an *Endpoint which will be used to handle interactions with the database.
 	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage, tenant string) (*Endpoint, error)
+	// PreReqs performs verification checks that the provided configuration can
+	// be used to interact with the endpoint to the degree required by the
+	// connector, to as much of an extent as possible. The returned PrereqErr
+	// can include multiple separate errors if it possible to determine that
+	// there is more than one issue that needs corrected.
+	PreReqs func(ctx context.Context, conf any, tenant string) *PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver{}
@@ -68,10 +74,15 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		client     Client
 		loadedSpec *pf.MaterializationSpec
 		resp       = new(pm.Response_Validated)
+		conf       = d.EndpointSpecType
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
+	} else if err := json.Unmarshal(req.ConfigJson, conf); err != nil {
+		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if prereqErrs := d.PreReqs(ctx, conf, mustGetTenantNameFromTaskName(req.Name.String())); prereqErrs.Len() != 0 {
+		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
@@ -79,9 +90,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 	defer client.Close()
 
-	if prereqErrs := client.PreReqs(ctx); prereqErrs.Len() != 0 {
-		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
-	} else if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
+	if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 

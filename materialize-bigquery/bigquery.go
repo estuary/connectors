@@ -155,8 +155,8 @@ func Driver() *sql.Driver {
 func newBigQueryDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
-		EndpointSpecType: config{},
-		ResourceSpecType: tableConfig{},
+		EndpointSpecType: new(config),
+		ResourceSpecType: new(tableConfig),
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -187,5 +187,6 @@ func newBigQueryDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }

@@ -102,6 +102,7 @@ func newDatabricksDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 

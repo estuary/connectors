@@ -176,6 +176,7 @@ func newDuckDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 

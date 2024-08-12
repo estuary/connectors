@@ -179,8 +179,15 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	})
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+	c, err := cfg.client(ctx)
+	if err != nil {
+		errs.Err(fmt.Errorf("creating client: %w", err))
+		return errs
+	}
 
 	var googleErr *googleapi.Error
 

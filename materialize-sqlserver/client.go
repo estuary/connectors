@@ -39,8 +39,16 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+
+	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
@@ -48,7 +56,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := c.db.PingContext(ctx); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var sqlServerErr *mssqldb.Error
 		var netConnErr *net.DNSError
@@ -60,11 +68,11 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
 		}
 
