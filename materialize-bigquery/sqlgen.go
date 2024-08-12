@@ -9,7 +9,6 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // Identifiers matching the this pattern do not need to be quoted. See
@@ -63,36 +62,29 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 var bqDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.ARRAY:          sql.MapStatic("STRING", jsonConverter),
-			sql.BINARY:         sql.MapStatic("STRING"),
-			sql.BOOLEAN:        sql.MapStatic("BOOL"),
-			sql.INTEGER:        sql.MapStatic("INT64"),
-			sql.NUMBER:         sql.MapStatic("FLOAT64"),
-			sql.OBJECT:         sql.MapStatic("STRING", jsonConverter),
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("BIGNUMERIC(38,0)", sql.StrToInt),
+			sql.ARRAY:    sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.BINARY:   sql.MapStatic("STRING"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:  sql.MapStatic("INTEGER"),
+			sql.NUMBER:   sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float")),
+			sql.OBJECT:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			// BigQuery's table metadata APIs include the precision and scale
+			// with BIGNUMERIC columns, and we strip that off when creating the
+			// InfoSchema so that a BIGNUMERIC(38,0) is compatible with any
+			// BIGNUMERIC column.
+			sql.STRING_INTEGER: sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric"), sql.UsingConverter(sql.StrToInt)),
 			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
-			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.StrToFloat("NaN", "Infinity", "-Infinity")),
+			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMP"),
+					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
+					"date-time": sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime)),
 				},
 			}),
 		},
 		sql.WithNotNullText("NOT NULL"),
-	)
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"integer"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.MultipleCompatible},
-		sql.ColValidation{Types: []string{"bignumeric"}, Validate: bignumericCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
 	)
 
 	return sql.Dialect{
@@ -117,31 +109,10 @@ var bqDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    300,
 		CaseInsensitiveColumns: true,
 	}
 }()
-
-// bignumericCompatible allows either integers or numbers, since we used to create number columns as
-// "bignumeric" (now they are float64), and currently create strings formatted as integers as
-// "bignumeric". This is needed for compatibility for older materializations.
-func bignumericCompatible(p pf.Projection) bool {
-	return sql.IntegerCompatible(p) || sql.NumberCompatible(p)
-}
-
-// stringCompatible allow strings of any format, arrays, or objects to be materialized.
-func stringCompatible(p pf.Projection) bool {
-	if sql.StringCompatible(p) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"array"}) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"object"}) {
-		return true
-	}
-
-	return false
-}
 
 var (
 	tplAll = sql.MustParseTemplate(bqDialect, "root", `

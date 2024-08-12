@@ -7,7 +7,6 @@ import (
 	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // Databricks does not allow column names to contain these characters. Attempting to create a column
@@ -27,7 +26,7 @@ var databricksDialect = func() sql.Dialect {
 	// Databricks supports JSON extraction using the : operator, this seems like
 	// a simpler method for persisting JSON values:
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
-	var jsonMapper = sql.MapStatic("STRING", sql.ToJsonString)
+	var jsonMapper = sql.MapStatic("STRING", sql.UsingConverter(sql.ToJsonString))
 
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	mapper := sql.NewDDLMapper(
@@ -35,12 +34,12 @@ var databricksDialect = func() sql.Dialect {
 			sql.ARRAY:          jsonMapper,
 			sql.BINARY:         sql.MapStatic("BINARY"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.INTEGER:        sql.MapStatic("LONG"),
 			sql.NUMBER:         sql.MapStatic("DOUBLE"),
 			sql.OBJECT:         jsonMapper,
 			sql.MULTIPLE:       jsonMapper,
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.StrToInt),
-			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.StrToFloat("NaN", "Inf", "-Inf")),
+			sql.STRING_INTEGER: sql.MapStatic("LONG", sql.UsingConverter(sql.StrToInt)),
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "Inf", "-Inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.MapProjectionFn{
@@ -50,16 +49,6 @@ var databricksDialect = func() sql.Dialect {
 			}),
 		},
 		sql.WithNotNullText("NOT NULL"),
-	)
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"long", "decimal"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"binary"}, Validate: sql.BinaryCompatible},
 	)
 
 	return sql.Dialect{
@@ -103,28 +92,10 @@ var databricksDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    255,
 		CaseInsensitiveColumns: true,
 	}
 }()
-
-// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
-// be materialized since they are all converted to strings.
-func stringCompatible(p pf.Projection) bool {
-	// TODO(whb): This is a hack for making sure that pre-existing base64 encoded columns that were
-	// materialized as string columns in v1 fail validation in v2, which will materialize these
-	// columns as binary. This is needed because we currently validate a pre-existing "string"
-	// column positively with a string field having any format, content-type, or content-encoding,
-	// see https://github.com/estuary/connectors/issues/1501.
-	if sql.TypesOrNull(p.Inference.Types, []string{"string"}) {
-		if p.Inference.String_.ContentEncoding == "base64" {
-			return false
-		}
-	}
-
-	return sql.StringCompatible(p) || sql.JsonCompatible(p)
-}
 
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
