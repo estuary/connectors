@@ -193,6 +193,7 @@ func newSqlServerDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 

@@ -214,6 +214,7 @@ func newPostgresDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
