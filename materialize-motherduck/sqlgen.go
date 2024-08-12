@@ -13,13 +13,13 @@ var duckDialect = func() sql.Dialect {
 			sql.INTEGER:        sql.MapStatic("BIGINT"),
 			sql.NUMBER:         sql.MapStatic("DOUBLE"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON", sql.ToJsonBytes),
-			sql.ARRAY:          sql.MapStatic("JSON", sql.ToJsonBytes),
+			sql.OBJECT:         sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.ARRAY:          sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.BINARY:         sql.MapStatic("VARCHAR"),
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.ToJsonBytes),
-			sql.STRING_INTEGER: sql.MapStatic("HUGEINT", sql.StrToInt),
+			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStatic("HUGEINT", sql.UsingConverter(sql.StrToInt)),
 			// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
-			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", sql.StrToFloat("NaN", "Infinity", "-Infinity")),
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("VARCHAR"),
 				WithFormat: map[string]sql.MapProjectionFn{
@@ -32,19 +32,6 @@ var duckDialect = func() sql.Dialect {
 			}),
 		},
 		sql.WithNotNullText("NOT NULL"),
-	)
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"bigint", "hugeint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"varchar"}, Validate: sql.StringCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"interval"}, Validate: sql.DurationCompatible},
-		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
-		sql.ColValidation{Types: []string{"uuid"}, Validate: sql.UuidCompatible},
 	)
 
 	return sql.Dialect{
@@ -64,7 +51,6 @@ var duckDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Duckdb has no apparent limit on how long column names can be
 		CaseInsensitiveColumns: true,
 	}

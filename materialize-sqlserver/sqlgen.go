@@ -9,7 +9,6 @@ import (
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to
@@ -47,15 +46,15 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER:        sql.MapStatic("BIGINT"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
 			sql.BOOLEAN:        sql.MapStatic("BIT"),
-			sql.OBJECT:         sql.MapStatic(textType, sql.ToJsonString),
-			sql.ARRAY:          sql.MapStatic(textType, sql.ToJsonString),
-			sql.BINARY:         sql.MapStatic(textType),
-			sql.MULTIPLE:       sql.MapStatic(textType, sql.ToJsonString),
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", strToInt),
+			sql.OBJECT:         sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:          sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:         sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+			sql.MULTIPLE:       sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
 			// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
-			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.StrToFloat(nil, nil, nil)),
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapPrimaryKey(
 					// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
@@ -63,27 +62,17 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 					// stored in the column, not the character count.
 					// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
 					// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-					sql.MapStatic(textPKType),
-					sql.MapStatic(textType),
+					sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
+					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("DATETIME2", rfc3339ToUTC()),
-					"time":      sql.MapStatic("TIME", rfc3339TimeToUTC()),
+					"date-time": sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC())),
+					"time":      sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC())),
 				},
 			}),
 		},
 		sql.WithNotNullText("NOT NULL"),
-	)
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{stringType}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"bit"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"datetime2"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
 	)
 
 	return sql.Dialect{
@@ -107,16 +96,9 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 			return fmt.Sprintf("@p%d", index+1)
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    128,
 		CaseInsensitiveColumns: true,
 	}
-}
-
-// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
-// be materialized.
-func stringCompatible(p pf.Projection) bool {
-	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
 func rfc3339ToUTC() sql.ElementConverter {
