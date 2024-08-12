@@ -384,3 +384,74 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 		})
 	}
 }
+
+func TestAlterationAddColumn(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Grant the 'db_owner' role, it is required for the capture instance automation to work.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner ADD MEMBER %s", *dbCaptureUser))
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner DROP MEMBER %s", *dbCaptureUser)) })
+
+	for _, tc := range []struct {
+		Name     string
+		UniqueID string
+		Manual   bool
+		Automate bool
+	}{
+		{"Off", "39517707", false, false},
+		{"Manual", "22713060", true, false},
+		{"Automatic", "81310450", false, true},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var tableName = tb.CreateTable(ctx, t, tc.UniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(tc.UniqueID))
+			cs.Validator = &st.OrderedCaptureValidator{}
+			cs.EndpointSpec.(*Config).Advanced.AutomaticCaptureInstances = tc.Automate
+
+			// Get the backfill out of the way
+			tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
+			cs.Capture(ctx, t, nil)
+
+			// Add a column. Since the changes occur before the first capture here, it won't
+			// be able to get the new column, but the second capture should.
+			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD extra TEXT;", tableName))
+			tb.Insert(ctx, t, tableName, [][]any{{2, "two", "aaa"}, {3, "three", "bbb"}})
+			cs.Capture(ctx, t, nil)
+			if tc.Manual {
+				time.Sleep(1 * time.Second)
+				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%[1]s', @source_name = '%[2]s', @role_name = '%[3]s', @capture_instance = '%[1]s_%[2]s_v2';`, *testSchemaName, tb.TableName(t, tc.UniqueID), *dbCaptureUser))
+				time.Sleep(1 * time.Second)
+			}
+			tb.Insert(ctx, t, tableName, [][]any{{4, "four", "ccc"}, {5, "five", "ddd"}})
+			cs.Capture(ctx, t, nil)
+			if tc.Manual {
+				time.Sleep(1 * time.Second)
+				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%[1]s', @source_name = '%[2]s', @capture_instance = '%[1]s_%[2]s';`, *testSchemaName, tb.TableName(t, tc.UniqueID)))
+				time.Sleep(1 * time.Second)
+			}
+
+			// Add a second column. Since each table alteration requires a new capture instance
+			// this should demonstrate that cleanup is working correctly as well.
+			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD evenmore TEXT;", tableName))
+			tb.Insert(ctx, t, tableName, [][]any{{6, "six", "eee", "foo"}, {7, "seven", "fff", "bar"}})
+			cs.Capture(ctx, t, nil)
+			if tc.Manual {
+				time.Sleep(1 * time.Second)
+				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%[1]s', @source_name = '%[2]s', @role_name = '%[3]s', @capture_instance = '%[1]s_%[2]s_v3';`, *testSchemaName, tb.TableName(t, tc.UniqueID), *dbCaptureUser))
+				time.Sleep(1 * time.Second)
+			}
+			tb.Insert(ctx, t, tableName, [][]any{{8, "eight", "ggg", "baz"}, {9, "nine", "hhh", "asdf"}})
+			cs.Capture(ctx, t, nil)
+			if tc.Manual {
+				time.Sleep(1 * time.Second)
+				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%[1]s', @source_name = '%[2]s', @capture_instance = '%[1]s_%[2]s_v2';`, *testSchemaName, tb.TableName(t, tc.UniqueID)))
+				time.Sleep(1 * time.Second)
+			}
+
+			// Validate test snapshot
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}
