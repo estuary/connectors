@@ -1,7 +1,7 @@
 --- Begin `a-schema`.key_value createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS `a-schema`.key_value (
-  key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
+  key1 LONG NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
   key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
   `key!binary` BINARY NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
   array STRING COMMENT 'auto-generated projection of JSON at: /array with inferred types: [array]',
@@ -10,14 +10,14 @@ CREATE TABLE IF NOT EXISTS `a-schema`.key_value (
   flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',
-  integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
+  integer LONG COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
   `integerWithUserDDL` DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]',
   multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]',
   number DOUBLE COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
   `numberCastToString` STRING COMMENT 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]',
   object STRING COMMENT 'auto-generated projection of JSON at: /object with inferred types: [object]',
   string STRING COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
-  `stringInteger` BIGINT COMMENT 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]',
+  `stringInteger` LONG COMMENT 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]',
   `stringNumber` DOUBLE COMMENT 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]',
   flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'
 ) COMMENT 'Generated for materialization test/sqlite of collection key/value';
@@ -27,7 +27,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 
 CREATE TABLE IF NOT EXISTS `a-schema`.delta_updates (
   `theKey` STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
-  `aValue` BIGINT COMMENT 'A super-awesome value.
+  `aValue` LONG COMMENT 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]',
   flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time
 Flow publication date-time of this document
@@ -65,12 +65,12 @@ SELECT 0, `a-schema`.key_value.flow_document
 	USING (
 		(
 			SELECT
-			key1::BIGINT, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::BIGINT, `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::BIGINT, `stringNumber`::DOUBLE, flow_document::STRING
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::LONG, `stringNumber`::DOUBLE, flow_document::STRING
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1::BIGINT, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::BIGINT, `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::BIGINT, `stringNumber`::DOUBLE, flow_document::STRING
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::LONG, `stringNumber`::DOUBLE, flow_document::STRING
 			FROM json.`file2`
 		)
 	) AS r
@@ -87,7 +87,7 @@ SELECT 0, `a-schema`.key_value.flow_document
 --- Begin `a-schema`.key_value copyIntoDirect ---
 	COPY INTO `a-schema`.key_value FROM (
     SELECT
-		key1::BIGINT, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::BIGINT, `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::BIGINT, `stringNumber`::DOUBLE, flow_document::STRING
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::LONG, `stringNumber`::DOUBLE, flow_document::STRING
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
@@ -106,12 +106,12 @@ SELECT -1, ""
 	USING (
 		(
 			SELECT
-			`theKey`::STRING, `aValue`::BIGINT, flow_published_at::TIMESTAMP
+			`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			`theKey`::STRING, `aValue`::BIGINT, flow_published_at::TIMESTAMP
+			`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
 			FROM json.`file2`
 		)
 	) AS r
@@ -126,7 +126,7 @@ SELECT -1, ""
 --- Begin `a-schema`.delta_updates copyIntoDirect ---
 	COPY INTO `a-schema`.delta_updates FROM (
     SELECT
-		`theKey`::STRING, `aValue`::BIGINT, flow_published_at::TIMESTAMP
+		`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON

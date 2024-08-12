@@ -12,50 +12,38 @@ import (
 var pgDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.INTEGER:        sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("JSON"),
 			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         sql.MapStatic("TEXT"),
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.ToJsonBytes),
+			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
+			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
-			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL"),
+			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("TEXT", sql.StringCastConverter(func(in string) (any, error) {
-					// Postgres doesn't allow fields with null bytes, so they must be stripped out if
-					// present.
-					return strings.ReplaceAll(in, "\u0000", ""), nil
-				})),
+				Fallback: sql.MapStatic(
+					"TEXT",
+					sql.AlsoCompatibleWith("character varying"),
+					sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) {
+						// Postgres doesn't allow fields with null bytes, so they must be stripped out if
+						// present.
+						return strings.ReplaceAll(in, "\u0000", ""), nil
+					})),
+				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.ClampDate),
-					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.ClampDatetime),
+					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
+					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime)),
 					"duration":  sql.MapStatic("INTERVAL"),
 					"ipv4":      sql.MapStatic("CIDR"),
 					"ipv6":      sql.MapStatic("CIDR"),
 					"macaddr":   sql.MapStatic("MACADDR"),
 					"macaddr8":  sql.MapStatic("MACADDR8"),
-					"time":      sql.MapStatic("TIME"),
+					"time":      sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone")),
 				},
 			}),
 		},
 		sql.WithNotNullText("NOT NULL"),
-	)
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"bigint", "integer"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double precision"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"numeric"}, Validate: sql.NumericCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"text", "character varying"}, Validate: sql.StringCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"interval"}, Validate: sql.DurationCompatible},
-		sql.ColValidation{Types: []string{"cidr"}, Validate: sql.IPv4or6Compatible},
-		sql.ColValidation{Types: []string{"macaddr"}, Validate: sql.MacAddrCompatible},
-		sql.ColValidation{Types: []string{"macaddr8"}, Validate: sql.MacAddr8Compatible},
-		sql.ColValidation{Types: []string{"time without time zone"}, Validate: sql.TimeCompatible},
 	)
 
 	return sql.Dialect{
@@ -82,7 +70,6 @@ var pgDialect = func() sql.Dialect {
 			return fmt.Sprintf("$%d", index+1)
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
 		CaseInsensitiveColumns: false,
 	}

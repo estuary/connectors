@@ -13,7 +13,6 @@ type Dialect struct {
 	Literaler
 	Placeholderer
 	TypeMapper
-	ColumnValidator
 
 	// MaxFieldCharLength is provided as the "maxFieldLength" parameter to boilerplate.NewValidator.
 	MaxColumnCharLength int
@@ -112,7 +111,6 @@ var _ = Dialect{
 	Literaler:       LiteralFn(func(s string) string { return "" }),
 	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
 	TypeMapper:      DDLMapper{},
-	ColumnValidator: ColumnValidator{},
 }
 
 // PassThroughTransform returns a function that evaluates `if_` over its input
