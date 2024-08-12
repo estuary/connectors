@@ -135,6 +135,16 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 }
 
+// CompatibleColumnTypes is a list of column types that the mapped type
+// corresponding to the Flow field's schema is compatible with. By default the
+// DDL used to create the column is included in this list, so any additional
+// column types to be considered compatible for validation should be added using
+// the AlsoCompatibleWith variadic option when configuring the type mapping.
+// Most often this is used when the endpoint's information schema describes the
+// column in a different way than the DDL used to create it. Types are
+// case-insensitive.
+type CompatibleColumnTypes []string
+
 type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL
 	// for new table creation.
@@ -144,11 +154,18 @@ type MappedType struct {
 	NullableDDL string
 	// Converter of tuple elements for this mapping, into SQL runtime values.
 	Converter ElementConverter `json:"-"`
+	// The list of compatible column types for this mapping. Any columns with
+	// types not in this list will produce an "unsatisfiable" constraint. The
+	// DDL used to create the column is included by default.
+	CompatibleColumnnTypes CompatibleColumnTypes
+	// If the column is using user-defined DDL or not. The selected field will
+	// always pass validation if this is true.
+	UserDefinedDDL bool
 }
 
 // MapProjectionFn is a function that converts a Projection into the column DDL
 // and element converter for storing values into the column.
-type MapProjectionFn func(p *Projection) (string, ElementConverter)
+type MapProjectionFn func(p *Projection) (string, CompatibleColumnTypes, ElementConverter)
 
 var _ TypeMapper = DDLMapper{}
 
@@ -198,26 +215,55 @@ func WithNullableText(nullableText string) DDLMapperOption {
 	}
 }
 
-// MapStatic creates a ProjectionMapper that always returns the same DDL and
-// optionally sets an ElementConverter.
-func MapStatic(ddl string, converter ...ElementConverter) MapProjectionFn {
-	var c ElementConverter
-	if converter != nil {
-		c = converter[0]
-	}
+type mapStaticConfig struct {
+	compatible CompatibleColumnTypes
+	converter  ElementConverter
+}
 
-	return func(p *Projection) (string, ElementConverter) {
-		return ddl, c
+type mapStaticOption func(*mapStaticConfig)
+
+// AlsoCompatibleWith sets additional column types that the mapped type should
+// be considered compatible with.
+func AlsoCompatibleWith(compatibleTypes ...string) mapStaticOption {
+	return func(c *mapStaticConfig) {
+		c.compatible = append(c.compatible, compatibleTypes...)
 	}
 }
 
-// MapPrimaryKey specifies an alternate ProjectionMapper for the the column if
-// it is a primary key. This is useful for cases where specific databases
-// require certain variations of a type for primary keys. For example, MySQL
-// does not accept TEXT as a primary key, but a VARCHAR with specified size
-// works.
+// Using converter sets a custom ElementConverter for the mapped type.
+func UsingConverter(converter ElementConverter) mapStaticOption {
+	return func(c *mapStaticConfig) {
+		c.converter = converter
+	}
+}
+
+// MapStatic creates a ProjectionMapper that always returns the same DDL. All
+// mapping configurations must eventually resolve with a MapStatic that defines
+// the DDL for a column as the "leaf" MapProjectionFn in a possibly compound
+// arrangement of additional MapProjectionFn's, such as MapPrimaryKey or
+// MapString.
+func MapStatic(ddl string, opts ...mapStaticOption) MapProjectionFn {
+	cfg := mapStaticConfig{
+		// A projection is always valid with a reported endpoint column type
+		// that matches it exactly.
+		compatible: []string{ddl},
+	}
+
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		return ddl, cfg.compatible, cfg.converter
+	}
+}
+
+// MapPrimaryKey specifies an alternate MapProjectionFn for the the column if it
+// is a primary key. This is useful for cases where specific databases require
+// certain variations of a type for primary keys. For example, MySQL does not
+// accept TEXT as a primary key, but a VARCHAR with specified size works.
 func MapPrimaryKey(pkMapper, delegate MapProjectionFn) MapProjectionFn {
-	return func(p *Projection) (string, ElementConverter) {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
 		if p.IsPrimaryKey {
 			return pkMapper(p)
 		}
@@ -246,11 +292,11 @@ type StringMappings struct {
 	WithContentType map[string]MapProjectionFn
 }
 
-// StringTypeMapper is a special ProjectionMapper for string type columns, which
+// StringTypeMapper is a special MapProjectionFn for string type columns, which
 // can take the format or content type into account when deciding how to handle
 // the column.
 func MapString(m StringMappings) MapProjectionFn {
-	return func(p *Projection) (string, ElementConverter) {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
 		delegate := m.Fallback
 
 		if p.Inference.String_ != nil {
@@ -284,7 +330,7 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		return MappedType{}, fmt.Errorf("unable to map field %s with type %s", p.Field, p.Inference.Types)
 	}
 
-	ddl, converter := h(p)
+	ddl, compatibleTypes, converter := h(p)
 	if converter == nil {
 		converter = passThrough
 	}
@@ -299,7 +345,7 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 	if fc.IgnoreStringFormat || fc.CastToString {
 		// Materialize this field as a string, and convert its values to strings
 		// if configured.
-		ddl, _ = d.m[STRING](p)
+		ddl, compatibleTypes, _ = d.m[STRING](p)
 		converter = ToStr
 	}
 
@@ -309,9 +355,11 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 	}
 
 	out := MappedType{
-		DDL:         ddl,
-		NullableDDL: ddl,
-		Converter:   converter,
+		DDL:                    ddl,
+		NullableDDL:            ddl,
+		Converter:              converter,
+		CompatibleColumnnTypes: compatibleTypes,
+		UserDefinedDDL:         fc.DDL != "",
 	}
 
 	if mustExist && d.notNullText != "" {
@@ -370,26 +418,22 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 }
 
 func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	var fc fieldConfig
-	if rawFieldConfig != nil {
-		if err := json.Unmarshal(rawFieldConfig, &fc); err != nil {
-			return false, fmt.Errorf("unmarshaling field config: %w", err)
-		}
+	proj := buildProjection(proposed, rawFieldConfig)
+	mapped, err := c.dialect.MapType(&proj)
+	if err != nil {
+		return false, fmt.Errorf("mapping type: %w", err)
 	}
 
-	if fc.DDL != "" || fc.CastToString || fc.IgnoreStringFormat {
+	if mapped.UserDefinedDDL {
 		// Fields with custom DDL set are always said to be compatible, since it
 		// is not practical in general to correlate the database's
 		// representation of an existing column and the user's DDL definition.
-		// Additionally, fields that are being cast to strings are always
-		// compatible, since these values could go into a variety of different
-		// columns types. The expectation is that using these advanced features
-		// will also involve re-backfilling tables or manually
-		// altering/migrating tables as desired.
 		return true, nil
 	}
 
-	return c.dialect.ValidateColumn(existing, *proposed)
+	return slices.ContainsFunc(mapped.CompatibleColumnnTypes, func(compatibleType string) bool {
+		return strings.EqualFold(existing.Type, compatibleType)
+	}), nil
 }
 
 func (c constrainter) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
