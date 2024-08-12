@@ -152,7 +152,7 @@ class IterableExportStream(IterableStream, IncrementalMixin, ABC):
 
     cursor_field = "createdAt"
     primary_key = None
-    state_checkpoint_interval = 500
+    state_checkpoint_interval = 10000
 
     def __init__(self, start_date=None, end_date=None, **kwargs):
         super().__init__(**kwargs)
@@ -570,6 +570,7 @@ class EmailOpen(IterableExportStreamAdjustableRange):
 class EmailSend(IterableExportStreamAdjustableRange):
     data_field = "emailSend"
     primary_key = ["messageId", "email"]
+    state_checkpoint_interval = 1000
 
     def read_records(
         self,
