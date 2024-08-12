@@ -420,6 +420,7 @@ func TestAlterationAddColumn(t *testing.T) {
 			// be able to get the new column, but the second capture should.
 			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD extra TEXT;", tableName))
 			tb.Insert(ctx, t, tableName, [][]any{{2, "two", "aaa"}, {3, "three", "bbb"}})
+			time.Sleep(1 * time.Second) // Sleep to let the alteration make its way to cdc.ddl_history
 			cs.Capture(ctx, t, nil)
 			if tc.Manual {
 				time.Sleep(1 * time.Second)
@@ -438,6 +439,7 @@ func TestAlterationAddColumn(t *testing.T) {
 			// this should demonstrate that cleanup is working correctly as well.
 			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD evenmore TEXT;", tableName))
 			tb.Insert(ctx, t, tableName, [][]any{{6, "six", "eee", "foo"}, {7, "seven", "fff", "bar"}})
+			time.Sleep(1 * time.Second) // Sleep to let the alteration make its way to cdc.ddl_history
 			cs.Capture(ctx, t, nil)
 			if tc.Manual {
 				time.Sleep(1 * time.Second)
