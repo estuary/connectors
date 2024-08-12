@@ -480,19 +480,6 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 			"msg": msg,
 		}).Trace("received message")
 
-		// last message indicated a continuation of SQL_REDO and SQL_UNDO values
-		// so this row's sqls will be appended to the last
-		if lastMsg != nil && lastMsg.CSF == 1 {
-			// sanity check the (SSN, RSID) tuple matches between the rows
-			if lastMsg.SSN != msg.SSN || lastMsg.RSID != msg.RSID {
-				return fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.SSN, lastMsg.RSID, msg.SSN, msg.RSID)
-			}
-			lastMsg.SQL += msg.SQL
-			lastMsg.UndoSQL += msg.UndoSQL
-			lastMsg.CSF = msg.CSF
-			continue
-		}
-
 		// If this change event is on a table we're not capturing, skip doing any
 		// further processing on it.
 		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
@@ -520,6 +507,29 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		// the case to be one of dictionary mismatch
 		if msg.Status == 2 && msg.Info != "" {
 			return fmt.Errorf("dictionary mismatch (%s) for table %q: %q", msg.Info, msg.TableName, msg.SQL)
+		}
+
+		// last message indicated a continuation of SQL_REDO and SQL_UNDO values
+		// so this row's sqls will be appended to the last
+		if lastMsg != nil && lastMsg.CSF == 1 {
+			// sanity check the (SSN, RSID) tuple matches between the rows
+			if lastMsg.SSN != msg.SSN || lastMsg.RSID != msg.RSID {
+				return fmt.Errorf("expected SSN and RSID of continued rows to match: (%d, %s) != (%d, %s)", lastMsg.SSN, lastMsg.RSID, msg.SSN, msg.RSID)
+			}
+			lastMsg.SQL += msg.SQL
+			lastMsg.UndoSQL += msg.UndoSQL
+			lastMsg.CSF = msg.CSF
+
+			// last message was CSF, this one is not. This is the end of the continuation chain
+			if msg.CSF == 0 {
+				s.decodeCh <- *lastMsg
+				relevantMessages++
+			}
+			continue
+		}
+		if msg.CSF == 1 {
+			lastMsg = &msg
+			continue
 		}
 
 		s.decodeCh <- msg
