@@ -11,7 +11,6 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/trinodb/trino-go-client/trino"
 )
 
@@ -54,7 +53,7 @@ var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (inter
 
 // starburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
 var starburstTrinoDialect = func() sql.Dialect {
-	dateTimeMapper := sql.MapStatic("TIMESTAMP(6) WITH TIME ZONE", timestampConverter)
+	dateTimeMapper := sql.MapStatic("TIMESTAMP(6) WITH TIME ZONE", sql.UsingConverter(timestampConverter))
 	return starburstDialect(sql.MapStatic("DATE"), dateTimeMapper)
 }()
 
@@ -66,15 +65,15 @@ var starburstHiveDialect = func() sql.Dialect {
 var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.MapProjectionFn) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.ARRAY:          sql.MapStatic("VARCHAR", jsonConverter),
+			sql.ARRAY:          sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
 			sql.BINARY:         sql.MapStatic("VARCHAR"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.INTEGER:        sql.MapStatic("BIGINT"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE", doubleConverter),
-			sql.OBJECT:         sql.MapStatic("VARCHAR", jsonConverter),
-			sql.MULTIPLE:       sql.MapStatic("VARCHAR", jsonConverter),
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.StrToInt),
-			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.StrToFloat("NaN", "inf", "-inf")),
+			sql.NUMBER:         sql.MapStatic("DOUBLE", sql.UsingConverter(doubleConverter)),
+			sql.OBJECT:         sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
+			sql.MULTIPLE:       sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.UsingConverter(sql.StrToInt)),
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "inf", "-inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("VARCHAR"),
 				WithFormat: map[string]sql.MapProjectionFn{
@@ -85,15 +84,6 @@ var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.M
 		},
 		// We are not using NOT NULL TEXT so that all columns are created as nullable. This is
 		// necessary because Hive temp table which does not support NOT NULL
-	)
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"varchar"}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp(6) with time zone"}, Validate: sql.DateTimeCompatible},
 	)
 
 	return sql.Dialect{
@@ -125,26 +115,9 @@ var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.M
 		// We are not using sql.NullableMapper so that all columns are created as nullable. This is
 		// necessary because Hive temp table which does not support NOT NULL
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Starburst has no limit on how long column names can be that I can find
 		CaseInsensitiveColumns: true,
 	}
-}
-
-// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
-// be materialized, since these are all materialized as VARCHAR columns.
-func stringCompatible(p pf.Projection) bool {
-	if sql.StringCompatible(p) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"array"}) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"object"}) {
-		return true
-	} else if sql.MultipleCompatible(p) {
-		return true
-	}
-
-	return false
 }
 
 type templates struct {

@@ -1,13 +1,13 @@
 --- Begin projectID.dataset.key_value createTargetTable ---
 CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
-		key1 INT64 NOT NULL,
-		key2 BOOL NOT NULL,
+		key1 INTEGER NOT NULL,
+		key2 BOOLEAN NOT NULL,
 		key_binary STRING NOT NULL,
 		`array` STRING,
 		binary STRING,
-		boolean BOOL,
+		boolean BOOLEAN,
 		flow_published_at TIMESTAMP NOT NULL,
-		integer INT64,
+		integer INTEGER,
 		integerWithUserDDL DECIMAL(20),
 		multiple JSON,
 		number FLOAT64,
@@ -24,7 +24,7 @@ CLUSTER BY key1, key2, key_binary;
 --- Begin projectID.dataset.delta_updates createTargetTable ---
 CREATE TABLE IF NOT EXISTS projectID.dataset.delta_updates (
 		theKey STRING NOT NULL,
-		aValue INT64,
+		aValue INTEGER,
 		flow_published_at TIMESTAMP NOT NULL
 )
 CLUSTER BY theKey;

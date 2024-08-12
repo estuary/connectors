@@ -32,15 +32,6 @@ func newTestDialect() Dialect {
 		WithNotNullText("NOT NULL"),
 	)
 
-	cv := NewColumnValidator(
-		ColValidation{Types: []string{"json"}, Validate: JsonCompatible},
-		ColValidation{Types: []string{"boolean"}, Validate: BooleanCompatible},
-		ColValidation{Types: []string{"bigint", "numeric"}, Validate: IntegerCompatible},
-		ColValidation{Types: []string{"double precision", "decimal"}, Validate: NumberCompatible},
-		ColValidation{Types: []string{"date-time"}, Validate: DateTimeCompatible},
-		ColValidation{Types: []string{"text"}, Validate: StringCompatible},
-	)
-
 	return Dialect{
 		TableLocatorer: TableLocatorFn(func(path []string) InfoTableLocation {
 			return InfoTableLocation{TableSchema: path[1], TableName: path[2]}
@@ -57,8 +48,7 @@ func newTestDialect() Dialect {
 		Placeholderer: PlaceholderFn(func(index int) string {
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: cv,
+		TypeMapper: mapper,
 	}
 }
 
