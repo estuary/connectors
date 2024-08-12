@@ -110,7 +110,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	), nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	return &sql.PrereqErr{}
 }
 

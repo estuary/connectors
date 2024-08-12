@@ -266,6 +266,7 @@ func newRedshiftDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 

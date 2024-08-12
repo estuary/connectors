@@ -198,14 +198,31 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return err
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
-	var httpPathSplit = strings.Split(c.cfg.HTTPPath, "/")
+	cfg := conf.(*config)
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.Credentials.PersonalAccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
+	if err != nil {
+		errs.Err(fmt.Errorf("creating workspace client: %w", err))
+		return errs
+	}
+
+	db, err := stdsql.Open("databricks", cfg.ToURI())
+	if err != nil {
+		errs.Err(fmt.Errorf("opening database: %w", err))
+		return errs
+	}
+
+	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 	var warehouseStopped = true
 	var warehouseErr error
-	if res, err := c.wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
+	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
 		errs.Err(err)
 	} else {
 		switch res.State {
@@ -235,8 +252,8 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 		// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up
 		// process however we don't want to wait 5 minutes as that does not create a good UX for the
 		// user in the UI
-		if r, err := c.wsClient.Warehouses.Start(ctx, databricksSql.StartRequest{Id: warehouseId}); err != nil {
-			errs.Err(fmt.Errorf("Could not start the warehouse: %w", err))
+		if r, err := wsClient.Warehouses.Start(ctx, databricksSql.StartRequest{Id: warehouseId}); err != nil {
+			errs.Err(fmt.Errorf("could not start the warehouse: %w", err))
 		} else if _, err := r.GetWithTimeout(60 * time.Second); err != nil {
 			errs.Err(warehouseErr)
 		}
@@ -249,7 +266,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	// We avoid running this ping if the warehouse is not awake, see
 	// the issue below for more information on why:
 	// https://github.com/databricks/databricks-sql-go/issues/198
-	if err := c.db.PingContext(ctx); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var execErr dbsqlerr.DBExecutionError
 		var netConnErr *net.DNSError
@@ -262,11 +279,11 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
 		}
 

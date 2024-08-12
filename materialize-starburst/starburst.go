@@ -137,6 +137,7 @@ func newStarburstDriver() *sql.Driver {
 				Tenant:              tenant,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 

@@ -134,6 +134,7 @@ func newSnowflakeDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
