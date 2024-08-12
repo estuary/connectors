@@ -231,8 +231,7 @@ func getTableObjectMappings(ctx context.Context, conn *sql.DB, tables []*sqlcapt
 			return nil, fmt.Errorf("scanning table object identifier row: %w", err)
 		}
 
-		var streamID = sqlcapture.JoinStreamID(owner, tableName)
-		mapping[streamID] = tableObject{objectID: objectID, dataObjectID: dataObjectID}
+		mapping[joinObjectID(objectID, dataObjectID)] = tableObject{objectID: objectID, dataObjectID: dataObjectID}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
