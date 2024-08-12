@@ -72,11 +72,22 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		"startSCN": startSCN,
 	}).Info("starting replication")
 
+	var logminerQuery = generateLogminerQuery(db.tableObjectMapping)
+	logrus.WithFields(logrus.Fields{
+		"query": logminerQuery,
+	}).Info("logminer contents query")
+
+	stmt, err := conn.PrepareContext(ctx, logminerQuery)
+	if err != nil {
+		return nil, fmt.Errorf("preparing logminer query: %w", err)
+	}
+
 	var stream = &replicationStream{
 		db:   db,
 		conn: conn,
 
 		lastTxnEndSCN: startSCN,
+		logminerStmt:  stmt,
 	}
 
 	stream.tables.active = make(map[string]struct{})
@@ -236,6 +247,8 @@ type replicationStream struct {
 	redoSequence int
 
 	lastTxnEndSCN int // End SCN (record + 1) of the last completed transaction.
+
+	logminerStmt *sql.Stmt
 
 	// The 'active tables' set, guarded by a mutex so it can be modified from
 	// the main goroutine while it's read by the replication goroutine.
@@ -424,31 +437,28 @@ const (
 	opFlush = -1
 )
 
-// receiveMessage reads and parses the next replication message from the database,
-// blocking until a message is available, the context is cancelled, or an error
-// occurs.
-func (s *replicationStream) receiveMessages(ctx context.Context) error {
+func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
 	var tablesCondition = ""
 	var i = 0
-	for _, mapping := range s.db.tableObjectMapping {
+	for _, mapping := range tableObjectMapping {
 		if i > 0 {
 			tablesCondition += " OR "
 		}
 		tablesCondition += fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping.objectID, mapping.dataObjectID)
 		i++
 	}
-	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
+	return fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
     FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
     SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
     AND (%s)`, tablesCondition)
+}
 
-	var stmt, err = s.conn.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("preparing logminer query: %w", err)
-	}
-
-	rows, err := stmt.QueryContext(ctx, s.lastTxnEndSCN)
+// receiveMessage reads and parses the next replication message from the database,
+// blocking until a message is available, the context is cancelled, or an error
+// occurs.
+func (s *replicationStream) receiveMessages(ctx context.Context) error {
+	rows, err := s.logminerStmt.QueryContext(ctx, s.lastTxnEndSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
 	}
