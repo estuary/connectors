@@ -139,6 +139,14 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		return fmt.Errorf("querying archive log files destination: %w", err)
 	}
 
+	// In order to make sure we don't hit dictionary mismatches, we need to find the most recent archive log before
+	// or at our SCN range that begins a dictionary, so that early rows of this range are not missing their dictionary
+	row = s.conn.QueryRowContext(ctx, "SELECT MAX(NEXT_CHANGE#) FROM V$ARCHIVED_LOG WHERE DICTIONARY_BEGIN='YES' AND NEXT_CHANGE# <= :scn", startSCN)
+	var minArchiveSCN int
+	if err := row.Scan(&minArchiveSCN); err != nil {
+		return fmt.Errorf("querying latest archive log to contain the dictionary for the SCN range: %w", err)
+	}
+
 	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#,'NO' as DICT_START, 'NO' as DICT_END FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
     WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED'
@@ -149,7 +157,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
 	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
-	rows, err := s.conn.QueryContext(ctx, fullQuery, startSCN)
+	rows, err := s.conn.QueryContext(ctx, fullQuery, minArchiveSCN)
 	if err != nil {
 		return fmt.Errorf("fetching log file list: %w", err)
 	}
@@ -200,10 +208,6 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN 
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
 	} else if s.db.config.Advanced.DictionaryMode == DictionaryModeOnline {
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG"
-	}
-
-	if err := s.addLogFiles(ctx, startSCN, endSCN); err != nil {
-		return err
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -345,21 +349,25 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			endSCN = currentSCN
 		}
 
-		switched, err := s.redoFileSwitched(ctx)
-		if err != nil {
+		// If redo files have switched, we need to restart and add log files
+		// over again, otherwise we just start a new session with a different SCN range
+		if switched, err := s.redoFileSwitched(ctx); err != nil {
 			return err
-		}
-
-		if switched {
+		} else if switched {
 			if err := s.endLogminer(ctx); err != nil {
+				return err
+			} else if err := s.addLogFiles(ctx, startSCN, endSCN); err != nil {
 				return err
 			} else if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
 				return err
 			}
+		} else {
+			if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
+				return err
+			}
 		}
 
-		err = s.receiveMessages(ctx)
-		if err != nil {
+		if err := s.receiveMessages(ctx); err != nil {
 			return fmt.Errorf("receive messages: %w", err)
 		}
 
@@ -555,10 +563,15 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		return err
 	}
 
+	var finalSCN = 0
+	if lastMsg != nil {
+		finalSCN = lastMsg.SCN
+	}
 	logrus.WithFields(logrus.Fields{
 		"totalMessages":    totalMessages,
 		"relevantMessages": relevantMessages,
 		"startSCN":         startSCN,
+		"lastSCN":          finalSCN,
 	}).Debug("received messages")
 
 	return nil
