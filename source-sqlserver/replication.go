@@ -24,10 +24,11 @@ import (
 var replicationBufferSize = 4 * 1024 // Assuming change events average ~2kB then 4k * 2kB = 8MB
 
 const (
-	cdcPollingWorkers  = 4                      // Number of parallel worker threads to execute CDC polling operations
-	cdcCleanupWorkers  = 16                     // Number of parallel worker threads to execute table cleanup operations
-	cdcPollingInterval = 500 * time.Millisecond // How frequently to perform CDC polling
-	cdcCleanupInterval = 15 * time.Second       // How frequently to perform CDC table cleanup
+	cdcPollingWorkers     = 4                      // Number of parallel worker threads to execute CDC polling operations
+	cdcCleanupWorkers     = 16                     // Number of parallel worker threads to execute table cleanup operations
+	cdcPollingInterval    = 500 * time.Millisecond // How frequently to perform CDC polling
+	cdcCleanupInterval    = 15 * time.Second       // How frequently to perform CDC table cleanup
+	cdcManagementInterval = 30 * time.Second       // How frequently to perform CDC instance management
 )
 
 // LSN is just a type alias for []byte to make the code that works with LSN values a bit clearer.
@@ -180,10 +181,20 @@ func (rs *sqlserverReplicationStream) Close(ctx context.Context) error {
 }
 
 func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
+	// Run capture instance management once at startup before entering the main
+	// loop. This helps ensure that alteration handling is quick and reliable in
+	// tests, and in production it doesn't really matter at all.
+	if err := rs.manageCaptureInstances(ctx); err != nil {
+		log.WithField("err", err).Error("error managing capture instances")
+		return fmt.Errorf("error managing capture instances: %w", err)
+	}
+
 	var poll = time.NewTicker(cdcPollingInterval)
 	var cleanup = time.NewTicker(cdcCleanupInterval)
+	var manage = time.NewTicker(cdcManagementInterval)
 	defer poll.Stop()
 	defer cleanup.Stop()
+	defer manage.Stop()
 
 	for {
 		select {
@@ -198,6 +209,11 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 			if err := rs.cleanupChangeTables(ctx); err != nil {
 				log.WithField("err", err).Error("error cleaning up change tables")
 				return fmt.Errorf("error cleaning up change tables: %w", err)
+			}
+		case <-manage.C:
+			if err := rs.manageCaptureInstances(ctx); err != nil {
+				log.WithField("err", err).Error("error managing capture instances")
+				return fmt.Errorf("error managing capture instances: %w", err)
 			}
 		}
 	}
@@ -236,21 +252,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	rs.tables.RLock()
 	for streamID, info := range rs.tables.info {
 		// Figure out which capture instance to use for the current polling cycle.
-		// The logic goes like this:
-		//   - In general we always want to use the newest capture instance, according
-		//     to the `create_date` column of the `cdc.change_tables` metadata.
-		//   - But if the newest capture instance was just created since our last
-		//     polling cycle, then our current 'FromLSN' point will be earlier than
-		//     that instance covers, and we shouldn't use it yet.
-		var instance *captureInstanceInfo
-		for _, candidate := range captureInstances[streamID] {
-			if bytes.Compare(candidate.StartLSN, rs.fromLSN) > 0 {
-				continue // Can't use this one yet, the StartLSN is newer than our current FromLSN
-			}
-			if instance == nil || candidate.CreateDate.After(instance.CreateDate) {
-				instance = candidate
-			}
-		}
+		var instance = newestValidInstance(captureInstances[streamID], rs.fromLSN)
 		if instance == nil {
 			return fmt.Errorf("no valid capture instances for stream %q: considered %d candidates", streamID, len(captureInstances[streamID]))
 		}
@@ -313,6 +315,128 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	return nil
 }
 
+// newestValidInstance selects the newest (according to the `create_date` column of
+// the system table `cdc.change_tables`) capture instance which has a `start_lsn`
+// lower bound less than (or equal to) the specified LSN.
+//
+// The logic is that in general we always want to use the newest capture instance
+// for polling, but if the newest instance was created more recently than our last
+// polling cycle we can't quite use it yet, so we have to wait until our `fromLSN`
+// for polling advances past the point where the capture instance was created.
+func newestValidInstance(instances []*captureInstanceInfo, fromLSN LSN) *captureInstanceInfo {
+	var selected *captureInstanceInfo
+	for _, candidate := range instances {
+		if bytes.Compare(candidate.StartLSN, fromLSN) > 0 {
+			continue // Can't use this one yet, the StartLSN is newer than our current FromLSN
+		}
+		if selected == nil || candidate.CreateDate.After(selected.CreateDate) {
+			selected = candidate // Retain the newest valid instance
+		}
+	}
+	return selected
+}
+
+// manageCaptureInstances handles creating new capture instances in response to alterations of source
+// tables, and deleting old capture instances once they are no longer needed.
+func (rs *sqlserverReplicationStream) manageCaptureInstances(ctx context.Context) error {
+	// If the user hasn't requested automatic capture instance management, do nothing
+	if !rs.cfg.Advanced.AutomaticCaptureInstances {
+		return nil
+	}
+
+	// Query system tables for the latest instance list and any DDL events of note.
+	captureInstances, err := cdcListCaptureInstances(ctx, rs.conn)
+	if err != nil {
+		return fmt.Errorf("error listing CDC instances: %w", err)
+	}
+	ddlHistory, err := cdcGetDDLHistory(ctx, rs.conn)
+	if err != nil {
+		return fmt.Errorf("error fetching DDL history: %w", err)
+	}
+
+	// See whether any DDL events require us to create new capture instances. Since
+	// our polling logic will seamlessly switch to the latest instance at the right
+	// time and we clean up after ourselves, it is okay to err on the side of doing
+	// this more often than necessary. So we consider any DDL events to require new
+	// capture intance creation.
+	var createInstances []*ddlHistoryEntry // (Ab)using the DDL history events to track this because they hold the schema and table name
+	rs.tables.RLock()
+	for streamID := range rs.tables.info {
+		if len(captureInstances[streamID]) != 1 {
+			continue // Ignore any streams which don't have exactly one capture instance, we can't do anything about those now.
+		}
+
+		// Since `ddl_history` entries are deleted when the corresponding capture instance is
+		// deleted, and we've just checked to make sure there's only one capture instance for
+		// this table, we can assume any nonzero number of DDL events means that changes have
+		// occurred since the current instance was created.
+		if events := ddlHistory[streamID]; len(events) > 0 {
+			for _, event := range events {
+				log.WithFields(log.Fields{
+					"stream":  streamID,
+					"command": event.Command,
+					"lsn":     fmt.Sprintf("%X", event.LSN),
+					"ts":      event.Time.UTC().Format(time.RFC3339),
+				}).Debug("observed DDL event on stream")
+			}
+
+			// Queue a new capture instance creation for this table
+			createInstances = append(createInstances, events[len(events)-1])
+		}
+	}
+	rs.tables.RUnlock()
+
+	// Queue for deletion any capture instances (on tables which we're responsible for)
+	// where there is a newer instance for the same table which it's valid to use.
+	var deleteInstances []*captureInstanceInfo
+	rs.tables.RLock()
+	for streamID := range rs.tables.info {
+		if len(captureInstances[streamID]) == 1 {
+			// No deletions possible when there's only one. Strictly speaking this is
+			// probably not required as all the other logic should correctly identify
+			// that this instance is not eligible for deletion, but it's useful to be
+			// explicit about that.
+			continue
+		}
+		var activeInstance = newestValidInstance(captureInstances[streamID], rs.fromLSN)
+		for _, candidate := range captureInstances[streamID] {
+			// Any instance which is valid (startLSN <= fromLSN) but not the newest one is eligible for deletion.
+			if bytes.Compare(candidate.StartLSN, rs.fromLSN) <= 0 && candidate != activeInstance {
+				deleteInstances = append(deleteInstances, candidate)
+			}
+		}
+	}
+	rs.tables.RUnlock()
+
+	// Perform all instance creations
+	for _, create := range createInstances {
+		var instanceName, err = cdcCreateCaptureInstance(ctx, rs.conn, create.TableSchema, create.TableName, rs.cfg.User)
+		if err != nil {
+			return err
+		}
+		log.WithFields(log.Fields{
+			"schema":   create.TableSchema,
+			"table":    create.TableName,
+			"instance": instanceName,
+		}).Info("created new capture instance for table")
+	}
+
+	// Perform all instance deletions
+	for _, delete := range deleteInstances {
+		if err := cdcDeleteCaptureInstance(ctx, rs.conn, delete.TableSchema, delete.TableName, delete.Name); err != nil {
+			return err
+		}
+		log.WithFields(log.Fields{
+			"schema":   delete.TableSchema,
+			"table":    delete.TableName,
+			"instance": delete.Name,
+		}).Info("deleted obsolete capture instance")
+	}
+
+	return nil
+}
+
+// cleanupChangeTables handles pruning change tables of events which have been persisted into Flow.
 func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) error {
 	// If the user hasn't requested automatic change table cleanup, do nothing
 	if !rs.cfg.Advanced.AutomaticChangeTableCleanup {
@@ -547,6 +671,40 @@ func cdcListCaptureInstances(ctx context.Context, conn *sql.DB) (map[sqlcapture.
 	return captureInstances, rows.Err()
 }
 
+type ddlHistoryEntry struct {
+	TableSchema, TableName string    // The schema and name of the source table to which the DDL change was applied.
+	RequiredColumnUpdate   bool      // Indicates that the data type of a captured column was modified in the source table. This modification altered the column in the change table.
+	Command                string    // The DDL statement applied to the source table.
+	LSN                    LSN       // The LSN associated with the DDL statement commit.
+	Time                   time.Time // The timestamp at which the DDL change was made to the source table.
+}
+
+// cdcGetDDLHistory queries the `cdc.ddl_history` system table and returns the results
+// as a map from the associated source table stream ID to an ordered list of changes.
+func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]*ddlHistoryEntry, error) {
+	const query = `SELECT sch.name, tbl.name, hist.required_column_update, hist.ddl_command, hist.ddl_lsn, hist.ddl_time
+				     FROM cdc.ddl_history AS hist
+					 JOIN sys.tables AS tbl ON hist.source_object_id = tbl.object_id
+					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id
+					 ORDER BY hist.ddl_lsn;`
+	var rows, err = conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	var ddlHistory = make(map[string][]*ddlHistoryEntry)
+	for rows.Next() {
+		var entry ddlHistoryEntry
+		if err := rows.Scan(&entry.TableSchema, &entry.TableName, &entry.RequiredColumnUpdate, &entry.Command, &entry.LSN, &entry.Time); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		var streamID = sqlcapture.JoinStreamID(entry.TableSchema, entry.TableName)
+		ddlHistory[streamID] = append(ddlHistory[streamID], &entry)
+	}
+	return ddlHistory, rows.Err()
+}
+
 // cdcGetInstanceMaxLSNs queries the maximum change event LSN for each listed capture instance.
 //
 // It does this by generating a hairy union query which simply selects `MAX(__$start_lsn)` for
@@ -650,6 +808,14 @@ func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, 
 		return "", fmt.Errorf("error creating capture instance %q: %w", instanceName, err)
 	}
 	return instanceName, nil
+}
+
+func cdcDeleteCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, instance string) error {
+	const query = `EXEC sys.sp_cdc_disable_table @source_schema = @p1, @source_name = @p2, @capture_instance = @p3;`
+	if _, err := conn.ExecContext(ctx, query, schema, table, instance); err != nil {
+		return fmt.Errorf("error deleting capture instance %q: %w", instance, err)
+	}
+	return nil
 }
 
 func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
