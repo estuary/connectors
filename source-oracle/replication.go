@@ -459,7 +459,8 @@ func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context) error {
-	rows, err := s.logminerStmt.QueryContext(ctx, s.lastTxnEndSCN)
+	var startSCN = s.lastTxnEndSCN
+	rows, err := s.logminerStmt.QueryContext(ctx, startSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
 	}
@@ -496,7 +497,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 		if !s.tableActive(streamID) {
 			var isKnownTable = false
-			// conditions for tables that has been dropped, check their object identifier against discovered tables
+			// if the table has been dropped, check their object identifier
 			if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
 				if _, ok := s.db.tableObjectMapping[joinObjectID(msg.ObjectID, msg.DataObjectID)]; ok {
 					// This is a known table to us, a dictionary mismatch on this row is an error
@@ -557,6 +558,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"totalMessages":    totalMessages,
 		"relevantMessages": relevantMessages,
+		"startSCN":         startSCN,
 	}).Debug("received messages")
 
 	return nil
