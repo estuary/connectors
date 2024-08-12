@@ -318,6 +318,12 @@ func (t *transactor) commit(ctx context.Context) error {
 
 		edcTableDefs[b.tempTableName] = b.storeFile.edc()
 
+		log.WithFields(log.Fields{
+			"source collection": b.target.Source.String(),
+			"temp table":        b.tempTableName,
+			"source uris":       b.storeFile.edc().SourceURIs,
+		}).Info("store: encoding and uploading files")
+
 		if b.target.DeltaUpdates {
 			subqueries = append(subqueries, b.storeInsertSQL)
 		} else {
