@@ -296,6 +296,7 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 				err = nil
 			}
 			close(s.events)
+			s.logminerStmt.Close()
 			s.conn.Close()
 			s.errCh <- err
 		}
