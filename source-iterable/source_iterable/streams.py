@@ -152,6 +152,7 @@ class IterableExportStream(IterableStream, IncrementalMixin, ABC):
 
     cursor_field = "createdAt"
     primary_key = None
+    state_checkpoint_interval = 500
 
     def __init__(self, start_date=None, end_date=None, **kwargs):
         super().__init__(**kwargs)
