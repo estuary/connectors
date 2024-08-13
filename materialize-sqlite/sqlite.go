@@ -87,6 +87,7 @@ func NewSQLiteDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: func(context.Context, any, string) *sql.PrereqErr { return &sql.PrereqErr{} },
 	}
 }
 
@@ -108,10 +109,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 		func(in []string) []string { return in },
 		func(in string) string { return in },
 	), nil
-}
-
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	return &sql.PrereqErr{}
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
