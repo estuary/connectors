@@ -87,6 +87,9 @@
               },
               {
                 "type": "null"
+              },
+              {
+                "type": "integer"
               }
             ]
           },
