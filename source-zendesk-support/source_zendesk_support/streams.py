@@ -976,6 +976,18 @@ class TicketSkips(SourceZendeskSupportCursorPaginationStream):
 
         return params
 
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        for record in super().parse_response(response, **kwargs):
+            # Additional handling to coerce custom fields' boolean values to strings.
+            custom_fields = record.get("ticket", {}).get("custom_fields", [])
+
+            for field in custom_fields:
+                value = field.get("value", None)
+                if isinstance(value, bool):
+                    field["value"] = str(value).lower()
+
+            yield record
+
 
 class Posts(SourceZendeskSupportCursorPaginationStream):
     """Posts: https://developer.zendesk.com/api-reference/help_center/help-center-api/posts/#list-posts"""
