@@ -31,15 +31,22 @@ var databricksDialect = func() sql.Dialect {
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.ARRAY:          jsonMapper,
-			sql.BINARY:         sql.MapStatic("BINARY"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:        sql.MapStatic("LONG"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE"),
-			sql.OBJECT:         jsonMapper,
-			sql.MULTIPLE:       jsonMapper,
-			sql.STRING_INTEGER: sql.MapStatic("LONG", sql.UsingConverter(sql.StrToInt)),
-			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "Inf", "-Inf"))),
+			sql.ARRAY:   jsonMapper,
+			sql.BINARY:  sql.MapStatic("BINARY"),
+			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("LONG", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("decimal")),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE"),
+			sql.OBJECT:   jsonMapper,
+			sql.MULTIPLE: jsonMapper,
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("STRING", sql.UsingConverter(sql.ToStr)),
+				38,
+			),
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "Inf", "-Inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.MapProjectionFn{

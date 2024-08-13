@@ -10,14 +10,23 @@ import (
 var duckDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.ARRAY:          sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:         sql.MapStatic("VARCHAR"),
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.STRING_INTEGER: sql.MapStatic("HUGEINT", sql.UsingConverter(sql.StrToInt)),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("HUGEINT"),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.ARRAY:    sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.BINARY:   sql.MapStatic("VARCHAR"),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("HUGEINT", sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("VARCHAR", sql.UsingConverter(sql.ToStr)),
+				// A 96-bit integer is 39 characters long, but not all 39 digit
+				// integers will fit in one.
+				38,
+			),
 			// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
