@@ -13,7 +13,10 @@ collections:
         multiple: { type: [integer, object, boolean] }
         string: { type: string }
         integer: { type: integer }
+        integerGt64Bit: { type: integer, maximum: 1e19 }
         stringInteger: { type: [integer, string], format: integer }
+        stringInteger39Chars : { type: [integer, string], format: integer, maxLength: 39 }
+        stringInteger66Chars : { type: [integer, string], format: integer, maxLength: 66 }
         number: { type: number }
         stringNumber: { type: [number, string], format: number }
         numberCastToString: { type: [number, string], format: number }

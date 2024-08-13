@@ -45,14 +45,23 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
-			sql.BOOLEAN:        sql.MapStatic("BIT"),
-			sql.OBJECT:         sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.ARRAY:          sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY:         sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
-			sql.MULTIPLE:       sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
+			sql.BOOLEAN:  sql.MapStatic("BIT"),
+			sql.OBJECT:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:    sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+			sql.MULTIPLE: sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
+				// The maximum length of a signed 64-bit integer is 19
+				// characters.
+				18,
+			),
 			// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
 			sql.STRING: sql.MapString(sql.StringMappings{

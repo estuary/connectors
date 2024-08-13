@@ -50,15 +50,19 @@ func (m timestampTypeMapping) valid() bool {
 var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.ARRAY:          sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:         sql.MapStatic("TEXT"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:        sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("number")), // INTEGER DDL is actually an alias for NUMBER
-			sql.NUMBER:         sql.MapStatic("FLOAT"),
-			sql.OBJECT:         sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.MULTIPLE:       sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.STRING_INTEGER: sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("number"), sql.UsingConverter(sql.StrToInt)), // Equivalent to NUMBER(38,0)
-			sql.STRING_NUMBER:  sql.MapStatic("FLOAT", sql.UsingConverter(sql.StrToFloat("NaN", "inf", "-inf"))),
+			sql.ARRAY:    sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.BINARY:   sql.MapStatic("TEXT"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:  sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("number")), // INTEGER DDL is actually an alias for NUMBER
+			sql.NUMBER:   sql.MapStatic("FLOAT"),
+			sql.OBJECT:   sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.MULTIPLE: sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("number"), sql.UsingConverter(sql.StrToInt)), // Equivalent to NUMBER(38,0)
+				sql.MapStatic("TEXT", sql.UsingConverter(sql.ToStr)),
+				38,
+			),
+			sql.STRING_NUMBER: sql.MapStatic("FLOAT", sql.UsingConverter(sql.StrToFloat("NaN", "inf", "-inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("TEXT"),
 				WithFormat: map[string]sql.MapProjectionFn{
