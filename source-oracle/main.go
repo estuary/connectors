@@ -147,7 +147,7 @@ func (c *Config) SetDefaults(name string) {
 		c.Advanced.IncrementalChunkSize = 10000
 	}
 	if c.Advanced.IncrementalSCNRange <= 0 {
-		c.Advanced.IncrementalSCNRange = 20000
+		c.Advanced.IncrementalSCNRange = 50000
 	}
 
 	if c.Advanced.NodeID == 0 {
