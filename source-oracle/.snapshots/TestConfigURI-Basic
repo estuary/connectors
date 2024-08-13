@@ -1,2 +1,2 @@
-oracle://will:secret1234@example.com:1521/somedb
+oracle://will:secret1234@example.com:1521/somedb?PREFETCH_ROWS=1
 config valid
