@@ -3,6 +3,7 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 
@@ -308,6 +309,38 @@ func MapString(m StringMappings) MapProjectionFn {
 		}
 
 		return delegate(p)
+	}
+}
+
+// MapStringMaxLen uses an alternate mapping for string fields where string
+// inference is available and the string is longer than the cutoff.
+func MapStringMaxLen(def, alt MapProjectionFn, cutoff uint32) MapProjectionFn {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		if p.Inference.String_ != nil &&
+			p.Inference.String_.MaxLength > cutoff {
+			return alt(p)
+		}
+
+		return def(p)
+	}
+}
+
+// MapSignedInt64 uses an alternate mapping for numeric fields where numeric
+// inference is available and the minimum or maximum of the inferred range is
+// outside the bounds of what will fit in a signed 64 bit integer.
+func MapSignedInt64(def, alt MapProjectionFn) MapProjectionFn {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		if p.Inference.Numeric != nil &&
+			(p.Inference.Numeric.Minimum < math.MinInt64 || p.Inference.Numeric.Maximum > math.MaxInt64) {
+			// Numeric Minimum and Maximums are stated as powers of 10, so
+			// comparisons to exact integer values aren't precise, but this
+			// logic should still work out since 1e19 is greater than 1<<63, and
+			// that's the next power of 10 bigger than the maximum signed 64 bit
+			// integer.
+			return alt(p)
+		}
+
+		return def(p)
 	}
 }
 

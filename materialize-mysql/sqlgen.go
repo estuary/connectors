@@ -45,15 +45,23 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
-			sql.OBJECT:         sql.MapStatic("JSON"),
-			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         sql.MapStatic("LONGTEXT"),
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
-			// We encode as CSV and must send MySQL string sentinels.
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
+			sql.OBJECT:   sql.MapStatic("JSON"),
+			sql.ARRAY:    sql.MapStatic("JSON"),
+			sql.BINARY:   sql.MapStatic("LONGTEXT"),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToStr)),
+				65,
+			),
+			// We encode as CSV and must send MySQL string sentinels for
+			// non-numeric float values.
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double"), sql.UsingConverter(sql.StrToFloat("NaN", "+inf", "-inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapPrimaryKey(

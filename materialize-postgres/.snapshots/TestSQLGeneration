@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS key_value (
 		"boolean" BOOLEAN,
 		flow_published_at TIMESTAMPTZ NOT NULL,
 		"integer" BIGINT,
+		"integerGt64Bit" NUMERIC,
 		"integerWithUserDDL" DECIMAL(20),
 		multiple JSON,
 		number DOUBLE PRECISION,
@@ -16,6 +17,8 @@ CREATE TABLE IF NOT EXISTS key_value (
 		object JSON,
 		string TEXT,
 		"stringInteger" NUMERIC,
+		"stringInteger39Chars" NUMERIC,
+		"stringInteger66Chars" NUMERIC,
 		"stringNumber" DECIMAL,
 		flow_document JSON NOT NULL,
 
@@ -33,6 +36,7 @@ COMMENT ON COLUMN key_value.flow_published_at IS 'Flow Publication Time
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
 COMMENT ON COLUMN key_value."integer" IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN key_value."integerGt64Bit" IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
 COMMENT ON COLUMN key_value."integerWithUserDDL" IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
 COMMENT ON COLUMN key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
 COMMENT ON COLUMN key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
@@ -40,6 +44,8 @@ COMMENT ON COLUMN key_value."numberCastToString" IS 'auto-generated projection o
 COMMENT ON COLUMN key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
 COMMENT ON COLUMN key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
 COMMENT ON COLUMN key_value."stringInteger" IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN key_value."stringInteger39Chars" IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
+COMMENT ON COLUMN key_value."stringInteger66Chars" IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
 COMMENT ON COLUMN key_value."stringNumber" IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
 COMMENT ON COLUMN key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
 --- End key_value createTargetTable ---
@@ -117,6 +123,7 @@ INSERT INTO key_value (
 		"boolean",
 		flow_published_at,
 		"integer",
+		"integerGt64Bit",
 		"integerWithUserDDL",
 		multiple,
 		number,
@@ -124,9 +131,11 @@ INSERT INTO key_value (
 		object,
 		string,
 		"stringInteger",
+		"stringInteger39Chars",
+		"stringInteger66Chars",
 		"stringNumber",
 		flow_document
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20);
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
@@ -146,15 +155,18 @@ UPDATE key_value SET
 		"boolean" = $6,
 		flow_published_at = $7,
 		"integer" = $8,
-		"integerWithUserDDL" = $9,
-		multiple = $10,
-		number = $11,
-		"numberCastToString" = $12,
-		object = $13,
-		string = $14,
-		"stringInteger" = $15,
-		"stringNumber" = $16,
-		flow_document = $17
+		"integerGt64Bit" = $9,
+		"integerWithUserDDL" = $10,
+		multiple = $11,
+		number = $12,
+		"numberCastToString" = $13,
+		object = $14,
+		string = $15,
+		"stringInteger" = $16,
+		"stringInteger39Chars" = $17,
+		"stringInteger66Chars" = $18,
+		"stringNumber" = $19,
+		flow_document = $20
 	 WHERE key1 = $1
 	 AND   key2 = $2
 	 AND   "key!binary" = $3;
