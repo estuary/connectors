@@ -31,7 +31,7 @@ require (
 	github.com/databricks/databricks-sql-go v1.5.5
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.4.0
+	github.com/estuary/flow v0.4.1-0.20240815183205-bba5ae475f12
 	github.com/estuary/vitess v0.15.10
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-mysql-org/go-mysql v1.8.0

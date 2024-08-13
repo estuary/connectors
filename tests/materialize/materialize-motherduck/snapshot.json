@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE IF NOT EXISTS test_db.main.simple (\n\tid BIGINT NOT NULL,\n\tcanary VARCHAR NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_standard (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta_exclude_flow_doc (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.multiple_types (\n\tid BIGINT NOT NULL,\n\tarray_int JSON,\n\tbinary_field VARCHAR,\n\tbool_field BOOLEAN,\n\tfloat_field DOUBLE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tmultiple JSON,\n\tnested JSON,\n\tnullable_int BIGINT,\n\tstr_field VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.formatted_strings (\n\tid BIGINT NOT NULL,\n\tdate DATE,\n\tdatetime TIMESTAMP WITH TIME ZONE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint_and_str HUGEINT,\n\tint_str HUGEINT,\n\tnum_and_str DOUBLE,\n\tnum_str DOUBLE,\n\ttime TIME,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.deletions (\n\tid BIGINT NOT NULL,\n\t\"_meta/op\" VARCHAR,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\nINSERT INTO test_db.main.flow_materializations_v2 (version, spec, materialization) VALUES ('0101010101010101', '(a-base64-encoded-value)', 'tests/materialize-motherduck/materialize');"
+  "\nCREATE TABLE IF NOT EXISTS test_db.main.simple (\n\tid BIGINT NOT NULL,\n\tcanary VARCHAR NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_standard (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.duplicate_keys_delta_exclude_flow_doc (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint BIGINT,\n\tstr VARCHAR NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.multiple_types (\n\tid BIGINT NOT NULL,\n\tarray_int JSON,\n\tbinary_field VARCHAR,\n\tbool_field BOOLEAN,\n\tfloat_field DOUBLE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tmultiple JSON,\n\tnested JSON,\n\tnullable_int BIGINT,\n\tstr_field VARCHAR NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.formatted_strings (\n\tid BIGINT NOT NULL,\n\tdate DATE,\n\tdatetime TIMESTAMP WITH TIME ZONE,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tint_and_str HUGEINT,\n\tint_str HUGEINT,\n\tnum_and_str DOUBLE,\n\tnum_str DOUBLE,\n\ttime TIME,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.unsigned_bigint (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tunsigned_bigint HUGEINT,\n\tflow_document JSON NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.main.deletions (\n\tid BIGINT NOT NULL,\n\t\"_meta/op\" VARCHAR,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\tflow_document JSON NOT NULL\n);\n\nINSERT INTO test_db.main.flow_materializations_v2 (version, spec, materialization) VALUES ('0101010101010101', '(a-base64-encoded-value)', 'tests/materialize-motherduck/materialize');"
 ]
 [
   "connectorState",
@@ -1099,6 +1099,21 @@
     "num_and_str": null,
     "num_str": -1.7976931348623157e+308,
     "time": null
+  }
+}
+{
+  "_table": "unsigned_bigint",
+  "rows": {
+    "flow_document": {
+      "_meta": {
+        "uuid": "2431b600-1dd2-11b2-8000-071353030311"
+      },
+      "id": 1,
+      "unsigned_bigint": 18446744073709551615
+    },
+    "flow_published_at": "1970-01-01 00:00:28+00",
+    "id": 1,
+    "unsigned_bigint": 18446744073709552000.0
   }
 }
 {

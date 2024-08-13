@@ -31,14 +31,21 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:        sql.MapStatic("BIGINT"),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.ARRAY:          sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:         sql.MapStatic("TEXT"),
-			sql.MULTIPLE:       sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric"), sql.UsingConverter(sql.StrToInt)),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric")),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.ARRAY:    sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.BINARY:   sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
+			sql.MULTIPLE: sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(sql.ToStr)),
+				38,
+			),
 			// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
 			// There's some indication that others have resorted to mapping these to NULL:
 			// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
@@ -58,6 +65,9 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 						return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
 					}))),
+					// "time" is not currently support due to limitations with loading time values from
+					// staged JSON.
+					// "time": sql.NewStaticMapper("TIMETZ"),
 				},
 				WithContentType: map[string]sql.MapProjectionFn{
 					// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and

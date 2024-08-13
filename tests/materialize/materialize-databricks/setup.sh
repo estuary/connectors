@@ -65,13 +65,7 @@ resources_json_template='[
     "resource": {
       "table": "unsigned_bigint"
     },
-    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}",
-    "fields": {
-      "recommended": true,
-      "include": {
-        "unsigned_bigint": {"DDL": "DECIMAL(20)"}
-      }
-    }
+    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
   },
   {
     "resource": {

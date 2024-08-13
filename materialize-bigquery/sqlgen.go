@@ -62,18 +62,25 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 var bqDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.ARRAY:    sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
-			sql.BINARY:   sql.MapStatic("STRING"),
-			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:  sql.MapStatic("INTEGER"),
+			sql.ARRAY:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.BINARY:  sql.MapStatic("STRING"),
+			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("INTEGER", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
+			),
 			sql.NUMBER:   sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float")),
 			sql.OBJECT:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
 			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			// BigQuery's table metadata APIs include the precision and scale
-			// with BIGNUMERIC columns, and we strip that off when creating the
-			// InfoSchema so that a BIGNUMERIC(38,0) is compatible with any
-			// BIGNUMERIC column.
-			sql.STRING_INTEGER: sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric"), sql.UsingConverter(sql.StrToInt)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				// BigQuery's table metadata APIs include the precision and
+				// scale with BIGNUMERIC columns, and we strip that off when
+				// creating the InfoSchema so that a BIGNUMERIC(38,0) is
+				// compatible with any BIGNUMERIC column.
+				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("STRING", sql.UsingConverter(sql.ToStr)),
+				38,
+			),
 			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
 			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
