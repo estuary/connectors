@@ -131,6 +131,7 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s%s;", quotedTableName, tableDef))
 
 	if *enableCDCWhenCreatingTables {
+		time.Sleep(1 * time.Second) // Sleep to make deadlocks less likely
 		var query = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s';`,
 			*testSchemaName,
 			tableName,
@@ -421,12 +422,11 @@ func TestAlterationAddColumn(t *testing.T) {
 			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD extra TEXT;", tableName))
 			tb.Insert(ctx, t, tableName, [][]any{{2, "two", "aaa"}, {3, "three", "bbb"}})
 			time.Sleep(1 * time.Second) // Sleep to let the alteration make its way to cdc.ddl_history
-			cs.Capture(ctx, t, nil)
 			if tc.Manual {
-				time.Sleep(1 * time.Second)
 				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%[1]s', @source_name = '%[2]s', @role_name = '%[3]s', @capture_instance = '%[1]s_%[2]s_v2';`, *testSchemaName, tb.TableName(t, tc.UniqueID), *dbCaptureUser))
 				time.Sleep(1 * time.Second)
 			}
+			cs.Capture(ctx, t, nil)
 			tb.Insert(ctx, t, tableName, [][]any{{4, "four", "ccc"}, {5, "five", "ddd"}})
 			cs.Capture(ctx, t, nil)
 			if tc.Manual {
@@ -440,12 +440,11 @@ func TestAlterationAddColumn(t *testing.T) {
 			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD evenmore TEXT;", tableName))
 			tb.Insert(ctx, t, tableName, [][]any{{6, "six", "eee", "foo"}, {7, "seven", "fff", "bar"}})
 			time.Sleep(1 * time.Second) // Sleep to let the alteration make its way to cdc.ddl_history
-			cs.Capture(ctx, t, nil)
 			if tc.Manual {
-				time.Sleep(1 * time.Second)
 				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%[1]s', @source_name = '%[2]s', @role_name = '%[3]s', @capture_instance = '%[1]s_%[2]s_v3';`, *testSchemaName, tb.TableName(t, tc.UniqueID), *dbCaptureUser))
 				time.Sleep(1 * time.Second)
 			}
+			cs.Capture(ctx, t, nil)
 			tb.Insert(ctx, t, tableName, [][]any{{8, "eight", "ggg", "baz"}, {9, "nine", "hhh", "asdf"}})
 			cs.Capture(ctx, t, nil)
 			if tc.Manual {
