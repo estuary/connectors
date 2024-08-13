@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS key_value (
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',
 		`integer` BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
+		`integerGt64Bit` NUMERIC(65,0) COMMENT 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]',
 		`integerWithUserDDL` DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]',
 		multiple JSON COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]',
 		`number` DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
@@ -18,6 +19,8 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 		object JSON COMMENT 'auto-generated projection of JSON at: /object with inferred types: [object]',
 		`string` LONGTEXT COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
 		`stringInteger` NUMERIC(65,0) COMMENT 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]',
+		`stringInteger39Chars` NUMERIC(65,0) COMMENT 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]',
+		`stringInteger66Chars` LONGTEXT COMMENT 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]',
 		`stringNumber` DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]',
 		flow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',
 
@@ -68,6 +71,7 @@ CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		`boolean` BOOLEAN,
 		flow_published_at DATETIME(6) NOT NULL,
 		`integer` BIGINT,
+		`integerGt64Bit` NUMERIC(65,0),
 		`integerWithUserDDL` DECIMAL(20),
 		multiple JSON,
 		`number` DOUBLE PRECISION,
@@ -75,6 +79,8 @@ CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		object JSON,
 		`string` LONGTEXT,
 		`stringInteger` NUMERIC(65,0),
+		`stringInteger39Chars` NUMERIC(65,0),
+		`stringInteger66Chars` LONGTEXT,
 		`stringNumber` DOUBLE PRECISION,
 		flow_document JSON NOT NULL
 	,
@@ -168,6 +174,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 		`boolean`,
 		flow_published_at,
 		`integer`,
+		`integerGt64Bit`,
 		`integerWithUserDDL`,
 		multiple,
 		`number`,
@@ -175,6 +182,8 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 		object,
 		`string`,
 		`stringInteger`,
+		`stringInteger39Chars`,
+		`stringInteger66Chars`,
 		`stringNumber`,
 		flow_document
 );
@@ -214,6 +223,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 		`boolean`,
 		flow_published_at,
 		`integer`,
+		`integerGt64Bit`,
 		`integerWithUserDDL`,
 		multiple,
 		`number`,
@@ -221,6 +231,8 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 		object,
 		`string`,
 		`stringInteger`,
+		`stringInteger39Chars`,
+		`stringInteger66Chars`,
 		`stringNumber`,
 		flow_document
 );
@@ -254,6 +266,7 @@ REPLACE INTO key_value
 		`boolean`,
 		flow_published_at,
 		`integer`,
+		`integerGt64Bit`,
 		`integerWithUserDDL`,
 		multiple,
 		`number`,
@@ -261,6 +274,8 @@ REPLACE INTO key_value
 		object,
 		`string`,
 		`stringInteger`,
+		`stringInteger39Chars`,
+		`stringInteger66Chars`,
 		`stringNumber`,
 		flow_document
 )
@@ -273,6 +288,7 @@ SELECT
 		`boolean`,
 		flow_published_at,
 		`integer`,
+		`integerGt64Bit`,
 		`integerWithUserDDL`,
 		multiple,
 		`number`,
@@ -280,6 +296,8 @@ SELECT
 		object,
 		`string`,
 		`stringInteger`,
+		`stringInteger39Chars`,
+		`stringInteger66Chars`,
 		`stringNumber`,
 		flow_document
 FROM flow_temp_update_table_0;

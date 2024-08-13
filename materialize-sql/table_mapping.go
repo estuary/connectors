@@ -61,15 +61,15 @@ type Column struct {
 
 // ConvertKey converts a key Tuple to database parameters.
 func (t *Table) ConvertKey(key tuple.Tuple) (out []interface{}, err error) {
-	return convertTuple(key, t.Keys, out)
+	return t.convertTuple(key, t.Keys, out)
 }
 
 // ConvertAll concerts key and values Tuples, as well as a document RawMessage into database parameters.
 func (t *Table) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) (out []interface{}, err error) {
 	out = make([]interface{}, 0, len(t.Keys)+len(t.Values)+1)
-	if out, err = convertTuple(key, t.Keys, out); err != nil {
+	if out, err = t.convertTuple(key, t.Keys, out); err != nil {
 		return nil, err
-	} else if out, err = convertTuple(values, t.Values, out); err != nil {
+	} else if out, err = t.convertTuple(values, t.Values, out); err != nil {
 		return nil, err
 	}
 
@@ -84,14 +84,14 @@ func (t *Table) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) (out []
 	return out, nil
 }
 
-func convertTuple(in tuple.Tuple, columns []Column, out []interface{}) ([]interface{}, error) {
+func (t *Table) convertTuple(in tuple.Tuple, columns []Column, out []interface{}) ([]interface{}, error) {
 	if a, b := len(in), len(columns); a != b {
 		panic(fmt.Sprintf("len(in) is %d but len(columns) is %d", a, b))
 	}
 
 	for i := range in {
 		if m, err := columns[i].MappedType.Converter(in[i]); err != nil {
-			return nil, fmt.Errorf("converting field %s: %w", columns[i].Field, err)
+			return nil, fmt.Errorf("converting field %s of collection %s: %w", columns[i].Field, t.Source.String(), err)
 		} else {
 			out = append(out, m)
 		}

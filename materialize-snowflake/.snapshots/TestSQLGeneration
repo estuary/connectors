@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	boolean BOOLEAN,
 	flow_published_at TIMESTAMP_LTZ NOT NULL,
 	integer INTEGER,
+	integerGt64Bit INTEGER,
 	integerWithUserDDL DECIMAL(20),
 	multiple VARIANT,
 	number FLOAT,
@@ -16,6 +17,8 @@ CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	object VARIANT,
 	string TEXT,
 	stringInteger INTEGER,
+	stringInteger39Chars STRING,
+	stringInteger66Chars STRING,
 	stringNumber FLOAT,
 	flow_document VARIANT NOT NULL,
 
@@ -33,6 +36,7 @@ COMMENT ON COLUMN "a-schema".key_value.flow_published_at IS 'Flow Publication Ti
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".key_value.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerGt64Bit IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value.integerWithUserDDL IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
 COMMENT ON COLUMN "a-schema".key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
@@ -40,6 +44,8 @@ COMMENT ON COLUMN "a-schema".key_value.numberCastToString IS 'auto-generated pro
 COMMENT ON COLUMN "a-schema".key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
 COMMENT ON COLUMN "a-schema".key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".key_value.stringInteger IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger39Chars IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger66Chars IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
 COMMENT ON COLUMN "a-schema".key_value.stringNumber IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
 COMMENT ON COLUMN "a-schema".key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
 --- End "a-schema".key_value createTargetTable ---
@@ -98,9 +104,9 @@ SELECT 0, "a-schema".key_value.flow_document
 
 --- Begin "a-schema".key_value copyInto ---
 COPY INTO "a-schema".key_value (
-	key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringNumber, flow_document
+	key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
 ) FROM (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerWithUserDDL, $1[9] AS multiple, $1[10] AS number, $1[11] AS numberCastToString, $1[12] AS object, $1[13] AS string, $1[14] AS stringInteger, $1[15] AS stringNumber, $1[16] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
 	FROM test-file
 );
 --- End "a-schema".key_value copyInto ---
@@ -108,17 +114,17 @@ COPY INTO "a-schema".key_value (
 --- Begin "a-schema".key_value mergeInto ---
 MERGE INTO "a-schema".key_value AS l
 USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerWithUserDDL, $1[9] AS multiple, $1[10] AS number, $1[11] AS numberCastToString, $1[12] AS object, $1[13] AS string, $1[14] AS stringInteger, $1[15] AS stringNumber, $1[16] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
 	FROM test-file
 ) AS r
 ON l.key1 = r.key1 AND l.key2 = r.key2 AND l."key!binary" = r."key!binary"
 WHEN MATCHED AND r.flow_document='delete' THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
+	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
 WHEN NOT MATCHED THEN
-	INSERT (key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringNumber, flow_document)
-	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringNumber, r.flow_document);
+	INSERT (key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
 --- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".delta_updates loadQuery ---

@@ -29,7 +29,7 @@ require (
 	github.com/databricks/databricks-sql-go v1.5.5
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.3.12-0.20240118233153-7681c66d4e1f
+	github.com/estuary/flow v0.4.1-0.20240814191845-c228194b3e2f
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/go-sql-driver/mysql v1.6.0
@@ -62,7 +62,7 @@ require (
 	github.com/trinodb/trino-go-client v0.313.0
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
-	go.gazette.dev/core v0.89.1-0.20231214220647-b3bd8e97cfbc
+	go.gazette.dev/core v0.89.1-0.20240418133910-d612fdcfd24a
 	go.mongodb.org/mongo-driver v1.12.1
 	golang.org/x/crypto v0.25.0
 	golang.org/x/oauth2 v0.18.0

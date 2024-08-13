@@ -324,6 +324,17 @@
 {
   "rows": [
     {
+      "flow_document": "{\"_meta\":{\"uuid\":\"2431b600-1dd2-11b2-8000-071353030311\"},\"id\":1,\"unsigned_bigint\":18446744073709551615}",
+      "flow_published_at": "1970-01-01T00:00:28Z",
+      "id": 1,
+      "unsigned_bigint": "18446744073709551615"
+    }
+  ],
+  "table": "unsigned_bigint"
+}
+{
+  "rows": [
+    {
       "_meta_op": "u",
       "flow_document": "{\"_meta\":{\"op\":\"u\",\"uuid\":\"84c4f100-1dda-11b2-8000-071353030311\"},\"id\":2}",
       "flow_published_at": "1970-01-01T01:00:26Z",
