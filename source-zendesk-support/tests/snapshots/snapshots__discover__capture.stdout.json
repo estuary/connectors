@@ -1616,6 +1616,9 @@
                   },
                   {
                     "type": "null"
+                  },
+                  {
+                    "type": "integer"
                   }
                 ]
               },

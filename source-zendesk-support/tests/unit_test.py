@@ -653,7 +653,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (GroupMemberships, {"page": 1, "per_page": 100, "sort_by": "asc", "start_time": 1622505600}),
             (TicketForms, {"start_time": 1622505600}),
             (TicketMetricEvents, {"start_time": 1622505600}),
-            (TicketAudits, {"sort_by": "created_at", "sort_order": "desc", "limit": 1000}),
+            (TicketAudits, {"limit": 200}),
             (SatisfactionRatings, {"page": 1, "per_page": 100, "sort_by": "asc", "start_time": 1622505600}),
             (TicketMetrics, {"page[size]": 100, "start_time": 1622505600}),
             (OrganizationMemberships, {"page[size]": 100, "start_time": 1622505600})
