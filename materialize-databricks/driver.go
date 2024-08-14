@@ -153,7 +153,7 @@ func newTransactor(
 	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId), cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId)); err != nil {
 		return nil, err
 	} else if useSched {
 		d.sched = sched
