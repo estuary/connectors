@@ -82,7 +82,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		return false, fmt.Errorf("rows.Columns: %w", err)
 	}
 	var resultRows int // Count of rows received within the current backfill chunk
-	var rowOffset = state.BackfilledCount
 	logEntry.Debug("translating query rows to change events")
 
 	var fields = make(map[string]any, len(cols)-1)
@@ -126,7 +125,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			return false, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
-		rowOffset++
 	}
 
 	if err := rows.Err(); err != nil {
@@ -174,7 +172,7 @@ func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) 
 
 // WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 func (db *oracleDatabase) WatermarksTable() string {
-	return db.config.Advanced.WatermarksTable
+	return strings.ToLower(db.config.Advanced.WatermarksTable)
 }
 
 // The set of column types for which we need to specify `COLLATE BINARY` to get

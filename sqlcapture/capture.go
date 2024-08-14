@@ -838,5 +838,5 @@ type StreamID = string
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) StreamID {
-	return namespace + "." + stream
+	return strings.ToLower(namespace + "." + stream)
 }
