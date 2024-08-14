@@ -639,6 +639,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,
+		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("waiting for next scheduled poll")
 	if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
 		return err
@@ -646,7 +647,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,
-		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("ready to poll")
 
 	// Acquire mutex so that only one worker at a time can be actively executing a query.
@@ -671,7 +671,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"args":  args,
 	}).Info("executing query")
 	var pollTime = time.Now().UTC()
-	state.LastPolled = pollTime
 
 	// There is no helper function for a streaming select query _with arguments_,
 	// so we have to drop down a level and prepare the statement ourselves here.
@@ -754,16 +753,14 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		return fmt.Errorf("error executing backfill query: %w", err)
 	}
 
-	if count%documentsPerCheckpoint != 0 {
-		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-			return err
-		}
-	}
-
 	log.WithFields(log.Fields{
 		"query": query,
 		"count": count,
 	}).Info("query complete")
+	state.LastPolled = pollTime
+	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+		return err
+	}
 	return nil
 }
 

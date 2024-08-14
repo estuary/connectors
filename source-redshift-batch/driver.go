@@ -772,6 +772,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,
+		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("waiting for next scheduled poll")
 	if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
 		return err
@@ -779,7 +780,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,
-		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("ready to poll")
 
 	var queryBuf = new(strings.Builder)
@@ -793,7 +793,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"args":  cursorValues,
 	}).Info("executing query")
 	var pollTime = time.Now().UTC()
-	state.LastPolled = pollTime
 
 	rows, err := c.DB.QueryContext(ctx, query, cursorValues...)
 	if err != nil {
@@ -879,16 +878,17 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		}
 	}
 
-	if count%documentsPerCheckpoint != 0 {
-		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-			return err
-		}
-	}
-
 	log.WithFields(log.Fields{
 		"query": query,
 		"count": count,
 	}).Info("query complete")
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error processing results iterator: %w", err)
+	}
+	state.LastPolled = pollTime
+	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+		return err
+	}
 	return nil
 }
 
