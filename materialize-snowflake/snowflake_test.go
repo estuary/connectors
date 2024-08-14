@@ -134,7 +134,7 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong username",
 			cfg: func(cfg config) *config {
-				cfg.Credentials.User = "wrong" + cfg.User
+				cfg.Credentials.User = "wrong" + cfg.Credentials.User
 				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
@@ -142,7 +142,7 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong password",
 			cfg: func(cfg config) *config {
-				cfg.Credentials.Password = "wrong" + cfg.Password
+				cfg.Credentials.Password = "wrong" + cfg.Credentials.Password
 				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
