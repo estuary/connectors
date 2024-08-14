@@ -171,16 +171,6 @@ class BaseSourceZendeskSupportStream(HttpStream, ABC):
         dt = datetime.strptime(str_dt, DATETIME_FORMAT)
         return calendar.timegm(dt.utctimetuple())
 
-    @staticmethod
-    def _parse_next_page_number(response: requests.Response) -> Optional[int]:
-        """Parses a response and tries to find next page number"""
-        try:
-            next_page = response.json().get("next_page")
-        except requests.exceptions.JSONDecodeError:
-            next_page = None
-
-        return dict(parse_qsl(urlparse(next_page).query)).get("page") if next_page else None
-
     def parse_response(self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs) -> Iterable[Mapping]:
         """try to select relevant data only"""
 
@@ -408,20 +398,22 @@ class SourceZendeskSupportFullRefreshStream(BaseSourceZendeskSupportStream):
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
         if self._ignore_pagination:
             return None
-        next_page = self._parse_next_page_number(response)
-        if not next_page:
-            self._finished = True
-            return None
-        return next_page
 
-    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
-        params = super().request_params(next_page_token=next_page_token, **kwargs)
-        params.update(
-            {
-                "page": next_page_token or 1,
-                "per_page": self.page_size,
-            }
-        )
+        meta = {}
+        if response.content:
+            meta = response.json().get("meta", {})
+
+        return {"page[after]": meta.get("after_cursor")} if meta.get("has_more") else None
+
+    def request_params(
+        self,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
+    ) -> MutableMapping[str, Any]:
+        params = {"page[size]": self.page_size}
+        if next_page_token:
+            params.update(next_page_token)
         return params
 
 
@@ -440,30 +432,23 @@ class SourceZendeskSupportCursorPaginationStream(SourceZendeskSupportFullRefresh
         new_value = str((latest_record or {}).get(self.cursor_field, ""))
         return {self.cursor_field: max(new_value, old_value)}
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
-        if self._ignore_pagination:
-            return None
-        start_time = dict(parse_qsl(urlparse(response.json().get(self.next_page_field), "").query)).get("start_time")
-        if start_time != self.prev_start_time:
-            self.prev_start_time = start_time
-            return {self.cursor_field: int(start_time)}
-
     def check_stream_state(self, stream_state: Mapping[str, Any] = None):
         """
         Returns the state value, if exists. Otherwise, returns user defined `Start Date`.
         """
         state = stream_state.get(self.cursor_field) or self._start_date if stream_state else self._start_date
         return calendar.timegm(pendulum.parse(state).utctimetuple())
-
+    
     def request_params(
-        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None,
     ) -> MutableMapping[str, Any]:
-        next_page_token = next_page_token or {}
-        parsed_state = self.check_stream_state(stream_state)
-        if self.cursor_field:
-            params = {"start_time": next_page_token.get(self.cursor_field, parsed_state)}
-        else:
-            params = {"start_time": calendar.timegm(pendulum.parse(self._start_date).utctimetuple())}
+        params = {
+            "start_time": self.check_stream_state(stream_state),
+            "page[size]": self.page_size,
+        }
+        if next_page_token:
+            params.pop("start_time", None)
+            params.update(next_page_token)
         return params
 
 
@@ -501,9 +486,16 @@ class SourceZendeskIncrementalExportStream(SourceZendeskSupportCursorPaginationS
         return None if response.json().get(END_OF_STREAM_KEY, False) else next_page_token
 
     def request_params(
-        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None,
     ) -> MutableMapping[str, Any]:
-        params = super().request_params(stream_state, next_page_token, **kwargs)
+        params = {}
+        next_page_token = next_page_token or {}
+        parsed_state = self.check_stream_state(stream_state)
+        if self.cursor_field:
+            params = {"start_time": next_page_token.get(self.cursor_field, parsed_state)}
+        else:
+            params = {"start_time": calendar.timegm(pendulum.parse(self._start_date).utctimetuple())}
+
         # check "start_time" is not in the future
         params["start_time"] = self.check_start_time_param(params["start_time"])
         if self.sideload_param:
@@ -604,6 +596,48 @@ class SourceZendeskSupportTicketEventsExportStream(SourceZendeskIncrementalExpor
     response_target_entity: str = "child_events"
     list_entities_from_event: List[str] = None
     event_type: str = None
+    sideload_param: str = None
+    next_page_field: str = "next_page"
+
+    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        """
+        Returns all necessary query params for the next page of results by parsing the next_page_field of the response.
+
+        Note: This is different from other streams' next_page_token method (that return a single cursor param) due to 
+        how this API endpoint's responses are structured.
+        """
+        if self._ignore_pagination:
+            return None
+
+        response_json = response.json()
+        is_end_of_stream = response_json.get(END_OF_STREAM_KEY, False)
+
+        if is_end_of_stream:
+            return None
+
+        params = dict(parse_qsl(urlparse(response_json.get(self.next_page_field, "")).query))
+
+        return params
+
+    def request_params(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None,
+    ) -> MutableMapping[str, Any]:
+        """
+        If this is not the first request in a sweep, returns the query params for the next page from the previous response.
+        Otherwise, returns the start time param from the stream's state/config and the sideload param.
+        """
+        if next_page_token:
+            return next_page_token
+
+        start_time = self.check_stream_state(stream_state=stream_state)
+        start_time = self.check_start_time_param(start_time)
+
+        params = {"start_time": start_time}
+
+        if self.sideload_param:
+            params.update({"include": self.sideload_param})
+
+        return params
 
     @property
     def update_event_from_record(self) -> bool:
@@ -623,33 +657,60 @@ class SourceZendeskSupportTicketEventsExportStream(SourceZendeskIncrementalExpor
 class OrganizationMemberships(SourceZendeskSupportCursorPaginationStream):
     """OrganizationMemberships stream: https://developer.zendesk.com/api-reference/ticketing/organizations/organization_memberships/"""
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
-        if self._ignore_pagination:
-            return None
-        meta = response.json().get("meta", {})
-        return meta.get("after_cursor") if meta.get("has_more", False) else None
-
-    def request_params(
-        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
-    ) -> MutableMapping[str, Any]:
-        params = {
-            "start_time": self.check_stream_state(stream_state),
-            "page[size]": self.page_size,
-        }
-        if next_page_token:
-            params.pop("start_time", None)
-            params["page[after]"] = next_page_token
-        return params
-
 
 class AuditLogs(SourceZendeskSupportCursorPaginationStream):
-    """AuditLogs stream: https://developer.zendesk.com/api-reference/ticketing/account-configuration/audit_logs/#list-audit-logs"""
+    """AuditLogs stream: https://developer.zendesk.com/api-reference/ticketing/account-configuration/audit_logs/#list-audit-logs
+    
+    This endpoint does not respect the start_time param. It requires two query params with the same name to filter by date.
+    See https://support.zendesk.com/hc/en-us/community/posts/4859612547866-Audit-Log-API-error.
+    Instead, we mimic the TicketAudits stream strategy of not paginating further when the most recent page contains results we don't need.
+    """
 
-    # can request a maximum of 1,00 results
-    page_size = 100
+    response_list_name: str = "audit_logs"
     # audit_logs doesn't have the 'updated_by' field
     cursor_field = "created_at"
 
+    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+        params = {"page[size]": self.page_size}
+
+        if next_page_token:
+            params.update(next_page_token)
+
+        return params
+    
+    def _is_before_last_cursor_date(self, response: requests.Response, stream_state: Mapping[str, Any]) -> bool:
+        """
+        This method checks whether a response contains documents before the last cursor date (if it exists) or thg start date.
+        This allows us to determine when to stop paginating backwards.
+        """
+        document = response.json().get(self.response_list_name, [{}])[0]
+        document_created_at = document.get(self.cursor_field, "")
+        cursor_date = (stream_state or {}).get(self.cursor_field) or self._start_date
+        return document_created_at < cursor_date
+
+    # Same as airbyte_cdk's HttpStream._read_pages method, but adds a condition to stop paginating 
+    # if the response contains documents created before our last cursor date / start date.
+    def _read_pages(
+        self,
+        records_generator_fn: Callable[
+            [requests.PreparedRequest, requests.Response, Mapping[str, Any], Optional[Mapping[str, Any]]], Iterable[StreamData]
+        ],
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+    ) -> Iterable[StreamData]:
+        stream_state = stream_state or {}
+        pagination_complete = False
+        next_page_token = None
+        while not pagination_complete:
+            request, response = self._fetch_next_page(stream_slice, stream_state, next_page_token)
+            yield from records_generator_fn(request, response, stream_state, stream_slice)
+
+            next_page_token = self.next_page_token(response)
+            if not next_page_token or self._is_before_last_cursor_date(response, stream_state):
+                pagination_complete = True
+
+        # Return an empty generator in case no records are yielded
+        yield from []
 
 class Users(SourceZendeskSupportIncrementalCursorExportStream):
     """Users stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export-cursor-based"""
@@ -700,20 +761,14 @@ class Groups(SourceZendeskSupportStream):
 class GroupMemberships(SourceZendeskSupportCursorPaginationStream):
     """GroupMemberships stream: https://developer.zendesk.com/api-reference/ticketing/groups/group_memberships/"""
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
-        if self._ignore_pagination:
-            return None
-        next_page = self._parse_next_page_number(response)
-        return next_page if next_page else None
-
     def request_params(
-        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
+        self,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
     ) -> MutableMapping[str, Any]:
-        params = {"page": 1, "per_page": self.page_size, "sort_by": "asc"}
-        start_time = self.str2unixtime((stream_state or {}).get(self.cursor_field))
-        params["start_time"] = start_time if start_time else self.str2unixtime(self._start_date)
-        if next_page_token:
-            params["page"] = next_page_token
+        params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
+        params.update({"sort_by": "asc"})
         return params
 
 
@@ -722,20 +777,19 @@ class SatisfactionRatings(SourceZendeskSupportCursorPaginationStream):
     SatisfactionRatings stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/satisfaction_ratings/
     """
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
-        if self._ignore_pagination:
-            return None
-        next_page = self._parse_next_page_number(response)
-        return next_page if next_page else None
-
     def request_params(
-        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
+        self,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
     ) -> MutableMapping[str, Any]:
-        params = {"page": 1, "per_page": self.page_size, "sort_by": "asc"}
-        start_time = self.str2unixtime((stream_state or {}).get(self.cursor_field))
-        params["start_time"] = start_time if start_time else self.str2unixtime(self._start_date)
+        params = {
+            "start_time": self.check_stream_state(stream_state=stream_state),
+            "page[size]": self.page_size,
+        }
         if next_page_token:
-            params["page"] = next_page_token
+            # need start time param for subsequent requests to this endpoint.
+            params.update(next_page_token)
         return params
 
 
@@ -746,36 +800,13 @@ class TicketFields(SourceZendeskSupportStream):
 class TicketForms(SourceZendeskSupportCursorPaginationStream):
     """TicketForms stream: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_forms"""
 
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
+
 
 class TicketMetrics(SourceZendeskSupportCursorPaginationStream):
     """TicketMetric stream: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metrics/"""
-
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
-        """
-        https://developer.zendesk.com/documentation/api-basics/pagination/paginating-through-lists-using-cursor-pagination/#when-to-stop-paginating
-        """
-        if self._ignore_pagination:
-            return None
-        meta = response.json().get("meta", {})
-        return meta.get("after_cursor") if meta.get("has_more", False) else None
-
-    def request_params(
-        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
-    ) -> MutableMapping[str, Any]:
-        """
-        To make the Cursor Pagination to return `after_cursor` we should follow these instructions:
-        https://developer.zendesk.com/documentation/api-basics/pagination/paginating-through-lists-using-cursor-pagination/#enabling-cursor-pagination
-        """
-        params = {
-            "start_time": self.check_stream_state(stream_state),
-            "page[size]": self.page_size,
-        }
-        if next_page_token:
-            # when cursor pagination is used, we can pass only `after` and `page size` params,
-            # other params should be omitted.
-            params.pop("start_time", None)
-            params["page[after]"] = next_page_token
-        return params
 
 
 class TicketMetricEvents(SourceZendeskSupportCursorPaginationStream):
@@ -787,6 +818,21 @@ class TicketMetricEvents(SourceZendeskSupportCursorPaginationStream):
 
     def path(self, **kwargs):
         return "incremental/ticket_metric_events"
+
+    def request_params(
+        self,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
+    ) -> MutableMapping[str, Any]:
+        params = {
+            "start_time": self.check_stream_state(stream_state),
+            "page[size]": self.page_size,
+        }
+        if next_page_token:  
+            # need start time param for subsequent requests to this endpoint.
+            params.update(next_page_token)
+        return params
 
 
 class Macros(SourceZendeskSupportStream):
@@ -875,6 +921,10 @@ class SlaPolicies(SourceZendeskSupportFullRefreshStream):
     def path(self, *args, **kwargs) -> str:
         return "slas/policies.json"
 
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
+
 
 class Brands(SourceZendeskSupportFullRefreshStream):
     """Brands stream: https://developer.zendesk.com/api-reference/ticketing/account-configuration/brands/#list-brands"""
@@ -883,12 +933,19 @@ class Brands(SourceZendeskSupportFullRefreshStream):
 class CustomRoles(SourceZendeskSupportFullRefreshStream):
     """CustomRoles stream: https://developer.zendesk.com/api-reference/ticketing/account-configuration/custom_roles/#list-custom-roles"""
 
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
 
 class Schedules(SourceZendeskSupportFullRefreshStream):
     """Schedules stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/schedules/#list-schedules"""
 
     def path(self, *args, **kwargs) -> str:
         return "business_hours/schedules.json"
+
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
 
 
 class UserSettingsStream(SourceZendeskSupportFullRefreshStream):
@@ -911,6 +968,10 @@ class UserSettingsStream(SourceZendeskSupportFullRefreshStream):
         for resp in self.read_records(SyncMode.full_refresh):
             return resp
         raise SourceZendeskException("not found settings")
+
+    def request_params(self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        # This endpoint does not use query params, so we override the parent class' request_params method.
+        return {}
 
 
 class AccountAttributes(SourceZendeskSupportFullRefreshStream):
@@ -935,6 +996,10 @@ class AttributeDefinitions(SourceZendeskSupportFullRefreshStream):
         return "routing/attributes/definitions"
 
     def parse_response(self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs) -> Iterable[Mapping]:
+        # If there is no content in the response (i.e. not an enterprise Zendesk account), return early.
+        if not response.content:
+            return {}
+
         defs_all = response.json()["definitions"]["conditions_all"]
         for d in defs_all:
             d["condition"] = "all"
