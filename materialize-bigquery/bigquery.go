@@ -28,11 +28,6 @@ type config struct {
 	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=7"`
 
 	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce compute time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 func (c *config) Validate() error {
@@ -62,7 +57,7 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
 
