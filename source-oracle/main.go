@@ -138,7 +138,7 @@ const (
 // SetDefaults fills in the default values for unset optional parameters.
 func (c *Config) SetDefaults(name string) {
 	if c.Advanced.WatermarksTable == "" {
-		c.Advanced.WatermarksTable = strings.ToUpper(c.User) + ".FLOW_WATERMARKS"
+		c.Advanced.WatermarksTable = strings.ToLower(c.User) + ".flow_watermarks"
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
