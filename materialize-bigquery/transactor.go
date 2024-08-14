@@ -56,7 +56,7 @@ func newTransactor(
 		bucket:     cfg.Bucket,
 	}
 
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.ProjectID+cfg.Dataset), cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.ProjectID+cfg.Dataset)); err != nil {
 		return nil, err
 	} else if useSched {
 		t.sched = sched

@@ -13,24 +13,14 @@ import (
 
 // config represents the endpoint configuration for sql server.
 type config struct {
-	Address     string `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	HTTPPath    string `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse" jsonschema_extras:"order=1"`
-	CatalogName string `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog." jsonschema_extras:"order=2"`
-	SchemaName  string `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default" jsonschema_extras:"order=3"`
-
-	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
-
-	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
-
-	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-
-	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
-
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=6"`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	Address       string                     `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	HTTPPath      string                     `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse" jsonschema_extras:"order=1"`
+	CatalogName   string                     `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog." jsonschema_extras:"order=2"`
+	SchemaName    string                     `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default" jsonschema_extras:"order=3"`
+	HardDelete    bool                       `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
+	Credentials   credentialConfig           `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
+	Schedule      boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
 }
 
 const (
@@ -112,7 +102,7 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
 

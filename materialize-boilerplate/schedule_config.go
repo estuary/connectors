@@ -38,8 +38,8 @@ func (ScheduleConfig) GetFieldDocString(fieldName string) string {
 	}
 }
 
-func (c ScheduleConfig) Validate(deprecatedUpdateDelay string) error {
-	if _, _, err := CreateSchedule(c, nil, deprecatedUpdateDelay); err != nil {
+func (c ScheduleConfig) Validate() error {
+	if _, _, err := CreateSchedule(c, nil); err != nil {
 		return fmt.Errorf("validating schedule configuration: %w", err)
 	}
 	return nil
@@ -58,14 +58,7 @@ func (c ScheduleConfig) Validate(deprecatedUpdateDelay string) error {
 // consistently across different materializations: For the Snowflake example,
 // this would be the combination of the host URL + warehouse name, since
 // warehouses are named uniquely per account.
-func CreateSchedule(cfg ScheduleConfig, jitter []byte, deprecatedUpdateDelay string) (sched schedule.Schedule, useSchedule bool, err error) {
-	// TODO(whb): Migrate all existing task usages of an explicit `updateDelay`
-	// configuration and get rid of the `deprecatedUpdateDelay` parameter here
-	// and in ScheduleConfig.Validate.
-	if cfg.SyncFrequency != "" && deprecatedUpdateDelay != "" {
-		return nil, false, fmt.Errorf("cannot specify both Sync Frequency and Update Delay")
-	}
-
+func CreateSchedule(cfg ScheduleConfig, jitter []byte) (sched schedule.Schedule, useSchedule bool, err error) {
 	alternatingSchedule := false
 	if cfg.FastSyncStartTime != "" || cfg.FastSyncStopTime != "" || cfg.FastSyncEnabledDays != "" || cfg.Timezone != "" {
 		if cfg.SyncFrequency == "" || cfg.Timezone == "" || cfg.FastSyncStartTime == "" || cfg.FastSyncStopTime == "" {
@@ -75,9 +68,6 @@ func CreateSchedule(cfg ScheduleConfig, jitter []byte, deprecatedUpdateDelay str
 	}
 
 	freq := cfg.SyncFrequency
-	if deprecatedUpdateDelay != "" {
-		freq = deprecatedUpdateDelay
-	}
 	if freq == "" {
 		freq = defaultSyncFrequency
 	}

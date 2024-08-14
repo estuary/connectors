@@ -251,7 +251,7 @@ func newTransactor(
 		version:    open.Version,
 	}
 
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Host+cfg.Warehouse), cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Host+cfg.Warehouse)); err != nil {
 		return nil, err
 	} else if useSched {
 		d.sched = sched
