@@ -16,6 +16,8 @@ import (
 
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
+	sqlcapture.CaseSensitiveStreamID = true
+
 	// Get lists of all tables, columns and primary keys in the database
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {

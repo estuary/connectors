@@ -23,6 +23,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	sqlcapture.CaseSensitiveStreamID = true
 	flag.Parse()
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {

@@ -36,6 +36,8 @@ const OUT_TS_FORMAT = "2006-01-02T15:04:05.999999999"
 const OUT_TSTZ_FORMAT = time.RFC3339Nano
 
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+	sqlcapture.CaseSensitiveStreamID = true
+
 	var dbConn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.IncrementalChunkSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)

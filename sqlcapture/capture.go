@@ -28,6 +28,13 @@ var (
 	// to shut down after replication is all caught up and all tables are fully
 	// backfilled. It is always false in normal operation.
 	TestShutdownAfterCaughtUp = false
+
+	// TODO: we previously had case-insensitive StreamIDs since all StreamIDs would be turned
+	// to their lowercase version, but for some connectors (notably Oracle) we needed to keep the casing
+	// of the table names since table names are by default uppercase in Oracle. This flag
+	// allows Oracle to change this behavior while not risking breaking production for other connectors.
+	// We need to test this change on all connectors and remove this flag.
+	CaseSensitiveStreamID = false
 )
 
 // PersistentState represents the part of a connector's state which can be serialized
@@ -835,5 +842,9 @@ type StreamID = string
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) StreamID {
-	return namespace + "." + stream
+	if CaseSensitiveStreamID {
+		return namespace + "." + stream
+	} else {
+		return strings.ToLower(namespace + "." + stream)
+	}
 }

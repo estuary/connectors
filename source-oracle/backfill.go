@@ -14,6 +14,8 @@ import (
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
+	sqlcapture.CaseSensitiveStreamID = true
+
 	logrus.WithField("state", state).Debug("ScanChunk")
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
@@ -82,7 +84,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		return false, fmt.Errorf("rows.Columns: %w", err)
 	}
 	var resultRows int // Count of rows received within the current backfill chunk
-	var rowOffset = state.BackfilledCount
 	logEntry.Debug("translating query rows to change events")
 
 	var fields = make(map[string]any, len(cols)-1)
@@ -126,7 +127,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			return false, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
-		rowOffset++
 	}
 
 	if err := rows.Err(); err != nil {

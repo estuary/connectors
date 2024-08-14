@@ -45,6 +45,7 @@ var oracleDriver = &sqlcapture.Driver{
 const sortableRFC3339Nano = "2006-01-02T15:04:05.000000000Z07:00"
 
 func main() {
+	sqlcapture.CaseSensitiveStreamID = true
 	boilerplate.RunMain(oracleDriver)
 }
 

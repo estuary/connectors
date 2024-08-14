@@ -151,6 +151,8 @@ func decodeUnistr(input string) (string, error) {
 }
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
+	sqlcapture.CaseSensitiveStreamID = true
+
 	var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
