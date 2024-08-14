@@ -22,7 +22,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 228
+            "Size": 240
           }
         ],
         "Version": "0101010101010101"
@@ -35,7 +35,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 116
+            "Size": 119
           }
         ],
         "Version": "0101010101010101"
@@ -112,7 +112,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 230
+            "Size": 240
           }
         ],
         "Version": "0101010101010101"
@@ -125,7 +125,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 115
+            "Size": 116
           }
         ],
         "Version": "0101010101010101"
@@ -181,7 +181,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 230
+            "Size": 240
           }
         ],
         "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA_00000000_0101010101010101",
@@ -194,7 +194,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 115
+            "Size": 116
           }
         ],
         "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC_00000000_0101010101010101",
