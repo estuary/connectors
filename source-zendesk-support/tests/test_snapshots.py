@@ -29,6 +29,16 @@ def test_capture(request, snapshot):
             unique_stream_lines.append(line)
             seen.add(stream)
 
+    for l in unique_stream_lines:
+        _, rec = l[0], l[1]
+
+        rec['_meta']['row_id'] = 0
+        if "updated_at" in rec:
+            rec["updated_at"] = "redacted"
+        if "last_login_at" in rec:
+            rec["last_login_at"] = "redacted"
+
+
     assert snapshot("capture.stdout.json") == unique_stream_lines
 
 

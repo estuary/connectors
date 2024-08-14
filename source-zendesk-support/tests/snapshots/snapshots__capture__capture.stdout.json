@@ -1,27 +1,5 @@
 [
   [
-    "acmeCo/audit_logs",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 101,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "action": "update",
-      "action_label": "Updated",
-      "actor_id": -1,
-      "actor_name": "Zendesk",
-      "change_description": "Changed from not set to Alex Bair",
-      "created_at": "2024-07-26T15:40:53Z",
-      "id": 28835703011988,
-      "ip_address": null,
-      "source_id": 21678981,
-      "source_label": "Contacts: Account owner",
-      "source_type": "account",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/audit_logs/28835703011988.json"
-    }
-  ],
-  [
     "acmeCo/group_memberships",
     {
       "_meta": {
@@ -33,7 +11,7 @@
       "default": true,
       "group_id": 28835740822676,
       "id": 28835714743188,
-      "updated_at": "2024-07-26T15:41:00Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/group_memberships/28835714743188.json",
       "user_id": 28835702984212
     }
@@ -53,7 +31,7 @@
       "id": 28835740822676,
       "is_public": true,
       "name": "Support",
-      "updated_at": "2024-07-26T15:41:00Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/groups/28835740822676.json"
     }
   ],
@@ -62,7 +40,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 6,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "actions": [
@@ -84,7 +62,7 @@
       "raw_title": "Take it!",
       "restriction": null,
       "title": "Take it!",
-      "updated_at": "2024-07-26T15:41:01Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/macros/28835714801684.json"
     }
   ],
@@ -108,7 +86,7 @@
       "shared_comments": false,
       "shared_tickets": false,
       "tags": [],
-      "updated_at": "2024-07-26T15:41:00Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/organizations/28835714737428.json"
     }
   ],
@@ -125,7 +103,7 @@
       "id": 28835714744724,
       "organization_id": 28835714737428,
       "organization_name": "Estuary",
-      "updated_at": "2024-07-26T15:41:00Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/organization_memberships/28835714744724.json",
       "user_id": 28835702984212,
       "view_tickets": true
@@ -156,7 +134,7 @@
       "status": "none",
       "title": "I'd like a way for users to submit feature requests",
       "topic_id": 28847452157844,
-      "updated_at": "2024-08-01T13:10:26Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests.json",
       "vote_count": 1,
       "vote_sum": 1
@@ -167,7 +145,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "author_id": 28835702984212,
@@ -179,7 +157,7 @@
       "non_author_updated_at": null,
       "official": false,
       "post_id": 28847424303764,
-      "updated_at": "2024-08-01T13:10:11Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/community/posts/28847424303764/comments/29005581511700.json",
       "vote_count": 1,
       "vote_sum": 1
@@ -197,7 +175,7 @@
       "id": 29005807715092,
       "item_id": 29005581511700,
       "item_type": "PostComment",
-      "updated_at": "2024-08-01T13:19:33Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/votes/29005807715092.json",
       "user_id": 28835702984212,
       "value": 1
@@ -215,7 +193,7 @@
       "id": 29005734783508,
       "item_id": 28847424303764,
       "item_type": "Post",
-      "updated_at": "2024-08-01T13:15:00Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/votes/29005734783508.json",
       "user_id": 28835702984212,
       "value": 1
@@ -226,7 +204,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "assignee_id": 28835702984212,
@@ -239,7 +217,7 @@
       "requester_id": 28835702984212,
       "score": "offered",
       "ticket_id": 29,
-      "updated_at": "2024-08-01T17:02:45Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/satisfaction_ratings/29013431981588.json"
     }
   ],
@@ -311,7 +289,7 @@
       ],
       "position": 1,
       "title": "Test SLA Policy",
-      "updated_at": "2024-08-01T13:54:41Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/slas/policies/29006807867284.json"
     }
   ],
@@ -320,7 +298,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 11,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "count": 1,
@@ -332,7 +310,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 73,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "author_id": 28835702984212,
@@ -452,7 +430,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 11,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "attachments": [],
@@ -507,7 +485,7 @@
       "title": "Subject",
       "title_in_portal": "Subject",
       "type": "subject",
-      "updated_at": "2024-07-26T15:40:58Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/ticket_fields/28835714573076.json",
       "visible_in_portal": true
     }
@@ -517,7 +495,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 29,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "agent_wait_time_in_minutes": {
@@ -559,7 +537,7 @@
       "solved_at": null,
       "status_updated_at": "2024-07-26T15:41:04Z",
       "ticket_id": 1,
-      "updated_at": "2024-08-01T14:45:47Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/ticket_metrics/28835715028244.json"
     }
   ],
@@ -656,7 +634,7 @@
         }
       },
       "ticket_id": 1,
-      "updated_at": "2024-08-01T12:45:36Z",
+      "updated_at": "redacted",
       "user_id": 28835702984212
     }
   ],
@@ -665,7 +643,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 27,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "allow_attachments": true,
@@ -720,7 +698,7 @@
       ],
       "ticket_form_id": 28835740693908,
       "type": "incident",
-      "updated_at": "2024-08-01T14:45:47Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/tickets/1.json",
       "via": {
         "channel": "sample_ticket",
@@ -737,7 +715,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 14,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "active": true,
@@ -750,7 +728,7 @@
       "external_id": null,
       "iana_time_zone": "America/New_York",
       "id": 28835702984212,
-      "last_login_at": "2024-08-05T12:29:57Z",
+      "last_login_at": "redacted",
       "locale": "en-US",
       "locale_id": 1,
       "moderator": true,
@@ -773,7 +751,7 @@
       "ticket_restriction": null,
       "time_zone": "America/New_York",
       "two_factor_auth_enabled": null,
-      "updated_at": "2024-08-05T12:33:10Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/users/28835702984212.json",
       "user_fields": {},
       "verified": true
@@ -803,7 +781,7 @@
       "ticket_form_ids": [
         28835740693908
       ],
-      "updated_at": "2024-07-26T18:13:43Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/brands/28835714705684.json"
     }
   ],
@@ -812,7 +790,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 3,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "configuration": {
@@ -876,7 +854,7 @@
       "name": "Light agent",
       "role_type": 1,
       "team_member_count": 0,
-      "updated_at": "2024-07-26T15:40:57Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -913,7 +891,7 @@
       ],
       "name": "Test schedule",
       "time_zone": "Eastern Time (US & Canada)",
-      "updated_at": "2024-08-01T13:29:59Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -949,7 +927,7 @@
         28835714575124,
         28835767646868
       ],
-      "updated_at": "2024-08-05T19:07:53Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/ticket_forms/28835740693908.json"
     }
   ],
@@ -964,7 +942,7 @@
       "created_at": "2024-08-01T12:48:41Z",
       "id": "6149ea30-5004-11ef-ba4d-1fb32c16a1d3",
       "name": "Test attribute",
-      "updated_at": "2024-08-01T12:48:41Z",
+      "updated_at": "redacted",
       "url": "https://d3v-estuary6996.zendesk.com/api/v2/routing/attributes/6149ea30-5004-11ef-ba4d-1fb32c16a1d3.json"
     }
   ],
@@ -973,7 +951,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "condition": "all",

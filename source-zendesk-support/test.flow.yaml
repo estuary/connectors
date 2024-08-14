@@ -17,6 +17,7 @@ captures:
           cursorField:
             - created_at
         target: acmeCo/audit_logs
+        disable: true
       - resource:
           stream: group_memberships
           syncMode: incremental
