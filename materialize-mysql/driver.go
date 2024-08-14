@@ -216,26 +216,14 @@ func newMysqlDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-mysql",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
-			log.WithFields(log.Fields{
-				"database": cfg.Database,
-				"address":  cfg.Address,
-				"user":     cfg.User,
-			}).Info("opening database")
-
-			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+		StartTunnel: func(ctx context.Context, conf any) error {
+			cfg := conf.(*config)
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 				host, port, err := net.SplitHostPort(cfg.Address)
 				if err != nil {
-					return nil, fmt.Errorf("splitting address to host and port: %w", err)
+					return fmt.Errorf("splitting address to host and port: %w", err)
 				}
 
 				var sshConfig = &networkTunnel.SshConfig{
@@ -250,9 +238,26 @@ func newMysqlDriver() *sql.Driver {
 				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 				if err := tunnel.Start(); err != nil {
-					return nil, fmt.Errorf("error starting network tunnel: %w", err)
+					return fmt.Errorf("error starting network tunnel: %w", err)
 				}
 			}
+
+			return nil
+		},
+		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
+			var cfg = new(config)
+			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+			}
+
+			log.WithFields(log.Fields{
+				"database": cfg.Database,
+				"address":  cfg.Address,
+				"user":     cfg.User,
+			}).Info("opening database")
+
+			var metaBase sql.TablePath
+			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			if cfg.Advanced.SSLMode == "verify_ca" || cfg.Advanced.SSLMode == "verify_identity" {
 				if err := registerCustomSSL(cfg); err != nil {

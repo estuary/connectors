@@ -25,6 +25,9 @@ type Driver struct {
 	EndpointSpecType interface{}
 	// Instance of the type into which resource specifications are parsed.
 	ResourceSpecType Resource
+	// StartTunnel starts up an SSH tunnel if one is configured prior to running
+	// any operations that require connectivity to the database.
+	StartTunnel func(ctx context.Context, conf any) error
 	// NewEndpoint returns an *Endpoint which will be used to handle interactions with the database.
 	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage, tenant string) (*Endpoint, error)
 	// PreReqs performs verification checks that the provided configuration can
@@ -81,6 +84,8 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if err := json.Unmarshal(req.ConfigJson, conf); err != nil {
 		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if err := d.StartTunnel(ctx, conf); err != nil {
+		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	} else if prereqErrs := d.PreReqs(ctx, conf, mustGetTenantNameFromTaskName(req.Name.String())); prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
@@ -163,10 +168,15 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		endpoint *Endpoint
 		client   Client
 		err      error
+		conf     = d.EndpointSpecType
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
+	} else if err := json.Unmarshal(req.Materialization.ConfigJson, conf); err != nil {
+		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if err := d.StartTunnel(ctx, conf); err != nil {
+		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
@@ -217,6 +227,13 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
+	var conf = d.EndpointSpecType
+
+	if err := json.Unmarshal(open.Materialization.ConfigJson, conf); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if err := d.StartTunnel(ctx, conf); err != nil {
+		return nil, nil, fmt.Errorf("starting network tunnel: %w", err)
+	}
 
 	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.Name.String()))
 	if err != nil {
