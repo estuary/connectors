@@ -642,7 +642,8 @@
           "items": {
             "type": [
               "null",
-              "number"
+              "number",
+              "string"
             ]
           }
         },

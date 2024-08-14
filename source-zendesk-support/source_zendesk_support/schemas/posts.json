@@ -11,7 +11,7 @@
       "content_tag_ids": {
         "type": ["null", "array"],
         "items": {
-          "type": ["null", "number"]
+          "type": ["null", "number", "string"]
         }
       },
       "featured": {
