@@ -29,7 +29,7 @@
         "canary": "amputation's",
         "id": 1
       },
-      "flow_published_at": "1970-01-01T00:00:00Z",
+      "flow_published_at": "1970-01-01T00:00:00.000000000Z",
       "id": 1
     },
     {
@@ -42,7 +42,7 @@
         "canary": "armament's",
         "id": 2
       },
-      "flow_published_at": "1970-01-01T00:00:01Z",
+      "flow_published_at": "1970-01-01T00:00:01.000000000Z",
       "id": 2
     },
     {
@@ -55,7 +55,7 @@
         "canary": "splatters",
         "id": 3
       },
-      "flow_published_at": "1970-01-01T00:00:02Z",
+      "flow_published_at": "1970-01-01T00:00:02.000000000Z",
       "id": 3
     },
     {
@@ -68,7 +68,7 @@
         "canary": "strengthen",
         "id": 4
       },
-      "flow_published_at": "1970-01-01T00:00:03Z",
+      "flow_published_at": "1970-01-01T00:00:03.000000000Z",
       "id": 4
     },
     {
@@ -81,7 +81,7 @@
         "canary": "Kringle's",
         "id": 5
       },
-      "flow_published_at": "1970-01-01T00:00:04Z",
+      "flow_published_at": "1970-01-01T00:00:04.000000000Z",
       "id": 5
     },
     {
@@ -94,7 +94,7 @@
         "canary": "grosbeak's",
         "id": 6
       },
-      "flow_published_at": "1970-01-01T00:00:05Z",
+      "flow_published_at": "1970-01-01T00:00:05.000000000Z",
       "id": 6
     },
     {
@@ -107,7 +107,7 @@
         "canary": "pieced",
         "id": 7
       },
-      "flow_published_at": "1970-01-01T01:00:00Z",
+      "flow_published_at": "1970-01-01T01:00:00.000000000Z",
       "id": 7
     },
     {
@@ -120,7 +120,7 @@
         "canary": "roaches",
         "id": 8
       },
-      "flow_published_at": "1970-01-01T01:00:01Z",
+      "flow_published_at": "1970-01-01T01:00:01.000000000Z",
       "id": 8
     },
     {
@@ -133,7 +133,7 @@
         "canary": "devilish",
         "id": 9
       },
-      "flow_published_at": "1970-01-01T01:00:02Z",
+      "flow_published_at": "1970-01-01T01:00:02.000000000Z",
       "id": 9
     },
     {
@@ -146,7 +146,7 @@
         "canary": "glucose's",
         "id": 10
       },
-      "flow_published_at": "1970-01-01T01:00:03Z",
+      "flow_published_at": "1970-01-01T01:00:03.000000000Z",
       "id": 10
     }
   ]
@@ -164,7 +164,7 @@
         "int": 7,
         "str": "str 6"
       },
-      "flow_published_at": "1970-01-01T01:00:04Z",
+      "flow_published_at": "1970-01-01T01:00:04.000000000Z",
       "id": 1,
       "int": 7,
       "str": "str 6"
@@ -179,7 +179,7 @@
         "int": 9,
         "str": "str 7"
       },
-      "flow_published_at": "1970-01-01T01:00:05Z",
+      "flow_published_at": "1970-01-01T01:00:05.000000000Z",
       "id": 2,
       "int": 9,
       "str": "str 7"
@@ -194,7 +194,7 @@
         "int": 11,
         "str": "str 8"
       },
-      "flow_published_at": "1970-01-01T01:00:06Z",
+      "flow_published_at": "1970-01-01T01:00:06.000000000Z",
       "id": 3,
       "int": 11,
       "str": "str 8"
@@ -209,7 +209,7 @@
         "int": 13,
         "str": "str 9"
       },
-      "flow_published_at": "1970-01-01T01:00:07Z",
+      "flow_published_at": "1970-01-01T01:00:07.000000000Z",
       "id": 4,
       "int": 13,
       "str": "str 9"
@@ -224,7 +224,7 @@
         "int": 15,
         "str": "str 10"
       },
-      "flow_published_at": "1970-01-01T01:00:08Z",
+      "flow_published_at": "1970-01-01T01:00:08.000000000Z",
       "id": 5,
       "int": 15,
       "str": "str 10"
@@ -244,7 +244,7 @@
         "int": 1,
         "str": "str 1"
       },
-      "flow_published_at": "1970-01-01T00:00:06Z",
+      "flow_published_at": "1970-01-01T00:00:06.000000000Z",
       "id": 1,
       "int": 1,
       "str": "str 1"
@@ -259,7 +259,7 @@
         "int": 6,
         "str": "str 6"
       },
-      "flow_published_at": "1970-01-01T01:00:04Z",
+      "flow_published_at": "1970-01-01T01:00:04.000000000Z",
       "id": 1,
       "int": 6,
       "str": "str 6"
@@ -274,7 +274,7 @@
         "int": 2,
         "str": "str 2"
       },
-      "flow_published_at": "1970-01-01T00:00:07Z",
+      "flow_published_at": "1970-01-01T00:00:07.000000000Z",
       "id": 2,
       "int": 2,
       "str": "str 2"
@@ -289,7 +289,7 @@
         "int": 7,
         "str": "str 7"
       },
-      "flow_published_at": "1970-01-01T01:00:05Z",
+      "flow_published_at": "1970-01-01T01:00:05.000000000Z",
       "id": 2,
       "int": 7,
       "str": "str 7"
@@ -304,7 +304,7 @@
         "int": 3,
         "str": "str 3"
       },
-      "flow_published_at": "1970-01-01T00:00:08Z",
+      "flow_published_at": "1970-01-01T00:00:08.000000000Z",
       "id": 3,
       "int": 3,
       "str": "str 3"
@@ -319,7 +319,7 @@
         "int": 8,
         "str": "str 8"
       },
-      "flow_published_at": "1970-01-01T01:00:06Z",
+      "flow_published_at": "1970-01-01T01:00:06.000000000Z",
       "id": 3,
       "int": 8,
       "str": "str 8"
@@ -334,7 +334,7 @@
         "int": 4,
         "str": "str 4"
       },
-      "flow_published_at": "1970-01-01T00:00:09Z",
+      "flow_published_at": "1970-01-01T00:00:09.000000000Z",
       "id": 4,
       "int": 4,
       "str": "str 4"
@@ -349,7 +349,7 @@
         "int": 9,
         "str": "str 9"
       },
-      "flow_published_at": "1970-01-01T01:00:07Z",
+      "flow_published_at": "1970-01-01T01:00:07.000000000Z",
       "id": 4,
       "int": 9,
       "str": "str 9"
@@ -364,7 +364,7 @@
         "int": 5,
         "str": "str 5"
       },
-      "flow_published_at": "1970-01-01T00:00:10Z",
+      "flow_published_at": "1970-01-01T00:00:10.000000000Z",
       "id": 5,
       "int": 5,
       "str": "str 5"
@@ -379,7 +379,7 @@
         "int": 10,
         "str": "str 10"
       },
-      "flow_published_at": "1970-01-01T01:00:08Z",
+      "flow_published_at": "1970-01-01T01:00:08.000000000Z",
       "id": 5,
       "int": 10,
       "str": "str 10"
@@ -391,70 +391,70 @@
   "rows": [
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:06Z",
+      "flow_published_at": "1970-01-01T00:00:06.000000000Z",
       "id": 1,
       "int": 1,
       "str": "str 1"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:04Z",
+      "flow_published_at": "1970-01-01T01:00:04.000000000Z",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:07Z",
+      "flow_published_at": "1970-01-01T00:00:07.000000000Z",
       "id": 2,
       "int": 2,
       "str": "str 2"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:05Z",
+      "flow_published_at": "1970-01-01T01:00:05.000000000Z",
       "id": 2,
       "int": 7,
       "str": "str 7"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:08Z",
+      "flow_published_at": "1970-01-01T00:00:08.000000000Z",
       "id": 3,
       "int": 3,
       "str": "str 3"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:06Z",
+      "flow_published_at": "1970-01-01T01:00:06.000000000Z",
       "id": 3,
       "int": 8,
       "str": "str 8"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:09Z",
+      "flow_published_at": "1970-01-01T00:00:09.000000000Z",
       "id": 4,
       "int": 4,
       "str": "str 4"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:07Z",
+      "flow_published_at": "1970-01-01T01:00:07.000000000Z",
       "id": 4,
       "int": 9,
       "str": "str 9"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:10Z",
+      "flow_published_at": "1970-01-01T00:00:10.000000000Z",
       "id": 5,
       "int": 5,
       "str": "str 5"
     },
     {
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:08Z",
+      "flow_published_at": "1970-01-01T01:00:08.000000000Z",
       "id": 5,
       "int": 10,
       "str": "str 10"
@@ -487,7 +487,7 @@
         "nullable_int": null,
         "str_field": "str1"
       },
-      "flow_published_at": "1970-01-01T00:00:13Z",
+      "flow_published_at": "1970-01-01T00:00:13.000000000Z",
       "id": 1,
       "nested": {
         "id": "i1"
@@ -518,7 +518,7 @@
         "nullable_int": 2,
         "str_field": "str2"
       },
-      "flow_published_at": "1970-01-01T00:00:14Z",
+      "flow_published_at": "1970-01-01T00:00:14.000000000Z",
       "id": 2,
       "nested": {
         "id": "i2"
@@ -549,7 +549,7 @@
         "nullable_int": null,
         "str_field": "str3"
       },
-      "flow_published_at": "1970-01-01T00:00:15Z",
+      "flow_published_at": "1970-01-01T00:00:15.000000000Z",
       "id": 3,
       "nested": {
         "id": "i3"
@@ -580,7 +580,7 @@
         "nullable_int": 4,
         "str_field": "str4"
       },
-      "flow_published_at": "1970-01-01T00:00:16Z",
+      "flow_published_at": "1970-01-01T00:00:16.000000000Z",
       "id": 4,
       "nested": {
         "id": "i4"
@@ -611,7 +611,7 @@
         "nullable_int": null,
         "str_field": "str5"
       },
-      "flow_published_at": "1970-01-01T00:00:17Z",
+      "flow_published_at": "1970-01-01T00:00:17.000000000Z",
       "id": 5,
       "nested": {
         "id": "i5"
@@ -646,7 +646,7 @@
         "nullable_int": 6,
         "str_field": "str6 v2"
       },
-      "flow_published_at": "1970-01-01T01:00:19Z",
+      "flow_published_at": "1970-01-01T01:00:19.000000000Z",
       "id": 6,
       "nested": {
         "id": "i6"
@@ -679,7 +679,7 @@
         "nullable_int": null,
         "str_field": "str7 v2"
       },
-      "flow_published_at": "1970-01-01T01:00:20Z",
+      "flow_published_at": "1970-01-01T01:00:20.000000000Z",
       "id": 7,
       "nested": {
         "id": "i7"
@@ -710,7 +710,7 @@
         "nullable_int": 8,
         "str_field": "str8 v2"
       },
-      "flow_published_at": "1970-01-01T01:00:21Z",
+      "flow_published_at": "1970-01-01T01:00:21.000000000Z",
       "id": 8,
       "nested": {
         "id": "i8"
@@ -741,7 +741,7 @@
         "nullable_int": null,
         "str_field": "str9 v2"
       },
-      "flow_published_at": "1970-01-01T01:00:22Z",
+      "flow_published_at": "1970-01-01T01:00:22.000000000Z",
       "id": 9,
       "nested": {
         "id": "i9"
@@ -772,7 +772,7 @@
         "nullable_int": 10,
         "str_field": "str10 v2"
       },
-      "flow_published_at": "1970-01-01T01:00:23Z",
+      "flow_published_at": "1970-01-01T01:00:23.000000000Z",
       "id": 10,
       "nested": {
         "id": "i10"
@@ -802,7 +802,7 @@
         "num_str": "10.1",
         "time": "00:00:00Z"
       },
-      "flow_published_at": "1970-01-01T01:00:13Z",
+      "flow_published_at": "1970-01-01T01:00:13.000000000Z",
       "id": 1,
       "int_and_str": 1,
       "int_str": "10",
@@ -827,7 +827,7 @@
         "num_str": "20.1",
         "time": "14:20:12.33Z"
       },
-      "flow_published_at": "1970-01-01T01:00:14Z",
+      "flow_published_at": "1970-01-01T01:00:14.000000000Z",
       "id": 2,
       "int_and_str": 2,
       "int_str": "20",
@@ -852,7 +852,7 @@
         "num_str": "30.1",
         "time": "23:59:38.10Z"
       },
-      "flow_published_at": "1970-01-01T00:00:11Z",
+      "flow_published_at": "1970-01-01T00:00:11.000000000Z",
       "id": 3,
       "int_and_str": 3,
       "int_str": "30",
@@ -877,7 +877,7 @@
         "num_str": "40.1",
         "time": "23:59:38Z"
       },
-      "flow_published_at": "1970-01-01T00:00:12Z",
+      "flow_published_at": "1970-01-01T00:00:12.000000000Z",
       "id": 4,
       "int_and_str": "4",
       "int_str": "40",
@@ -902,7 +902,7 @@
         "num_str": "50.1",
         "time": "23:59:59Z"
       },
-      "flow_published_at": "1970-01-01T01:00:15Z",
+      "flow_published_at": "1970-01-01T01:00:15.000000000Z",
       "id": 5,
       "int_and_str": "5",
       "int_str": "50",
@@ -921,7 +921,7 @@
         "id": 8,
         "num_str": "NaN"
       },
-      "flow_published_at": "1970-01-01T01:00:16Z",
+      "flow_published_at": "1970-01-01T01:00:16.000000000Z",
       "id": 8,
       "int_and_str": null,
       "int_str": null,
@@ -940,7 +940,7 @@
         "id": 9,
         "num_str": "Infinity"
       },
-      "flow_published_at": "1970-01-01T01:00:17Z",
+      "flow_published_at": "1970-01-01T01:00:17.000000000Z",
       "id": 9,
       "int_and_str": null,
       "int_str": null,
@@ -959,7 +959,7 @@
         "id": 10,
         "num_str": "-Infinity"
       },
-      "flow_published_at": "1970-01-01T01:00:18Z",
+      "flow_published_at": "1970-01-01T01:00:18.000000000Z",
       "id": 10,
       "int_and_str": null,
       "int_str": null,
@@ -982,7 +982,7 @@
         },
         "id": 2
       },
-      "flow_published_at": "1970-01-01T01:00:26Z",
+      "flow_published_at": "1970-01-01T01:00:26.000000000Z",
       "id": 2
     },
     {
@@ -995,7 +995,7 @@
         },
         "id": 3
       },
-      "flow_published_at": "1970-01-01T01:00:27Z",
+      "flow_published_at": "1970-01-01T01:00:27.000000000Z",
       "id": 3
     }
   ]
