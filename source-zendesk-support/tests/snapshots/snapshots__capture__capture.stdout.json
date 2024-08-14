@@ -4,21 +4,21 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 99,
+        "row_id": 101,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "action": "create",
-      "action_label": "Created",
+      "action": "update",
+      "action_label": "Updated",
       "actor_id": -1,
       "actor_name": "Zendesk",
-      "change_description": "Organization Estuary created",
-      "created_at": "2024-07-26T15:41:02Z",
-      "id": 28835703787924,
+      "change_description": "Changed from not set to Alex Bair",
+      "created_at": "2024-07-26T15:40:53Z",
+      "id": 28835703011988,
       "ip_address": null,
-      "source_id": 28835714737428,
-      "source_label": "Organization: Estuary",
-      "source_type": "organization",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/audit_logs/28835703787924.json"
+      "source_id": 21678981,
+      "source_label": "Contacts: Account owner",
+      "source_type": "account",
+      "url": "https://d3v-estuary6996.zendesk.com/api/v2/audit_logs/28835703011988.json"
     }
   ],
   [
@@ -226,7 +226,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "assignee_id": 28835702984212,
@@ -320,7 +320,7 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 15,
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "count": 1,
