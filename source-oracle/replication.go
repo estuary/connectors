@@ -117,7 +117,6 @@ type redoFile struct {
 	DictEnd     string
 }
 
-// We process a maximum number of files for each run to avoid timeouts when querying from logminer
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int) error {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
@@ -242,10 +241,9 @@ type replicationStream struct {
 	db   *oracleDatabase
 	conn *sql.Conn // The Oracle connection
 
-	cancel   context.CancelFunc            // Cancel function for the replication goroutine's context
-	errCh    chan error                    // Error channel for the final exit status of the replication goroutine
-	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
-	decodeCh chan logminerMessage          // Messages received from Logminer are sent to this channel to be decoded and then sent to events channel
+	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
+	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
+	events chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
 
 	// sequence# of the last redo log file read, used to check if new log files have appeared
 	redoSequence int
@@ -282,14 +280,10 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 	var streamCtx, streamCancel = context.WithCancel(egCtx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	s.errCh = make(chan error)
-	s.decodeCh = make(chan logminerMessage, replicationBufferSize)
 	s.cancel = streamCancel
 
 	eg.Go(func() error {
 		return s.run(streamCtx)
-	})
-	eg.Go(func() error {
-		return s.decodeMessageWorker(streamCtx)
 	})
 
 	go func() {
@@ -343,6 +337,12 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		if err := row.Scan(&currentSCN); err != nil {
 			return fmt.Errorf("fetching current SCN: %w", err)
 		}
+		// TODO: this value should adapt to the number of log files we find: if we find
+		// too many log files, we need to reduce this value automatically to avoid a timeout
+		// if we receive too few log files, we can try a larger value to progress faster.
+		// One challenge that makes this task more difficult is the need to have dictionary boundaries
+		// around a SCN range that we capture. Sometimes it is hard to find a dictionary bound range
+		// that is small enough to not exceed the limit of files we need
 		var endSCN = startSCN + s.db.config.Advanced.IncrementalSCNRange
 
 		if currentSCN < endSCN {
@@ -367,7 +367,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			}
 		}
 
-		if err := s.receiveMessages(ctx); err != nil {
+		if err := s.receiveMessages(ctx, startSCN, endSCN); err != nil {
 			return fmt.Errorf("receive messages: %w", err)
 		}
 
@@ -377,40 +377,23 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// on restart, but it saves us from missing events
 		s.lastTxnEndSCN = endSCN
 
-		s.decodeCh <- logminerMessage{Op: opFlush, SCN: s.lastTxnEndSCN}
+		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.Itoa(s.lastTxnEndSCN)}
 	}
 }
 
-func (s *replicationStream) decodeMessageWorker(ctx context.Context) error {
-	for {
-		var msg logminerMessage
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case msg = <-s.decodeCh:
-		}
-
-		if msg.Op == opFlush {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case s.events <- &sqlcapture.FlushEvent{Cursor: strconv.Itoa(msg.SCN)}:
-				continue
-			}
-		}
-
-		var event, err = s.decodeMessage(msg)
-		if err != nil {
-			return err
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case s.events <- event:
-			continue
-		}
+func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logminerMessage) error {
+	var event, err = s.decodeMessage(msg)
+	if err != nil {
+		return err
 	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case s.events <- event:
+	}
+
+	return nil
 }
 
 // in WHERE AST, columns are quoted with backticks for some reason. This function
@@ -441,9 +424,6 @@ const (
 	opInsert = 1
 	opDelete = 2
 	opUpdate = 3
-
-	// This is a custom op value we use in the decodeCh to signal a flush / commit
-	opFlush = -1
 )
 
 func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
@@ -458,7 +438,7 @@ func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
 	}
 	return fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
     FROM V$LOGMNR_CONTENTS
-    WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :scn AND
+    WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :startSCN AND SCN <= :endSCN AND
     SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
     AND (%s)`, tablesCondition)
 }
@@ -466,9 +446,8 @@ func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
 // receiveMessage reads and parses the next replication message from the database,
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
-func (s *replicationStream) receiveMessages(ctx context.Context) error {
-	var startSCN = s.lastTxnEndSCN
-	rows, err := s.logminerStmt.QueryContext(ctx, startSCN)
+func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN int) error {
+	rows, err := s.logminerStmt.QueryContext(ctx, startSCN, endSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
 	}
@@ -542,18 +521,23 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 
 			// last message was CSF, this one is not. This is the end of the continuation chain
 			if msg.CSF == 0 {
-				s.decodeCh <- *lastMsg
+				if err := s.decodeAndEmitMessage(ctx, *lastMsg); err != nil {
+					return err
+				}
 				relevantMessages++
 			}
-			continue
-		}
-		if msg.CSF == 1 {
-			lastMsg = &msg
+
 			continue
 		}
 
-		s.decodeCh <- msg
 		lastMsg = &msg
+		if msg.CSF == 1 {
+			continue
+		}
+
+		if err := s.decodeAndEmitMessage(ctx, msg); err != nil {
+			return err
+		}
 		relevantMessages++
 	}
 
@@ -571,7 +555,8 @@ func (s *replicationStream) receiveMessages(ctx context.Context) error {
 		"totalMessages":    totalMessages,
 		"relevantMessages": relevantMessages,
 		"startSCN":         startSCN,
-		"lastSCN":          finalSCN,
+		"endSCN":           endSCN,
+		"finalSCN":         finalSCN,
 	}).Debug("received messages")
 
 	return nil
