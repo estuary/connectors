@@ -9,23 +9,6 @@ import (
 
 func TestConfigURI(t *testing.T) {
 	for name, cfg := range map[string]config{
-		"v1 User & Password Authentication": {
-			Host:     "orgname-accountname.snowflakecomputing.com",
-			User:     "alex",
-			Password: "mysecret",
-			Database: "mydb",
-			Schema:   "myschema",
-		},
-		"Optional Parameters": {
-			Host:      "orgname-accountname.snowflakecomputing.com",
-			User:      "alex",
-			Password:  "mysecret",
-			Database:  "mydb",
-			Schema:    "myschema",
-			Warehouse: "mywarehouse",
-			Role:      "myrole",
-			Account:   "myaccount",
-		},
 		"v2 User & Password Authentication": {
 			Host:     "orgname-accountname.snowflakecomputing.com",
 			Database: "mydb",
@@ -34,6 +17,20 @@ func TestConfigURI(t *testing.T) {
 				UserPass,
 				"will",
 				"password",
+				"non-existant-jwt",
+			},
+		},
+		"Optional Parameters": {
+			Host:      "orgname-accountname.snowflakecomputing.com",
+			Database:  "mydb",
+			Schema:    "myschema",
+			Warehouse: "mywarehouse",
+			Role:      "myrole",
+			Account:   "myaccount",
+			Credentials: credentialConfig{
+				UserPass,
+				"alex",
+				"mysecret",
 				"non-existant-jwt",
 			},
 		},
