@@ -22,8 +22,6 @@ import (
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
 	Host       string `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	User       string `json:"user" jsonschema:"-"`
-	Password   string `json:"password" jsonschema:"-"`
 	Database   string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
 	Schema     string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
 	Warehouse  string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
@@ -96,7 +94,7 @@ func (c *config) toURI(tenant string) (string, error) {
 		}
 		uri.User = url.User(c.Credentials.User)
 	} else {
-		uri.User = url.UserPassword(c.User, c.Password)
+		return "", fmt.Errorf("unknown auth type: %s", c.Credentials.AuthType)
 	}
 
 	dsn := uri.User.String() + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
@@ -152,17 +150,6 @@ func (c *config) Validate() error {
 
 	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
 		return err
-	}
-
-	if c.Password != "" {
-		// If they have both old user and password and new ones, ask them to remove the old ones
-		if c.Credentials.AuthType != "" || c.Credentials.Password != "" {
-			return fmt.Errorf("User and password in the root config are deprecated, please omit them and use the `credentials` config object only.")
-		}
-
-		c.Credentials.AuthType = UserPass
-		c.Credentials.Password = c.Password
-		c.Credentials.User = c.User
 	}
 
 	if err := c.Credentials.Validate(); err != nil {
