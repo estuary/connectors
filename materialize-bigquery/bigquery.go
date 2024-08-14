@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -57,7 +56,7 @@ func (c *config) Validate() error {
 	// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 	// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 	// directly to bigquery.NewClient.
-	if !json.Valid(decodeCredentials(c.CredentialsJSON)) {
+	if !json.Valid([]byte(c.CredentialsJSON)) {
 		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 	}
 
@@ -82,7 +81,7 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	var clientOpts []option.ClientOption
 
 	clientOpts = append(clientOpts,
-		option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)),
+		option.WithCredentialsJSON([]byte(c.CredentialsJSON)),
 		option.WithUserAgent("Estuary Technologies"))
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
@@ -138,22 +137,6 @@ func (c tableConfig) Path() sql.TablePath {
 // DeltaUpdates returns if BigQuery is in DeltaUpdates mode or not.
 func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
-}
-
-// decodeCredentials allows support for legacy credentials that were base64 encoded. Previously, the
-// connector required base64 encoding of JSON service account credentials. In the future, this
-// fallback can be removed when base64 encoded credentials are no longer supported and only
-// unencoded JSON is acceptable.
-func decodeCredentials(credentialString string) []byte {
-	decoded, err := base64.StdEncoding.DecodeString(credentialString)
-	if err == nil {
-		// If the provided credentials string was a valid base64 encoding, assume that it was base64
-		// encoded JSON and return the result of successfully decoding that.
-		return decoded
-	}
-
-	// Otherwise, assume that the credentials string was not base64 encoded.
-	return []byte(credentialString)
 }
 
 func Driver() *sql.Driver {
