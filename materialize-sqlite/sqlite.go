@@ -58,6 +58,7 @@ func NewSQLiteDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlite",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, _ json.RawMessage, _ string) (*sql.Endpoint, error) {
 			var path = databasePath
 
