@@ -27,12 +27,8 @@ Binding 0:
               ]
             },
             "c": {
-              "format": "number",
-              "description": "(source type: non-nullable float4)",
-              "type": [
-                "number",
-                "string"
-              ]
+              "type": "number",
+              "description": "(source type: non-nullable float4)"
             },
             "d": {
               "description": "(source type: varchar)",

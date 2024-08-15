@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"strings"
 	"time"
@@ -229,14 +228,6 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			return x[:truncateColumnThreshold], nil
 		}
 		return x, nil
-	case float32:
-		if str, ok := stringifySpecialFloats(float64(x)); ok {
-			return str, nil
-		}
-	case float64:
-		if str, ok := stringifySpecialFloats(x); ok {
-			return str, nil
-		}
 	case json.RawMessage:
 		if len(x) > truncateColumnThreshold {
 			return oversizePlaceholderJSON(x), nil
@@ -288,19 +279,6 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 	}
 
 	return val, nil
-}
-
-// stringifySpecialFloats replaces the legal IEEE-754 values NaN/Infinity/-Infinity (which
-// don't have a defined JSON representation) with equivalent strings.
-func stringifySpecialFloats(x float64) (string, bool) {
-	if math.IsNaN(x) {
-		return "NaN", true
-	} else if math.IsInf(x, +1) {
-		return "Infinity", true
-	} else if math.IsInf(x, -1) {
-		return "-Infinity", true
-	}
-	return "", false
 }
 
 func stringifyRange(r pgtype.Range[any]) (string, error) {
