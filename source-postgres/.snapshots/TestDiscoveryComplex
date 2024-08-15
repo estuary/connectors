@@ -44,8 +44,12 @@ Binding 0:
               "description": "(source type: non-nullable text)"
             },
             "real_": {
-              "type": "number",
-              "description": "(source type: non-nullable float4)"
+              "format": "number",
+              "description": "(source type: non-nullable float4)",
+              "type": [
+                "number",
+                "string"
+              ]
             }
           }
         }
