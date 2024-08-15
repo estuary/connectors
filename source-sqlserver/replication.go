@@ -778,11 +778,8 @@ func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, 
 	// created. The timestamp also helps ensure that successive capture instances from the
 	// same table are always unique.
 
-	// Human-readable prefix of the name, truncated to 64 characters
-	var prefix = schema + "_" + table
-	if len(prefix) > 64 {
-		prefix = prefix[:64]
-	}
+	// Human-readable prefix of the name, truncated to at most 64 bytes.
+	var prefix = unicodeTruncate(schema+"_"+table, 64)
 
 	// A 32-bit hash of the full name provides more uniqueness if the truncated prefixes match for multiple tables.
 	var hash = crc32.ChecksumIEEE([]byte(fmt.Sprintf("%s_%s", schema, table)))
@@ -808,6 +805,19 @@ func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, 
 		return "", fmt.Errorf("error creating capture instance %q: %w", instanceName, err)
 	}
 	return instanceName, nil
+}
+
+// unicodeTruncate returns the longest prefix of the input string which is
+// not longer than the specified limit in bytes and which is made entirely
+// out of complete Unicode code points.
+func unicodeTruncate(str string, limit int) (truncated string) {
+	for _, r := range str {
+		if len(truncated)+len(string(r)) > limit {
+			break
+		}
+		truncated += string(r)
+	}
+	return truncated
 }
 
 func cdcDeleteCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, instance string) error {
