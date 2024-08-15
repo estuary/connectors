@@ -95,3 +95,4 @@ properties:
         type: integer
     required:
       - row_id
+x-infer-schema: true
