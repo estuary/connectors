@@ -20,7 +20,7 @@ Binding 0:
               ]
             },
             "b": {
-              "description": "(source type: text)",
+              "description": "(source type: varchar(2000))",
               "type": [
                 "string",
                 "null"
