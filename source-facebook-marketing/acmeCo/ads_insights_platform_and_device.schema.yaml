@@ -6,8 +6,8 @@ properties:
       - string
   account_id:
     type:
-      - "null"
       - string
+    default: ""
   account_name:
     type:
       - "null"
@@ -161,8 +161,8 @@ properties:
             - number
   ad_id:
     type:
-      - "null"
       - string
+    default: ""
   ad_impression_actions:
     type:
       - "null"
@@ -1198,7 +1198,6 @@ properties:
   date_start:
     format: date
     type:
-      - "null"
       - string
   date_stop:
     format: date
@@ -2455,14 +2454,17 @@ properties:
     type:
       - "null"
       - string
+    default: ""
   platform_position:
     type:
       - "null"
       - string
+    default: ""
   impression_device:
     type:
       - "null"
       - string
+    default: ""
   _meta:
     type: object
     properties:
@@ -2472,4 +2474,7 @@ properties:
       - row_id
 type:
   - object
-x-infer-schema: true
+required:
+  - account_id
+  - ad_id
+  - date_start

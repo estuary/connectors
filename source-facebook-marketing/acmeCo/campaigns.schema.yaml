@@ -47,7 +47,6 @@ properties:
       - string
   id:
     type:
-      - "null"
       - string
   issues_info:
     type:
@@ -117,4 +116,5 @@ properties:
       - row_id
 type:
   - object
-x-infer-schema: true
+required:
+  - id

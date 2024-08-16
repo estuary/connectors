@@ -2,7 +2,6 @@
 properties:
   id:
     type:
-      - "null"
       - string
   account_id:
     type:
@@ -80,4 +79,5 @@ properties:
       - row_id
 type:
   - object
-x-infer-schema: true
+required:
+  - id

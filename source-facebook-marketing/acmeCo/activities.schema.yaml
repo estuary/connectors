@@ -1,0 +1,59 @@
+---
+properties:
+  actor_id:
+    type:
+      - string
+  actor_name:
+    type:
+      - "null"
+      - string
+  application_id:
+    type:
+      - string
+  application_name:
+    type:
+      - "null"
+      - string
+  date_time_in_timezone:
+    type:
+      - "null"
+      - string
+  event_time:
+    type: string
+  event_type:
+    type:
+      - string
+  extra_data:
+    type:
+      - "null"
+      - string
+  object_id:
+    type:
+      - string
+  object_name:
+    type:
+      - "null"
+      - string
+  object_type:
+    type:
+      - "null"
+      - string
+  translated_event_type:
+    type:
+      - "null"
+      - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+type:
+  - object
+required:
+  - actor_id
+  - application_id
+  - event_time
+  - event_type
+  - object_id
