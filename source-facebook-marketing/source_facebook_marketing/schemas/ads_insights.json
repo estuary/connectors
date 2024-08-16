@@ -33,9 +33,6 @@
     "adset_name": {
       "type": ["null", "string"]
     },
-    "age_targeting": {
-      "type": ["null", "string"]
-    },
     "attribution_setting": {
       "type": ["null", "string"]
     },
@@ -179,9 +176,6 @@
     },
     "full_view_reach": {
       "type": ["null", "number"]
-    },
-    "gender_targeting": {
-      "type": ["null", "string"]
     },
     "impressions": {
       "type": ["null", "integer"]

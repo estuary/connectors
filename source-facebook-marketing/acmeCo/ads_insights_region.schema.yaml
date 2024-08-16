@@ -224,10 +224,6 @@ properties:
     type:
       - "null"
       - string
-  age_targeting:
-    type:
-      - "null"
-      - string
   attribution_setting:
     type:
       - "null"
@@ -1228,10 +1224,6 @@ properties:
     type:
       - "null"
       - number
-  gender_targeting:
-    type:
-      - "null"
-      - string
   impressions:
     type:
       - "null"
