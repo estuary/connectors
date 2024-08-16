@@ -1,6 +1,8 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+
 # Build Stage
 ################################################################################
-FROM golang:1.21-bullseye as builder
+FROM golang:1.22-bullseye as builder
 
 WORKDIR /builder
 
@@ -23,7 +25,7 @@ RUN go build -o ./connector -v ./source-google-pubsub/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
