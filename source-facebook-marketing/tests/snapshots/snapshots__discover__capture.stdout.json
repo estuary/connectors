@@ -12547,12 +12547,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -14059,12 +14053,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -16246,12 +16234,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -17758,12 +17740,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -19961,12 +19937,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -21473,12 +21443,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -23668,12 +23632,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -25180,12 +25138,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -27375,12 +27327,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -28887,12 +28833,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -31082,12 +31022,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -32594,12 +32528,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -34805,12 +34733,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -36317,12 +36239,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
