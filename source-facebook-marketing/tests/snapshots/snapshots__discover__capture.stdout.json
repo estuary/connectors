@@ -14037,31 +14037,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -14200,18 +14176,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -17772,31 +17736,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -17935,18 +17875,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -21523,31 +21451,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -21686,18 +21590,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -25266,31 +25158,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -25429,18 +25297,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -29009,31 +28865,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -29172,18 +29004,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -32752,31 +32572,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -32915,18 +32711,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -36511,31 +36295,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -36674,18 +36434,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
