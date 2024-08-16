@@ -2,16 +2,16 @@
 properties:
   account_id:
     type:
-      - "null"
       - string
+    default: ""
   account_name:
     type:
       - "null"
       - string
   ad_id:
     type:
-      - "null"
       - string
+    default: ""
   ad_name:
     type:
       - "null"
@@ -39,7 +39,6 @@ properties:
   date_start:
     format: date
     type:
-      - "null"
       - string
   date_stop:
     format: date
@@ -111,6 +110,7 @@ properties:
     type:
       - "null"
       - string
+    default: ""
   _meta:
     type: object
     properties:
@@ -120,4 +120,7 @@ properties:
       - row_id
 type:
   - object
-x-infer-schema: true
+required:
+  - account_id
+  - ad_id
+  - date_start
