@@ -1,0 +1,37 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-pendo:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_pendo
+        config: {}
+    bindings:
+      - resource:
+          stream: Page
+          syncMode: full_refresh
+        target: acmeCo/Page
+      - resource:
+          stream: Feature
+          syncMode: full_refresh
+        target: acmeCo/Feature
+      - resource:
+          stream: Report
+          syncMode: full_refresh
+        target: acmeCo/Report
+      - resource:
+          stream: Guide
+          syncMode: full_refresh
+        target: acmeCo/Guide
+      - resource:
+          stream: Account Metadata
+          syncMode: full_refresh
+        target: acmeCo/Account Metadata
+      - resource:
+          stream: Visitor Metadata
+          syncMode: full_refresh
+        target: acmeCo/Visitor Metadata

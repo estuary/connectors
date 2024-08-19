@@ -1,0 +1,110 @@
+---
+collections:
+  acmeCo/Account Metadata:
+    schema:
+      type: object
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
+  acmeCo/Feature:
+    schema:
+      type: object
+      $schema: "http://json-schema.org/schema#"
+      properties:
+        id:
+          type: string
+          description: The unique identifier of the feature.
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/Guide:
+    schema:
+      type: object
+      $schema: "http://json-schema.org/schema#"
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the guide.
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/Page:
+    schema:
+      type: object
+      $schema: "http://json-schema.org/schema#"
+      properties:
+        id:
+          type: string
+          description: The unique ID of the page.
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/Report:
+    schema:
+      type: object
+      $schema: "http://json-schema.org/schema#"
+      properties:
+        id:
+          type: string
+          description: Unique ID of the report
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/Visitor Metadata:
+    schema:
+      type: object
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
