@@ -15,10 +15,11 @@ Binding 0:
           "$anchor": "TestUsertypes_tuple_51424093",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "value": {
-              "description": "using catch-all schema: unable to translate PostgreSQL type \"usertuple\" into JSON schema"
+              "description": "(source type: composite)"
             }
           }
         }

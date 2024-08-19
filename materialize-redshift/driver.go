@@ -23,12 +23,12 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jackc/pgconn"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
 	// Imported for side-effects (registers the required stdsql driver)
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -195,6 +195,32 @@ func newRedshiftDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-redshift",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel: func(ctx context.Context, conf any) error {
+			cfg := conf.(*config)
+
+			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+			if cfg.networkTunnelEnabled() {
+				host, port, err := net.SplitHostPort(cfg.Address)
+				if err != nil {
+					return fmt.Errorf("splitting address to host and port: %w", err)
+				}
+
+				var sshConfig = &networkTunnel.SshConfig{
+					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
+					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
+					ForwardHost: host,
+					ForwardPort: port,
+					LocalPort:   "5432",
+				}
+				var tunnel = sshConfig.CreateTunnel()
+
+				if err := tunnel.Start(); err != nil {
+					return fmt.Errorf("error starting network tunnel: %w", err)
+				}
+			}
+
+			return nil
+		},
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -212,27 +238,6 @@ func newRedshiftDriver() *sql.Driver {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 			metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
-
-			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-			if cfg.networkTunnelEnabled() {
-				host, port, err := net.SplitHostPort(cfg.Address)
-				if err != nil {
-					return nil, fmt.Errorf("splitting address to host and port: %w", err)
-				}
-
-				var sshConfig = &networkTunnel.SshConfig{
-					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
-					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
-					ForwardHost: host,
-					ForwardPort: port,
-					LocalPort:   "5432",
-				}
-				var tunnel = sshConfig.CreateTunnel()
-
-				if err := tunnel.Start(); err != nil {
-					return nil, fmt.Errorf("error starting network tunnel: %w", err)
-				}
-			}
 
 			db, err := stdsql.Open("pgx", cfg.toURI())
 			if err != nil {
@@ -266,6 +271,7 @@ func newRedshiftDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 

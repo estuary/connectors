@@ -15,19 +15,22 @@ Binding 0:
           "$anchor": "DboTest_DiscoveryIrrelevantConstraints_44516719",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "foo": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "id": {
-              "type": "string"
+              "type": "string",
+              "description": "(source type: non-nullable varchar(64))"
             }
           }
         }

@@ -37,8 +37,32 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
+// See https://docs.snowflake.com/en/sql-reference/data-types-datetime#timestamp
+// for the official description of the different types of timestamps.
+type timestampTypeMapping string
+
+var (
+	// NTZ is the default type if it hasn't been otherwise set for the database,
+	// but it's generally not a very good choice since it ignores timezone
+	// information and stores the time directly as a wallclock time without
+	// adjusting it to UTC. We never create columns with this type.
+	timestampNTZ timestampTypeMapping = "TIMESTAMP_NTZ"
+
+	// LTZ stores the time in Snowflake as UTC and performs operations on it
+	// using the session timezone. We use LTZ for timestamp columns unless the
+	// TIMESTAMP_TYPE_MAPPING has explicitly been set to TZ.
+	timestampLTZ timestampTypeMapping = "TIMESTAMP_LTZ"
+
+	// TZ stores the time in Snowflake as UTC with a time zone offset.
+	timestampTZ timestampTypeMapping = "TIMESTAMP_TZ"
+)
+
+func (m timestampTypeMapping) valid() bool {
+	return m == timestampNTZ || m == timestampLTZ || m == timestampTZ
+}
+
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
-var snowflakeDialect = func(configSchema string) sql.Dialect {
+var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    variantMapper,
@@ -61,7 +85,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 					Delegate: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "inf", "-inf"))),
 				},
 				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMP"),
+				"date-time": sql.NewStaticMapper(string(timestampMapping)),
 			},
 		},
 	}
@@ -77,7 +101,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 		sql.ColValidation{Types: []string{"number"}, Validate: sql.IntegerCompatible}, // "number" is what Snowflake calls INTEGER.
 		sql.ColValidation{Types: []string{"variant"}, Validate: sql.JsonCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp_ntz"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"timestamp_ntz", "timestamp_tz", "timestamp_ltz"}, Validate: sql.DateTimeCompatible},
 	)
 
 	translateIdentifier := func(in string) string {

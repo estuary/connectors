@@ -1,0 +1,14 @@
+{
+  "type": ["object"],
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "count": {
+      "type": ["null", "integer"]
+    },
+    "name": {
+      "type": "string"
+    }
+  }
+}

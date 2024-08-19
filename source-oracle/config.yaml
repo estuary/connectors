@@ -1,0 +1,52 @@
+user: FLOW_TEST_LOGMINER
+password: flow_test123
+address: database-1.chqpmndqvzby.us-east-2.rds.amazonaws.com:1521
+database: ORCL
+advanced:
+    discover_schemas:
+        - FLOW_TEST_LOGMINER
+networkTunnel:
+    sshForwarding:
+        sshEndpoint: ssh://ec2-user@18.221.36.63:22
+        privateKey: |
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEpQIBAAKCAQEAxcEsse+Nr0JWJI3JfMj2xs+iv8rcV4NMwlZybLVnwOOK7bR+
+            Db0sYaEmVccgfhr6yGixxSvfi0PeW4atNYCwFHOkRcKK92SnRGVNScb3lcE/Xy60
+            zwyNx5r1DZpiKkKFqsAkVvtCx5CMJX002bD0yFouNPW+CLAj4eNd5BXxogcL8zJd
+            oCTCyV+BlAW6b+aMMkasV6m8lCA7zVE0pW50Zl6lpAYN4P5Uje8NLe0YkRcUE+0K
+            C3VJyRwiHXSVgirL5W5wrxL6WQV37YaLLhsRnh99KMkjBtSy8NkGO8GUKMw32atz
+            0xfKX3GKmBPu8BYp6nwowNT8sKfMwDyowT7t2wIDAQABAoIBAQCOubFMaxzTVQlf
+            MIYvbcvOCaXozrzg3H7V9BZ5pyPO72shzJb9y37wp6JHXoRw/3/ojMdhCx04Ii+l
+            1znD17E90YjKYHJzw02F66cwjE2849CdHdSZavIZEhmzS6112rUmW67eqFG2Pvkn
+            RYqTY0gIIi4fQw14r8f2DGeDauMOkMjMmNEyxZra3DZ2CE+habSwoQH6ikSRkacl
+            wjbq6gA9OvQdRm0usCaJH2SGDT9j0/tPEMxhU4vnf9X5qMkxxVaMMi+HjfrgHwsG
+            19CJ3FTVZFsYEfmx4lN/MuQP8iB9cA/N+4zlXcrRMVpBWBpktmAL6+42kUsBfpNE
+            m9BtY4mBAoGBAPo6DQr+OAB9RcHGUzT28mNFFezN/d1NjRnxYUnRddnJp2kupgR6
+            O78SnuTQWV8r4h5q1Y1vnV8joIE2vtJ1jKaLrHaoQAP38khHg/PS9rpQacZvI6Pa
+            aaFunSu58mjMtWYrEeRUgNhP0QKcZq3c0ebMANtOBxBaU8a4mLQe7tcLAoGBAMpR
+            MzCq2ckdPEW2XccrAouMBTKl8ZZBG25IkJI75zlvCmePfeYsIJPUWGAaoOwc/TJC
+            6FwaH2qvHj+Jj5RGBG+ZOpA35PCLUtE6DXZgHdTsdLL0uI9eJV9kzMEvGRk4XX8Z
+            +4zZLSVJxoc7gc5UtSLfB0YTApCuhJQHxnrwL0ZxAoGBALyfKdnRjHGB/SV21J4m
+            UMzX9REOroE1xll6BTZZ+JZ1VgcJrQfPBF6iMLiW/eep8sevDM+TBXQELSd6Fxoa
+            li2tOBIx/h9/tlkZ37PaoTYNC88TVDBdoiaYdU3S25J4TX14lgIiWQW2FP3828HP
+            pUJvIW4vQU/oZyJzYFjWwH/FAoGBALMA7xrTP4gKnuZLOWPb8Q+I3px2aG75wgxs
+            lcVczPNrBLimI82AI37IdTzqspDWAUv0GORMlJluwYOT8X5OCOS4nTE20w/lJWxL
+            QdgHqL1YTNR9Y8ItmUFyzRrr0fgXf9nSIlf3W1NPmCDUjMADAJUO4b+lWDKsxk63
+            JmxlkF5xAoGAED2PnMPHFArAkpcIr5932bBupLBPh3ObV56m59va5fHP9VYQa/kV
+            i6OQzls+g2Wa5wLmWRmimJhdgli3tJBNQW2nqZKNxGmmrp6zCpjq6M67/chwXFCC
+            gmLqE5zBii5RiZCwUB+XQRKRAEJNiy70GNUB+RGSalOmc5/862nI9Qw=
+            -----END RSA PRIVATE KEY-----
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-07-08T15:32:33Z"
+    mac: ENC[AES256_GCM,data:0N2iwi8xQGNQLRcMeJ3ousRqWXVyC+u5twFmZDMz12oBk4LVI+mw23UdG4iPu0igbN+sdbxEiTJzv/ROsxJzqR9hdpds4qcsiUabytVl6cZMm282YCdTvZj5a4fqMTHHsJ5zPwkyW2KAKa2CqPaAtJlBmqbzQUsuOdFdgggCyOg=,iv:aT+M91TXQjGn/MEs9r/M+MgzUWGX+F1Bwl1F8pyI9Js=,tag:it1hCM2PQ3T1A5kwVhdUgw==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1

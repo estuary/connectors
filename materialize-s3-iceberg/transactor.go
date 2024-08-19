@@ -48,7 +48,7 @@ type bindingState struct {
 	// storage overhead of table snapshot files.
 	PreviousCheckpoint string   `json:"previousCheckpoint,omitempty"`
 	CurrentCheckpoint  string   `json:"currentCheckpoint,omitempty"`
-	FilePaths          []string `json:"fileKeys,omitempty"`
+	FileKeys           []string `json:"fileKeys"`
 }
 
 func hashCheckpoint(cp *protocol.Checkpoint) (string, error) {
@@ -113,7 +113,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		key := path.Join(t.prefix, uuid.New().String()+".parquet")
 		s3path := fmt.Sprintf("s3://%s/%s", t.bucket, key)
-		states[b.stateKey].FilePaths = append(states[b.stateKey].FilePaths, s3path)
+		states[b.stateKey].FileKeys = append(states[b.stateKey].FileKeys, s3path)
 
 		group.Go(func() error {
 			ll := log.WithFields(log.Fields{
@@ -197,8 +197,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(err)
 		}
 
-		for _, bs := range t.state.BindingStates {
-			bs.PreviousCheckpoint, bs.CurrentCheckpoint = bs.CurrentCheckpoint, currentCp
+		for _, bindingState := range t.state.BindingStates {
+			if len(bindingState.FileKeys) == 0 {
+				continue // no data for this binding
+			}
+
+			bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint = bindingState.CurrentCheckpoint, currentCp
 		}
 
 		checkpointJSON, err := json.Marshal(t.state)
@@ -212,28 +216,33 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	for _, b := range t.bindings {
-		state := t.state.BindingStates[b.stateKey]
+		bindingState := t.state.BindingStates[b.stateKey]
 
-		if len(state.FilePaths) == 0 {
+		if len(bindingState.FileKeys) == 0 {
 			continue // no data for this binding
 		}
 
 		ll := log.WithFields(log.Fields{
 			"table":             pathToFQN(b.path),
-			"previousCheckoint": state.PreviousCheckpoint,
-			"currentCheckpoint": state.CurrentCheckpoint,
+			"previousCheckoint": bindingState.PreviousCheckpoint,
+			"currentCheckpoint": bindingState.CurrentCheckpoint,
 		})
 
 		ll.Info("starting appendFiles for table")
-		if err := t.catalog.appendFiles(b.path, state.FilePaths, state.PreviousCheckpoint, state.CurrentCheckpoint); err != nil {
+		if err := t.catalog.appendFiles(b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
 			return nil, fmt.Errorf("appendFiles for %s: %w", b.path, err)
 		}
 		ll.Info("finished appendFiles for table")
 
-		state.FilePaths = nil // reset for next txn
+		bindingState.FileKeys = nil // reset for next txn
 	}
 
-	return nil, nil
+	checkpointJSON, err := json.Marshal(t.state)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint json: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
 }
 
 func (t *transactor) Destroy() {}

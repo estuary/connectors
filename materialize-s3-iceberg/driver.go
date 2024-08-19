@@ -313,10 +313,15 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 			return nil, nil, fmt.Errorf("unmarshalling resource config: %w", err)
 		}
 
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		resourcePaths = append(resourcePaths, res.path())
 		bindings = append(bindings, binding{
 			path:       b.ResourcePath,
-			pqSchema:   schemaWithOptions(b.FieldSelection.AllFields(), b.Collection),
+			pqSchema:   pqSchema,
 			includeDoc: b.FieldSelection.Document != "",
 			stateKey:   b.StateKey,
 		})

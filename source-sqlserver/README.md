@@ -29,7 +29,7 @@ automated test suite runs take 10-20x longer than they do on other databases.
 
 Some useful commands for working with a test instance of SQL Server:
 
-    $ docker-compose -f ./source-sqlserver/docker-compose.yaml exec db /opt/mssql-tools/bin/sqlcmd -U sa -P gf6w6dkD
+    $ docker-compose -f ./source-sqlserver/docker-compose.yaml exec db /opt/mssql-tools18/bin/sqlcmd -C -U sa -P gf6w6dkD
 
     ## Enabling CDC on a database
     > CREATE DATABASE test;

@@ -1,0 +1,263 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-iterable:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_iterable
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: campaigns
+          syncMode: full_refresh
+        target: acmeCo/campaigns
+      - resource:
+          stream: campaigns_metrics
+          syncMode: full_refresh
+        target: acmeCo/campaigns_metrics
+      - resource:
+          stream: channels
+          syncMode: full_refresh
+        target: acmeCo/channels
+      - resource:
+          stream: lists
+          syncMode: full_refresh
+        target: acmeCo/lists
+      - resource:
+          stream: message_types
+          syncMode: full_refresh
+        target: acmeCo/message_types
+      - resource:
+          stream: metadata
+          syncMode: full_refresh
+        target: acmeCo/metadata
+      - resource:
+          stream: templates
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/templates
+      - resource:
+          stream: users
+          syncMode: incremental
+          cursorField:
+            - profileUpdatedAt
+        target: acmeCo/users
+      - resource:
+          stream: list_users
+          syncMode: full_refresh
+        target: acmeCo/list_users
+      - resource:
+          stream: email_bounce
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_bounce
+      - resource:
+          stream: email_click
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_click
+      - resource:
+          stream: email_complaint
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_complaint
+      - resource:
+          stream: email_open
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_open
+      - resource:
+          stream: email_send
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_send
+      - resource:
+          stream: email_send_skip
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_send_skip
+      - resource:
+          stream: email_subscribe
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_subscribe
+      - resource:
+          stream: email_unsubscribe
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/email_unsubscribe
+      - resource:
+          stream: push_send
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/push_send
+      - resource:
+          stream: push_send_skip
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/push_send_skip
+      - resource:
+          stream: push_open
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/push_open
+      - resource:
+          stream: push_uninstall
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/push_uninstall
+      - resource:
+          stream: push_bounce
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/push_bounce
+      - resource:
+          stream: web_push_send
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/web_push_send
+      - resource:
+          stream: web_push_click
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/web_push_click
+      - resource:
+          stream: web_push_send_skip
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/web_push_send_skip
+      - resource:
+          stream: in_app_send
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_send
+      - resource:
+          stream: in_app_open
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_open
+      - resource:
+          stream: in_app_click
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_click
+      - resource:
+          stream: in_app_close
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_close
+      - resource:
+          stream: in_app_delete
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_delete
+      - resource:
+          stream: in_app_delivery
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_delivery
+      - resource:
+          stream: in_app_send_skip
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/in_app_send_skip
+      - resource:
+          stream: inbox_session
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/inbox_session
+      - resource:
+          stream: inbox_message_impression
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/inbox_message_impression
+      - resource:
+          stream: sms_send
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/sms_send
+      - resource:
+          stream: sms_bounce
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/sms_bounce
+      - resource:
+          stream: sms_click
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/sms_click
+      - resource:
+          stream: sms_received
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/sms_received
+      - resource:
+          stream: sms_send_skip
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/sms_send_skip
+      - resource:
+          stream: sms_usage_info
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/sms_usage_info
+      - resource:
+          stream: purchase
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/purchase
+      - resource:
+          stream: custom_event
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/custom_event
+      - resource:
+          stream: hosted_unsubscribe_click
+          syncMode: incremental
+          cursorField:
+            - createdAt
+        target: acmeCo/hosted_unsubscribe_click
+      - resource:
+          stream: events
+          syncMode: full_refresh
+        target: acmeCo/events
+    shards:
+      logLevel: debug

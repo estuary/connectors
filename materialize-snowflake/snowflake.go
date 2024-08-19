@@ -18,6 +18,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
@@ -77,15 +78,13 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-// The Snowflake driver Params map uses string pointers as values, which is what this is used for.
-var trueString = "true"
-
 // newSnowflakeDriver creates a new Driver for Snowflake.
 func newSnowflakeDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var parsed = new(config)
 			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
@@ -102,7 +101,23 @@ func newSnowflakeDriver() *sql.Driver {
 			var metaBase sql.TablePath = []string{parsed.Schema}
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
-			var dialect = snowflakeDialect(parsed.Schema)
+			dsn, err := parsed.toURI(tenant)
+			if err != nil {
+				return nil, fmt.Errorf("building snowflake dsn: %w", err)
+			}
+
+			db, err := stdsql.Open("snowflake", dsn)
+			if err != nil {
+				return nil, fmt.Errorf("newSnowflakeDriver stdsql.Open: %w", err)
+			}
+			defer db.Close()
+
+			timestampTypeMapping, err := getTimestampTypeMapping(ctx, db)
+			if err != nil {
+				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
+			}
+
+			var dialect = snowflakeDialect(parsed.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
@@ -120,7 +135,36 @@ func newSnowflakeDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
+}
+
+func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, error) {
+	xdb := sqlx.NewDb(db, "snowflake").Unsafe()
+
+	type paramRow struct {
+		Value string `db:"value"`
+	}
+
+	got := paramRow{}
+	if err := xdb.GetContext(ctx, &got, "SHOW PARAMETERS LIKE 'TIMESTAMP_TYPE_MAPPING';"); err != nil {
+		return "", err
+	}
+
+	m := timestampTypeMapping(got.Value)
+	if !m.valid() {
+		return "", fmt.Errorf("invalid timestamp type mapping: %s", got.Value)
+	}
+
+	log.WithField("value", got.Value).Debug("queried TIMESTAMP_TYPE_MAPPING")
+
+	if m == timestampNTZ {
+		// Default to LTZ if the TIMESTAMP_TYPE_MAPPING is set to NTZ, either
+		// explicitly or via the default.
+		m = timestampLTZ
+	}
+
+	return m, nil
 }
 
 var _ m.DelayedCommitter = (*transactor)(nil)
@@ -174,8 +218,6 @@ func newTransactor(
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
-	dialect := snowflakeDialect(cfg.Schema)
-
 	dsn, err := cfg.toURI(ep.Tenant)
 	if err != nil {
 		return nil, fmt.Errorf("building snowflake dsn: %w", err)
@@ -201,7 +243,7 @@ func newTransactor(
 	var d = &transactor{
 		cfg:        cfg,
 		ep:         ep,
-		templates:  renderTemplates(dialect),
+		templates:  renderTemplates(ep.Dialect),
 		db:         db,
 		pipeClient: pipeClient,
 		_range:     open.Range,
@@ -666,7 +708,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// If we see no results from the REST API for `maxTries` iterations, then we
 	// fallback to asking the `COPY_HISTORY` table. We allow up to 5 minutes for results to show up in the REST API.
 	var maxTries = 40
-	var retryDelaySeconds = 3 * time.Second
+	var retryDelay = 3 * time.Second
 	for tries := 0; tries < maxTries; tries++ {
 		for pipeName, pipe := range pipes {
 			// if the pipe has no files to begin with, just skip it
@@ -694,7 +736,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// We try `maxTries` times since it may take some time for the REST API
 				// to reflect the new pipe requests
 				if tries < maxTries-1 {
-					time.Sleep(retryDelaySeconds)
+					time.Sleep(retryDelay)
 					continue
 				}
 
@@ -730,7 +772,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
 					tries--
-					time.Sleep(retryDelaySeconds)
+					time.Sleep(retryDelay)
 					continue
 				}
 
@@ -761,7 +803,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				d.deleteFiles(ctx, []string{pipe.dir})
 				continue
 			} else {
-				time.Sleep(retryDelaySeconds)
+				time.Sleep(retryDelay)
 			}
 		}
 	}

@@ -16,15 +16,20 @@ Binding 0:
           "$anchor": "TestDiscoverycomplex_cheap_oxygenation",
           "properties": {
             "Bounded Text": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "doc": {},
-            "doc/bin": {},
+            "doc": {
+              "description": "(source type: json)"
+            },
+            "doc/bin": {
+              "description": "(source type: non-nullable jsonb)"
+            },
             "foo": {
-              "description": "This is a text field!",
+              "description": "This is a text field! (source type: text)",
               "type": [
                 "string",
                 "null"
@@ -32,13 +37,19 @@ Binding 0:
             },
             "k1": {
               "type": "integer",
-              "description": "I think this is a key ?"
+              "description": "I think this is a key ? (source type: non-nullable int4)"
             },
             "k2": {
-              "type": "string"
+              "type": "string",
+              "description": "(source type: non-nullable text)"
             },
             "real_": {
-              "type": "number"
+              "format": "number",
+              "description": "(source type: non-nullable float4)",
+              "type": [
+                "number",
+                "string"
+              ]
             }
           }
         }

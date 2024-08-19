@@ -87,6 +87,8 @@ func TestScanKeyTypes(t *testing.T) {
 			"ffffffff-ffff-ffff-ffff-ffffffff00ff",
 			"ffffffff-ffff-ffff-ffff-ffffffffff00",
 		}},
+		{"Numeric", "NUMERIC(10,5)", []any{"-1234", "0", "-3", "2", "12345.12", "12345.121", "12345.1205", "12345.12059", "12346"}},
+		{"Decimal", "DECIMAL(10,5)", []any{"-1234", "0", "-3", "2", "12345.12", "12345.121", "12345.1205", "12345.12059", "12346"}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("88929806%04d", idx)

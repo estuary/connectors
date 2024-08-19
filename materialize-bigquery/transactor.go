@@ -253,7 +253,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
-		b.storeFile.start()
 
 		var flowDocument = it.RawJSON
 		if t.cfg.HardDelete && it.Delete {
@@ -264,6 +263,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				continue
 			}
 		}
+
+		b.storeFile.start()
+
 		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)

@@ -171,6 +171,7 @@ func TestEnumPrimaryKey(t *testing.T) {
 	cs.Validator = &st.OrderedCaptureValidator{}
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 3
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"A", 1, "A1"}, {"A", 2, "A2"}, {"A", 3, "A3"}, {"A", 4, "A4"},
@@ -192,6 +193,7 @@ func TestEnumDecodingFix(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them via replication
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1, "A"}, {2, "B"}, {3, "C"}, {4, "D"}, {5, "error"}})
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
@@ -266,6 +268,7 @@ func TestEnumEmptyString(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them via replication
 	tb.Insert(ctx, t, tableName, [][]any{{1, "A"}, {2, "B"}, {3, "C"}, {4, "error"}, {100, 0}, {101, 1}, {102, ""}, {105, 5}})
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
@@ -280,6 +283,7 @@ func TestUnsignedIntegers(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them via replication
 	tb.Insert(ctx, t, tableName, [][]any{{1, "222", "55555", "11111111", "3333333333", "17777777777777777777"}})
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })

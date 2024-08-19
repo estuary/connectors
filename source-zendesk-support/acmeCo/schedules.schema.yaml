@@ -1,0 +1,51 @@
+---
+type:
+  - object
+required:
+  - id
+properties:
+  id:
+    type: integer
+  name:
+    type:
+      - "null"
+      - string
+  intervals:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        start_time:
+          type:
+            - "null"
+            - integer
+        end_time:
+          type:
+            - "null"
+            - integer
+  time_zone:
+    type:
+      - "null"
+      - string
+  created_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  updated_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+x-infer-schema: true

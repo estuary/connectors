@@ -58,6 +58,7 @@ func NewSQLiteDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlite",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, _ json.RawMessage, _ string) (*sql.Endpoint, error) {
 			var path = databasePath
 
@@ -87,6 +88,7 @@ func NewSQLiteDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: func(context.Context, any, string) *sql.PrereqErr { return &sql.PrereqErr{} },
 	}
 }
 
@@ -108,10 +110,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 		func(in []string) []string { return in },
 		func(in string) string { return in },
 	), nil
-}
-
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
-	return &sql.PrereqErr{}
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {

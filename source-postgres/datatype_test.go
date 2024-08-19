@@ -29,8 +29,10 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `serial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},      // non-nullable
 		{ColumnType: `smallserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`}, // non-nullable
 		{ColumnType: `bigserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},   // non-nullable
-		{ColumnType: `real`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `123.456`},
-		{ColumnType: `double precision`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `real`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `double precision`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `real`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
+		{ColumnType: `double precision`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
 
 		{ColumnType: `decimal`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123.456"`},
 		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123.456"`},
@@ -122,11 +124,11 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `char(5) ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{foo, bar}`, ExpectValue: `{"dimensions":[2],"elements":["foo  ","bar  "]}`},
 		{ColumnType: `cidr ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{192.168.100.0/24, 2001:4f8:3:ba::/64}`, ExpectValue: `{"dimensions":[2],"elements":["192.168.100.0/24","2001:4f8:3:ba::/64"]}`},
 		{ColumnType: `date ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"date-time"}`), InputValue: []interface{}{`2022-01-09`, `2022-01-10`}, ExpectValue: `{"dimensions":[2],"elements":["2022-01-09T00:00:00Z","2022-01-10T00:00:00Z"]}`},
-		{ColumnType: `double precision ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{1.23, 4.56}, ExpectValue: `{"dimensions":[2],"elements":[1.23,4.56]}`},
+		{ColumnType: `double precision ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","string","null"],"format":"number"}`), InputValue: []interface{}{1.23, 4.56}, ExpectValue: `{"dimensions":[2],"elements":[1.23,4.56]}`},
 		{ColumnType: `inet ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`192.168.100.0/24`, `2001:4f8:3:ba::/64`}, ExpectValue: `{"dimensions":[2],"elements":["192.168.100.0/24","2001:4f8:3:ba::/64"]}`},
 		{ColumnType: `integer ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{1, 2, nil, 4}, ExpectValue: `{"dimensions":[4],"elements":[1,2,null,4]}`},
 		{ColumnType: `numeric ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"number"}`), InputValue: []interface{}{`123.456`, `-789.0123`}, ExpectValue: `{"dimensions":[2],"elements":["123.456","-789.0123"]}`},
-		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{123.456, 789.012}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.012]}`},
+		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","string","null"],"format":"number"}`), InputValue: []interface{}{123.456, 789.012}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.012]}`},
 		{ColumnType: `smallint ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{123, 456, 789}, ExpectValue: `{"dimensions":[3],"elements":[123,456,789]}`},
 		{ColumnType: `text ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`Hello, world!`, `asdf`}, ExpectValue: `{"dimensions":[2],"elements":["Hello, world!","asdf"]}`},
 		{ColumnType: `uuid ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"uuid"}`), InputValue: []interface{}{`a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11`}, ExpectValue: `{"dimensions":[1],"elements":["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"]}`},

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = snowflakeDialect("public")
+var testDialect = snowflakeDialect("public", timestampLTZ)
 
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec

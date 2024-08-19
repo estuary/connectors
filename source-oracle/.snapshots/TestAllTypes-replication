@@ -1,0 +1,9 @@
+# ================================
+# Collection "acmeCo/test/flow_test_logminer_t18110541": 1 Documents
+# ================================
+{"DATEONLY":"2022-01-01T00:00:00","DATETIME":"1998-01-01T13:00:00","DOUBLE_PRECISION":"123456789.123457","FLOAT_126":"123456789.123457","INTEG":"18446744073709551615","INTERVAL_DAY":"+01 02:03:04.567000","INTERVAL_YEAR":"+1234-05","NUM":"123456789.123457","NUM15":123456789123456,"NUM19":"1234567891234567891","NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')","R":"dGVzdGluZyByYXcgdmFsdWU=","REAL_NUM":"123456789.123457","SINGLE_NCHAR":"a","SMALL_INT":"123456789","TS":"2022-01-01T13:00:00","TS_LOCAL_TZ":"2022-01-01T12:00:00","TS_LOCAL_TZ_NINE":"2022-01-01T12:00:00","TS_NINE":"2022-01-01T13:00:00.123456789","TS_TZ":"2022-01-01T12:00:00Z","TS_TZ_NINE":"2022-01-01T12:00:00.123456789Z","VCAHR2":"varchar2 value","VCHAR":"varchar value","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT18110541":{"backfilled":1,"mode":"Active"}},"cursor":"11111111"}
+
