@@ -45,7 +45,6 @@ func TestMain(m *testing.M) {
 	} else {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	fixMysqlLogging()
 
 	os.Exit(m.Run())
 }

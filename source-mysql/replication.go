@@ -80,6 +80,9 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		// and fail+restart the capture within a few minutes at worst.
 		HeartbeatPeriod: 30 * time.Second,
 		ReadTimeout:     5 * time.Minute,
+
+		// Output replication log messages with Logrus the same as our own connector messages.
+		Logger: logrus.StandardLogger(),
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
