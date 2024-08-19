@@ -56,7 +56,6 @@ require (
 	github.com/rockset/rockset-go-client v0.15.4
 	github.com/segmentio/encoding v0.4.0
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
-	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/sijms/go-ora/v2 v2.8.19
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snowflakedb/gosnowflake v1.10.0
@@ -199,6 +198,7 @@ require (
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
+	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
