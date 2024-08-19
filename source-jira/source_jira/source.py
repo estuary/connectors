@@ -13,6 +13,7 @@ from airbyte_cdk.sources import AbstractSource
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http.auth import BasicHttpAuthenticator
 from airbyte_cdk.utils.traced_exception import AirbyteTracedException
+from datetime import datetime
 from pydantic.error_wrappers import ValidationError
 
 from .streams import (
@@ -75,15 +76,16 @@ from .streams import (
 )
 from .utils import read_full_refresh
 
-logger = logging.getLogger("airbyte")
+logger = logging.getLogger("airbyte").setLevel("DEBUG")
 
 
 class SourceJira(AbstractSource):
     def _validate_and_transform(self, config: Mapping[str, Any]):
         start_date = config.get("start_date")
-        if start_date:
+        if type(start_date) == str:
             config["start_date"] = pendulum.parse(start_date)
-        config["lookback_window_minutes"] = pendulum.duration(minutes=config.get("lookback_window_minutes", 0))
+        if type(config["lookback_window_minutes"]) == int:
+            config["lookback_window_minutes"] = pendulum.duration(minutes=config.get("lookback_window_minutes", 0))
         config["projects"] = config.get("projects", [])
         return config
 

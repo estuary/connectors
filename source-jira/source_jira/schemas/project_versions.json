@@ -4,10 +4,7 @@
   "properties": {
     "expand": {
       "description": "Use expand parameter to include additional information about the version in the response. Optional field for creation and update. Expand options include operations and issuesstatus.",
-      "type": ["string", "null"],
-      "xml": {
-        "attribute": true
-      }
+      "type": ["string", "null"]
     },
     "self": {
       "description": "The URL of the version.",

@@ -5,10 +5,7 @@
     "expand": {
       "description": "Expand options that include additional issue details in the response.",
       "type": "string",
-      "readOnly": true,
-      "xml": {
-        "attribute": true
-      }
+      "readOnly": true
     },
     "id": {
       "description": "The unique ID of the issue.",

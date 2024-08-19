@@ -12,7 +12,7 @@
       "type": "string",
       "readOnly": true
     },
-    "descriptionI18nKey": {
+    "descriptionKey": {
       "description": "The key of the project type's description.",
       "type": "string",
       "readOnly": true
