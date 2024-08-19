@@ -22,6 +22,7 @@ on:
       - "source-stripe-native/**"
       - "source-zendesk-support/**"
       - "source-iterable/**"
+      - "source-pendo/**"
   pull_request:
     branches: [main]
     paths:
@@ -45,6 +46,7 @@ on:
       - "source-stripe-native/**"
       - "source-zendesk-support/**"
       - "source-iterable/**"
+      - "source-pendo/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -127,6 +129,10 @@ jobs:
           - name: source-iterable
             type: capture
             version: v2
+            usage_rate: "1.0"
+          - name: source-pendo
+            type: capture
+            version: v1
             usage_rate: "1.0"
 
     steps:
