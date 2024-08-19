@@ -63,6 +63,35 @@ class ResourceConfig(common.BaseResourceConfig, extra="forbid"):
         alias="cursorField", title="Cursor Field", default=None
     )
 
+    @classmethod
+    def model_json_schema(cls: "ResourceConfig") -> dict:
+        from estuary_cdk.pydantic_polyfill import VERSION
+
+        sch = super().model_json_schema()
+
+        if VERSION == "v2":
+            # TODO(whb): Pydantic V2 represents the schema of unions using
+            # `anyOf`, which is different than Pydantic V1 (see
+            # https://github.com/pydantic/pydantic/issues/656). While
+            # technically correct, this causes problems when rending the JSON
+            # form in the UI, so this patches the schema to work around it for
+            # imports that use Pydantic V2.
+            sch["properties"]["namespace"] = {
+                "title": "Namespace",
+                "description": "Enclosing schema namespace of this resource",
+                "type": "string"
+            }
+
+            sch["properties"]["cursorField"] = {
+                "title": "Cursor Field",
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            }
+
+        return sch
+
     def path(self) -> list[str]:
         if self.namespace:
             return [self.namespace, self.stream]
