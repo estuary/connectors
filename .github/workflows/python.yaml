@@ -20,6 +20,7 @@ on:
       - "source-klaviyo/**"
       - "source-recharge/**"
       - "source-stripe-native/**"
+      - "source-jira/**"
   pull_request:
     branches: [main]
     paths:
@@ -41,6 +42,7 @@ on:
       - "source-klaviyo/**"
       - "source-recharge/**"
       - "source-stripe-native/**"
+      - "source-jira/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -115,6 +117,10 @@ jobs:
           - name: source-stripe-native
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-jira
+            type: capture
+            version: v2
             usage_rate: "1.0"
 
     steps:
