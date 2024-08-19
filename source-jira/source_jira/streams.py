@@ -7,6 +7,7 @@ import urllib.parse as urlparse
 from abc import ABC
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Union
 from urllib.parse import parse_qsl
+from copy import deepcopy
 
 import pendulum
 import requests
@@ -409,6 +410,7 @@ class Issues(IncrementalJiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-get
     """
 
+    state_checkpoint_interval = 10000
     cursor_field = "updated"
     extract_field = "issues"
     use_cache = True
@@ -625,7 +627,7 @@ class IssueNavigatorSettings(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-navigator-settings/#api-rest-api-3-settings-columns-get
     """
 
-    primary_key = None
+    primary_key = "value"
 
     def path(self, **kwargs) -> str:
         return "settings/columns"
@@ -830,7 +832,7 @@ class IssueVotes(StartDateJiraStream):
     """
 
     # extract_field = "voters"
-    primary_key = None
+    primary_key = "self"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -861,7 +863,7 @@ class IssueWatchers(StartDateJiraStream):
     """
 
     # extract_field = "watchers"
-    primary_key = None
+    primary_key = "self"
     skip_http_status_codes = [
         # Issue is not found or the user does not have permission to view it.
         requests.codes.NOT_FOUND,
@@ -1124,10 +1126,17 @@ class ProjectTypes(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-project-types/#api-rest-api-3-project-type-get
     """
 
-    primary_key = None
+    primary_key = "self"
 
     def path(self, **kwargs) -> str:
         return "project/type"
+
+    def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
+        for project in super().read_records(**kwargs):
+            if project.get("descriptionI18nKey"):
+                project["descriptionKey"] = deepcopy(project["descriptionI18nKey"])
+                del project["descriptionI18nKey"]
+                yield project
 
 
 class ProjectVersions(JiraStream):
@@ -1453,9 +1462,22 @@ class Workflows(JiraStream):
     """
 
     extract_field = "values"
+    primary_key = "entity_id"
 
     def path(self, **kwargs) -> str:
         return "workflow/search"
+
+    def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
+        try:
+            for record in super().read_records(**kwargs):
+                record["entity_id"] = record["id"]["entityId"]
+                yield record
+        except HTTPError as e:
+            if not (self.skip_http_status_codes and e.response.status_code in self.skip_http_status_codes):
+                raise e
+            errors = e.response.json().get("errorMessages")
+            custom_error = self._get_custom_error(e.response)
+            self.logger.warning(f"Stream `{self.name}`. An error occurred, details: {errors}. Skipping for now. {custom_error}")
 
 
 class WorkflowSchemes(JiraStream):

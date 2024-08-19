@@ -5,11 +5,7 @@
     "expand": {
       "description": "Expand options that include additional project details in the response.",
       "type": "string",
-      "readOnly": true,
-      "xml": {
-        "description": "Data in XML format for expanded project details.",
-        "attribute": true
-      }
+      "readOnly": true
     },
     "self": {
       "description": "The URL of the project details.",

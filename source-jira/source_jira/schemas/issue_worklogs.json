@@ -33,7 +33,7 @@
           "type": "string"
         },
         "emailAddress": {
-          "description": "The email address of the user. Depending on the user\u2019s privacy settings, this may be returned as null.",
+          "description": "The email address of the user. Depending on the user’s privacy settings, this may be returned as null.",
           "type": "string",
           "readOnly": true
         },
@@ -61,7 +61,7 @@
           }
         },
         "displayName": {
-          "description": "The display name of the user. Depending on the user\u2019s privacy settings, this may return an alternative value.",
+          "description": "The display name of the user. Depending on the user’s privacy settings, this may return an alternative value.",
           "type": "string",
           "readOnly": true
         },
@@ -71,7 +71,7 @@
           "readOnly": true
         },
         "timeZone": {
-          "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy settings, this may be returned as null.",
+          "description": "The time zone specified in the user's profile. Depending on the user’s privacy settings, this may be returned as null.",
           "type": "string",
           "readOnly": true
         },
@@ -108,7 +108,7 @@
           "type": "string"
         },
         "emailAddress": {
-          "description": "The email address of the user. Depending on the user\u2019s privacy settings, this may be returned as null.",
+          "description": "The email address of the user. Depending on the user’s privacy settings, this may be returned as null.",
           "type": "string",
           "readOnly": true
         },
@@ -136,7 +136,7 @@
           }
         },
         "displayName": {
-          "description": "The display name of the user. Depending on the user\u2019s privacy settings, this may return an alternative value.",
+          "description": "The display name of the user. Depending on the user’s privacy settings, this may return an alternative value.",
           "type": "string",
           "readOnly": true
         },
@@ -146,7 +146,7 @@
           "readOnly": true
         },
         "timeZone": {
-          "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy settings, this may be returned as null.",
+          "description": "The time zone specified in the user's profile. Depending on the user’s privacy settings, this may be returned as null.",
           "type": "string",
           "readOnly": true
         },

@@ -123,10 +123,7 @@
           "type": "object",
           "properties": {
             "size": {
-              "type": "integer",
-              "xml": {
-                "attribute": true
-              }
+              "type": "integer"
             },
             "items": {
               "type": "array",
@@ -152,11 +149,7 @@
               "type": "object"
             },
             "max-results": {
-              "type": "integer",
-              "xml": {
-                "name": "max-results",
-                "attribute": true
-              }
+              "type": "integer"
             }
           }
         },
@@ -166,10 +159,7 @@
           "type": "object",
           "properties": {
             "size": {
-              "type": "integer",
-              "xml": {
-                "attribute": true
-              }
+              "type": "integer"
             },
             "items": {
               "type": "array",
@@ -241,21 +231,14 @@
               "type": "object"
             },
             "max-results": {
-              "type": "integer",
-              "xml": {
-                "name": "max-results",
-                "attribute": true
-              }
+              "type": "integer"
             }
           }
         },
         "expand": {
           "description": "Expand options that include additional user details in the response.",
           "type": "string",
-          "readOnly": true,
-          "xml": {
-            "attribute": true
-          }
+          "readOnly": true
         }
       }
     },

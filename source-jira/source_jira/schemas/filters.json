@@ -55,7 +55,7 @@
         },
         "emailAddress": {
           "type": "string",
-          "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+          "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
           "readOnly": true
         },
         "avatarUrls": {
@@ -83,7 +83,7 @@
         },
         "displayName": {
           "type": "string",
-          "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+          "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
           "readOnly": true
         },
         "active": {
@@ -93,12 +93,12 @@
         },
         "timeZone": {
           "type": "string",
-          "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+          "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
           "readOnly": true
         },
         "locale": {
           "type": "string",
-          "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+          "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
           "readOnly": true
         },
         "groups": {
@@ -107,10 +107,7 @@
           "type": "object",
           "properties": {
             "size": {
-              "type": "integer",
-              "xml": {
-                "attribute": true
-              }
+              "type": "integer"
             },
             "items": {
               "type": "array",
@@ -136,11 +133,7 @@
               "type": "object"
             },
             "max-results": {
-              "type": "integer",
-              "xml": {
-                "name": "max-results",
-                "attribute": true
-              }
+              "type": "integer"
             }
           }
         },
@@ -150,10 +143,7 @@
           "type": "object",
           "properties": {
             "size": {
-              "type": "integer",
-              "xml": {
-                "attribute": true
-              }
+              "type": "integer"
             },
             "items": {
               "type": "array",
@@ -225,21 +215,14 @@
               "type": "object"
             },
             "max-results": {
-              "type": "integer",
-              "xml": {
-                "name": "max-results",
-                "attribute": true
-              }
+              "type": "integer"
             }
           }
         },
         "expand": {
           "type": "string",
           "description": "Expand options that include additional user details in the response.",
-          "readOnly": true,
-          "xml": {
-            "attribute": true
-          }
+          "readOnly": true
         }
       }
     },
@@ -299,10 +282,7 @@
               "expand": {
                 "type": "string",
                 "description": "Expand options that include additional project details in the response.",
-                "readOnly": true,
-                "xml": {
-                  "attribute": true
-                }
+                "readOnly": true
               },
               "self": {
                 "type": "string",
@@ -354,7 +334,7 @@
                   },
                   "emailAddress": {
                     "type": "string",
-                    "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "avatarUrls": {
@@ -382,7 +362,7 @@
                   },
                   "displayName": {
                     "type": "string",
-                    "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                    "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                     "readOnly": true
                   },
                   "active": {
@@ -392,12 +372,12 @@
                   },
                   "timeZone": {
                     "type": "string",
-                    "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "locale": {
                     "type": "string",
-                    "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "groups": {
@@ -406,10 +386,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -435,11 +412,7 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
@@ -449,10 +422,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -524,21 +494,14 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
                   "expand": {
                     "type": "string",
                     "description": "Expand options that include additional user details in the response.",
-                    "readOnly": true,
-                    "xml": {
-                      "attribute": true
-                    }
+                    "readOnly": true
                   }
                 }
               },
@@ -598,7 +561,7 @@
                         },
                         "emailAddress": {
                           "type": "string",
-                          "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "avatarUrls": {
@@ -626,7 +589,7 @@
                         },
                         "displayName": {
                           "type": "string",
-                          "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                          "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                           "readOnly": true
                         },
                         "active": {
@@ -636,12 +599,12 @@
                         },
                         "timeZone": {
                           "type": "string",
-                          "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "locale": {
                           "type": "string",
-                          "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "groups": {
@@ -650,10 +613,7 @@
                           "type": "object",
                           "properties": {
                             "size": {
-                              "type": "integer",
-                              "xml": {
-                                "attribute": true
-                              }
+                              "type": "integer"
                             },
                             "items": {
                               "type": "array",
@@ -679,11 +639,7 @@
                               "type": "object"
                             },
                             "max-results": {
-                              "type": "integer",
-                              "xml": {
-                                "name": "max-results",
-                                "attribute": true
-                              }
+                              "type": "integer"
                             }
                           }
                         },
@@ -693,10 +649,7 @@
                           "type": "object",
                           "properties": {
                             "size": {
-                              "type": "integer",
-                              "xml": {
-                                "attribute": true
-                              }
+                              "type": "integer"
                             },
                             "items": {
                               "type": "array",
@@ -768,21 +721,14 @@
                               "type": "object"
                             },
                             "max-results": {
-                              "type": "integer",
-                              "xml": {
-                                "name": "max-results",
-                                "attribute": true
-                              }
+                              "type": "integer"
                             }
                           }
                         },
                         "expand": {
                           "type": "string",
                           "description": "Expand options that include additional user details in the response.",
-                          "readOnly": true,
-                          "xml": {
-                            "attribute": true
-                          }
+                          "readOnly": true
                         }
                       }
                     },
@@ -837,7 +783,7 @@
                         },
                         "emailAddress": {
                           "type": "string",
-                          "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "avatarUrls": {
@@ -865,7 +811,7 @@
                         },
                         "displayName": {
                           "type": "string",
-                          "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                          "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                           "readOnly": true
                         },
                         "active": {
@@ -875,12 +821,12 @@
                         },
                         "timeZone": {
                           "type": "string",
-                          "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "locale": {
                           "type": "string",
-                          "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "groups": {
@@ -889,10 +835,7 @@
                           "type": "object",
                           "properties": {
                             "size": {
-                              "type": "integer",
-                              "xml": {
-                                "attribute": true
-                              }
+                              "type": "integer"
                             },
                             "items": {
                               "type": "array",
@@ -918,11 +861,7 @@
                               "type": "object"
                             },
                             "max-results": {
-                              "type": "integer",
-                              "xml": {
-                                "name": "max-results",
-                                "attribute": true
-                              }
+                              "type": "integer"
                             }
                           }
                         },
@@ -932,10 +871,7 @@
                           "type": "object",
                           "properties": {
                             "size": {
-                              "type": "integer",
-                              "xml": {
-                                "attribute": true
-                              }
+                              "type": "integer"
                             },
                             "items": {
                               "type": "array",
@@ -1007,21 +943,14 @@
                               "type": "object"
                             },
                             "max-results": {
-                              "type": "integer",
-                              "xml": {
-                                "name": "max-results",
-                                "attribute": true
-                              }
+                              "type": "integer"
                             }
                           }
                         },
                         "expand": {
                           "type": "string",
                           "description": "Expand options that include additional user details in the response.",
-                          "readOnly": true,
-                          "xml": {
-                            "attribute": true
-                          }
+                          "readOnly": true
                         }
                       }
                     },
@@ -1067,7 +996,7 @@
                         },
                         "emailAddress": {
                           "type": "string",
-                          "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "avatarUrls": {
@@ -1095,7 +1024,7 @@
                         },
                         "displayName": {
                           "type": "string",
-                          "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                          "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                           "readOnly": true
                         },
                         "active": {
@@ -1105,12 +1034,12 @@
                         },
                         "timeZone": {
                           "type": "string",
-                          "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "locale": {
                           "type": "string",
-                          "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                          "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                           "readOnly": true
                         },
                         "groups": {
@@ -1119,10 +1048,7 @@
                           "type": "object",
                           "properties": {
                             "size": {
-                              "type": "integer",
-                              "xml": {
-                                "attribute": true
-                              }
+                              "type": "integer"
                             },
                             "items": {
                               "type": "array",
@@ -1148,11 +1074,7 @@
                               "type": "object"
                             },
                             "max-results": {
-                              "type": "integer",
-                              "xml": {
-                                "name": "max-results",
-                                "attribute": true
-                              }
+                              "type": "integer"
                             }
                           }
                         },
@@ -1162,10 +1084,7 @@
                           "type": "object",
                           "properties": {
                             "size": {
-                              "type": "integer",
-                              "xml": {
-                                "attribute": true
-                              }
+                              "type": "integer"
                             },
                             "items": {
                               "type": "array",
@@ -1237,21 +1156,14 @@
                               "type": "object"
                             },
                             "max-results": {
-                              "type": "integer",
-                              "xml": {
-                                "name": "max-results",
-                                "attribute": true
-                              }
+                              "type": "integer"
                             }
                           }
                         },
                         "expand": {
                           "type": "string",
                           "description": "Expand options that include additional user details in the response.",
-                          "readOnly": true,
-                          "xml": {
-                            "attribute": true
-                          }
+                          "readOnly": true
                         }
                       }
                     },
@@ -1451,10 +1363,7 @@
                   "properties": {
                     "expand": {
                       "type": "string",
-                      "description": "Use [expand](em>#expansion) to include additional information about version in the response. This parameter accepts a comma-separated list. Expand options include:\n\n *  `operations` Returns the list of operations available for this version.\n *  `issuesstatus` Returns the count of issues in this version for each of the status categories *to do*, *in progress*, *done*, and *unmapped*. The *unmapped* property contains a count of issues with a status other than *to do*, *in progress*, and *done*.\n\nOptional for create and update.",
-                      "xml": {
-                        "attribute": true
-                      }
+                      "description": "Use [expand](em>#expansion) to include additional information about version in the response. This parameter accepts a comma-separated list. Expand options include:\n\n *  `operations` Returns the list of operations available for this version.\n *  `issuesstatus` Returns the count of issues in this version for each of the status categories *to do*, *in progress*, *done*, and *unmapped*. The *unmapped* property contains a count of issues with a status other than *to do*, *in progress*, and *done*.\n\nOptional for create and update."
                     },
                     "self": {
                       "type": "string",
@@ -1800,7 +1709,7 @@
                   },
                   "emailAddress": {
                     "type": "string",
-                    "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "avatarUrls": {
@@ -1828,7 +1737,7 @@
                   },
                   "displayName": {
                     "type": "string",
-                    "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                    "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                     "readOnly": true
                   },
                   "active": {
@@ -1838,12 +1747,12 @@
                   },
                   "timeZone": {
                     "type": "string",
-                    "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "locale": {
                     "type": "string",
-                    "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "groups": {
@@ -1852,10 +1761,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -1881,11 +1787,7 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
@@ -1895,10 +1797,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -1970,21 +1869,14 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
                   "expand": {
                     "type": "string",
                     "description": "Expand options that include additional user details in the response.",
-                    "readOnly": true,
-                    "xml": {
-                      "attribute": true
-                    }
+                    "readOnly": true
                   }
                 }
               },
@@ -2030,7 +1922,7 @@
                   },
                   "emailAddress": {
                     "type": "string",
-                    "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "avatarUrls": {
@@ -2058,7 +1950,7 @@
                   },
                   "displayName": {
                     "type": "string",
-                    "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                    "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                     "readOnly": true
                   },
                   "active": {
@@ -2068,12 +1960,12 @@
                   },
                   "timeZone": {
                     "type": "string",
-                    "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "locale": {
                     "type": "string",
-                    "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                    "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                     "readOnly": true
                   },
                   "groups": {
@@ -2082,10 +1974,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -2111,11 +2000,7 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
@@ -2125,10 +2010,7 @@
                     "type": "object",
                     "properties": {
                       "size": {
-                        "type": "integer",
-                        "xml": {
-                          "attribute": true
-                        }
+                        "type": "integer"
                       },
                       "items": {
                         "type": "array",
@@ -2200,21 +2082,14 @@
                         "type": "object"
                       },
                       "max-results": {
-                        "type": "integer",
-                        "xml": {
-                          "name": "max-results",
-                          "attribute": true
-                        }
+                        "type": "integer"
                       }
                     }
                   },
                   "expand": {
                     "type": "string",
                     "description": "Expand options that include additional user details in the response.",
-                    "readOnly": true,
-                    "xml": {
-                      "attribute": true
-                    }
+                    "readOnly": true
                   }
                 }
               }
@@ -2257,7 +2132,7 @@
                     },
                     "displayName": {
                       "type": "string",
-                      "description": "The display name of the role actor. For users, depending on the user\u2019s privacy setting, this may return an alternative value for the user's name.",
+                      "description": "The display name of the role actor. For users, depending on the user’s privacy setting, this may return an alternative value for the user's name.",
                       "readOnly": true
                     },
                     "type": {
@@ -2506,7 +2381,7 @@
               },
               "emailAddress": {
                 "type": "string",
-                "description": "The email address of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                "description": "The email address of the user. Depending on the user’s privacy setting, this may be returned as null.",
                 "readOnly": true
               },
               "avatarUrls": {
@@ -2534,7 +2409,7 @@
               },
               "displayName": {
                 "type": "string",
-                "description": "The display name of the user. Depending on the user\u2019s privacy setting, this may return an alternative value.",
+                "description": "The display name of the user. Depending on the user’s privacy setting, this may return an alternative value.",
                 "readOnly": true
               },
               "active": {
@@ -2544,12 +2419,12 @@
               },
               "timeZone": {
                 "type": "string",
-                "description": "The time zone specified in the user's profile. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                "description": "The time zone specified in the user's profile. Depending on the user’s privacy setting, this may be returned as null.",
                 "readOnly": true
               },
               "locale": {
                 "type": "string",
-                "description": "The locale of the user. Depending on the user\u2019s privacy setting, this may be returned as null.",
+                "description": "The locale of the user. Depending on the user’s privacy setting, this may be returned as null.",
                 "readOnly": true
               },
               "groups": {
@@ -2558,10 +2433,7 @@
                 "type": "object",
                 "properties": {
                   "size": {
-                    "type": "integer",
-                    "xml": {
-                      "attribute": true
-                    }
+                    "type": "integer"
                   },
                   "items": {
                     "type": "array",
@@ -2587,11 +2459,7 @@
                     "type": "object"
                   },
                   "max-results": {
-                    "type": "integer",
-                    "xml": {
-                      "name": "max-results",
-                      "attribute": true
-                    }
+                    "type": "integer"
                   }
                 }
               },
@@ -2601,10 +2469,7 @@
                 "type": "object",
                 "properties": {
                   "size": {
-                    "type": "integer",
-                    "xml": {
-                      "attribute": true
-                    }
+                    "type": "integer"
                   },
                   "items": {
                     "type": "array",
@@ -2676,21 +2541,14 @@
                     "type": "object"
                   },
                   "max-results": {
-                    "type": "integer",
-                    "xml": {
-                      "name": "max-results",
-                      "attribute": true
-                    }
+                    "type": "integer"
                   }
                 }
               },
               "expand": {
                 "type": "string",
                 "description": "Expand options that include additional user details in the response.",
-                "readOnly": true,
-                "xml": {
-                  "attribute": true
-                }
+                "readOnly": true
               }
             }
           },
