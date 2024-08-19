@@ -81,7 +81,10 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 
 	var conn *client.Conn
 	var err error
-	var withTLS = func(c *client.Conn) { c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true}) }
+	var withTLS = func(c *client.Conn) error {
+		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+		return nil
+	}
 	if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName, withTLS); err == nil {
 		log.WithField("addr", cfg.Address).Debug("connected with TLS")
 	} else if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName); err == nil {
