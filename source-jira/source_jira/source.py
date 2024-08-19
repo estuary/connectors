@@ -84,7 +84,7 @@ class SourceJira(AbstractSource):
         start_date = config.get("start_date")
         if type(start_date) == str:
             config["start_date"] = pendulum.parse(start_date)
-        if type(config["lookback_window_minutes"]) == int:
+        if type(config.get("lookback_window_minutes")) == int:
             config["lookback_window_minutes"] = pendulum.duration(minutes=config.get("lookback_window_minutes", 0))
         config["projects"] = config.get("projects", [])
         return config
