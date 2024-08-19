@@ -42,7 +42,9 @@ var databricksDialect = func() sql.Dialect {
 			sql.OBJECT:   jsonMapper,
 			sql.MULTIPLE: jsonMapper,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
+				// We used to materialize these as "LONG", so pre-existing
+				// columns of that type are allowed for backward-compatibility.
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("decimal", "long"), sql.UsingConverter(sql.StrToInt)),
 				sql.MapStatic("STRING", sql.UsingConverter(sql.ToStr)),
 				38,
 			),

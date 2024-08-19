@@ -69,7 +69,10 @@ var bqDialect = func() sql.Dialect {
 				sql.MapStatic("INTEGER", sql.UsingConverter(sql.CheckedInt64)),
 				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
 			),
-			sql.NUMBER:   sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float")),
+			// We used to materialize these as "BIGNUMERIC(38,0)", so
+			// pre-existing columns of that type are allowed for
+			// backward-compatibility.
+			sql.NUMBER:   sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float", "bignumeric")),
 			sql.OBJECT:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
 			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
