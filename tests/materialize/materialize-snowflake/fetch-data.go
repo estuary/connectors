@@ -85,6 +85,10 @@ func main() {
 		log.Fatal(fmt.Errorf("connecting to snowflake: %w", err))
 	}
 
+	if _, err := db.ExecContext(ctx, "ALTER SESSION SET TIMEZONE = 'UTC';"); err != nil {
+		log.Fatal(fmt.Errorf("setting timezone: %w", err))
+	}
+
 	// Handle cleanup cases of for dropping a table and deleting the stored materialization spec &
 	// checkpoint if flags were provided.
 	if *deleteTable {

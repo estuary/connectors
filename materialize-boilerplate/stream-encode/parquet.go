@@ -564,6 +564,8 @@ func getNumberVal(val any) (got float64, err error) {
 		got = v
 	case float32:
 		got = float64(v)
+	case int64:
+		got = float64(v)
 	case string:
 		if p, parseErr := strconv.ParseFloat(v, 64); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as float64: %w", v, parseErr)

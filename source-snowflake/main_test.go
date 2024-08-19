@@ -116,6 +116,8 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	return &testBackend{control: conn, config: captureConfig}
 }
 
+func (tb *testBackend) UpperCaseMode() bool { return false }
+
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"rowid":"ffffffffffffffffffffffffffffffffffffffff"`] = regexp.MustCompile(`"rowid":"[0-9a-fA-F]{32,}"`)

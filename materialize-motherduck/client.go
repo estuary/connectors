@@ -127,17 +127,25 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return sql.StdCreateSchema(ctx, c.db, duckDialect, schemaName)
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+
+	db, err := cfg.db(ctx)
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := c.db.PingContext(pingCtx); err != nil {
+	if err := db.PingContext(pingCtx); err != nil {
 		errs.Err(err)
 	}
 
-	s3client, err := c.cfg.toS3Client(ctx)
+	s3client, err := cfg.toS3Client(ctx)
 	if err != nil {
 		// This is not caused by invalid S3 credentials, and would most likely be a logic error in
 		// the connector code.
@@ -146,11 +154,11 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	}
 
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
-	testKey := path.Join(c.cfg.BucketPath, uuid.NewString())
+	testKey := path.Join(cfg.BucketPath, uuid.NewString())
 
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(c.cfg.Bucket),
+		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
@@ -158,26 +166,26 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
 			// exist but the configured credentials aren't authorized to write to it.
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
-				err = fmt.Errorf("bucket %q does not exist", c.cfg.Bucket)
+				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to %q", path.Join(c.cfg.Bucket, c.cfg.BucketPath))
+				err = fmt.Errorf("not authorized to write to %q", path.Join(cfg.Bucket, cfg.BucketPath))
 			}
 		}
 		errs.Err(err)
 	} else if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(c.cfg.Bucket),
+		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to read from %q", path.Join(c.cfg.Bucket, c.cfg.BucketPath))
+			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.BucketPath))
 		}
 		errs.Err(err)
 	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(c.cfg.Bucket),
+		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", path.Join(c.cfg.Bucket, c.cfg.BucketPath))
+			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.BucketPath))
 		}
 		errs.Err(err)
 	}

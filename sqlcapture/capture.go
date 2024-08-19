@@ -551,6 +551,9 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 		if event, ok := event.(*ChangeEvent); ok {
 			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
 				var actual = event.After["watermark"]
+				if actual == nil {
+					actual = event.After["WATERMARK"]
+				}
 				logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
 				if actual == watermark {
 					watermarkReached = true
@@ -823,7 +826,10 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 	var cursor = c.pending.cursors[count-1]
 	c.pending.cursors = c.pending.cursors[count:]
-	logrus.WithField("cursor", cursor).Trace("acknowledged up to cursor")
+	logrus.WithFields(logrus.Fields{
+		"count":  count,
+		"cursor": cursor,
+	}).Debug("acknowledged up to cursor")
 	replStream.Acknowledge(ctx, cursor)
 	return nil
 }

@@ -197,8 +197,12 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 		if !ok {
 			return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
 		}
-	} else if colSchema, ok = column.DataType.(columnSchema); ok {
-		// Nothing else to do since the columnSchema was already determined.
+	} else if dataType, ok := column.DataType.(postgresComplexType); ok {
+		var schema, err = dataType.toColumnSchema(column)
+		if err != nil {
+			return nil, err
+		}
+		colSchema = schema
 	} else {
 		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", column.DataType)
 	}
@@ -248,7 +252,7 @@ type columnSchema struct {
 	contentEncoding string
 	format          string
 	nullable        bool
-	jsonType        string
+	jsonTypes       []string
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
@@ -261,61 +265,65 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
 	}
 
-	if s.jsonType == "" {
-		// No type constraint.
-	} else if s.nullable {
-		out.Extras["type"] = []string{s.jsonType, "null"} // Use variadic form.
-	} else {
-		out.Type = s.jsonType
+	if s.jsonTypes != nil {
+		var types = append([]string(nil), s.jsonTypes...)
+		if s.nullable {
+			types = append(types, "null")
+		}
+		if len(types) == 1 {
+			out.Type = types[0]
+		} else {
+			out.Extras["type"] = types
+		}
 	}
 	return out
 }
 
 var postgresTypeToJSON = map[string]columnSchema{
-	"bool": {jsonType: "boolean"},
+	"bool": {jsonTypes: []string{"boolean"}},
 
-	"int2": {jsonType: "integer"},
-	"int4": {jsonType: "integer"},
-	"int8": {jsonType: "integer"},
+	"int2": {jsonTypes: []string{"integer"}},
+	"int4": {jsonTypes: []string{"integer"}},
+	"int8": {jsonTypes: []string{"integer"}},
 
-	"numeric": {jsonType: "string", format: "number"},
-	"float4":  {jsonType: "number"},
-	"float8":  {jsonType: "number"},
+	"numeric": {jsonTypes: []string{"string"}, format: "number"},
+	"float4":  {jsonTypes: []string{"number", "string"}, format: "number"},
+	"float8":  {jsonTypes: []string{"number", "string"}, format: "number"},
 
-	"varchar": {jsonType: "string"},
-	"bpchar":  {jsonType: "string"},
-	"text":    {jsonType: "string"},
-	"bytea":   {jsonType: "string", contentEncoding: "base64"},
-	"xml":     {jsonType: "string"},
-	"bit":     {jsonType: "string"},
-	"varbit":  {jsonType: "string"},
+	"varchar": {jsonTypes: []string{"string"}},
+	"bpchar":  {jsonTypes: []string{"string"}},
+	"text":    {jsonTypes: []string{"string"}},
+	"bytea":   {jsonTypes: []string{"string"}, contentEncoding: "base64"},
+	"xml":     {jsonTypes: []string{"string"}},
+	"bit":     {jsonTypes: []string{"string"}},
+	"varbit":  {jsonTypes: []string{"string"}},
 
 	"json":     {},
 	"jsonb":    {},
-	"jsonpath": {jsonType: "string"},
+	"jsonpath": {jsonTypes: []string{"string"}},
 
 	// Domain-Specific Types
-	"date":        {jsonType: "string", format: "date-time"},
-	"timestamp":   {jsonType: "string", format: "date-time"},
-	"timestamptz": {jsonType: "string", format: "date-time"},
-	"time":        {jsonType: "integer"},
-	"timetz":      {jsonType: "string", format: "time"},
-	"interval":    {jsonType: "string"},
-	"money":       {jsonType: "string"},
-	"point":       {jsonType: "string"},
-	"line":        {jsonType: "string"},
-	"lseg":        {jsonType: "string"},
-	"box":         {jsonType: "string"},
-	"path":        {jsonType: "string"},
-	"polygon":     {jsonType: "string"},
-	"circle":      {jsonType: "string"},
-	"inet":        {jsonType: "string"},
-	"cidr":        {jsonType: "string"},
-	"macaddr":     {jsonType: "string"},
-	"macaddr8":    {jsonType: "string"},
-	"tsvector":    {jsonType: "string"},
-	"tsquery":     {jsonType: "string"},
-	"uuid":        {jsonType: "string", format: "uuid"},
+	"date":        {jsonTypes: []string{"string"}, format: "date-time"},
+	"timestamp":   {jsonTypes: []string{"string"}, format: "date-time"},
+	"timestamptz": {jsonTypes: []string{"string"}, format: "date-time"},
+	"time":        {jsonTypes: []string{"integer"}},
+	"timetz":      {jsonTypes: []string{"string"}, format: "time"},
+	"interval":    {jsonTypes: []string{"string"}},
+	"money":       {jsonTypes: []string{"string"}},
+	"point":       {jsonTypes: []string{"string"}},
+	"line":        {jsonTypes: []string{"string"}},
+	"lseg":        {jsonTypes: []string{"string"}},
+	"box":         {jsonTypes: []string{"string"}},
+	"path":        {jsonTypes: []string{"string"}},
+	"polygon":     {jsonTypes: []string{"string"}},
+	"circle":      {jsonTypes: []string{"string"}},
+	"inet":        {jsonTypes: []string{"string"}},
+	"cidr":        {jsonTypes: []string{"string"}},
+	"macaddr":     {jsonTypes: []string{"string"}},
+	"macaddr8":    {jsonTypes: []string{"string"}},
+	"tsvector":    {jsonTypes: []string{"string"}},
+	"tsquery":     {jsonTypes: []string{"string"}},
+	"uuid":        {jsonTypes: []string{"string"}, format: "uuid"},
 }
 
 const queryDiscoverTables = `
@@ -401,19 +409,54 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, e
 			// improve this by discovering composite types, building decoders for them, and
 			// registering the decoders with the pgx connection. pgx v5 has new utility methods
 			// specifically for doing this.
+			col.DataType = postgresCompositeType{}
 		case "e": // enum
 			// Enum values are always strings corresponding to an enum label.
-			col.DataType = columnSchema{jsonType: "string"}
+			col.DataType = postgresEnumType{}
 		case "r", "m": // range, multirange
 			// Capture ranges in their text form to retain inclusive (like `[`) & exclusive
 			// (like `(`) bounds information. For example, the text form of a range representing
 			// "integers greater than or equal to 1 but less than 5" is '[1,5)'
-			col.DataType = columnSchema{jsonType: "string"}
+			col.DataType = postgresRangeType{multirange: typtype == "m"}
 		}
 
 		columns = append(columns, col)
 	}
 	return columns, rows.Err()
+}
+
+type postgresComplexType interface {
+	String() string
+	toColumnSchema(info sqlcapture.ColumnInfo) (columnSchema, error)
+}
+
+type postgresEnumType struct{}
+
+func (t postgresEnumType) String() string { return "enum" }
+func (t postgresEnumType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	return columnSchema{jsonTypes: []string{"string"}}, nil
+}
+
+type postgresRangeType struct {
+	multirange bool
+}
+
+func (t postgresRangeType) String() string {
+	if t.multirange {
+		return "multirange"
+	}
+	return "range"
+}
+
+func (t postgresRangeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	return columnSchema{jsonTypes: []string{"string"}}, nil
+}
+
+type postgresCompositeType struct{}
+
+func (t postgresCompositeType) String() string { return "composite" }
+func (t postgresCompositeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	return columnSchema{}, nil
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with

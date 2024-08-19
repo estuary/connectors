@@ -37,8 +37,16 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+
+	db, err := stdsql.Open("mysql", cfg.ToURI())
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
@@ -46,7 +54,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := c.db.PingContext(ctx); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var mysqlErr *mysql.MySQLError
 		var netConnErr *net.DNSError
@@ -58,23 +66,23 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			case 1045:
 				err = fmt.Errorf("incorrect username or password (%d): %s", mysqlErr.Number, mysqlErr.Message)
 			case 1049:
-				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", c.cfg.Database, mysqlErr.Number, mysqlErr.Message)
+				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", cfg.Database, mysqlErr.Number, mysqlErr.Message)
 			case 1044:
-				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", c.cfg.Database, mysqlErr.Number, mysqlErr.Message)
+				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", cfg.Database, mysqlErr.Number, mysqlErr.Message)
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
 		}
 
 		errs.Err(err)
 	} else {
-		var row = c.db.QueryRowContext(ctx, "SELECT @@GLOBAL.local_infile;")
+		var row = db.QueryRowContext(ctx, "SELECT @@GLOBAL.local_infile;")
 		var localInFileEnabled bool
 
 		if err := row.Scan(&localInFileEnabled); err != nil {

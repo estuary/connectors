@@ -19,12 +19,6 @@ type Client interface {
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 
-	// PreReqs performs verification checks that the provided configuration can be used to interact
-	// with the endpoint to the degree required by the connector, to as much of an extent as
-	// possible. The returned PrereqErr can include multiple separate errors if it possible to
-	// determine that there is more than one issue that needs corrected.
-	PreReqs(ctx context.Context) *PrereqErr
-
 	// InfoSchema returns a populated *boilerplate.InfoSchema containing the state of the actual
 	// materialized tables in the schemas referenced by the resourcePaths. It doesn't necessarily
 	// need to include all tables in the entire destination system, but must include all tables in

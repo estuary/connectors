@@ -15,9 +15,11 @@ Binding 0:
           "$anchor": "TestSecondaryIndexDiscovery_index_and_fk_g16025",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             },
             "parent_id": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"

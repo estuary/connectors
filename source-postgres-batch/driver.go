@@ -23,6 +23,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	// When processing large tables we like to emit checkpoints every so often. But
+	// emitting a checkpoint after every row could be a significant drag on overall
+	// throughput, and isn't really needed anyway. So instead we emit one for every
+	// N rows, plus another when the query results are fully processed.
+	documentsPerCheckpoint = 1000
+)
+
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
 // by a config schema, connect function, and value translation logic.
 type BatchSQLDriver struct {
@@ -613,6 +621,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,
+		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("waiting for next scheduled poll")
 	if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
 		return err
@@ -620,7 +629,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	log.WithFields(log.Fields{
 		"name": res.Name,
 		"poll": pollScheduleStr,
-		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("ready to poll")
 
 	var queryBuf = new(strings.Builder)
@@ -634,7 +642,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"args":  cursorValues,
 	}).Info("executing query")
 	var pollTime = time.Now().UTC()
-	state.LastPolled = pollTime
 
 	rows, err := c.DB.QueryContext(ctx, query, cursorValues...)
 	if err != nil {
@@ -713,16 +720,24 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		state.CursorValues = cursorValues
 
 		count++
-	}
-
-	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-		return err
+		if count%documentsPerCheckpoint == 0 {
+			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+				return err
+			}
+		}
 	}
 
 	log.WithFields(log.Fields{
 		"query": query,
 		"count": count,
 	}).Info("query complete")
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error processing results iterator: %w", err)
+	}
+	state.LastPolled = pollTime
+	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+		return err
+	}
 	return nil
 }
 

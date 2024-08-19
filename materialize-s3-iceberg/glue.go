@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
@@ -98,7 +97,11 @@ func (c *glueCatalog) CreateResource(_ context.Context, spec *pf.Materialization
 
 	tc := tableCreate{Location: c.tableLocation}
 
-	parquetSchema := schemaWithOptions(b.FieldSelection.AllFields(), b.Collection)
+	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+	if err != nil {
+		return "", nil, err
+	}
+
 	for _, f := range parquetSchema {
 		tc.Fields = append(tc.Fields, existingIcebergColumn{
 			Name:     f.Name,
@@ -136,6 +139,12 @@ func (c *glueCatalog) DeleteResource(_ context.Context, path []string) (string, 
 }
 
 func (c *glueCatalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 {
+		// Nothing to do, since only adding new columns or dropping nullability
+		// constraints is supported currently.
+		return "", nil, nil
+	}
+
 	b := spec.Bindings[bindingIndex]
 
 	ta := tableAlter{}
@@ -145,7 +154,11 @@ func (c *glueCatalog) UpdateResource(_ context.Context, spec *pf.Materialization
 	}
 
 	for _, p := range bindingUpdate.NewProjections {
-		s := enc.ProjectionToParquetSchemaElement(p, schemaOptions...)
+		s, err := projectionToParquetSchemaElement(p, b.FieldSelection.FieldConfigJsonMap[p.Field])
+		if err != nil {
+			return "", nil, err
+		}
+
 		ta.NewColumns = append(ta.NewColumns, existingIcebergColumn{
 			Name:     s.Name,
 			Nullable: true, // always true for added columns

@@ -488,6 +488,13 @@ type mysqlColumnType struct {
 	Unsigned   bool     `json:"unsigned,omitempty" mapstructure:"unsigned"` // True IFF an integer type is unsigned
 }
 
+func (t *mysqlColumnType) String() string {
+	if t.Unsigned {
+		return t.Type + " unsigned"
+	}
+	return t.Type
+}
+
 func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, error) {
 	logrus.WithFields(logrus.Fields{
 		"type":  fmt.Sprintf("%#v", t),
