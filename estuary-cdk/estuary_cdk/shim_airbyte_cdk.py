@@ -340,9 +340,8 @@ class CaptureShim(BaseCaptureConnector):
                     )
                     continue
 
-                doc = Document(
-                    meta_=Document.Meta(op="u", row_id=entry[1].rowId), **record.data
-                )
+                doc = Document(**record.data)
+                doc.meta_ = Document.Meta(op="u", row_id=entry[1].rowId)
                 entry[1].rowId += 1
 
                 task.captured(entry[0], doc)
