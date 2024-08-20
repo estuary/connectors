@@ -156,9 +156,9 @@ type postgresSource struct {
 
 // Named constants for the LSN locations within a postgresSource.Location.
 const (
-	pgLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
-	pgLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
-	pgLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
+	PGLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
+	PGLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
+	PGLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
 )
 
 func (s *postgresSource) Common() sqlcapture.SourceCommon {
