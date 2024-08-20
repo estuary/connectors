@@ -8,7 +8,6 @@ properties:
       - string
   id:
     type:
-      - "null"
       - string
   name:
     type:
@@ -44,7 +43,6 @@ properties:
       - string
   created_time:
     type: string
-    format: date-time
   hash:
     type:
       - "null"
@@ -63,7 +61,6 @@ properties:
       - string
   updated_time:
     type: string
-    format: date-time
   height:
     type:
       - "null"
@@ -79,4 +76,5 @@ properties:
         type: integer
     required:
       - row_id
-x-infer-schema: true
+required:
+  - id
