@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -49,6 +50,8 @@ type config struct {
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
 
+	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
+
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -75,6 +78,10 @@ func (c *config) Validate() error {
 		if !slices.Contains([]string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
 		}
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -484,6 +491,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			if err := txn.Commit(ctx); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
+			}
+
+			if d.cfg.DBTJobTrigger.Enabled() {
+				log.Info("store: dbt job trigger")
+				if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+					return fmt.Errorf("triggering dbt job: %w", err)
+				}
 			}
 
 			return nil
