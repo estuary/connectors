@@ -124,7 +124,7 @@ func (c *Config) Validate() error {
 	}
 
 	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline}, c.Advanced.DictionaryMode) {
-		return fmt.Errorf("dictionary mode must be one of %s or %s.", DictionaryModeExtract, DictionaryModeOnline)
+		return fmt.Errorf("dictionary mode must be one of %s or %s", DictionaryModeExtract, DictionaryModeOnline)
 	}
 
 	return nil
@@ -210,7 +210,7 @@ type oracleDatabase struct {
 	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
 }
 
-func (db *oracleDatabase) isRDS() bool {
+func (db *oracleDatabase) IsRDS() bool {
 	return strings.Contains(db.config.Address, "rds.amazonaws.com")
 }
 
@@ -218,7 +218,7 @@ func (db *oracleDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
-func (db *oracleDatabase) connect(ctx context.Context) error {
+func (db *oracleDatabase) connect(_ context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":        db.config.Address,
 		"user":           db.config.User,

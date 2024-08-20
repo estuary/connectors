@@ -448,7 +448,7 @@ func (v *correctnessInvariantsCaptureValidator) Output(collection string, data j
 	case "u":
 		change = fmt.Sprintf("Update(%d)", event.Counter)
 	case "d":
-		change = fmt.Sprintf("Delete()")
+		change = "Delete()"
 	default:
 		change = fmt.Sprintf("UnknownOperation(%q)", event.Meta.Operation)
 	}

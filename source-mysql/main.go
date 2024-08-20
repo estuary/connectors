@@ -204,7 +204,7 @@ func (db *mysqlDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
-func (db *mysqlDatabase) connect(ctx context.Context) error {
+func (db *mysqlDatabase) connect(_ context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,

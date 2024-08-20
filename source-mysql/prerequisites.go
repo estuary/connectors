@@ -46,7 +46,7 @@ const (
 	mariadbReqMinorVersion = 3
 )
 
-func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
+func (db *mysqlDatabase) prerequisiteVersion(_ context.Context) error {
 	var minMajor, minMinor = mysqlReqMajorVersion, mysqlReqMinorVersion
 	if db.versionProduct == "MariaDB" {
 		minMajor, minMinor = mariadbReqMajorVersion, mariadbReqMinorVersion

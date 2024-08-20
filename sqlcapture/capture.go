@@ -319,7 +319,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	return nil
 }
 
-func (c *Capture) updateState(ctx context.Context) error {
+func (c *Capture) updateState(_ context.Context) error {
 	// Create the Streams map if nil
 	if c.State.Streams == nil {
 		c.State.Streams = make(map[boilerplate.StateKey]*TableState)

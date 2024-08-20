@@ -174,7 +174,7 @@ func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {
 	// If the user already created the publication we won't try and set the flag, that's their job.
 	// The main reason this might fail is if we're running against a pre-v13 database, which doesn't
 	// have this flag, so we log but ignore any errors here.
-	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true)`)); err != nil {
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" SET (publish_via_partition_root = true)`, pubName)); err != nil {
 		logEntry.WithField("err", err).Warn("unable to set publish_via_partition_root flag (this is normal for versions < 13)")
 	}
 

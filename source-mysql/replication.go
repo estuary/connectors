@@ -731,15 +731,6 @@ func unquoteEnumValues(values []string) []string {
 	return unquoted
 }
 
-func findStr(needle string, cols []string) int {
-	for idx, val := range cols {
-		if val == needle {
-			return idx
-		}
-	}
-	return -1
-}
-
 func resolveTableName(defaultSchema string, name sqlparser.TableName) string {
 	var schema, table = name.Qualifier.String(), name.Name.String()
 	if schema == "" {
