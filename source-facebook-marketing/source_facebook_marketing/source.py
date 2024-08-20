@@ -36,7 +36,9 @@ from source_facebook_marketing.streams import (
 from .utils import validate_end_date, validate_start_date
 
 logger = logging.getLogger("airbyte")
-UNSUPPORTED_FIELDS = {"unique_conversions", "unique_ctr", "unique_clicks"}
+UNSUPPORTED_FIELDS = {"unique_conversions", "unique_ctr", "unique_clicks",
+                      "age_targeting", "gender_targeting", "labels", "location",
+                      "estimated_ad_recall_rate_lower_bound", "estimated_ad_recall_rate_upper_bound", "estimated_ad_recallers_lower_bound", "estimated_ad_recallers_upper_bound" }
 
 
 class SourceFacebookMarketing(AbstractSource):
