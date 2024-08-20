@@ -5,5 +5,5 @@
 # ================================
 # Captures Terminated With Errors
 # ================================
-error updating capture state: table "FLOW_TEST_LOGMINER.T27607177" is a configured binding of this capture, but doesn't exist or isn't visible with current permissions
+error updating capture state: table "flow_test_logminer.t27607177" is a configured binding of this capture, but doesn't exist or isn't visible with current permissions
 

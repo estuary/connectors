@@ -14,6 +14,7 @@ Binding 0:
           "properties": {
             "ID": {
               "format": "integer",
+              "description": "(source type: NUMBER)",
               "type": [
                 "string",
                 "null"

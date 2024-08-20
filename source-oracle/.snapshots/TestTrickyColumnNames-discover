@@ -15,6 +15,7 @@ Binding 0:
           "$anchor": "FLOW_TEST_LOGMINERT39256824",
           "properties": {
             "DATA": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
@@ -22,7 +23,8 @@ Binding 0:
             },
             "`Meta/'wtf'~ID`": {
               "type": "string",
-              "format": "integer"
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
             }
           }
         }
@@ -145,6 +147,7 @@ Binding 1:
           "$anchor": "FLOW_TEST_LOGMINERT42531495",
           "properties": {
             "DATA": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
@@ -152,7 +155,8 @@ Binding 1:
             },
             "table": {
               "type": "string",
-              "format": "integer"
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
             }
           }
         }
