@@ -496,7 +496,11 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 
 	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
-		return fmt.Errorf("unable to parse query %q: %w", query, err)
+		logrus.WithFields(logrus.Fields{
+			"query": query,
+			"err":   err,
+		}).Warn("failed to parse query event, ignoring it")
+		return nil
 	}
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
