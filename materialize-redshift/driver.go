@@ -15,6 +15,7 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
@@ -77,7 +78,10 @@ type config struct {
 	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=10"`
 
 	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	Advanced advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
+	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
 }
@@ -109,6 +113,10 @@ func (c *config) Validate() error {
 	}
 
 	if err := c.Schedule.Validate(c.Advanced.UpdateDelay); err != nil {
+		return err
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
 		return err
 	}
 
@@ -864,6 +872,13 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return errors.New("this instance was fenced off by another")
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
+	}
+
+	if d.cfg.DBTJobTrigger.Enabled() {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+			return fmt.Errorf("triggering dbt job: %w", err)
+		}
 	}
 
 	log.Info("store: finished commit")

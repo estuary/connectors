@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -38,6 +39,8 @@ type config struct {
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
+	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
+
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
@@ -53,6 +56,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -555,6 +562,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
+			}
+
+			if d.cfg.DBTJobTrigger.Enabled() {
+				log.Info("store: dbt job trigger")
+				if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+					return fmt.Errorf("triggering dbt job: %w", err)
+				}
 			}
 
 			return nil
