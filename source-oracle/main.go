@@ -210,7 +210,7 @@ type oracleDatabase struct {
 	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
 }
 
-func (db *oracleDatabase) isRDS() bool {
+func (db *oracleDatabase) IsRDS() bool {
 	return strings.Contains(db.config.Address, "rds.amazonaws.com")
 }
 
