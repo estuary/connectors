@@ -272,6 +272,10 @@ type oracleColumnType struct {
 	nullable  bool
 }
 
+func (ct oracleColumnType) String() string {
+	return ct.original
+}
+
 // SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
 const defaultNumericPrecision = 38
 
