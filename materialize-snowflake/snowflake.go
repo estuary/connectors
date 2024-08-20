@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -821,6 +822,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s;", item.PipeName)); err != nil {
 				return nil, fmt.Errorf("dropping pipe %s failed: %w", item.PipeName, err)
 			}
+		}
+	}
+
+	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+			return nil, fmt.Errorf("triggering dbt job: %w", err)
 		}
 	}
 
