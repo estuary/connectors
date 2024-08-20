@@ -15,6 +15,7 @@ Binding 0:
           "$anchor": "FLOW_TEST_LOGMINERUSERS",
           "properties": {
             "DATA": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
@@ -22,7 +23,8 @@ Binding 0:
             },
             "ID": {
               "type": "string",
-              "format": "number"
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
             }
           }
         }

@@ -14,12 +14,14 @@ Binding 0:
           "properties": {
             "A": {
               "format": "integer",
+              "description": "(source type: NUMBER)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "B": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
@@ -27,12 +29,14 @@ Binding 0:
             },
             "C": {
               "format": "number",
+              "description": "(source type: FLOAT)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "D": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
