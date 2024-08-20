@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -345,6 +346,14 @@ func (t *transactor) commit(ctx context.Context) error {
 		log.WithField("query", queryString).Error("query failed")
 		return fmt.Errorf("commit query: %w", err)
 	}
+
+	if t.cfg.DBTJobTrigger.Enabled() {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(t.cfg.DBTJobTrigger); err != nil {
+			return fmt.Errorf("triggering dbt job: %w", err)
+		}
+	}
+
 	log.Info("store: finished commit")
 
 	return nil

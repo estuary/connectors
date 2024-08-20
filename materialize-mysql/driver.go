@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
@@ -43,6 +44,8 @@ type config struct {
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+
+	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
@@ -85,6 +88,10 @@ func (c *config) Validate() error {
 
 	if (c.Advanced.SSLMode == "verify_ca" || c.Advanced.SSLMode == "verify_identity") && c.Advanced.SSLServerCA == "" {
 		return fmt.Errorf("ssl_server_ca is required when using `verify_ca` and `verify_identity` modes")
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -826,6 +833,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
+			}
+
+			if d.cfg.DBTJobTrigger.Enabled() {
+				log.Info("store: dbt job trigger")
+				if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+					return fmt.Errorf("triggering dbt job: %w", err)
+				}
 			}
 
 			return nil
