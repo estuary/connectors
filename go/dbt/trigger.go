@@ -16,7 +16,7 @@ type JobConfig struct {
 	AccountID     string `json:"account_id" jsonschema:"title=Account ID,description=DBT account ID"`
 	AccountPrefix string `json:"account_prefix" jsonschema:"title=Account Prefix,description=DBT account prefix"`
 	APIKey        string `json:"api_key" jsonschema:"title=API Key,description=DBT API Key" jsonschema_extras:"secret=true"`
-	Cause         string `json:"cause,omitempty" jsonschema:"title=Cause Message,description=You can set a custom 'cause' message for the job trigger, defaults to 'Estuary Flow'"`
+	Cause         string `json:"cause,omitempty" jsonschema:"title=Cause Message,description=You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."`
 	Mode          string `json:"mode,omitempty" jsonschema:"title=Job Trigger Mode,description=Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.,enum=skip,enum=replace,enum=ignore,default=skip"`
 }
 
