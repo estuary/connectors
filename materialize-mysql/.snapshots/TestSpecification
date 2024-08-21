@@ -67,7 +67,7 @@
           "cause": {
             "type": "string",
             "title": "Cause Message",
-            "description": "You can set a custom 'cause' message for the job trigger"
+            "description": "You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."
           },
           "mode": {
             "type": "string",
