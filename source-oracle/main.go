@@ -293,8 +293,8 @@ func (db *oracleDatabase) ShouldBackfill(streamID string) bool {
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
-		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
-			if streamID == skipStreamID {
+		for _, skipTableName := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
+			if strings.EqualFold(streamID, skipTableName) {
 				return false
 			}
 		}
