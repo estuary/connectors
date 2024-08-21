@@ -1,7 +1,9 @@
 from datetime import datetime, UTC, timedelta
 from typing import AsyncGenerator, Awaitable, Iterable
 from logging import Logger
+import requests
 import functools
+import copy
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
@@ -15,6 +17,7 @@ from .api import (fetch_incremental,
                   fetch_incremental_no_events,
                   fetch_backfill_usage_records,
                   fetch_incremental_usage_records,
+                  API
                   )
 
 from .models import (
@@ -66,9 +69,10 @@ from .models import (
     EndpointConfig,
     EventResult,
     SubscriptionItems,
+    BackfillResult
     )
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig, is_discover: bool = False
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
@@ -119,6 +123,60 @@ async def all_resources(
 
     ]
 
+    headers = {}
+    unauthorized_parents = {}
+    original_list = copy.deepcopy(all_streams)
+
+    if config.credentials.access_token.startswith("rk_") and is_discover is True:
+        token = await http.token_source.fetch_token(log, http)
+        headers["Authorization"] = f"{token[0]} {token[1]}"
+        parameters = {"limit": 1}
+        for stream in original_list[:27]:
+            url = f"{API}/{stream.model.SEARCH_NAME}"
+
+            response = requests.get(url=url, params=parameters, headers=headers)
+
+            if response.status_code == 401:
+                all_streams.remove(stream)
+                unauthorized_parents[stream.model.NAME] = stream.model.NAME
+        # The idea here is to remove non-accessible itens as soon as possible
+        # in orde to allow for discover time
+        if unauthorized_parents.get("Accounts"):
+            all_streams.remove(original_list[27])
+            all_streams.remove(original_list[28])
+            all_streams.remove(original_list[29])
+        
+        if unauthorized_parents.get("ApplicationFees"):
+            all_streams.remove(original_list[30])
+
+        if unauthorized_parents.get("Customers"):
+            all_streams.remove(original_list[31])
+            all_streams.remove(original_list[32])
+            all_streams.remove(original_list[33])
+            all_streams.remove(original_list[34])
+        
+        if unauthorized_parents.get("CheckoutSessions"):
+            all_streams.remove(original_list[35])
+        
+        if unauthorized_parents.get("CreditNotes"):
+            all_streams.remove(original_list[36])
+        
+        if unauthorized_parents.get("Invoices"):
+            all_streams.remove(original_list[37])
+        
+        if unauthorized_parents.get("Transfers"):
+            all_streams.remove(original_list[38])
+        if unauthorized_parents.get("SetupIntents"):
+            all_streams.remove(original_list[39])
+        if unauthorized_parents.get("SubscriptionItems"):
+            all_streams.remove(original_list[40])
+        
+
+
+
+
+        
+        
     # Stripe 'Issuing' is only available in certain countries and 
     # accounts. Checking to see if user has permission to access 'Issuing' endpoints.
     try:
