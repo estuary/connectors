@@ -676,6 +676,12 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
+	if cursor == "" {
+		// The empty cursor will be acknowledged once at startup when all bindings
+		// are new, because the initial state checkpoint will have an unspecified
+		// cursor value on purpose. We don't need to do anything with those.
+		return nil
+	}
 	var lsn, err = pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
