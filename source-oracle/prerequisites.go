@@ -29,7 +29,11 @@ func (db *oracleDatabase) prerequisiteSupplementalLogging(ctx context.Context, o
 
 	if all != "YES" {
 		if min != "YES" {
-			return fmt.Errorf("supplemental logging not enabled. Please enable supplemental logging using `ALTER DATABASE ADD SUPPLEMENTAL LOG DATA`")
+			var enableCommand = "ALTER DATABASE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;"
+			if db.isRDS() {
+				enableCommand = "BEGIN rdsadmin.rdsadmin_util.alter_supplemental_logging(p_action => 'ADD', p_type   => 'ALL'); END;"
+			}
+			return fmt.Errorf("supplemental logging not enabled. Please enable supplemental logging using `%s`", enableCommand)
 		}
 
 		if owner != "" && tableName != "" {
