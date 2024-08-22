@@ -183,28 +183,3 @@ var ClampDate ElementConverter = StringCastConverter(func(str string) (interface
 	}
 	return str, nil
 })
-
-// CheckedIn64 passes through values that can be represented as a signed 64-bit
-// integer, and produces an error for other values.
-func CheckedInt64(te tuple.TupleElement) (any, error) {
-	switch ii := te.(type) {
-	case int64:
-		return ii, nil
-	case uint64, float64:
-		return nil, fmt.Errorf("value of %v (%T) will not fit in a signed 64-bit integer", te, te)
-	case string:
-		if b, err := StrToInt(ii); err != nil {
-			return nil, err
-		} else if b, ok := b.(*big.Int); !ok {
-			return nil, fmt.Errorf("application error: expected *big.Int from StrToInt")
-		} else if !b.IsInt64() {
-			return nil, fmt.Errorf("value of %v (%T) will not fit in a signed 64-bit integer", te, te)
-		} else {
-			return b.Int64(), nil
-		}
-	case nil:
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("CheckedInt64 unsupported type %T (%#v)", te, te)
-	}
-}

@@ -11,7 +11,7 @@ var duckDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGINT"),
 				sql.MapStatic("HUGEINT"),
 			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE"),
