@@ -137,6 +137,20 @@ func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamI
 }
 
 func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context) error {
+	// Activate replication for the watermarks table.
+	var discovery, err = rs.db.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+	var watermarks = rs.db.config.Advanced.WatermarksTable
+	var watermarksInfo = discovery[watermarks]
+	if watermarksInfo == nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+	}
+	if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	rs.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	rs.errCh = make(chan error)
@@ -308,7 +322,8 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	var cursor = base64.StdEncoding.EncodeToString(toLSN)
 	log.WithField("cursor", cursor).Debug("checkpoint at cursor")
 	rs.events <- &sqlcapture.FlushEvent{
-		Cursor: cursor,
+		Cursor:  cursor,
+		AtFence: rs.db.fence.Readout(),
 	}
 	rs.fromLSN = toLSN
 
@@ -595,7 +610,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 			before = fields
 		}
 
-		rs.events <- &sqlcapture.ChangeEvent{
+		var event = &sqlcapture.ChangeEvent{
 			Operation: operation,
 			RowKey:    rowKey,
 			Source: &sqlserverSourceInfo{
@@ -610,9 +625,37 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 			Before: before,
 			After:  after,
 		}
+		if err := rs.emitEvent(ctx, event); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (rs *sqlserverReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
+	// Mark the fence as reached when we observe a change event on the watermarks stream
+	// with the expected value.
+	if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+		if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == rs.db.WatermarksTable() {
+			var expect = rs.db.fence.Watermark()
+			var actual = event.After["watermark"]
+			if actual == nil {
+				actual = event.After["WATERMARK"]
+			}
+			log.WithFields(log.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
+			if actual == expect && expect != "" {
+				rs.db.fence.Reached()
+			}
+		}
+	}
+
+	select {
+	case rs.events <- event:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) (LSN, error) {

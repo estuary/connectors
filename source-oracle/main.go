@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -205,9 +206,50 @@ type oracleDatabase struct {
 	config             *Config
 	conn               *sql.DB
 	tunnel             *networkTunnel.SshTunnel
-	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
-	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
-	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
+	discovery          map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
+	explained          map[sqlcapture.StreamID]struct{}                  // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	includeTxIDs       map[sqlcapture.StreamID]bool                      // Tracks which tables should have XID properties in their replication metadata
+	tableObjectMapping map[string]tableObject                            // A mapping from streamID to objectID, dataObjectID
+
+	fence fenceDetectionState // State of the watermark-based fence detection state machine.
+}
+
+// fenceDetectionState represents the state of the watermark-based fence detection logic.
+// It is guarded by a mutex for concurrent access.
+type fenceDetectionState struct {
+	sync.RWMutex
+	watermark string
+	reached   bool
+}
+
+func (s *fenceDetectionState) SetWatermark(wm string) {
+	s.Lock()
+	defer s.Unlock()
+	s.watermark = wm
+	s.reached = false
+}
+
+func (s *fenceDetectionState) Watermark() string {
+	s.RLock()
+	defer s.RUnlock()
+	return s.watermark
+}
+
+func (s *fenceDetectionState) Reached() {
+	s.Lock()
+	defer s.Unlock()
+	s.reached = true
+}
+
+func (s *fenceDetectionState) Readout() bool {
+	s.Lock()
+	var wasReached = s.reached
+	if s.reached {
+		s.reached = false
+		s.watermark = ""
+	}
+	s.Unlock()
+	return wasReached
 }
 
 func (db *oracleDatabase) IsRDS() bool {

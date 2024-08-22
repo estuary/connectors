@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,6 +22,12 @@ func (db *sqlserverDatabase) createWatermarksTable(ctx context.Context) error {
 	}
 	rows.Close()
 	return nil
+}
+
+func (db *sqlserverDatabase) RequestFence(ctx context.Context) error {
+	var watermark = uuid.New().String()
+	db.fence.SetWatermark(watermark)
+	return db.WriteWatermark(ctx, watermark)
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.

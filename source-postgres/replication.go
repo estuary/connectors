@@ -226,6 +226,20 @@ func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 }
 
 func (s *replicationStream) StartReplication(ctx context.Context) error {
+	// Activate replication for the watermarks table.
+	var discovery, err = s.db.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+	var watermarks = s.db.config.Advanced.WatermarksTable
+	var watermarksInfo = discovery[watermarks]
+	if watermarksInfo == nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+	}
+	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	s.errCh = make(chan error)
@@ -314,6 +328,22 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 			return fmt.Errorf("error decoding message: %w", err)
 		}
 		s.eventBuf = event
+
+		// Mark the fence as reached when we observe a change event on the watermarks stream
+		// with the expected value.
+		if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+			if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == s.db.WatermarksTable() {
+				var expect = s.db.fence.Watermark()
+				var actual = event.After["watermark"]
+				if actual == nil {
+					actual = event.After["WATERMARK"]
+				}
+				logrus.WithFields(logrus.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
+				if actual == expect && expect != "" {
+					s.db.fence.Reached()
+				}
+			}
+		}
 	}
 }
 
@@ -387,7 +417,8 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		s.nextTxnXID = 0
 		s.lastTxnEndLSN = msg.TransactionEndLSN
 		var event = &sqlcapture.FlushEvent{
-			Cursor: s.lastTxnEndLSN.String(),
+			Cursor:  s.lastTxnEndLSN.String(),
+			AtFence: s.db.fence.Readout(),
 		}
 		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
 		return event, nil

@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/invopop/jsonschema"
@@ -75,10 +76,14 @@ type ChangeEvent struct {
 	After     map[string]interface{}
 }
 
-// FlushEvent informs the generic sqlcapture logic about transaction
-// boundaries.
+// FlushEvent informs the generic sqlcapture logic about transaction boundaries.
 type FlushEvent struct {
+	// The cursor value at which the current transaction was committed.
 	Cursor string
+
+	// True if this FlushEvent also marks the point at which the most
+	// recently requested fence has been reached.
+	AtFence bool
 }
 
 // MetadataEvent informs the generic sqlcapture logic about changes to
@@ -98,9 +103,9 @@ func (*ChangeEvent) isDatabaseEvent()   {}
 func (*FlushEvent) isDatabaseEvent()    {}
 func (*MetadataEvent) isDatabaseEvent() {}
 
-func (*ChangeEvent) String() string   { return "ChangeEvent" }
-func (*FlushEvent) String() string    { return "FlushEvent" }
-func (*MetadataEvent) String() string { return "MetadataEvent" }
+func (*ChangeEvent) String() string    { return "ChangeEvent" }
+func (evt *FlushEvent) String() string { return fmt.Sprintf("FlushEvent(fence=%t)", evt.AtFence) }
+func (*MetadataEvent) String() string  { return "MetadataEvent" }
 
 // KeyFields returns suitable fields for extracting the event primary key.
 func (e *ChangeEvent) KeyFields() map[string]interface{} {
@@ -119,18 +124,18 @@ type Database interface {
 	// ReplicationStream constructs a new ReplicationStream object, from which
 	// a neverending sequence of change events can be read.
 	ReplicationStream(ctx context.Context, startCursor string) (ReplicationStream, error)
-	// WriteWatermark writes the provided string into the 'watermarks' table.
-	WriteWatermark(ctx context.Context, watermark string) error
-	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-	WatermarksTable() string
-	// Once the capture is indefinitely streaming changes, it will write a heartbeat watermark this often.
-	HeartbeatWatermarkInterval() time.Duration
+	// RequestFence asks for a new fence point to be established in the replication stream, which
+	// will show up as a FlushEvent with AtFence=true at some point in the future. It is an error
+	// to request a new fence when there is already an outstanding fence request.
+	RequestFence(ctx context.Context) error
+	// Once the capture is indefinitely streaming changes, it will request a new fence this often.
+	StreamingFenceInterval() time.Duration
 
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
 	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)
 	// DiscoverTables queries the database for information about tables available for capture.
-	DiscoverTables(ctx context.Context) (map[string]*DiscoveryInfo, error)
+	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
@@ -186,8 +191,8 @@ type ReplicationStream interface {
 // DiscoveryInfo holds metadata about a specific table in the database, and
 // is used during discovery to automatically generate catalog information.
 type DiscoveryInfo struct {
-	Name        string                // The PostgreSQL table name.
-	Schema      string                // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
+	Name        string                // The table's name.
+	Schema      string                // The schema (a namespace, in normal parlance) which contains the table.
 	Columns     map[string]ColumnInfo // Information about each column of the table.
 	PrimaryKey  []string              // An ordered list of the column names which together form the table's primary key.
 	ColumnNames []string              // The names of all columns, in the table's natural order.

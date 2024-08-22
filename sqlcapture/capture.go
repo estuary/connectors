@@ -13,7 +13,6 @@ import (
 	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -128,13 +127,13 @@ type Capture struct {
 }
 
 const (
-	watermarkDiagnosticsTimeout = 60 * time.Second // How long to wait *after the point where the watermark write should have occurred* before triggering automated diagnostics.
+	automatedDiagnosticsTimeout = 60 * time.Second // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
 	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
 	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
 var (
-	errWatermarkNotReached = fmt.Errorf("replication stream closed before reaching watermark")
+	errFenceNotReached = fmt.Errorf("replication stream closed before reaching fence")
 )
 
 // Run is the top level entry point of the capture process.
@@ -171,13 +170,6 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
-	var watermarks = c.Database.WatermarksTable()
-	if c.discovery[watermarks] == nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
-	}
-	if err := replStream.ActivateTable(ctx, watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil); err != nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
-	}
 	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
@@ -195,16 +187,15 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	// Perform an initial "catch-up" stream-to-watermark before transitioning
+	// Perform an initial "catch-up" stream-to-fence before transitioning
 	// any "Pending" streams into the "Backfill" state. This helps ensure that
 	// a given stream only ever observes replication events which occur *after*
 	// the connector was started.
-	var watermark = uuid.New().String()
-	if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
-		return fmt.Errorf("error writing next watermark: %w", err)
+	if err := c.Database.RequestFence(ctx); err != nil {
+		return fmt.Errorf("error requesting fence: %w", err)
 	}
-	if err := c.streamCatchup(ctx, replStream, watermark); err != nil {
-		return fmt.Errorf("error streaming until watermark: %w", err)
+	if err := c.streamCatchup(ctx, replStream); err != nil {
+		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 	for _, binding := range c.BindingsInState(TableModePending) {
 		var streamID = binding.StreamID
@@ -285,13 +276,12 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 	// Backfill any tables which require it.
 	for c.BindingsCurrentlyBackfilling() != nil {
-		var watermark = uuid.New().String()
 		if err := c.backfillStreams(ctx); err != nil {
 			return fmt.Errorf("error performing backfill: %w", err)
-		} else if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
-			return fmt.Errorf("error writing next watermark: %w", err)
-		} else if err := c.streamToWatermark(ctx, replStream, watermark); err != nil {
-			return fmt.Errorf("error streaming until watermark: %w", err)
+		} else if err := c.Database.RequestFence(ctx); err != nil {
+			return fmt.Errorf("error requesting fence: %w", err)
+		} else if err := c.streamToFence(ctx, replStream); err != nil {
+			return fmt.Errorf("error streaming until fence: %w", err)
 		} else if err := c.emitState(); err != nil {
 			return err
 		}
@@ -452,40 +442,39 @@ func (c *Capture) updateState(_ context.Context) error {
 	return c.emitState()
 }
 
-func (c *Capture) streamCatchup(ctx context.Context, replStream ReplicationStream, watermark string) error {
-	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, true)
+func (c *Capture) streamCatchup(ctx context.Context, replStream ReplicationStream) error {
+	return c.streamToFenceWithOptions(ctx, replStream, true)
 }
 
-func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationStream, watermark string) error {
-	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, false)
+func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream) error {
+	return c.streamToFenceWithOptions(ctx, replStream, false)
 }
 
 func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
 	logrus.Info("streaming replication events indefinitely")
 	for ctx.Err() == nil {
-		// Spawn a worker goroutine which will write the watermark value after the appropriate interval.
-		var watermark = uuid.New().String()
+		// Spawn a worker goroutine which will request a fence after the appropriate interval.
 		var group, workerCtx = errgroup.WithContext(ctx)
 		group.Go(func() error {
 			select {
 			case <-workerCtx.Done():
-				logrus.WithField("watermark", watermark).Warn("not writing watermark due to context cancellation")
+				logrus.Warn("not requesting fence due to context cancellation")
 				return workerCtx.Err()
-			case <-time.After(c.Database.HeartbeatWatermarkInterval()):
-				if err := c.Database.WriteWatermark(workerCtx, watermark); err != nil {
-					logrus.WithField("watermark", watermark).Error("failed to write watermark")
-					return fmt.Errorf("error writing next watermark: %w", err)
+			case <-time.After(c.Database.StreamingFenceInterval()):
+				if err := c.Database.RequestFence(workerCtx); err != nil {
+					logrus.WithField("err", err).Error("failed to request fence")
+					return fmt.Errorf("error requesting fence: %w", err)
 				}
-				logrus.WithField("watermark", watermark).Debug("watermark written")
+				logrus.Debug("fence requested")
 				return nil
 			}
 		})
 
-		// Perform replication streaming until the watermark is reached (or the
-		// watermark-writing thread returns an error which cancels the context).
+		// Perform replication streaming until the fence is reached (or the
+		// fence-requesting thread returns an error which cancels the context).
 		group.Go(func() error {
-			if err := c.streamCatchup(workerCtx, replStream, watermark); err != nil {
-				return fmt.Errorf("error streaming until watermark: %w", err)
+			if err := c.streamCatchup(workerCtx, replStream); err != nil {
+				return fmt.Errorf("error streaming until fence: %w", err)
 			}
 			return nil
 		})
@@ -497,25 +486,23 @@ func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStrea
 	return ctx.Err()
 }
 
-// streamToWatermarkWithOptions implements two very similar operations:
+// streamToFenceWithOptions implements two very similar operations:
 //
-//   - streamCatchup: Processes replication events until the watermark is reached
+//   - streamCatchup: Processes replication events until the fence is reached
 //     and then stops. Whenever a database transaction commit is reported, a Flow
 //     state checkpoint update is emitted.
-//   - streamToWatermark: Like streamCatchup except that no state checkpoints are
+//   - streamToFence: Like streamCatchup except that no state checkpoints are
 //     emitted during replication processing. This is done during backfills so that
 //     a chunk of backfilled rows plus all relevant replication events will be
 //     committed into the same Flow transaction.
 //
 // Both operations are implemented as a single function here with a parameter
 // controlling checkpoint behavior because they're so similar.
-func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream ReplicationStream, watermark string, reportFlush bool) error {
-	logrus.WithField("watermark", watermark).Info("streaming to watermark")
-	var watermarksTable = c.Database.WatermarksTable()
-	var watermarkReached = false
+func (c *Capture) streamToFenceWithOptions(ctx context.Context, replStream ReplicationStream, reportFlush bool) error {
+	logrus.Info("streaming to fence")
 
-	// Log a warning and perform replication diagnostics if we don't observe the watermark within a few minutes
-	var diagnosticsTimeout = time.AfterFunc(c.Database.HeartbeatWatermarkInterval()+watermarkDiagnosticsTimeout, func() {
+	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
+	var diagnosticsTimeout = time.AfterFunc(c.Database.StreamingFenceInterval()+automatedDiagnosticsTimeout, func() {
 		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
 		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 			logrus.WithField("err", err).Error("replication diagnostics error")
@@ -523,7 +510,7 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	})
 	defer diagnosticsTimeout.Stop()
 
-	// When streaming completes (because we've either reached the watermark or encountered an error),
+	// When streaming completes (because we've either reached the fence or encountered an error),
 	// log the number of events which have been processed.
 	var eventCount int
 	defer func() { logrus.WithField("events", eventCount).Info("processed replication events") }()
@@ -534,12 +521,12 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 			return ctx.Err()
 		case event, ok := <-replStream.Events():
 			if !ok {
-				return errWatermarkNotReached
+				return errFenceNotReached
 			}
 			eventCount++
 
 			// Flush events update the checkpointed LSN and trigger a state update.
-			// If this is the commit after the target watermark, it also ends the loop.
+			// If this commit is at the requested fence, it also ends the loop.
 			if event, ok := event.(*FlushEvent); ok {
 				c.State.Cursor = event.Cursor
 				if reportFlush {
@@ -547,25 +534,10 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 						return fmt.Errorf("error emitting state update: %w", err)
 					}
 				}
-				if watermarkReached {
+				if event.AtFence {
 					return nil
 				}
 				continue
-			}
-
-			// Check for watermark change events and set a flag when the target watermark is reached.
-			// The subsequent FlushEvent will exit the loop.
-			if event, ok := event.(*ChangeEvent); ok {
-				if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
-					var actual = event.After["watermark"]
-					if actual == nil {
-						actual = event.After["WATERMARK"]
-					}
-					logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
-					if actual == watermark {
-						watermarkReached = true
-					}
-				}
 			}
 
 			if err := c.handleReplicationEvent(event); err != nil {

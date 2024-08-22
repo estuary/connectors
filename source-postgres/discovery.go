@@ -13,8 +13,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// DiscoverTables queries the database for information about tables available for capture.
-func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
+// DiscoverTables queries the database for information about tables available for capture, and may
+// cache the results when successful.
+func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+	if db.discovery == nil {
+		var discovery, err = db.discoverTables(ctx)
+		if err != nil {
+			return nil, err
+		}
+		db.discovery = discovery
+	}
+	return db.discovery, nil
+}
+
+// discoverTables queries the database for information about tables available for capture, without any caching.
+func (db *postgresDatabase) discoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all tables, columns and primary keys in the database
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
@@ -46,6 +59,10 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		if streamID == db.WatermarksTable() {
+			// We want to exclude the watermarks table from the output bindings, but we still discover it
+			table.OmitBinding = true
+		}
 		tableMap[streamID] = table
 	}
 	for _, column := range columns {
