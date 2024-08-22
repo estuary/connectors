@@ -35,10 +35,6 @@ class SourceNotion(AbstractSource):
         start_date = config.get("start_date")
 
         if start_date:
-            pattern = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z")
-            if not pattern.match(start_date):  # Compare against the pattern descriptor.
-                return "Please check the format of the start date against the pattern descriptor."
-
             try:  # Handle invalid dates.
                 parsed_start_date = pendulum.parse(start_date)
             except ParserError:
