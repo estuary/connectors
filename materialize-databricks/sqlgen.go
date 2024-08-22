@@ -35,7 +35,7 @@ var databricksDialect = func() sql.Dialect {
 			sql.BINARY:  sql.MapStatic("BINARY"),
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("LONG", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("LONG"),
 				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("decimal")),
 			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE"),

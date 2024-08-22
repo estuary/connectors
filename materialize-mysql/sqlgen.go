@@ -46,7 +46,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGINT"),
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
 			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),

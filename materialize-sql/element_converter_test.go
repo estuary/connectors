@@ -2,8 +2,6 @@ package sql
 
 import (
 	"encoding/json"
-	"fmt"
-	"math"
 	"math/big"
 	"testing"
 
@@ -137,65 +135,5 @@ func TestToJsonString(t *testing.T) {
 		got, err := ToJsonString(tt.input)
 		require.NoError(t, err)
 		require.Equal(t, tt.want, got)
-	}
-}
-
-func TestCheckedInt64(t *testing.T) {
-	for _, tt := range []struct {
-		input   any
-		want    any
-		wantErr bool
-	}{
-		{
-			input:   nil,
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			input:   int64(12),
-			want:    int64(12),
-			wantErr: false,
-		},
-		{
-			input:   "1234",
-			want:    int64(1234),
-			wantErr: false,
-		},
-		{
-			input:   uint64(math.MaxUint64),
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			input:   float64(math.MaxFloat64),
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			input:   fmt.Sprintf("%.0f", math.MaxFloat64),
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			input:   true,
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			input:   "notanintegerstring",
-			want:    nil,
-			wantErr: true,
-		},
-	} {
-		got, err := CheckedInt64(tt.input)
-		if tt.wantErr {
-			require.Error(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-		require.Equal(t, tt.want, got)
-		if tt.want != nil {
-			require.IsType(t, int64(0), tt.want)
-		}
 	}
 }

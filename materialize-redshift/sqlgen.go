@@ -32,7 +32,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGINT"),
 				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric")),
 			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),

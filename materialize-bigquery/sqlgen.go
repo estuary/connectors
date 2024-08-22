@@ -66,7 +66,7 @@ var bqDialect = func() sql.Dialect {
 			sql.BINARY:  sql.MapStatic("STRING"),
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("INTEGER", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("INTEGER"),
 				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
 			),
 			// We used to materialize these as "BIGNUMERIC(38,0)", so
