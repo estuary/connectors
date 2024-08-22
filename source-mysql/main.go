@@ -10,6 +10,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -195,9 +196,50 @@ type mysqlDatabase struct {
 
 	config           *Config
 	conn             *client.Conn
-	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
-	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
-	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
+	discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
+	explained        map[string]struct{}                               // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
+	datetimeLocation *time.Location                                    // The location in which to interpret DATETIME column values as timestamps.
+	includeTxIDs     map[string]bool                                   // Tracks which tables should have XID properties in their replication metadata.
+
+	fence fenceDetectionState // State of the watermark-based fence detection state machine.
+}
+
+// fenceDetectionState represents the state of the watermark-based fence detection logic.
+// It is guarded by a mutex for concurrent access.
+type fenceDetectionState struct {
+	sync.RWMutex
+	watermark string
+	reached   bool
+}
+
+func (s *fenceDetectionState) SetWatermark(wm string) {
+	s.Lock()
+	defer s.Unlock()
+	s.watermark = wm
+	s.reached = false
+}
+
+func (s *fenceDetectionState) Watermark() string {
+	s.RLock()
+	defer s.RUnlock()
+	return s.watermark
+}
+
+func (s *fenceDetectionState) Reached() {
+	s.Lock()
+	defer s.Unlock()
+	s.reached = true
+}
+
+func (s *fenceDetectionState) Readout() bool {
+	s.Lock()
+	var wasReached = s.reached
+	if s.reached {
+		s.reached = false
+		s.watermark = ""
+	}
+	s.Unlock()
+	return wasReached
 }
 
 func (db *mysqlDatabase) HistoryMode() bool {
@@ -415,7 +457,7 @@ func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }
 
-func (db *mysqlDatabase) HeartbeatWatermarkInterval() time.Duration {
+func (db *mysqlDatabase) StreamingFenceInterval() time.Duration {
 	if db.config.Advanced.HeartbeatInterval != "" {
 		var dt, _ = time.ParseDuration(db.config.Advanced.HeartbeatInterval)
 		return dt

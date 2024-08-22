@@ -187,6 +187,20 @@ func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
 		return fmt.Errorf("internal error: replication stream already started")
 	}
 
+	// Activate replication for the watermarks table.
+	var discovery, err = rs.db.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+	var watermarks = rs.db.config.Advanced.WatermarksTable
+	var watermarksInfo = discovery[watermarks]
+	if watermarksInfo == nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+	}
+	if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	rs.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	rs.errCh = make(chan error)
@@ -386,7 +400,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				"cursor": rs.cursor,
 			}).Trace("XID Event")
 			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-				Cursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
+				Cursor:  fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
+				AtFence: rs.db.fence.Readout(),
 			}); err != nil {
 				return err
 			}
@@ -874,6 +889,22 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 }
 
 func (rs *mysqlReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
+	// Mark the fence as reached when we observe a change event on the watermarks stream
+	// with the expected value.
+	if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+		if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == rs.db.WatermarksTable() {
+			var expect = rs.db.fence.Watermark()
+			var actual = event.After["watermark"]
+			if actual == nil {
+				actual = event.After["WATERMARK"]
+			}
+			logrus.WithFields(logrus.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
+			if actual == expect && expect != "" {
+				rs.db.fence.Reached()
+			}
+		}
+	}
+
 	select {
 	case rs.events <- event:
 		return nil

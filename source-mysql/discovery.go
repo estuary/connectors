@@ -22,7 +22,21 @@ const (
 	truncateColumnThreshold = 8 * 1024 * 1024 // Arbitrarily selected value
 )
 
-func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
+// DiscoverTables queries the database for information about tables available for capture, and may
+// cache the results when successful.
+func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+	if db.discovery == nil {
+		var discovery, err = db.discoverTables(ctx)
+		if err != nil {
+			return nil, err
+		}
+		db.discovery = discovery
+	}
+	return db.discovery, nil
+}
+
+// discoverTables queries the database for information about tables available for capture, without any caching.
+func (db *mysqlDatabase) discoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	var tables, err = getTables(ctx, db.conn)
 	if err != nil {
@@ -30,6 +44,10 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 	}
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		if streamID == db.WatermarksTable() {
+			// We want to exclude the watermarks table from the output bindings, but we still discover it
+			table.OmitBinding = true
+		}
 		tableMap[streamID] = table
 	}
 

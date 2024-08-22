@@ -6,18 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/sirupsen/logrus"
 )
 
-func (db *oracleDatabase) HeartbeatWatermarkInterval() time.Duration {
+func (db *oracleDatabase) StreamingFenceInterval() time.Duration {
 	return 60 * time.Second
 }
 
@@ -286,6 +287,20 @@ func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 var replicationBufferSize = 16
 
 func (s *replicationStream) StartReplication(ctx context.Context) error {
+	// Activate replication for the watermarks table.
+	var discovery, err = s.db.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+	var watermarks = s.db.config.Advanced.WatermarksTable
+	var watermarksInfo = discovery[watermarks]
+	if watermarksInfo == nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+	}
+	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
 	var eg, egCtx = errgroup.WithContext(ctx)
 	var streamCtx, streamCancel = context.WithCancel(egCtx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
@@ -387,7 +402,10 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// on restart, but it saves us from missing events
 		s.lastTxnEndSCN = endSCN
 
-		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
+		s.events <- &sqlcapture.FlushEvent{
+			Cursor:  strconv.FormatInt(s.lastTxnEndSCN, 10),
+			AtFence: s.db.fence.Readout(),
+		}
 	}
 }
 
@@ -395,6 +413,22 @@ func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logmin
 	var event, err = s.decodeMessage(msg)
 	if err != nil {
 		return err
+	}
+
+	// Mark the fence as reached when we observe a change event on the watermarks stream
+	// with the expected value.
+	if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+		if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == s.db.WatermarksTable() {
+			var expect = s.db.fence.Watermark()
+			var actual = event.After["watermark"]
+			if actual == nil {
+				actual = event.After["WATERMARK"]
+			}
+			logrus.WithFields(logrus.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
+			if actual == expect && expect != "" {
+				s.db.fence.Reached()
+			}
+		}
 	}
 
 	select {
