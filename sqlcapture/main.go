@@ -224,15 +224,10 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return nil, err
 	}
 
-	// Filter well-known flow created tables out of the discovered catalog before output. These
-	// include the watermarks table that this capture would create as-configured as well as
-	// materialization metadata tables. They are basically never useful to capture so we shouldn't
-	// suggest them.
-
-	// The materialization metadata table names "flow_materializations_v2" and "flow_checkpoints_v1"
+	// Filter Flow materialization metadata tables out of the discovered catalog before output.
+	// The materialization table names "flow_materializations_v2" and "flow_checkpoints_v1"
 	// are expected to remain stable and may exist in any schema, depending on how the
 	// materialization is configured.
-	var watermarkStreamID = db.WatermarksTable()
 	var filteredBindings = []*pc.Response_Discovered_Binding{} // Empty discovery must result in `[]` rather than `null`
 	for _, binding := range discoveredBindings {
 		var res Resource
@@ -240,12 +235,12 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 		res.SetDefaults()
-		var streamID = JoinStreamID(res.Namespace, res.Stream)
-		if streamID != watermarkStreamID && res.Stream != "flow_materializations_v2" && res.Stream != "flow_checkpoints_v1" {
+		if res.Stream != "flow_materializations_v2" && res.Stream != "flow_checkpoints_v1" {
 			filteredBindings = append(filteredBindings, binding)
 		} else {
 			log.WithFields(log.Fields{
-				"filtered": streamID,
+				"schema": res.Namespace,
+				"table":  res.Stream,
 			}).Debug("filtered well-known table from discovery")
 		}
 	}
@@ -324,7 +319,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	err = c.Run(ctx)
-	if errors.Is(err, errWatermarkNotReached) {
+	if errors.Is(err, errFenceNotReached) {
 		log.Warn("replication stream closed unexpectedly")
 		return nil
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -157,6 +158,12 @@ func scanToMap(rows *sql.Rows, cols []string, fields map[string]any) (string, er
 	}
 
 	return rowid, nil
+}
+
+func (db *oracleDatabase) RequestFence(ctx context.Context) error {
+	var watermark = uuid.New().String()
+	db.fence.SetWatermark(watermark)
+	return db.WriteWatermark(ctx, watermark)
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
