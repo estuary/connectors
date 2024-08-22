@@ -55,9 +55,9 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		return nil, fmt.Errorf("set NLS_TIMESTAMP_TZ_FORMAT: %w", err)
 	}
 
-	var startSCN int
+	var startSCN int64
 	if startCursor != "" {
-		startSCN, err = strconv.Atoi(startCursor)
+		startSCN, err = strconv.ParseInt(startCursor, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("parsing start cursor: %w", err)
 		}
@@ -112,12 +112,12 @@ type redoFile struct {
 	Status      string
 	Name        string
 	Sequence    int
-	FirstChange int
+	FirstChange int64
 	DictStart   string
 	DictEnd     string
 }
 
-func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int) error {
+func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int64) error {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
 		"endSCN":   endSCN,
@@ -141,10 +141,20 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 	// In order to make sure we don't hit dictionary mismatches, we need to find the most recent archive log before
 	// or at our SCN range that begins a dictionary, so that early rows of this range are not missing their dictionary
 	row = s.conn.QueryRowContext(ctx, "SELECT MAX(NEXT_CHANGE#) FROM V$ARCHIVED_LOG WHERE DICTIONARY_BEGIN='YES' AND NEXT_CHANGE# <= :scn", startSCN)
-	var minArchiveSCN int
-	if err := row.Scan(&minArchiveSCN); err != nil {
+	var minArchiveSCNScan sql.NullInt64
+	if err := row.Scan(&minArchiveSCNScan); err != nil {
 		return fmt.Errorf("querying latest archive log to contain the dictionary for the SCN range: %w", err)
 	}
+
+	var minArchiveSCN = minArchiveSCNScan.Int64
+	// If there are no archive log files with a dictionary file, start with the first archive log file
+	// that covers the SCN
+	if !minArchiveSCNScan.Valid {
+		minArchiveSCN = startSCN
+	}
+	logrus.WithFields(logrus.Fields{
+		"minArchiveSCN": minArchiveSCN,
+	}).Debug("starting SCN for log files based on dictionary starting point")
 
 	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#,'NO' as DICT_START, 'NO' as DICT_END FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
@@ -201,7 +211,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 	return nil
 }
 
-func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int) error {
+func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
 	var dictionaryOption = ""
 	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
@@ -248,7 +258,7 @@ type replicationStream struct {
 	// sequence# of the last redo log file read, used to check if new log files have appeared
 	redoSequence int
 
-	lastTxnEndSCN int // End SCN (record + 1) of the last completed transaction.
+	lastTxnEndSCN int64 // End SCN (record + 1) of the last completed transaction.
 
 	logminerStmt *sql.Stmt
 
@@ -332,7 +342,7 @@ func (s *replicationStream) run(ctx context.Context) error {
 func (s *replicationStream) poll(ctx context.Context) error {
 	for {
 		var startSCN = s.lastTxnEndSCN
-		var currentSCN int
+		var currentSCN int64
 		var row = s.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
 		if err := row.Scan(&currentSCN); err != nil {
 			return fmt.Errorf("fetching current SCN: %w", err)
@@ -343,7 +353,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// One challenge that makes this task more difficult is the need to have dictionary boundaries
 		// around a SCN range that we capture. Sometimes it is hard to find a dictionary bound range
 		// that is small enough to not exceed the limit of files we need
-		var endSCN = startSCN + s.db.config.Advanced.IncrementalSCNRange
+		var endSCN = startSCN + int64(s.db.config.Advanced.IncrementalSCNRange)
 
 		if currentSCN < endSCN {
 			endSCN = currentSCN
@@ -377,7 +387,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// on restart, but it saves us from missing events
 		s.lastTxnEndSCN = endSCN
 
-		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.Itoa(s.lastTxnEndSCN)}
+		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
 	}
 }
 
@@ -446,7 +456,7 @@ func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
 // receiveMessage reads and parses the next replication message from the database,
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
-func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN int) error {
+func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN int64) error {
 	rows, err := s.logminerStmt.QueryContext(ctx, startSCN, endSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)

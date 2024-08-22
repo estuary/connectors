@@ -203,7 +203,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		err := sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				if key == "ROWID" {
 					var value = n.Right.(*sqlparser.Literal).Val
 					after[key] = value
@@ -226,10 +227,12 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		if !ok {
 			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
 		}
+
 		err := sqlparser.VisitExpr(update.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				value, err := decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("update sql statement where clause %q, key %q: %w", msg.SQL, key, err)
@@ -260,7 +263,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		err = sqlparser.VisitExpr(undo.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				value, err := decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("update sql undo statement where clause %q, key %q: %w", msg.UndoSQL, key, err)
@@ -292,7 +296,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		err := sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				value, err := decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("delete sql statement %q, key %q: %w", msg.SQL, key, err)
