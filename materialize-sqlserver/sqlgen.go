@@ -46,7 +46,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGINT"),
 				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
 			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
@@ -56,7 +56,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 			sql.BINARY:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 			sql.MULTIPLE: sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				sql.MapStatic("BIGINT", sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
 				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
 				// The maximum length of a signed 64-bit integer is 19
 				// characters.

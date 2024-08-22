@@ -13,7 +13,7 @@ var pgDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer"), sql.UsingConverter(sql.CheckedInt64)),
+				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
 				sql.MapStatic("NUMERIC"),
 			),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
