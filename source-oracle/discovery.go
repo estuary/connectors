@@ -356,7 +356,13 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			t = reflect.TypeFor[[]byte]()
 			jsonType = "string"
 		} else {
-			return nil, nil, fmt.Errorf("unsupported data type: %s", dataType)
+			logrus.WithFields(logrus.Fields{
+				"owner":    sc.TableSchema,
+				"table":    sc.TableName,
+				"dataType": dataType,
+				"column":   sc.Name,
+			}).Warn("skipping column, data type is not supported")
+			continue
 		}
 
 		sc.DataType = oracleColumnType{
