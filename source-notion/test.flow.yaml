@@ -33,6 +33,7 @@ captures:
           cursorField:
             - last_edited_time
         target: acmeCo/blocks
+        disable: true
       - resource:
           stream: comments
           syncMode: incremental
