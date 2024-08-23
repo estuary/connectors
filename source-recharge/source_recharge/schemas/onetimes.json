@@ -10,8 +10,7 @@
       "type": ["null", "string"]
     },
     "created_at": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "customer_id": {
       "type": ["null", "string"]
@@ -48,8 +47,7 @@
       "type": ["null", "string"]
     },
     "updated_at": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "variant_title": {
       "type": ["null", "string"]
