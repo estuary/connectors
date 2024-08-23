@@ -1252,6 +1252,7 @@
           ]
         },
         "created_at": {
+          "format": "date-time",
           "type": [
             "null",
             "string"
@@ -1269,7 +1270,6 @@
           ]
         },
         "next_charge_scheduled_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
@@ -1330,6 +1330,7 @@
           ]
         },
         "updated_at": {
+          "format": "date-time",
           "type": [
             "null",
             "string"
