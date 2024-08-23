@@ -400,8 +400,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				"cursor": rs.cursor,
 			}).Trace("XID Event")
 			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-				Cursor:  fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
-				AtFence: rs.db.fence.Readout(),
+				Cursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
 			}); err != nil {
 				return err
 			}
@@ -889,22 +888,6 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 }
 
 func (rs *mysqlReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
-	// Mark the fence as reached when we observe a change event on the watermarks stream
-	// with the expected value.
-	if event, ok := event.(*sqlcapture.ChangeEvent); ok {
-		if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == rs.db.WatermarksTable() {
-			var expect = rs.db.fence.Watermark()
-			var actual = event.After["watermark"]
-			if actual == nil {
-				actual = event.After["WATERMARK"]
-			}
-			logrus.WithFields(logrus.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
-			if actual == expect && expect != "" {
-				rs.db.fence.Reached()
-			}
-		}
-	}
-
 	select {
 	case rs.events <- event:
 		return nil
@@ -913,8 +896,70 @@ func (rs *mysqlReplicationStream) emitEvent(ctx context.Context, event sqlcaptur
 	}
 }
 
-func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.DatabaseEvent {
-	return rs.events
+func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
+	// Time-based event streaming until the fenceAfter duration is reached.
+	if fenceAfter > 0 {
+		var deadline = time.NewTimer(fenceAfter)
+		defer deadline.Stop()
+
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-deadline.C:
+				break loop
+			case event, ok := <-rs.events:
+				if !ok {
+					return sqlcapture.ErrFenceNotReached
+				} else if err := callback(event); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Establish a watermark-based fence position.
+	var fenceWatermark = uuid.New().String()
+	if err := rs.db.WriteWatermark(ctx, fenceWatermark); err != nil {
+		return fmt.Errorf("error establishing watermark fence: %w", err)
+	}
+
+	// Stream replication events until the fence is reached.
+	var fenceReached = false
+	var watermarkStreamID = rs.db.WatermarksTable()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-rs.events:
+			if !ok {
+				return sqlcapture.ErrFenceNotReached
+			} else if err := callback(event); err != nil {
+				return err
+			}
+
+			// Mark the fence as reached when we observe a change event on the watermarks stream
+			// with the expected value.
+			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
+					var actual = event.After["watermark"]
+					if actual == nil {
+						actual = event.After["WATERMARK"]
+					}
+					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
+					if actual == fenceWatermark {
+						fenceReached = true
+					}
+				}
+			}
+
+			// The flush event following the watermark change ends the stream-to-fence operation.
+			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
+				return nil
+			}
+		}
+	}
 }
 
 func (rs *mysqlReplicationStream) Acknowledge(ctx context.Context, cursor string) error {

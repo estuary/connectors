@@ -3,7 +3,6 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/invopop/jsonschema"
@@ -80,10 +79,6 @@ type ChangeEvent struct {
 type FlushEvent struct {
 	// The cursor value at which the current transaction was committed.
 	Cursor string
-
-	// True if this FlushEvent also marks the point at which the most
-	// recently requested fence has been reached.
-	AtFence bool
 }
 
 // MetadataEvent informs the generic sqlcapture logic about changes to
@@ -104,7 +99,7 @@ func (*FlushEvent) isDatabaseEvent()    {}
 func (*MetadataEvent) isDatabaseEvent() {}
 
 func (*ChangeEvent) String() string    { return "ChangeEvent" }
-func (evt *FlushEvent) String() string { return fmt.Sprintf("FlushEvent(fence=%t)", evt.AtFence) }
+func (evt *FlushEvent) String() string { return "FlushEvent" }
 func (*MetadataEvent) String() string  { return "MetadataEvent" }
 
 // KeyFields returns suitable fields for extracting the event primary key.
@@ -124,11 +119,8 @@ type Database interface {
 	// ReplicationStream constructs a new ReplicationStream object, from which
 	// a neverending sequence of change events can be read.
 	ReplicationStream(ctx context.Context, startCursor string) (ReplicationStream, error)
-	// RequestFence asks for a new fence point to be established in the replication stream, which
-	// will show up as a FlushEvent with AtFence=true at some point in the future. It is an error
-	// to request a new fence when there is already an outstanding fence request.
-	RequestFence(ctx context.Context) error
-	// Once the capture is indefinitely streaming changes, it will request a new fence this often.
+
+	// Once the capture is indefinitely streaming changes, it will establish new fences at this interval.
 	StreamingFenceInterval() time.Duration
 
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
@@ -181,9 +173,17 @@ type Database interface {
 // tables before starting replication.
 type ReplicationStream interface {
 	ActivateTable(ctx context.Context, streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
-
 	StartReplication(ctx context.Context) error
-	Events() <-chan DatabaseEvent
+
+	// StreamToFence yields via the provided callback all change events between the
+	// current stream position and a new "fence" position which is guaranteed to be
+	// no earlier in the WAL than the point at which the StreamToFence call began.
+	//
+	// If fenceAfter is greater than zero, the fence should not be established until
+	// after the specified amount of time has passed. This should be used to guarantee
+	// that indefinite streaming doesn't busy-loop on an idle database.
+	StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event DatabaseEvent) error) error
+
 	Acknowledge(ctx context.Context, cursor string) error
 	Close(ctx context.Context) error
 }

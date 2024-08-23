@@ -319,7 +319,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	err = c.Run(ctx)
-	if errors.Is(err, errFenceNotReached) {
+	if errors.Is(err, ErrFenceNotReached) {
 		log.Warn("replication stream closed unexpectedly")
 		return nil
 	}
