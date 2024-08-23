@@ -50,18 +50,16 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 
 	var pos mysql.Position
 	if startCursor != "" {
-		var binlogName, binlogPos, err = splitCursor(startCursor)
+		pos, err = parseCursor(startCursor)
 		if err != nil {
 			return nil, fmt.Errorf("invalid resume cursor: %w", err)
 		}
-		pos.Name = binlogName
-		pos.Pos = uint32(binlogPos)
+		logrus.WithField("pos", pos).Debug("resuming from binlog position")
 	} else {
-		var status, err = db.queryBinlogStatus()
+		pos, err = db.queryBinlogPosition()
 		if err != nil {
 			return nil, err
 		}
-		pos = status.Position
 		logrus.WithField("pos", pos).Debug("initialized binlog position")
 	}
 
@@ -111,10 +109,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 	}
 
 	var stream = &mysqlReplicationStream{
-		db:       db,
-		syncer:   syncer,
-		streamer: streamer,
-		cursor:   pos,
+		db:          db,
+		syncer:      syncer,
+		streamer:    streamer,
+		startCursor: pos,
+		fenceCursor: pos,
 	}
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.discovery = make(map[string]sqlcapture.DiscoveryInfo)
@@ -123,16 +122,19 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 	return stream, nil
 }
 
-func splitCursor(cursor string) (string, int64, error) {
+func parseCursor(cursor string) (mysql.Position, error) {
 	seps := strings.Split(cursor, ":")
 	if len(seps) != 2 {
-		return "", 0, fmt.Errorf("input %q must have <logfile>:<position> shape", cursor)
+		return mysql.Position{}, fmt.Errorf("input %q must have <logfile>:<offset> shape", cursor)
 	}
-	position, err := strconv.ParseInt(seps[1], 10, 64)
+	offset, err := strconv.ParseInt(seps[1], 10, 64)
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid position value %q: %w", seps[1], err)
+		return mysql.Position{}, fmt.Errorf("invalid offset value %q: %w", seps[1], err)
 	}
-	return seps[0], position, nil
+	return mysql.Position{
+		Name: seps[0],
+		Pos:  uint32(offset),
+	}, nil
 }
 
 func splitHostPort(addr string) (string, int64, error) {
@@ -148,11 +150,12 @@ func splitHostPort(addr string) (string, int64, error) {
 }
 
 type mysqlReplicationStream struct {
-	db       *mysqlDatabase
-	syncer   *replication.BinlogSyncer
-	streamer *replication.BinlogStreamer
-	cursor   mysql.Position
-	events   chan sqlcapture.DatabaseEvent // Output channel from replication worker goroutine
+	db          *mysqlDatabase
+	syncer      *replication.BinlogSyncer
+	streamer    *replication.BinlogStreamer
+	startCursor mysql.Position                // The start position when the stream was created. Never updated.
+	fenceCursor mysql.Position                // The latest fence position, updated at the end of each StreamToFence cycle.
+	events      chan sqlcapture.DatabaseEvent // Output channel from replication worker goroutine
 
 	cancel context.CancelFunc // Cancellation thunk for the replication worker goroutine
 	errCh  chan error         // Error output channel for the replication worker goroutine
@@ -207,7 +210,7 @@ func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
 	rs.cancel = streamCancel
 
 	go func() {
-		var err = rs.run(streamCtx)
+		var err = rs.run(streamCtx, rs.startCursor)
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
@@ -218,34 +221,10 @@ func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
 	return nil
 }
 
-func (rs *mysqlReplicationStream) run(ctx context.Context) error {
-	for {
-		// Send "Metadata Change" events to the consumer where applicable.
-		//
-		// Note that the work is divided in two here so that the mutex-acquiring
-		// part cannot block and the blocking send doesn't hold the mutex. This
-		// helps avoid a (very unlikely) deadlock with the main thread calling
-		// ActivateTable() while the events buffer is full.
-		var metadataEvents []sqlcapture.DatabaseEvent
-		rs.tables.RLock()
-		for _, streamID := range rs.tables.dirtyMetadata {
-			var bs, err = json.Marshal(rs.tables.metadata[streamID])
-			if err != nil {
-				return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
-			}
-			metadataEvents = append(metadataEvents, &sqlcapture.MetadataEvent{
-				StreamID: streamID,
-				Metadata: json.RawMessage(bs),
-			})
-		}
-		rs.tables.dirtyMetadata = nil
-		rs.tables.RUnlock()
-		for _, metadataEvent := range metadataEvents {
-			if err := rs.emitEvent(ctx, metadataEvent); err != nil {
-				return err
-			}
-		}
+func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Position) error {
+	var cursor = startCursor
 
+	for {
 		// Process the next binlog event from the database.
 		var event, err = rs.streamer.GetEvent(ctx)
 		if err != nil {
@@ -253,7 +232,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		}
 
 		if event.Header.LogPos > 0 {
-			rs.cursor.Pos = event.Header.LogPos
+			cursor.Pos = event.Header.LogPos
 		}
 
 		switch data := event.Event.(type) {
@@ -306,7 +285,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					}
 					var sourceInfo = &mysqlSourceInfo{
 						SourceCommon: sourceCommon,
-						EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, cursor.Pos, rowIdx),
 					}
 					if rs.db.includeTxIDs[streamID] {
 						sourceInfo.TxID = rs.gtidString
@@ -345,7 +324,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						}
 						var sourceInfo = &mysqlSourceInfo{
 							SourceCommon: sourceCommon,
-							EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx/2),
+							EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, cursor.Pos, rowIdx/2),
 						}
 						if rs.db.includeTxIDs[streamID] {
 							sourceInfo.TxID = rs.gtidString
@@ -376,7 +355,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					}
 					var sourceInfo = &mysqlSourceInfo{
 						SourceCommon: sourceCommon,
-						EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, cursor.Pos, rowIdx),
 						TxID:         rs.gtidString,
 					}
 					if rs.db.includeTxIDs[streamID] {
@@ -397,10 +376,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.XIDEvent:
 			logrus.WithFields(logrus.Fields{
 				"xid":    data.XID,
-				"cursor": rs.cursor,
+				"cursor": cursor,
 			}).Trace("XID Event")
 			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-				Cursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
+				Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
 			}); err != nil {
 				return err
 			}
@@ -426,11 +405,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				return fmt.Errorf("error processing query event: %w", err)
 			}
 		case *replication.RotateEvent:
-			rs.cursor.Name = string(data.NextLogName)
-			rs.cursor.Pos = uint32(data.Position)
+			cursor.Name = string(data.NextLogName)
+			cursor.Pos = uint32(data.Position)
 			logrus.WithFields(logrus.Fields{
-				"name": rs.cursor.Name,
-				"pos":  rs.cursor.Pos,
+				"name": cursor.Name,
+				"pos":  cursor.Pos,
 			}).Trace("Rotate Event")
 		case *replication.FormatDescriptionEvent:
 			logrus.WithField("data", data).Trace("Format Description Event")
@@ -897,11 +876,30 @@ func (rs *mysqlReplicationStream) emitEvent(ctx context.Context, event sqlcaptur
 }
 
 func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
+	// Report "Metadata Change" events when necessary.
+	rs.tables.RLock()
+	if len(rs.tables.dirtyMetadata) > 0 {
+		for _, streamID := range rs.tables.dirtyMetadata {
+			var bs, err = json.Marshal(rs.tables.metadata[streamID])
+			if err != nil {
+				return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
+			}
+			if err := callback(&sqlcapture.MetadataEvent{
+				StreamID: streamID,
+				Metadata: json.RawMessage(bs),
+			}); err != nil {
+				return err
+			}
+		}
+		rs.tables.dirtyMetadata = nil
+	}
+	rs.tables.RUnlock()
+
 	// Time-based event streaming until the fenceAfter duration is reached.
+	var timedPhaseEvents int
 	if fenceAfter > 0 {
 		var deadline = time.NewTimer(fenceAfter)
 		defer deadline.Stop()
-
 	loop:
 		for {
 			select {
@@ -915,19 +913,37 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 				} else if err := callback(event); err != nil {
 					return err
 				}
+				timedPhaseEvents++
 			}
 		}
 	}
 
-	// Establish a watermark-based fence position.
-	var fenceWatermark = uuid.New().String()
-	if err := rs.db.WriteWatermark(ctx, fenceWatermark); err != nil {
-		return fmt.Errorf("error establishing watermark fence: %w", err)
+	// Establish a binlog-position fence.
+	var fencePosition, err = rs.db.queryBinlogPosition()
+	if err != nil {
+		return fmt.Errorf("error establishing binlog fence position: %w", err)
+	}
+	// If we're currently at the fence, no further event relaying is required
+	// and we'll exit early.
+	if fencePosition == rs.fenceCursor {
+		// As an internal sanity check, we assert that it should never be possible
+		// to hit this early exit unless the database has been idle since the prev
+		// fence was reached.
+		if timedPhaseEvents > 0 {
+			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d events during timed phase", timedPhaseEvents)
+		}
+
+		// Since we're still at a valid fence position and those are always between
+		// transactions, we can safely emit a synthetic FlushEvent here. This means
+		// that every StreamToFence operation ends in a flush, and is helpful since
+		// there's a lot of implicit assumptions of regular events / flushes caused
+		// by the old watermark table behavior.
+		return callback(&sqlcapture.FlushEvent{
+			Cursor: fmt.Sprintf("%s:%d", fencePosition.Name, fencePosition.Pos),
+		})
 	}
 
 	// Stream replication events until the fence is reached.
-	var fenceReached = false
-	var watermarkStreamID = rs.db.WatermarksTable()
 	for {
 		select {
 		case <-ctx.Done():
@@ -939,24 +955,20 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 				return err
 			}
 
-			// Mark the fence as reached when we observe a change event on the watermarks stream
-			// with the expected value.
-			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
-				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
-					var actual = event.After["watermark"]
-					if actual == nil {
-						actual = event.After["WATERMARK"]
-					}
-					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
-					if actual == fenceWatermark {
-						fenceReached = true
-					}
+			// The first flush event whose cursor position is equal to or after the fence
+			// position ends the stream-to-fence operation.
+			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				// It might be a bit inefficient to re-parse every flush cursor here, but
+				// realistically it's probably not a significant slowdown and it would be
+				// a bit of work to preserve the position as a typed struct.
+				var eventPosition, err = parseCursor(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
-			}
-
-			// The flush event following the watermark change ends the stream-to-fence operation.
-			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
-				return nil
+				if eventPosition.Compare(fencePosition) >= 0 {
+					rs.fenceCursor = eventPosition
+					return nil
+				}
 			}
 		}
 	}
