@@ -53,6 +53,7 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
+        is_rds = "rds.amazonaws.com" in discover.config.address
         if discover.config.network_tunnel:
             ssh_forwarding = discover.config.network_tunnel.ssh_forwarding
             params = oracledb.ConnectParams()
@@ -70,7 +71,7 @@ class Connector(
                 local_bind_port=port,
             )
         self.pool = create_pool(log, discover.config)
-        resources = await all_resources(log, self, discover.config, self.pool)
+        resources = await all_resources(log, self, discover.config, self.pool, is_rds)
         return common.discovered(resources)
 
     async def validate(
@@ -97,7 +98,7 @@ class Connector(
             )
         self.pool = create_pool(log, validate.config)
         await validate_flashback(log, validate.config, self.pool, is_rds)
-        resources = await all_resources(log, self, validate.config, self.pool)
+        resources = await all_resources(log, self, validate.config, self.pool, is_rds)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
@@ -124,7 +125,7 @@ class Connector(
             )
         self.pool = create_pool(log, open.capture.config)
         await validate_flashback(log, open.capture.config, self.pool, is_rds)
-        resources = await all_resources(log, self, open.capture.config, self.pool)
+        resources = await all_resources(log, self, open.capture.config, self.pool, is_rds)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
 
