@@ -15,6 +15,7 @@
         },
         "_meta": {
           "type": "object",
+          "description": "Metadata object added by Estuary.",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -48,6 +49,7 @@
         },
         "_meta": {
           "type": "object",
+          "description": "Metadata object added by Estuary.",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -81,6 +83,7 @@
         },
         "_meta": {
           "type": "object",
+          "description": "Metadata object added by Estuary.",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -114,6 +117,7 @@
         },
         "_meta": {
           "type": "object",
+          "description": "Metadata object added by Estuary.",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -140,10 +144,10 @@
     "documentSchema": {
       "type": "object",
       "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "type": "object",
+          "description": "Metadata object added by Estuary.",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -154,6 +158,7 @@
           ]
         }
       },
+      "additionalProperties": true,
       "x-infer-schema": true
     },
     "key": [
@@ -169,10 +174,10 @@
     "documentSchema": {
       "type": "object",
       "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "type": "object",
+          "description": "Metadata object added by Estuary.",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -183,6 +188,7 @@
           ]
         }
       },
+      "additionalProperties": true,
       "x-infer-schema": true
     },
     "key": [

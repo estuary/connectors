@@ -177,6 +177,9 @@ schemas:
       id:
         type: string
         description: The unique ID of the page.
+      _meta:
+        type: object
+        description: Metadata object added by Estuary.
     additionalProperties: true
   Feature:
     type: object
@@ -185,6 +188,9 @@ schemas:
       id:
         type: string
         description: The unique identifier of the feature.
+      _meta:
+        type: object
+        description: Metadata object added by Estuary.
     additionalProperties: true
   Report:
     type: object
@@ -193,6 +199,9 @@ schemas:
       id:
         type: string
         description: Unique ID of the report
+      _meta:
+        type: object
+        description: Metadata object added by Estuary.
     additionalProperties: true
   Guide:
     type: object
@@ -201,12 +210,23 @@ schemas:
       id:
         type: string
         description: Unique identifier of the guide.
+      _meta:
+        type: object
+        description: Metadata object added by Estuary.
     additionalProperties: true
   Account Metadata:
     type: object
     $schema: http://json-schema.org/schema#
+    properties:
+      _meta:
+        type: object
+        description: Metadata object added by Estuary.
     additionalProperties: true
   Visitor Metadata:
     type: object
     $schema: http://json-schema.org/schema#
+    properties:
+      _meta:
+        type: object
+        description: Metadata object added by Estuary.
     additionalProperties: true
