@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -44,11 +45,15 @@ func oracleTestBackend(t testing.TB) *testBackend {
 	}
 
 	var ctx = context.Background()
-	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", "config.yaml")
+	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", "config.rds.yaml")
 	var configRaw, err = sops.Output()
 	require.NoError(t, err)
+	var jq = exec.CommandContext(ctx, "jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	jq.Stdin = bytes.NewReader(configRaw)
+	cleanedConfig, err := jq.Output()
+	require.NoError(t, err)
 	var config Config
-	err = json.Unmarshal(configRaw, &config)
+	err = json.Unmarshal(cleanedConfig, &config)
 	require.NoError(t, err)
 
 	config.Advanced.BackfillChunkSize = 16
@@ -58,7 +63,7 @@ func oracleTestBackend(t testing.TB) *testBackend {
 	config.SetDefaults("test")
 
 	// Open control connection
-	db, err := connectOracle(ctx, "test", configRaw)
+	db, err := connectOracle(ctx, "test", cleanedConfig)
 	log.WithFields(log.Fields{
 		"user": config.User,
 		"addr": config.Address,
