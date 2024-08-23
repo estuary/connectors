@@ -97,7 +97,7 @@ async def validate_flashback(
 
 
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool,
+    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool, is_rds: bool,
 ) -> list[common.Resource]:
     resources_list = []
 
@@ -185,7 +185,7 @@ async def all_resources(
                 state,
                 task,
                 fetch_page=functools.partial(fetch_page, table, pool, task, config.advanced.backfill_chunk_size, sync_lock),
-                fetch_changes=functools.partial(fetch_changes, table, pool, sync_lock),
+                fetch_changes=functools.partial(fetch_changes, table, pool, sync_lock, is_rds),
             )
 
         keys = [f"/{c.column_name}" for c in t.primary_key]
