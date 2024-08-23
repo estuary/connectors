@@ -376,9 +376,11 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 	}
 
 	if fc.IgnoreStringFormat || fc.CastToString {
-		// Materialize this field as a string, and convert its values to strings
-		// if configured.
-		ddl, compatibleTypes, _ = d.m[STRING](p)
+		// Materialize this field as a "plain" string, and convert its values to
+		// strings if configured.
+		p := *p
+		p.Inference.String_ = &pf.Inference_String{}
+		ddl, compatibleTypes, _ = d.m[STRING](&p)
 		converter = ToStr
 	}
 
