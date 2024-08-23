@@ -21,6 +21,9 @@ func (db *oracleDatabase) SetupPrerequisites(ctx context.Context) []error {
 }
 
 func (db *oracleDatabase) prerequisiteSupplementalLogging(ctx context.Context, owner, tableName string) error {
+	if err := db.switchToCDB(ctx); err != nil {
+		return err
+	}
 	var row = db.conn.QueryRowContext(ctx, "SELECT SUPPLEMENTAL_LOG_DATA_ALL, SUPPLEMENTAL_LOG_DATA_MIN FROM V$DATABASE")
 	var all, min string
 	if err := row.Scan(&all, &min); err != nil {
@@ -52,6 +55,10 @@ func (db *oracleDatabase) prerequisiteSupplementalLogging(ctx context.Context, o
 				}).Warn("supplemental logging (ALL) COLUMNS not enabled on table, we can only capture columns with explicit supplemental logging enabled.")
 			}
 		}
+	}
+
+	if err := db.switchToPDB(ctx); err != nil {
+		return err
 	}
 
 	return nil

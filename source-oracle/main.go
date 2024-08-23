@@ -85,12 +85,14 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address     string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password    string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database    string         `json:"database" jsonschema:"default=ORCL,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
-	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database    string `json:"database" jsonschema:"default=ORCL,description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	PDBName     string `json:"pdb_name" jsonschema:"title=PDB Name,description=Name of Pluggable Database to connect to. This option is required for multi-tenant / container databases" jsonschema_extras:"order=4"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -216,6 +218,32 @@ func (db *oracleDatabase) isRDS() bool {
 
 func (db *oracleDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
+}
+
+// This function is a no-op if there is no PDB name configured
+func (db *oracleDatabase) switchToCDB(ctx context.Context) error {
+	if db.config.PDBName == "" {
+		return nil
+	}
+
+	if _, err := db.conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
+		return fmt.Errorf("switching to CDB: %w", err)
+	}
+
+	return nil
+}
+
+// This function is a no-op if there is no PDB name configured
+func (db *oracleDatabase) switchToPDB(ctx context.Context) error {
+	if db.config.PDBName == "" {
+		return nil
+	}
+
+	if _, err := db.conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET CONTAINER=%s", db.config.PDBName)); err != nil {
+		return fmt.Errorf("switching to PDB %s: %w", db.config.PDBName, err)
+	}
+
+	return nil
 }
 
 func (db *oracleDatabase) connect(_ context.Context) error {

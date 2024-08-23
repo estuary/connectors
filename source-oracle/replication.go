@@ -86,6 +86,8 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		db:   db,
 		conn: conn,
 
+		pdbName: db.config.PDBName,
+
 		lastTxnEndSCN: startSCN,
 		logminerStmt:  stmt,
 	}
@@ -94,6 +96,32 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 	stream.tables.keyColumns = make(map[string][]string)
 	stream.tables.discovery = make(map[string]*sqlcapture.DiscoveryInfo)
 	return stream, nil
+}
+
+// This function is a no-op if there is no PDB name configured
+func (s *replicationStream) switchToCDB(ctx context.Context) error {
+	if s.pdbName == "" {
+		return nil
+	}
+
+	if _, err := s.conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
+		return fmt.Errorf("switching to CDB: %w", err)
+	}
+
+	return nil
+}
+
+// This function is a no-op if there is no PDB name configured
+func (s *replicationStream) switchToPDB(ctx context.Context) error {
+	if s.pdbName == "" {
+		return nil
+	}
+
+	if _, err := s.conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET CONTAINER=%s", s.pdbName)); err != nil {
+		return fmt.Errorf("switching to PDB %s: %w", s.pdbName, err)
+	}
+
+	return nil
 }
 
 func (s *replicationStream) endLogminer(ctx context.Context) error {
@@ -201,14 +229,23 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		return err
 	}
 
+	if err := s.switchToCDB(ctx); err != nil {
+		return err
+	}
+
 	for _, f := range redoFiles {
 		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.Name); err != nil {
 			return fmt.Errorf("adding logfile %q (%s, %d, %s, %s) to logminer: %w", f.Name, f.Status, f.FirstChange, f.DictStart, f.DictEnd, err)
 		}
 	}
+
+	if err := s.switchToPDB(ctx); err != nil {
+		return err
+	}
+
 	s.redoSequence = redoSequence
 
-	return nil
+	return err
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
@@ -254,6 +291,8 @@ type replicationStream struct {
 	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
 	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
 	events chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
+
+	pdbName string // name of Pluggable Database for multitenant/container database systems
 
 	// sequence# of the last redo log file read, used to check if new log files have appeared
 	redoSequence int
@@ -457,9 +496,15 @@ func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN int64) error {
+	if err := s.switchToCDB(ctx); err != nil {
+		return err
+	}
 	rows, err := s.logminerStmt.QueryContext(ctx, startSCN, endSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
+	}
+	if err := s.switchToPDB(ctx); err != nil {
+		return err
 	}
 
 	var totalMessages = 0
