@@ -10,14 +10,14 @@
       "type": ["null", "string"]
     },
     "created_at": {
-      "type": ["null", "string"]
+      "type": ["null", "string"],
+      "format": "date-time"
     },
     "customer_id": {
       "type": ["null", "string"]
     },
     "next_charge_scheduled_at": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "price": {
       "type": ["null", "string"]
@@ -47,7 +47,8 @@
       "type": ["null", "string"]
     },
     "updated_at": {
-      "type": ["null", "string"]
+      "type": ["null", "string"],
+      "format": "date-time"
     },
     "variant_title": {
       "type": ["null", "string"]
