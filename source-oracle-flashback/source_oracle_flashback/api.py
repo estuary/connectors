@@ -22,6 +22,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     BasicAuth,
     Task,
+    Triggers,
 )
 
 from .models import (
@@ -248,6 +249,7 @@ async def fetch_changes(
     table: Table,
     pool: oracledb.AsyncConnectionPool,
     lock: asyncio.Lock,
+    is_rds: bool,
     # Remainder is common.FetchPageFn:
     log: Logger,
     scn: (int,),
@@ -276,7 +278,17 @@ async def fetch_changes(
                 c.arraysize = CHECKPOINT_EVERY
                 c.prefetchrows = CHECKPOINT_EVERY + 1
                 c.outputtypehandler = number_to_decimal
-                await c.execute(query)
+                try:
+                    await c.execute(query)
+                except Exception as e:
+                    # invalid lower limit snapshot expression
+                    # this error is common in RDS instances because their retention period
+                    # cannot be configured, and there is no remedy for it, so in case of
+                    # an RDS instance, we automatically trigger a backfill for these connectors
+                    if "ORA-30052" in str(e) and is_rds:
+                        log.info("Automatically triggering a backfill due to ORA-30052 (low retention period of redo logs has caused a gap in data)")
+                        yield Triggers.BACKFILL
+
                 cols = [col[0] for col in c.description]
                 c.rowfactory = functools.partial(changes_rowfactory, table.table_name, cols)
 
