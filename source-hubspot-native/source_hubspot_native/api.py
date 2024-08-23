@@ -1,7 +1,6 @@
 import asyncio
 import functools
 import itertools
-import json
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
@@ -14,6 +13,7 @@ from typing import (
 )
 
 from estuary_cdk.capture.common import (
+    BaseDocument,
     LogCursor,
     PageCursor,
 )
@@ -24,10 +24,16 @@ from .models import (
     Association,
     BatchResult,
     CRMObject,
+    Company,
+    Contact,
+    CustomObject,
     CustomObjectSchema,
     CustomObjectSearchResult,
+    Deal,
     EmailEvent,
     EmailEventsResponse,
+    Engagement,
+    Names,
     OldRecentCompanies,
     OldRecentContacts,
     OldRecentDeals,
@@ -36,17 +42,10 @@ from .models import (
     PageResult,
     Properties,
     SearchPageResult,
+    Ticket,
 )
 
 HUB = "https://api.hubapi.com"
-
-# Various HubSpot APIs (namely, v3 search and email events) are eventually consistent, and may not
-# produce monotonic ordering for very recent updates with respect to their updated timestamps. The
-# best we can do is hold back reading very recent documents, and assume that slightly older
-# documents are monotonic.  The value chosen here is largely arbitrary as there is no HubSpot
-# documentation regarding this eventual consistency at the moment.
-CONSISTENCY_HORIZON_DELTA: timedelta = timedelta(minutes=5)
-
 
 properties_cache: dict[str, Properties]= {}
 
@@ -64,7 +63,7 @@ async def fetch_properties(
     return properties_cache[object_name]
 
 
-async def fetch_page(
+async def fetch_page_with_assocations(
     # Closed over via functools.partial:
     cls: type[CRMObject],
     http: HTTPSession,
@@ -74,7 +73,7 @@ async def fetch_page(
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[CRMObject | str, None]:
-    
+
     assert isinstance(cutoff, datetime)
 
     url = f"{HUB}/crm/v3/objects/{object_name}"
@@ -144,7 +143,7 @@ async def fetch_page(
         yield result.paging.next.after
 
 
-async def fetch_batch(
+async def _fetch_batch(
     log: Logger,
     cls: type[CRMObject],
     http: HTTPSession,
@@ -193,7 +192,7 @@ async def fetch_batch_with_associations(
 ) -> BatchResult[CRMObject]:
 
     batch, all_associated = await asyncio.gather(
-        fetch_batch(log, cls, http, object_name, ids),
+        _fetch_batch(log, cls, http, object_name, ids),
         asyncio.gather(
             *(
                 fetch_association(log, cls, http, object_name, ids, e)
@@ -216,44 +215,154 @@ async def fetch_batch_with_associations(
 
 
 FetchRecentFn = Callable[
-    [Logger, HTTPSession, datetime, PageCursor],
-    Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
+    [Logger, HTTPSession, datetime],
+    AsyncGenerator[tuple[datetime, Any], None],
 ]
-"""
-FetchRecentFn is the common signature of all fetch_recent_$thing functions below.
-They return a page of (updatedAt, id) tuples for entities that have recently
-changed, starting from PageCursor and optionally using the provided datetime to
-lower-bound the look back. If there are additional pages, a PageCursor is returned.
+'''
+Returns a stream of (timestamp, document) tuples that represent a potentially
+incomplete stream of very recent documents. The timestamp is used to checkpoint
+the next log cursor.
 
-Pages may return IDs in any order, but paging will stop only upon seeing an entry
-that's as-old or older than the datetime cursor.
-"""
+Documents may be returned in any order, but iteration will be stopped upon
+seeing an entry that's as-old or older than the datetime cursor.
+'''
+
+FetchDelayedFn = Callable[
+    [Logger, HTTPSession, datetime, datetime],
+    AsyncGenerator[tuple[datetime, Any], None],
+]
+'''
+Returns a stream of (timestamp, document) tuples that represent a complete
+stream of not-so-recent documents.
+
+Similar to FetchRecentFn, documents may be returned in any order and iteration
+stops when seeing an entry that's as-old or older than the "since" datetime
+cursor, which is the first datetime parameter. The second datetime parameter
+represents an "until" value, and documents more recent than this are discarded
+and should usually not even be retrieved if possible.
+'''
+
+# In-memory cache of how far along the "delayed" change stream is.
+last_delayed_fetch_end: dict[str, datetime] = {}
+
+delayed_offset = timedelta(hours=1)
+delayed_fetch_minimum_window = timedelta(minutes=5)
 
 
-async def fetch_changes(
-    # Closed over via functools.partial:
-    cls: type[CRMObject],
-    fetch_recent: FetchRecentFn,
-    http: HTTPSession,
+async def process_changes(
     object_name: str,
-    fallback_to_search_api: bool,
+    fetch_recent: FetchRecentFn,
+    fetch_delayed: FetchDelayedFn,
+    http: HTTPSession,
     # Remainder is common.FetchChangesFn:
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[CRMObject | LogCursor, None]:
+) -> AsyncGenerator[Any | LogCursor, None]:
+    '''
+    High-level processing of changes event documents, where there is both a
+    stream of very recent documents that is potentially incomplete, and a
+    trailing stream that is delayed but 100% complete.
+
+    Every time this function is invoked, the FetchRecentFn is called and any
+    recent documents are emitted. If a sufficient amount of time has passed
+    since the last time the delayed stream was polled, the FetchDelayedFn is
+    called and those documents are emitted to ensure all documents are captured.
+    This process will inevitably result in some duplicate documents being
+    emitted, but some duplicates are better than missing data completely.
+
+    The LogCursor is based on the position of the recent stream in time. To keep
+    track of the progress of both the recent and delayed streams with a single
+    LogCursor, there's a few of important details to note:
+
+    - The delayed stream will only ever read documents as recent as
+      `delayed_offset` (1 hour).
+    - The delayed stream will always be polled up to the LogCursor timestamp
+      minus `delayed_offset` if the LogCursor to be emitted would represent a
+      delayed stream "window" of at least `delayed_fetch_minimum_window` (5
+      minutes).
+    - On connector initialization, the delayed stream is assumed to have last
+      polled up to the persisted LogCursor, less `delayed_offset` _and_
+      `delayed_fetch_minimum_window`. This ensures that when the connector
+      restarts the delayed stream does not resume any later than where it last
+      left off, and will in fact always resume from just prior to the oldest
+      point it may have left off.
+    - While the connector is running, the delayed stream progress is kept in
+      memory.
+    '''
     assert isinstance(log_cursor, datetime)
 
+    max_ts: datetime = log_cursor
+    async for ts, obj in fetch_recent(log, http, log_cursor):
+        if ts > log_cursor:
+            max_ts = max(max_ts, ts)
+            yield obj
+        else:
+            break
+
+    if max_ts > log_cursor:
+        # There were some documents from the recent stream, so see if we should
+        # poll the delayed stream. This does mean that the delayed stream is not
+        # polled unless there is a steady stream of documents from the recent
+        # stream to "drive" it. We can only emit documents if also emitting a
+        # checkpoint, and we can only emit a checkpoint if there are recent
+        # documents.
+        since = last_delayed_fetch_end.setdefault(
+            object_name, log_cursor - delayed_offset - delayed_fetch_minimum_window
+        )
+        until = max_ts - delayed_offset
+
+        # Poll the delayed stream for documents if we need to.
+        if until - since > delayed_fetch_minimum_window:
+            async for ts, obj in fetch_delayed(log, http, since, until):
+                if ts > until:
+                    # In case the FetchDelayedFn is unable to filter based on
+                    # `until`.
+                    continue
+                elif ts > since:
+                    yield obj
+                else:
+                    break
+
+            last_delayed_fetch_end[object_name] = until
+
+        yield max_ts
+
+
+_FetchIdsFn = Callable[
+    [PageCursor, int],
+    Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
+]
+'''
+Returns a stream of object IDs that can be used to fetch the full object details
+along with its associations. Used in `fetch_changes_with_associations`.
+
+IDs may be returned in any order, but iteration will be stopped upon seeing an
+entry that's as-old or older than the datetime cursor. Entries newer than the
+until datetime will be discarded.
+'''
+
+async def fetch_changes_with_associations(
+    object_name: str,
+    cls: type[CRMObject],
+    fetcher: _FetchIdsFn,
+    log: Logger,
+    http: HTTPSession,
+    since: datetime,
+    until: datetime | None = None
+) -> AsyncGenerator[tuple[datetime, CRMObject], None]:
+    
     # Walk pages of recent IDs until we see one which is as-old
-    # as `log_cursor`, or no pages remain.
+    # as `since`, or no pages remain.
     recent: list[tuple[datetime, str]] = []
     next_page: PageCursor = None
-    using_fallback = False
 
     while True:
-        iter, next_page = await fetch_recent(log, http, log_cursor, next_page)
+        iter, next_page = await fetcher(next_page, len(recent))
 
         for ts, id in iter:
-            if ts > log_cursor:
+            if until and ts > until:
+                continue
+            elif ts > since:
                 recent.append((ts, id))
             else:
                 next_page = None
@@ -261,149 +370,51 @@ async def fetch_changes(
         if not next_page:
             break
 
-        if fallback_to_search_api and not using_fallback and len(recent) >= 9_900:
-            log.info(f"falling back to Search API to return more than 10,000 recent records")
-
-            # Some fetch_recent functions are limited to a maximum number of
-            # recent records. After that point we can use the Search API to fill
-            # in the rest. The Search API is slower and has consistency problems
-            # with very recent data so it is generally not used as the first
-            # option for capturing data, but falling back to it is preferable
-            # over doing an entire re-backfill.
-            using_fallback = True
-            next_page = None
-
-            # The datetime of the oldest of the retrieved records is used here
-            # as the inclusive upper limit for the Search API. There may be many
-            # records with the same "created at" timestamp and runs of these
-            # records may span the `use_search_api_limit` boundary. In this case
-            # we will capture some of the same records twice.
-            fetch_recent = functools.partial(fetch_recent_search_objects, object_name, min(r[0] for r in recent))
-
     recent.sort()  # Oldest updates first.
 
     for batch_it in itertools.batched(recent, 50):
         batch = list(batch_it)
 
+        # Enable lookup of datetimes for IDs from the result batch.
+        dts = {r[1]: r[0] for r in batch}
+
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
             log, cls, http, object_name, [id for _, id in batch]
         )
         for doc in documents.results:
-            yield doc
-
-    if recent:
-        yield recent[-1][0]
+            yield dts[str(doc.id)], doc
 
 
-async def fetch_recent_companies(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/companies/v2/companies/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
-
-    result = OldRecentCompanies.model_validate_json(
-        await http.request(log, url, params=params)
-    )
-    return (
-        (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
-        for r in result.results
-    ), result.hasMore and result.offset
-
-
-async def fetch_recent_contacts(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/contacts/v1/lists/recently_updated/contacts/recent"
-    params = {"count": 100, "timeOffset": page} if page else {"count": 1}
-
-    result = OldRecentContacts.model_validate_json(
-        await http.request(log, url, params=params)
-    )
-    return (
-        (_ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
-        for r in result.contacts
-    ), result.has_more and result.time_offset
-
-
-async def fetch_recent_deals(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/deals/v1/deal/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
-
-    result = OldRecentDeals.model_validate_json(
-        await http.request(log, url, params=params)
-    )
-
-    return (
-        (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
-        for r in result.results
-    ), result.hasMore and result.offset
-
-
-async def fetch_recent_engagements(
-    log: Logger, http: HTTPSession, since: datetime, page: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/engagements/v1/engagements/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
-
-    result = OldRecentEngagements.model_validate_json(
-        await http.request(log, url, params=params)
-    )
-    return (
-        (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
-        for r in result.results
-    ), result.hasMore and result.offset
-
-
-async def fetch_recent_tickets(
-    log: Logger, http: HTTPSession, since: datetime, cursor: PageCursor
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-
-    url = f"{HUB}/crm-objects/v1/change-log/tickets"
-    params = {"timestamp": int(since.timestamp() * 1000) - 1}
-
-    result = TypeAdapter(list[OldRecentTicket]).validate_json(
-        await http.request(log, url, params=params)
-    )
-    return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
-
-
-async def fetch_recent_search_objects(
+async def fetch_search_objects(
     object_name: str,
-    until: datetime | None,
     log: Logger,
     http: HTTPSession,
     since: datetime,
+    until: datetime | None,
     cursor: PageCursor,
+    last_modified_property_name: str = "hs_lastmodifieddate"
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
-    if not until:
-        # Fetch up until the present time. The search API has known
-        # inconsistencies with very recent data, so a small offset is applied.
-        until = datetime.now(tz=UTC) - CONSISTENCY_HORIZON_DELTA
-        if until <= since:
-            return [], None
+
+    filter = {
+        "propertyName": last_modified_property_name,
+        "operator": "BETWEEN",
+        "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "highValue": until.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    } if until else {
+        "propertyName": last_modified_property_name,
+        "operator": "GTE",
+        "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    }
 
     input = {
-        "filters": [
-            {
-                "propertyName": "hs_lastmodifieddate",
-                "operator": "BETWEEN",
-                "highValue": until.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            },
-        ],
+        "filters": [filter],
         # Sort newest to oldest since paging stops when an item as old or older than `since` is
         # encountered per the handling in `fetch_changes`.
         "sorts": [
             {
-                "propertyName": "hs_lastmodifieddate",
+                "propertyName": last_modified_property_name,
                 "direction": "DESCENDING"
             }
         ],
@@ -418,6 +429,230 @@ async def fetch_recent_search_objects(
 
     newCursor = result.paging.next.after if result.paging else None
     return ((r.properties.hs_lastmodifieddate, str(r.id)) for r in result.results), newCursor
+
+
+def fetch_recent_custom_objects(
+    object_name: str, log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, CustomObject], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(object_name, log, http, since, None, page)
+
+    return fetch_changes_with_associations(
+        object_name, CustomObject, do_fetch, log, http, since,
+    )
+
+
+def fetch_delayed_custom_objects(
+    object_name: str, log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, CustomObject], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(object_name, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        object_name, CustomObject, do_fetch, log, http, since,
+    )
+
+def fetch_recent_companies(
+    log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, Company], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        if count >= 9_900:
+            log.warn("limit of 9,900 recent companies reached")
+            return [], None
+
+        url = f"{HUB}/companies/v2/companies/recent/modified"
+        params = {"count": 100, "offset": page} if page else {"count": 1}
+
+        result = OldRecentCompanies.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+        return (
+            (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
+            for r in result.results
+        ), result.hasMore and result.offset
+
+
+    return fetch_changes_with_associations(
+        Names.companies, Company, do_fetch, log, http, since,
+    )
+
+
+def fetch_delayed_companies(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, Company], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.companies, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.companies, Company, do_fetch, log, http, since
+    )
+
+
+def fetch_recent_contacts(
+    log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, Contact], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        # There is no documented limit on the number of contacts that can be
+        # returned by this API, other than that it goes back a maximum of 30 days.
+
+        url = f"{HUB}/contacts/v1/lists/recently_updated/contacts/recent"
+        params = {"count": 100, "timeOffset": page} if page else {"count": 1}
+
+        result = OldRecentContacts.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+        return (
+            (_ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
+            for r in result.contacts
+        ), result.has_more and result.time_offset
+
+
+    return fetch_changes_with_associations(
+        Names.contacts, Contact, do_fetch, log, http, since,
+    )
+
+
+def fetch_delayed_contacts(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, Contact], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.contacts, log, http, since, until, page, "lastmodifieddate")
+
+    return fetch_changes_with_associations(
+        Names.contacts, Contact, do_fetch, log, http, since
+    )
+
+
+def fetch_recent_deals(
+    log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, Deal], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        if count >= 9_900:
+            log.warn("limit of 9,900 recent deals reached")
+            return [], None
+
+        url = f"{HUB}/deals/v1/deal/recent/modified"
+        params = {"count": 100, "offset": page} if page else {"count": 1}
+
+        result = OldRecentDeals.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        return (
+            (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
+            for r in result.results
+        ), result.hasMore and result.offset
+
+
+    return fetch_changes_with_associations(
+        Names.deals, Deal, do_fetch, log, http, since,
+    )
+
+
+def fetch_delayed_deals(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, Deal], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.deals, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.deals, Deal, do_fetch, log, http, since
+    )
+
+
+async def _fetch_engagements(
+    log: Logger, http:  HTTPSession, page: PageCursor, count: int
+) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    if count >= 9_900:
+        # TODO(whb): Consider implementing some kind of automatic re-backfill
+        # functionality to better support this. "Engagements" as we are
+        # capturing them has a 10k limit on how many items the API can return,
+        # and there is no other API that can be used to get them within a
+        # certain time window. The only option here is to re-backfill.
+        raise Exception("Recent engagements limit of 9,900 items reached. This binding must be re-backfilled for the capture to continue.")
+
+    url = f"{HUB}/engagements/v1/engagements/recent/modified"
+    params = {"count": 100, "offset": page} if page else {"count": 1}
+
+    result = OldRecentEngagements.model_validate_json(
+        await http.request(log, url, params=params)
+    )
+    return (
+        (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
+        for r in result.results
+    ), result.hasMore and result.offset
+
+
+def fetch_recent_engagements(
+    log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, Engagement], None]:
+    return fetch_changes_with_associations(
+        Names.engagements,
+        Engagement,
+        functools.partial(_fetch_engagements, log, http),
+        log,
+        http,
+        since,
+    )
+
+
+def fetch_delayed_engagements(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, Engagement], None]:
+    # There is no way to fetch engagements other than starting with the most
+    # recent and reading backward, so this is the same process as fetching
+    # "recent" engagements. It relies on the filtering in
+    # `fetch_changes_with_associations` to ignore the more recent items.
+    return fetch_changes_with_associations(
+        Names.engagements,
+        Engagement,
+        functools.partial(_fetch_engagements, log, http),
+        log,
+        http,
+        since,
+    )
+
+
+def fetch_recent_tickets(
+    log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, Ticket], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        # This API will return a maximum of 1000 tickets, and does not appear to
+        # ever return an error. It just ends at the 1000 most recently modified
+        # tickets.
+        url = f"{HUB}/crm-objects/v1/change-log/tickets"
+        params = {"timestamp": int(since.timestamp() * 1000) - 1}
+
+        result = TypeAdapter(list[OldRecentTicket]).validate_json(
+            await http.request(log, url, params=params)
+        )
+        return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
+
+
+    return fetch_changes_with_associations(
+        Names.tickets, Ticket, do_fetch, log, http, since,
+    )
+
+
+def fetch_delayed_tickets(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, Ticket], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.tickets, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.tickets, Ticket, do_fetch, log, http, since
+    )
 
 
 async def list_custom_objects(
@@ -463,51 +698,43 @@ async def fetch_email_events_page(
         yield result.offset
 
 
-async def fetch_recent_email_events(
-    http: HTTPSession, log: Logger, log_cursor: LogCursor
-) -> AsyncGenerator[EmailEvent | LogCursor, None]:
-
-    assert isinstance(log_cursor, datetime)
-
+async def _fetch_email_events(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
+) -> AsyncGenerator[tuple[datetime, EmailEvent], None]:
     url = f"{HUB}/email/public/v1/events"
-    # The email events API has known inconsistencies with recent data. Empirical
-    # evidence suggests that values as short as 5 minutes are too recent, but 1
-    # hour of delay will work.
-    horizon = datetime.now(tz=UTC) - timedelta(hours=1)
-    if horizon <= log_cursor:
-        return
 
     input: Dict[str, Any] = {
-        "startTimestamp": _dt_to_ms(log_cursor),
-        "endTimestamp": _dt_to_ms(horizon),
+        "startTimestamp": _dt_to_ms(since),
         "limit": 1000,
     }
+    if until:
+        input["endTimestamp"] = _dt_to_ms(until)
 
-    max_ts = log_cursor
-
-    # Email events are in reverse-chronological order. Page through them and yield them along the
-    # way, which will not produce documents ordered chronologically, but it isn't practical to load
-    # them all into memory and sort.
-    yielded_event = False
     while True:
         result = EmailEventsResponse.model_validate_json(
             await http.request(log, url, params=input)
         )
 
         for event in result.events:
-            if event.created > max_ts:
-                max_ts = event.created
-
-            yielded_event = True
-            yield event
+            yield event.created, event
 
         if not result.hasMore:
             break
 
         input["offset"] = result.offset
 
-    if yielded_event:
-        yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
+
+def fetch_recent_email_events(
+    log: Logger, http: HTTPSession, since: datetime
+) -> AsyncGenerator[tuple[datetime, EmailEvent], None]:
+
+    return _fetch_email_events(log, http, since + timedelta(milliseconds=1), None)
+
+def fetch_delayed_email_events(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, EmailEvent], None]:
+
+    return _fetch_email_events(log, http, since, until)
 
 
 def _ms_to_dt(ms: int) -> datetime:
