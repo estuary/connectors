@@ -152,6 +152,7 @@ func decodeUnistr(input string) (string, error) {
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
 	var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
+
 	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return nil, err
@@ -325,7 +326,9 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		if err := translateRecordFields(discovery, after); err != nil {
 			return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 		}
-	} else if before != nil {
+	}
+
+	if before != nil {
 		rowid = before["ROWID"].(string)
 		if err := translateRecordFields(discovery, before); err != nil {
 			return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
