@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -273,8 +274,70 @@ type replicationStream struct {
 	}
 }
 
-func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
-	return s.events
+func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
+	// Time-based event streaming until the fenceAfter duration is reached.
+	if fenceAfter > 0 {
+		var deadline = time.NewTimer(fenceAfter)
+		defer deadline.Stop()
+
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-deadline.C:
+				break loop
+			case event, ok := <-s.events:
+				if !ok {
+					return sqlcapture.ErrFenceNotReached
+				} else if err := callback(event); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Establish a watermark-based fence position.
+	var fenceWatermark = uuid.New().String()
+	if err := s.db.WriteWatermark(ctx, fenceWatermark); err != nil {
+		return fmt.Errorf("error establishing watermark fence: %w", err)
+	}
+
+	// Stream replication events until the fence is reached.
+	var fenceReached = false
+	var watermarkStreamID = s.db.WatermarksTable()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-s.events:
+			if !ok {
+				return sqlcapture.ErrFenceNotReached
+			} else if err := callback(event); err != nil {
+				return err
+			}
+
+			// Mark the fence as reached when we observe a change event on the watermarks stream
+			// with the expected value.
+			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
+					var actual = event.After["watermark"]
+					if actual == nil {
+						actual = event.After["WATERMARK"]
+					}
+					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
+					if actual == fenceWatermark {
+						fenceReached = true
+					}
+				}
+			}
+
+			// The flush event following the watermark change ends the stream-to-fence operation.
+			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
+				return nil
+			}
+		}
+	}
 }
 
 // replicationBufferSize controls how many change events can be buffered in the
@@ -402,10 +465,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// on restart, but it saves us from missing events
 		s.lastTxnEndSCN = endSCN
 
-		s.events <- &sqlcapture.FlushEvent{
-			Cursor:  strconv.FormatInt(s.lastTxnEndSCN, 10),
-			AtFence: s.db.fence.Readout(),
-		}
+		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
 	}
 }
 
@@ -415,29 +475,12 @@ func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logmin
 		return err
 	}
 
-	// Mark the fence as reached when we observe a change event on the watermarks stream
-	// with the expected value.
-	if event, ok := event.(*sqlcapture.ChangeEvent); ok {
-		if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == s.db.WatermarksTable() {
-			var expect = s.db.fence.Watermark()
-			var actual = event.After["watermark"]
-			if actual == nil {
-				actual = event.After["WATERMARK"]
-			}
-			logrus.WithFields(logrus.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
-			if actual == expect && expect != "" {
-				s.db.fence.Reached()
-			}
-		}
-	}
-
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case s.events <- event:
+		return nil
 	}
-
-	return nil
 }
 
 // in WHERE AST, columns are quoted with backticks for some reason. This function

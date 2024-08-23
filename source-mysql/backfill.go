@@ -7,15 +7,8 @@ import (
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
-
-func (db *mysqlDatabase) RequestFence(ctx context.Context) error {
-	var watermark = uuid.New().String()
-	db.fence.SetWatermark(watermark)
-	return db.WriteWatermark(ctx, watermark)
-}
 
 func (db *mysqlDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")

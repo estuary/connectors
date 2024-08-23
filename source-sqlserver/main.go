@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -197,46 +196,6 @@ type sqlserverDatabase struct {
 
 	discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
 	datetimeLocation *time.Location                                    // The location in which to interpret DATETIME column values as timestamps.
-
-	fence fenceDetectionState // State of the watermark-based fence detection state machine.
-}
-
-// fenceDetectionState represents the state of the watermark-based fence detection logic.
-// It is guarded by a mutex for concurrent access.
-type fenceDetectionState struct {
-	sync.RWMutex
-	watermark string
-	reached   bool
-}
-
-func (s *fenceDetectionState) SetWatermark(wm string) {
-	s.Lock()
-	defer s.Unlock()
-	s.watermark = wm
-	s.reached = false
-}
-
-func (s *fenceDetectionState) Watermark() string {
-	s.RLock()
-	defer s.RUnlock()
-	return s.watermark
-}
-
-func (s *fenceDetectionState) Reached() {
-	s.Lock()
-	defer s.Unlock()
-	s.reached = true
-}
-
-func (s *fenceDetectionState) Readout() bool {
-	s.Lock()
-	var wasReached = s.reached
-	if s.reached {
-		s.reached = false
-		s.watermark = ""
-	}
-	s.Unlock()
-	return wasReached
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {

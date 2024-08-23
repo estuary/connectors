@@ -14,7 +14,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -133,7 +132,7 @@ const (
 )
 
 var (
-	errFenceNotReached = fmt.Errorf("replication stream closed before reaching fence")
+	ErrFenceNotReached = fmt.Errorf("replication stream closed before reaching fence")
 )
 
 // Run is the top level entry point of the capture process.
@@ -191,10 +190,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// any "Pending" streams into the "Backfill" state. This helps ensure that
 	// a given stream only ever observes replication events which occur *after*
 	// the connector was started.
-	if err := c.Database.RequestFence(ctx); err != nil {
-		return fmt.Errorf("error requesting fence: %w", err)
-	}
-	if err := c.streamCatchup(ctx, replStream); err != nil {
+	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 	for _, binding := range c.BindingsInState(TableModePending) {
@@ -278,9 +274,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	for c.BindingsCurrentlyBackfilling() != nil {
 		if err := c.backfillStreams(ctx); err != nil {
 			return fmt.Errorf("error performing backfill: %w", err)
-		} else if err := c.Database.RequestFence(ctx); err != nil {
-			return fmt.Errorf("error requesting fence: %w", err)
-		} else if err := c.streamToFence(ctx, replStream); err != nil {
+		} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
 			return fmt.Errorf("error streaming until fence: %w", err)
 		} else if err := c.emitState(); err != nil {
 			return err
@@ -442,67 +436,30 @@ func (c *Capture) updateState(_ context.Context) error {
 	return c.emitState()
 }
 
-func (c *Capture) streamCatchup(ctx context.Context, replStream ReplicationStream) error {
-	return c.streamToFenceWithOptions(ctx, replStream, true)
-}
-
-func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream) error {
-	return c.streamToFenceWithOptions(ctx, replStream, false)
-}
-
 func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
 	logrus.Info("streaming replication events indefinitely")
 	for ctx.Err() == nil {
-		// Spawn a worker goroutine which will request a fence after the appropriate interval.
-		var group, workerCtx = errgroup.WithContext(ctx)
-		group.Go(func() error {
-			select {
-			case <-workerCtx.Done():
-				logrus.Warn("not requesting fence due to context cancellation")
-				return workerCtx.Err()
-			case <-time.After(c.Database.StreamingFenceInterval()):
-				if err := c.Database.RequestFence(workerCtx); err != nil {
-					logrus.WithField("err", err).Error("failed to request fence")
-					return fmt.Errorf("error requesting fence: %w", err)
-				}
-				logrus.Debug("fence requested")
-				return nil
-			}
-		})
-
-		// Perform replication streaming until the fence is reached (or the
-		// fence-requesting thread returns an error which cancels the context).
-		group.Go(func() error {
-			if err := c.streamCatchup(workerCtx, replStream); err != nil {
-				return fmt.Errorf("error streaming until fence: %w", err)
-			}
-			return nil
-		})
-
-		if err := group.Wait(); err != nil {
+		if err := c.streamToFence(ctx, replStream, c.Database.StreamingFenceInterval(), true); err != nil {
 			return err
 		}
 	}
 	return ctx.Err()
 }
 
-// streamToFenceWithOptions implements two very similar operations:
+// streamToFence processes replication events until after a new fence is reached.
 //
-//   - streamCatchup: Processes replication events until the fence is reached
-//     and then stops. Whenever a database transaction commit is reported, a Flow
-//     state checkpoint update is emitted.
-//   - streamToFence: Like streamCatchup except that no state checkpoints are
-//     emitted during replication processing. This is done during backfills so that
-//     a chunk of backfilled rows plus all relevant replication events will be
-//     committed into the same Flow transaction.
+// If reportFlush is true then all database transaction commits will be reported as
+// Flow transaction commits, and if it's false then they will not (this is used in
+// backfills to ensure that a backfill chunk and all concurrent changes commit as
+// a single Flow transaction).
 //
-// Both operations are implemented as a single function here with a parameter
-// controlling checkpoint behavior because they're so similar.
-func (c *Capture) streamToFenceWithOptions(ctx context.Context, replStream ReplicationStream, reportFlush bool) error {
-	logrus.Info("streaming to fence")
+// The fenceAfter argument is passed to the underlying replication stream, so that
+// it can make sure to stream changes for at least that length of time.
+func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
+	logrus.WithField("fenceAfter", fenceAfter.String()).Info("streaming to fence")
 
 	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
-	var diagnosticsTimeout = time.AfterFunc(c.Database.StreamingFenceInterval()+automatedDiagnosticsTimeout, func() {
+	var diagnosticsTimeout = time.AfterFunc(fenceAfter+automatedDiagnosticsTimeout, func() {
 		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
 		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 			logrus.WithField("err", err).Error("replication diagnostics error")
@@ -515,36 +472,23 @@ func (c *Capture) streamToFenceWithOptions(ctx context.Context, replStream Repli
 	var eventCount int
 	defer func() { logrus.WithField("events", eventCount).Info("processed replication events") }()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case event, ok := <-replStream.Events():
-			if !ok {
-				return errFenceNotReached
-			}
-			eventCount++
+	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
+		eventCount++
 
-			// Flush events update the checkpointed LSN and trigger a state update.
-			// If this commit is at the requested fence, it also ends the loop.
-			if event, ok := event.(*FlushEvent); ok {
-				c.State.Cursor = event.Cursor
-				if reportFlush {
-					if err := c.emitState(); err != nil {
-						return fmt.Errorf("error emitting state update: %w", err)
-					}
+		// Flush events update the checkpointed LSN and trigger a state update.
+		// If this commit is at the requested fence, it also ends the loop.
+		if event, ok := event.(*FlushEvent); ok {
+			c.State.Cursor = event.Cursor
+			if reportFlush {
+				if err := c.emitState(); err != nil {
+					return fmt.Errorf("error emitting state update: %w", err)
 				}
-				if event.AtFence {
-					return nil
-				}
-				continue
 			}
-
-			if err := c.handleReplicationEvent(event); err != nil {
-				return err
-			}
+			return nil
 		}
-	}
+
+		return c.handleReplicationEvent(event)
+	})
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
