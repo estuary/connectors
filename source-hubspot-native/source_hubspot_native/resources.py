@@ -10,19 +10,27 @@ from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
+    FetchDelayedFn,
     FetchRecentFn,
-    fetch_changes,
+    fetch_delayed_companies,
+    fetch_delayed_contacts,
+    fetch_delayed_custom_objects,
+    fetch_delayed_deals,
+    fetch_delayed_email_events,
+    fetch_delayed_engagements,
+    fetch_delayed_tickets,
     fetch_email_events_page,
-    fetch_page,
+    fetch_page_with_assocations,
     fetch_properties,
     fetch_recent_companies,
     fetch_recent_contacts,
-    fetch_recent_search_objects,
+    fetch_recent_custom_objects,
     fetch_recent_deals,
     fetch_recent_email_events,
     fetch_recent_engagements,
     fetch_recent_tickets,
     list_custom_objects,
+    process_changes,
 )
 from .models import (
     OAUTH2_SPEC,
@@ -58,30 +66,33 @@ async def all_resources(
     custom_object_names = await list_custom_objects(log, http)
 
     custom_object_resources = [
-        crm_object(
-            CustomObject, n, http, functools.partial(fetch_recent_search_objects, n, None)
+        crm_object_with_associations(
+            CustomObject,
+            n,
+            http,
+            functools.partial(fetch_recent_custom_objects, n),
+            functools.partial(fetch_delayed_custom_objects, n),
         )
         for n in custom_object_names
     ]
 
     return [
-        crm_object(Company, Names.companies, http, fetch_recent_companies, True),
-        crm_object(Contact, Names.contacts, http, fetch_recent_contacts),
-        crm_object(Deal, Names.deals, http, fetch_recent_deals, True),
-        crm_object(Engagement, Names.engagements, http, fetch_recent_engagements),
-        crm_object(Ticket, Names.tickets, http, fetch_recent_tickets),
+        crm_object_with_associations(Company, Names.companies, http, fetch_recent_companies, fetch_delayed_companies),
+        crm_object_with_associations(Contact, Names.contacts, http, fetch_recent_contacts, fetch_delayed_contacts),
+        crm_object_with_associations(Deal, Names.deals, http, fetch_recent_deals, fetch_delayed_deals),
+        crm_object_with_associations(Engagement, Names.engagements, http, fetch_recent_engagements, fetch_delayed_engagements),
+        crm_object_with_associations(Ticket, Names.tickets, http, fetch_recent_tickets, fetch_delayed_tickets),
         properties(http, itertools.chain(standard_object_names, custom_object_names)),
         email_events(http),
         *custom_object_resources,
     ]
 
-
-def crm_object(
+def crm_object_with_associations(
     cls: type[CRMObject],
     object_name: str,
     http: HTTPSession,
     fetch_recent: FetchRecentFn,
-    fallback_to_search_api: bool = False,
+    fetch_delayed: FetchDelayedFn,
 ) -> Resource:
 
     def open(
@@ -96,8 +107,14 @@ def crm_object(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes, cls, fetch_recent, http, object_name, fallback_to_search_api),
-            fetch_page=functools.partial(fetch_page, cls, http, object_name),
+            fetch_changes=functools.partial(
+                process_changes,
+                object_name,
+                fetch_recent,
+                fetch_delayed,
+                http,
+            ),
+            fetch_page=functools.partial(fetch_page_with_assocations, cls, http, object_name),
         )
 
     started_at = datetime.now(tz=UTC)
@@ -165,7 +182,13 @@ def email_events(http: HTTPSession) -> Resource:
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_recent_email_events, http),
+            fetch_changes=functools.partial(
+                process_changes,
+                Names.email_events,
+                fetch_recent_email_events,
+                fetch_delayed_email_events,
+                http,
+            ),
             fetch_page=functools.partial(fetch_email_events_page, http),
         )
 
@@ -180,6 +203,6 @@ def email_events(http: HTTPSession) -> Resource:
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=Names.email_events, interval=timedelta(minutes=5)),
+        initial_config=ResourceConfig(name=Names.email_events),
         schema_inference=True,
     )

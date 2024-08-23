@@ -1067,8 +1067,7 @@
   {
     "recommendedName": "email_events",
     "resourceConfig": {
-      "name": "email_events",
-      "interval": "PT300S"
+      "name": "email_events"
     },
     "documentSchema": {
       "$defs": {
