@@ -152,6 +152,11 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 			}
 		}
 
+		if columnInfo == nil {
+			delete(f, id)
+			continue
+		}
+
 		var translated, err = translateRecordField(columnInfo, val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)

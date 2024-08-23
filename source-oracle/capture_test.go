@@ -64,7 +64,6 @@ func TestAllTypes(t *testing.T) {
 		{"interval_year", "INTERVAL YEAR(4) TO MONTH", NewRawTupleValue("INTERVAL '1234-5' YEAR(4) TO MONTH")},
 		{"interval_day", "INTERVAL DAY TO SECOND", NewRawTupleValue("INTERVAL '1 2:3:4.567' DAY TO SECOND(3)")},
 		{"r", "RAW(1000)", NewRawTupleValue("UTL_RAW.CAST_To_RAW('testing raw value')")},
-		{"anycol", "ANYDATA", NewRawTupleValue("NULL")},
 	}
 
 	var columnDefs = "("
@@ -122,6 +121,42 @@ func TestNullValues(t *testing.T) {
 		{"interval_year", "INTERVAL YEAR(4) TO MONTH", NewRawTupleValue("NULL")},
 		{"interval_day", "INTERVAL DAY TO SECOND", NewRawTupleValue("NULL")},
 		{"r", "RAW(1000)", NewRawTupleValue("NULL")},
+	}
+
+	var columnDefs = "("
+	var vals []any
+	for idx, tv := range typesAndValues {
+		if idx > 0 {
+			columnDefs += ", "
+		}
+		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
+		vals = append(vals, tv[2])
+	}
+	columnDefs += ")"
+	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)
+
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestUnsupportedTypes(t *testing.T) {
+	var unique = "18110541"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var typesAndValues = [][]any{
+		{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
+		{"anycol", "ANYDATA", NewRawTupleValue("NULL")},
 	}
 
 	var columnDefs = "("
