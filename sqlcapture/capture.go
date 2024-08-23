@@ -475,8 +475,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		eventCount++
 
-		// Flush events update the checkpointed LSN and trigger a state update.
-		// If this commit is at the requested fence, it also ends the loop.
+		// Flush events update the checkpoint LSN and may trigger a state update.
 		if event, ok := event.(*FlushEvent); ok {
 			c.State.Cursor = event.Cursor
 			if reportFlush {

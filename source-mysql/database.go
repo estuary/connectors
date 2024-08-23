@@ -90,3 +90,11 @@ func (db *mysqlDatabase) queryBinlogStatus() (*binlogStatus, error) {
 		Extra: extra,
 	}, nil
 }
+
+func (db *mysqlDatabase) queryBinlogPosition() (mysql.Position, error) {
+	var status, err = db.queryBinlogStatus()
+	if err != nil {
+		return mysql.Position{}, err
+	}
+	return status.Position, nil
+}
