@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -167,8 +168,70 @@ func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context) erro
 	return nil
 }
 
-func (rs *sqlserverReplicationStream) Events() <-chan sqlcapture.DatabaseEvent {
-	return rs.events
+func (rs *sqlserverReplicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
+	// Time-based event streaming until the fenceAfter duration is reached.
+	if fenceAfter > 0 {
+		var deadline = time.NewTimer(fenceAfter)
+		defer deadline.Stop()
+
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-deadline.C:
+				break loop
+			case event, ok := <-rs.events:
+				if !ok {
+					return sqlcapture.ErrFenceNotReached
+				} else if err := callback(event); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Establish a watermark-based fence position.
+	var fenceWatermark = uuid.New().String()
+	if err := rs.db.WriteWatermark(ctx, fenceWatermark); err != nil {
+		return fmt.Errorf("error establishing watermark fence: %w", err)
+	}
+
+	// Stream replication events until the fence is reached.
+	var fenceReached = false
+	var watermarkStreamID = rs.db.WatermarksTable()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-rs.events:
+			if !ok {
+				return sqlcapture.ErrFenceNotReached
+			} else if err := callback(event); err != nil {
+				return err
+			}
+
+			// Mark the fence as reached when we observe a change event on the watermarks stream
+			// with the expected value.
+			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
+					var actual = event.After["watermark"]
+					if actual == nil {
+						actual = event.After["WATERMARK"]
+					}
+					log.WithFields(log.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
+					if actual == fenceWatermark {
+						fenceReached = true
+					}
+				}
+			}
+
+			// The flush event following the watermark change ends the stream-to-fence operation.
+			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
+				return nil
+			}
+		}
+	}
 }
 
 func (rs *sqlserverReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
@@ -322,8 +385,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	var cursor = base64.StdEncoding.EncodeToString(toLSN)
 	log.WithField("cursor", cursor).Debug("checkpoint at cursor")
 	rs.events <- &sqlcapture.FlushEvent{
-		Cursor:  cursor,
-		AtFence: rs.db.fence.Readout(),
+		Cursor: cursor,
 	}
 	rs.fromLSN = toLSN
 
@@ -634,22 +696,6 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 }
 
 func (rs *sqlserverReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
-	// Mark the fence as reached when we observe a change event on the watermarks stream
-	// with the expected value.
-	if event, ok := event.(*sqlcapture.ChangeEvent); ok {
-		if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == rs.db.WatermarksTable() {
-			var expect = rs.db.fence.Watermark()
-			var actual = event.After["watermark"]
-			if actual == nil {
-				actual = event.After["WATERMARK"]
-			}
-			log.WithFields(log.Fields{"expected": expect, "actual": actual}).Debug("watermark change")
-			if actual == expect && expect != "" {
-				rs.db.fence.Reached()
-			}
-		}
-	}
-
 	select {
 	case rs.events <- event:
 		return nil

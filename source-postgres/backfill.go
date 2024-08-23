@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
@@ -170,12 +169,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
 	return backfillComplete, nil
-}
-
-func (db *postgresDatabase) RequestFence(ctx context.Context) error {
-	var watermark = uuid.New().String()
-	db.fence.SetWatermark(watermark)
-	return db.WriteWatermark(ctx, watermark)
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
