@@ -1,5 +1,5 @@
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, Self, TypeVar
 
@@ -386,7 +386,8 @@ class EmailEvent(BaseDocument, extra="allow"):
         "UNBOUNCE", # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
     ] = Field(
         default="UNBOUNCE",
-        json_schema_extra=lambda x: x.pop('default'), # Don't schematize the default value.
+        # Don't schematize the default value. 
+        json_schema_extra=lambda x: x.pop('default'), # type: ignore
     )
 
 
@@ -420,6 +421,18 @@ class CustomObjectSearchResult(BaseModel):
 
     class Properties(BaseModel):
         hs_lastmodifieddate: AwareDatetime
+
+        @model_validator(mode="before")
+        def set_lastmodifieddate(cls, values):
+            assert isinstance(values, dict)
+
+            # The "Contacts" object uses `lastmodifieddate`, while everything
+            # else uses `hs_lastmodifieddate`.
+            if 'lastmodifieddate' in values:
+                values['hs_lastmodifieddate'] = datetime.fromisoformat(values.pop('lastmodifieddate'))
+            elif 'hs_lastmodifieddate' in values:
+                values['hs_lastmodifieddate'] = datetime.fromisoformat(values.pop('hs_lastmodifieddate'))
+            return values
 
     id: int
     properties: Properties
