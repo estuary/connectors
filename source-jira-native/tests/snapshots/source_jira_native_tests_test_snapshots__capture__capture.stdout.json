@@ -3,6 +3,8 @@
     "acmeCo/application_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "defaultGroups": [
@@ -53,6 +55,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 45,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10122",
@@ -71,6 +75,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10300",
@@ -89,6 +95,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10303",
@@ -107,6 +115,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10304",
@@ -125,6 +135,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10306",
@@ -143,6 +155,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10307",
@@ -161,6 +175,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10308",
@@ -179,6 +195,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10309",
@@ -197,6 +215,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10310",
@@ -215,6 +235,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10311",
@@ -233,6 +255,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10312",
@@ -251,6 +275,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10313",
@@ -269,6 +295,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10314",
@@ -287,6 +315,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10315",
@@ -305,6 +335,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10316",
@@ -323,6 +355,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10318",
@@ -341,6 +375,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10320",
@@ -359,6 +395,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10321",
@@ -377,6 +415,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10322",
@@ -395,6 +435,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10323",
@@ -413,6 +455,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 46,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10334",
@@ -431,6 +475,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 47,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10335",
@@ -449,6 +495,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 48,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10336",
@@ -467,6 +515,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 49,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10337",
@@ -485,6 +535,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 50,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10338",
@@ -503,6 +555,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 51,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10339",
@@ -521,6 +575,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 52,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10340",
@@ -539,6 +595,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 53,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10341",
@@ -557,6 +615,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 54,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10342",
@@ -575,6 +635,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 55,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10343",
@@ -593,6 +655,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 56,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10344",
@@ -611,6 +675,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 57,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10345",
@@ -629,6 +695,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 58,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10346",
@@ -647,6 +715,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 59,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10347",
@@ -665,6 +735,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 60,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10348",
@@ -683,6 +755,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 61,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10349",
@@ -701,6 +775,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 62,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10350",
@@ -719,6 +795,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 63,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10351",
@@ -737,6 +815,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 64,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10352",
@@ -755,6 +835,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10400",
@@ -773,6 +855,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 20,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10401",
@@ -791,6 +875,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 21,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10402",
@@ -809,6 +895,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 22,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10403",
@@ -827,6 +915,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 23,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10404",
@@ -845,6 +935,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 24,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10405",
@@ -863,6 +955,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 25,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10406",
@@ -881,6 +975,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 26,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10407",
@@ -899,6 +995,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 27,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10408",
@@ -917,6 +1015,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 28,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10409",
@@ -935,6 +1035,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 29,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10410",
@@ -953,6 +1055,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 30,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10411",
@@ -971,6 +1075,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 31,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10412",
@@ -989,6 +1095,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 32,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10413",
@@ -1007,6 +1115,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 33,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10414",
@@ -1025,6 +1135,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 34,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10415",
@@ -1043,6 +1155,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 35,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10416",
@@ -1061,6 +1175,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 36,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10417",
@@ -1079,6 +1195,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 37,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10418",
@@ -1097,6 +1215,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 38,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10419",
@@ -1115,6 +1235,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 39,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10420",
@@ -1133,6 +1255,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 40,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10421",
@@ -1151,6 +1275,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 41,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10422",
@@ -1169,6 +1295,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 42,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10423",
@@ -1187,6 +1315,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 43,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10424",
@@ -1205,6 +1335,8 @@
     "acmeCo/avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 44,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10425",
@@ -1223,6 +1355,8 @@
     "acmeCo/boards",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": 1,
@@ -1246,6 +1380,8 @@
     "acmeCo/board_issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
@@ -1265,6 +1401,8 @@
     "acmeCo/board_issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
@@ -1284,6 +1422,8 @@
     "acmeCo/board_issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
@@ -1303,6 +1443,8 @@
     "acmeCo/board_issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
@@ -1322,6 +1464,8 @@
     "acmeCo/dashboards",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "editPermissions": [],
@@ -1345,6 +1489,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "1df64970-af63-4a9b-9e4e-b66885446c20",
@@ -1355,6 +1501,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "34161fe0-2e2d-445b-8edb-46f4a37dafb8",
@@ -1365,6 +1513,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "441b716a-726f-4557-92be-e2de5a57f91c",
@@ -1375,6 +1525,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "5e2c20db-0932-4391-bd27-0ba693468132",
@@ -1385,6 +1537,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "83d6a024-cc15-45be-a35a-551107c31f4c",
@@ -1395,6 +1549,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "ae31b774-d7f4-4c5c-81d8-b2dbb341ff64",
@@ -1405,6 +1561,8 @@
     "acmeCo/groups",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "groupId": "c8cd20a8-9387-4c7c-89c0-482076c6d36a",
@@ -1415,6 +1573,8 @@
     "acmeCo/issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "changelog": {
@@ -1671,6 +1831,8 @@
     "acmeCo/issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "changelog": {
@@ -1927,6 +2089,8 @@
     "acmeCo/issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "changelog": {
@@ -2181,6 +2345,8 @@
     "acmeCo/issues",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "changelog": {
@@ -2435,6 +2601,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 68,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -2455,6 +2623,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 62,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -2475,6 +2645,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 39,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -2495,6 +2667,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -2515,6 +2689,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 42,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2537,6 +2713,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 61,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2560,6 +2738,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 78,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2582,6 +2762,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 45,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2605,6 +2787,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 24,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2628,6 +2812,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 65,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2650,6 +2836,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 69,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2675,6 +2863,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 70,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2704,6 +2894,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 71,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2730,6 +2922,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 72,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2757,6 +2951,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 73,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2783,6 +2979,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 56,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2809,6 +3007,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 57,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2835,6 +3035,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 59,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2861,6 +3063,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 60,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2887,6 +3091,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 63,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2913,6 +3119,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 49,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2938,6 +3146,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 50,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2963,6 +3173,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 51,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -2988,6 +3200,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 52,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3013,6 +3227,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 53,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3038,6 +3254,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 55,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3064,6 +3282,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 34,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3089,6 +3309,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 35,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3114,6 +3336,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 36,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3139,6 +3363,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 37,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3164,6 +3390,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 25,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3190,6 +3418,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 26,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3217,6 +3447,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 27,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3242,6 +3474,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 29,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3267,6 +3501,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 30,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3293,6 +3529,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 31,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3319,6 +3557,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 33,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3344,6 +3584,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3369,6 +3611,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3394,6 +3638,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3419,6 +3665,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3444,6 +3692,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3470,6 +3720,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3496,6 +3748,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3521,6 +3775,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3546,6 +3802,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3573,6 +3831,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 48,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3595,6 +3855,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 75,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3618,6 +3880,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 74,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3640,6 +3904,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3663,6 +3929,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 46,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3684,6 +3952,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 41,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3707,6 +3977,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 22,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -3727,6 +3999,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3750,6 +4024,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 32,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3773,6 +4049,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 20,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3795,6 +4073,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3813,6 +4093,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 28,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3835,6 +4117,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 76,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3857,6 +4141,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3879,6 +4165,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 67,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3901,6 +4189,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3923,6 +4213,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3946,6 +4238,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 58,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3968,6 +4262,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 44,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -3990,6 +4286,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4008,6 +4306,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4030,6 +4330,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 66,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4053,6 +4355,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 64,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4075,6 +4379,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 23,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -4091,6 +4397,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 38,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4114,6 +4422,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 47,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4137,6 +4447,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4159,6 +4471,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 54,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -4179,6 +4493,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 43,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4202,6 +4518,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 40,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4225,6 +4543,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 77,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4247,6 +4567,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 21,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4269,6 +4591,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 79,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [],
@@ -4290,6 +4614,8 @@
     "acmeCo/issue_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "clauseNames": [
@@ -4312,6 +4638,8 @@
     "acmeCo/issue_field_configurations",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "The default field configuration",
@@ -4324,6 +4652,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 31,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4339,6 +4669,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 32,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4354,6 +4686,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 33,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4369,6 +4703,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 34,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4384,6 +4720,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 35,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4399,6 +4737,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 26,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4414,6 +4754,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 27,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4429,6 +4771,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 28,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4444,6 +4788,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 29,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4459,6 +4805,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 30,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4474,6 +4822,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 20,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4489,6 +4839,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 21,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4504,6 +4856,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 22,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4519,6 +4873,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 23,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4534,6 +4890,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 24,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4549,6 +4907,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 25,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4564,6 +4924,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4579,6 +4941,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4594,6 +4958,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4609,6 +4975,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4624,6 +4992,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4639,6 +5009,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4654,6 +5026,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4669,6 +5043,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4684,6 +5060,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4699,6 +5077,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4714,6 +5094,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4729,6 +5111,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4744,6 +5128,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4759,6 +5145,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4774,6 +5162,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by JIRA",
@@ -4789,6 +5179,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by JIRA",
@@ -4804,6 +5196,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by JIRA",
@@ -4819,6 +5213,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4834,6 +5230,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by Jira",
@@ -4849,6 +5247,8 @@
     "acmeCo/issue_custom_field_contexts",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default configuration scheme generated by JIRA",
@@ -4864,6 +5264,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10104",
@@ -4877,6 +5279,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10104",
@@ -4890,6 +5294,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10104",
@@ -4903,6 +5309,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10104",
@@ -4916,6 +5324,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10105",
@@ -4929,6 +5339,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10105",
@@ -4942,6 +5354,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10105",
@@ -4955,6 +5369,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10106",
@@ -4968,6 +5384,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10106",
@@ -4981,6 +5399,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10106",
@@ -4994,6 +5414,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10106",
@@ -5007,6 +5429,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10107",
@@ -5020,6 +5444,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10107",
@@ -5033,6 +5459,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10107",
@@ -5046,6 +5474,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10107",
@@ -5059,6 +5489,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10107",
@@ -5072,6 +5504,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10112",
@@ -5085,6 +5519,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10112",
@@ -5098,6 +5534,8 @@
     "acmeCo/issue_custom_field_options",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "contextId": "10112",
@@ -5111,6 +5549,8 @@
     "acmeCo/issue_link_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10000",
@@ -5124,6 +5564,8 @@
     "acmeCo/issue_link_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10001",
@@ -5137,6 +5579,8 @@
     "acmeCo/issue_link_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10002",
@@ -5150,6 +5594,8 @@
     "acmeCo/issue_link_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10003",
@@ -5163,6 +5609,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Assignee",
@@ -5173,6 +5621,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Created",
@@ -5183,6 +5633,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Due date",
@@ -5193,6 +5645,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Key",
@@ -5203,6 +5657,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Issue Type",
@@ -5213,6 +5669,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Priority",
@@ -5223,6 +5681,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Reporter",
@@ -5233,6 +5693,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Resolution",
@@ -5243,6 +5705,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Status",
@@ -5253,6 +5717,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Summary",
@@ -5263,6 +5729,8 @@
     "acmeCo/issue_navigator_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "label": "Updated",
@@ -5273,6 +5741,8 @@
     "acmeCo/issue_notification_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "expand": "notificationSchemeEvents,user,group,projectRole,field,all",
@@ -5285,6 +5755,8 @@
     "acmeCo/issue_notification_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "expand": "notificationSchemeEvents,user,group,projectRole,field,all",
@@ -5303,6 +5775,8 @@
     "acmeCo/issue_priorities",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "This problem will block progress.",
@@ -5318,6 +5792,8 @@
     "acmeCo/issue_priorities",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Serious problem that could block progress.",
@@ -5333,6 +5809,8 @@
     "acmeCo/issue_priorities",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Has the potential to affect progress.",
@@ -5348,6 +5826,8 @@
     "acmeCo/issue_priorities",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Minor problem or easily worked around.",
@@ -5363,6 +5843,8 @@
     "acmeCo/issue_priorities",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Trivial problem with little or no impact on progress.",
@@ -5378,6 +5860,8 @@
     "acmeCo/issue_resolutions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Work has been completed on this issue.",
@@ -5391,6 +5875,8 @@
     "acmeCo/issue_security_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": 10000,
@@ -5402,6 +5888,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5433,6 +5921,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5464,6 +5954,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5495,6 +5987,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5526,6 +6020,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5557,6 +6053,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5588,6 +6086,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5619,6 +6119,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5650,6 +6152,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5681,6 +6185,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5712,6 +6218,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5743,6 +6251,8 @@
     "acmeCo/issue_transitions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasScreen": false,
@@ -5774,6 +6284,8 @@
     "acmeCo/issue_type_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default issue type scheme is the list of global issue types. All newly created issue types will automatically be added to this scheme.",
@@ -5786,6 +6298,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "A big user story that needs to be broken down. Created by Jira Software - do not edit or delete.",
@@ -5802,6 +6316,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarId": 10318,
@@ -5825,6 +6341,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarId": 10303,
@@ -5848,6 +6366,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarId": 10315,
@@ -5871,6 +6391,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarId": 10307,
@@ -5894,6 +6416,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarId": 10316,
@@ -5917,6 +6441,8 @@
     "acmeCo/issue_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarId": 10300,
@@ -5934,6 +6460,8 @@
     "acmeCo/issue_type_screen_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "The default issue type screen scheme",
@@ -5945,6 +6473,8 @@
     "acmeCo/issue_votes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasVoted": false,
@@ -5958,6 +6488,8 @@
     "acmeCo/issue_votes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasVoted": false,
@@ -5971,6 +6503,8 @@
     "acmeCo/issue_votes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasVoted": false,
@@ -5984,6 +6518,8 @@
     "acmeCo/issue_votes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "hasVoted": false,
@@ -5997,6 +6533,8 @@
     "acmeCo/issue_watchers",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "isWatching": true,
@@ -6026,6 +6564,8 @@
     "acmeCo/issue_watchers",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "isWatching": true,
@@ -6055,6 +6595,8 @@
     "acmeCo/issue_watchers",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "isWatching": true,
@@ -6084,6 +6626,8 @@
     "acmeCo/issue_watchers",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "isWatching": true,
@@ -6113,6 +6657,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 43,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "instance.try.intent",
@@ -6126,6 +6672,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 50,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.hash-id",
@@ -6139,6 +6687,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 47,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.is-dismissable",
@@ -6152,6 +6702,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 48,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.is-enabled",
@@ -6165,6 +6717,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 46,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.message",
@@ -6178,6 +6732,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 52,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.v2.bg-color",
@@ -6191,6 +6747,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 51,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.v2.content",
@@ -6204,6 +6762,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 56,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.v2.hash-id",
@@ -6217,6 +6777,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 53,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.v2.is-dismissable",
@@ -6230,6 +6792,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 54,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.announcement.banner.v2.is-enabled",
@@ -6243,6 +6807,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 55,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "allowedValues": [
@@ -6260,6 +6826,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 49,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "allowedValues": [
@@ -6277,6 +6845,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 57,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.compass.is-enabled-for-new-project",
@@ -6290,6 +6860,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 60,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.confluence.enable-content-creation-issue-confluence-content",
@@ -6303,6 +6875,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 59,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.confluence.enable-content-creation-issue-top-actions",
@@ -6316,6 +6890,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 61,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.confluence.enable-integrations",
@@ -6329,6 +6905,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 58,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.admin.confluence.enable-sprint-retros",
@@ -6342,6 +6920,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.clone.prefix",
@@ -6355,6 +6935,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 40,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "The minimum number of comments needing to be hidden for comment collapsing to occur. 0 means there will be no comment collapsing.",
@@ -6369,6 +6951,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "This part is only for the Java (server side) generated dates. Note that this should correspond to the javascript date picker format (jira.date.picker.javascript.format) setting.",
@@ -6383,6 +6967,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "This part is only for the JavaScript (client side) generated dates. Note that this should correspond to the java date picker format (jira.date.picker.java.format) setting.",
@@ -6397,6 +6983,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "This part is only for the Java (server side) generated datetimes. Note that this should correspond to the javascript datetime picker format (jira.date.time.picker.javascript.format) setting.",
@@ -6411,6 +6999,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "This part is only for the JavaScript (client side) generated date times. Note that this should correspond to the java datetime picker format (jira.date.time.picker.java.format) setting.",
@@ -6425,6 +7015,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "Turning it on will cause Monday to be the first day of week in the Date Picker, as specified by the ISO8601 standard",
@@ -6439,6 +7031,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 38,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.favicon.use.projecticon",
@@ -6452,6 +7046,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "allowedValues": [
@@ -6470,6 +7066,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "Turn on to update search results automatically",
@@ -6484,6 +7082,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "example": "23/May/07 3:55 AM",
@@ -6498,6 +7098,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "example": "Wednesday 3:55 AM",
@@ -6512,6 +7114,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "example": "23/May/07",
@@ -6526,6 +7130,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "example": "3:55 AM",
@@ -6540,6 +7146,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 22,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.favicon.hires.url",
@@ -6553,6 +7161,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 21,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.favicon.url",
@@ -6566,6 +7176,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color1",
@@ -6579,6 +7191,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color2",
@@ -6592,6 +7206,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color3",
@@ -6605,6 +7221,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color4",
@@ -6618,6 +7236,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color5",
@@ -6631,6 +7251,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color6",
@@ -6644,6 +7266,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.gadget.color7",
@@ -6657,6 +7281,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 33,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.hero.button.base.bg.colour",
@@ -6670,6 +7296,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 34,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.hero.button.text.colour",
@@ -6683,6 +7311,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 20,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.logo.show.application.title",
@@ -6696,6 +7326,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.logo.url",
@@ -6709,6 +7341,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 30,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.menu.bgcolour",
@@ -6722,6 +7356,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 31,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.menu.separator",
@@ -6735,6 +7371,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 32,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.menu.textcolour",
@@ -6748,6 +7386,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 24,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "The background color of the main navigation bar",
@@ -6762,6 +7402,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 25,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "The color of the create button and highlight color for the selected navigation item",
@@ -6776,6 +7418,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 35,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.text.activelinkcolour",
@@ -6789,6 +7433,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 36,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.text.headingcolour",
@@ -6802,6 +7448,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 37,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.text.linkcolour",
@@ -6815,6 +7463,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 23,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.top.bgcolour",
@@ -6828,6 +7478,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 26,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.top.hilightcolour",
@@ -6841,6 +7493,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 27,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.top.separator.bgcolor",
@@ -6854,6 +7508,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 28,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.top.textcolour",
@@ -6867,6 +7523,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 29,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.lf.top.texthilightcolour",
@@ -6880,6 +7538,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 41,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "The number of days before a prompt to sign up to the Jira Insiders newsletter is shown. A value of -1 disables this functionality.",
@@ -6894,6 +7554,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 42,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.option.globalsharing",
@@ -6907,6 +7569,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 45,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "jira.service-management.legacy-automation.state",
@@ -6920,6 +7584,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 39,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "desc": "Specifies the sort order of the issue links on the 'View Issue' screen.",
@@ -6934,6 +7600,8 @@
     "acmeCo/jira_settings",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 44,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "xflow.product.suggestions.enabled",
@@ -6947,6 +7615,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to comment on issues.",
@@ -6959,6 +7629,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Create and administer projects, issue types, fields, workflows, and schemes for all projects. Users with this permission can perform most administration tasks, except: managing users, importing data, and editing system email settings.",
@@ -6971,6 +7643,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to administer a project in Jira.",
@@ -6983,6 +7657,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Users with this permission may be assigned to issues.",
@@ -6995,6 +7671,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to assign issues to other people.",
@@ -7007,6 +7685,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to browse projects and the issues within them.",
@@ -7019,6 +7699,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Modify collections of issues at once. For example, resolve multiple issues in one step.",
@@ -7031,6 +7713,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to close issues. Often useful where your developers resolve issues, and a QA department closes them.",
@@ -7043,6 +7727,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Users with this permission may create attachments.",
@@ -7055,6 +7741,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to create issues.",
@@ -7067,6 +7755,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Create projects separate from shared configurations and schemes. Team-managed projects don't affect existing projects or shared configurations like workflows, fields or permissions. Only licensed users can create team-managed projects.",
@@ -7079,6 +7769,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Share dashboards and filters with other users.",
@@ -7091,6 +7783,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Users with this permission may delete all attachments.",
@@ -7103,6 +7797,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to delete all comments made on issues.",
@@ -7115,6 +7811,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to delete all worklogs made on issues.",
@@ -7127,6 +7825,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to delete issues.",
@@ -7139,6 +7839,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Users with this permission may delete own attachments.",
@@ -7151,6 +7853,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to delete own comments made on issues.",
@@ -7163,6 +7867,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to delete own worklogs made on issues.",
@@ -7175,6 +7881,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to edit all comments made on issues.",
@@ -7187,6 +7895,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 20,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to edit all worklogs made on issues.",
@@ -7199,6 +7909,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 21,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to edit issues.",
@@ -7211,6 +7923,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 22,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to edit own comments made on issues.",
@@ -7223,6 +7937,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 23,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to edit own worklogs made on issues.",
@@ -7235,6 +7951,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 24,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to link issues together and create linked issues. Only useful if issue linking is turned on.",
@@ -7247,6 +7965,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 25,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Create and delete group filter subscriptions.",
@@ -7259,6 +7979,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 26,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to manage sprints.",
@@ -7271,6 +7993,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 27,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to manage the watchers of an issue.",
@@ -7283,6 +8007,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 28,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to modify the reporter when creating or editing an issue.",
@@ -7295,6 +8021,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 29,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to move issues between projects or between workflows of the same project (if applicable). Note the user can only move issues to a project they have the create permission for.",
@@ -7307,6 +8035,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 30,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to resolve and reopen issues. This includes the ability to set a fix version.",
@@ -7319,6 +8049,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 31,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to view or edit an issue's due date.",
@@ -7331,6 +8063,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 32,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to set the level of security on an issue so that only people in that security level can see the issue.",
@@ -7343,6 +8077,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 33,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to perform all administration functions. There must be at least one group with this permission.",
@@ -7355,6 +8091,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 34,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to transition issues.",
@@ -7367,6 +8105,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 35,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "View and select users or groups from the user picker, and share issues. Users with this permission can see the names of all users and groups on your site.",
@@ -7379,6 +8119,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 36,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Users with this permission will have access to view combined and summarized project data, regardless of their individual permissions.",
@@ -7391,6 +8133,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 37,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Allows users in a software project to view development-related information on the issue, such as commits, reviews and build information.",
@@ -7403,6 +8147,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 38,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Users with this permission may view a read-only version of a workflow.",
@@ -7415,6 +8161,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 39,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to view the voters and watchers of an issue.",
@@ -7427,6 +8175,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 40,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Ability to log work done against an issue. Only useful if Time Tracking is turned on.",
@@ -7439,6 +8189,8 @@
     "acmeCo/permissions",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 41,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Enables the Atlassian Home for Jira Cloud issue glance field in issue sidebars, for connecting a Jira issue to a project overview",
@@ -7451,6 +8203,8 @@
     "acmeCo/permission_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "This is the default Permission Scheme. Any new projects that are created will be assigned this scheme.",
@@ -8139,6 +8893,8 @@
     "acmeCo/permission_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "expand": "permissions,user,group,projectRole,field,all",
@@ -9528,6 +10284,8 @@
     "acmeCo/projects",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "avatarUrls": {
@@ -9568,6 +10326,8 @@
     "acmeCo/project_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "A project role that represents administrators in a project",
@@ -9580,6 +10340,8 @@
     "acmeCo/project_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "actors": [
@@ -9690,6 +10452,8 @@
     "acmeCo/project_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Admins can do most things, like update settings and add other admins.",
@@ -9708,6 +10472,8 @@
     "acmeCo/project_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Members are part of the team, and can add, edit, and collaborate on all work.",
@@ -9726,6 +10492,8 @@
     "acmeCo/project_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Viewers can search through, view, and comment on your team's work, but not much else.",
@@ -9744,6 +10512,8 @@
     "acmeCo/project_roles",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "A project role that represents Connect add-ons declaring a scope that requires more than read issue permissions",
@@ -9762,6 +10532,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10400",
@@ -9781,6 +10553,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10401",
@@ -9800,6 +10574,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10402",
@@ -9819,6 +10595,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10403",
@@ -9838,6 +10616,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10404",
@@ -9857,6 +10637,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10405",
@@ -9876,6 +10658,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10406",
@@ -9895,6 +10679,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10407",
@@ -9914,6 +10700,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10408",
@@ -9933,6 +10721,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10409",
@@ -9952,6 +10742,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10410",
@@ -9971,6 +10763,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10411",
@@ -9990,6 +10784,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10412",
@@ -10009,6 +10805,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10413",
@@ -10028,6 +10826,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10414",
@@ -10047,6 +10847,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 15,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10415",
@@ -10066,6 +10868,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10416",
@@ -10085,6 +10889,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10417",
@@ -10104,6 +10910,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10418",
@@ -10123,6 +10931,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10419",
@@ -10142,6 +10952,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 20,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10420",
@@ -10161,6 +10973,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 21,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10421",
@@ -10180,6 +10994,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 22,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10422",
@@ -10199,6 +11015,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 23,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10423",
@@ -10218,6 +11036,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 24,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10424",
@@ -10237,6 +11057,8 @@
     "acmeCo/project_avatars",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 25,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "10425",
@@ -10256,6 +11078,8 @@
     "acmeCo/project_email",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "emailAddress": "jira@sourcejira.atlassian.net",
@@ -10266,10 +11090,12 @@
     "acmeCo/project_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "color": "#1D8832",
-      "descriptionI18nKey": "jira.project.type.business.description",
+      "descriptionKey": "jira.project.type.business.description",
       "formattedKey": "Business",
       "icon": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pg0KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE4LjEuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPg0KPHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCINCgkgdmlld0JveD0iMCAwIDMwMCAzMDAiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDMwMCAzMDA7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxnIGlkPSJMYXllcl8yIj4NCgk8cGF0aCBzdHlsZT0iZmlsbDojMzU3MkIwOyIgZD0iTTE1MCwwQzY2LjY2NywwLDAsNjYuNjY3LDAsMTUwczY2LjY2NywxNTAsMTUwLDE1MHMxNTAtNjYuNjY3LDE1MC0xNTBTMjMzLjMzMywwLDE1MCwweg0KCQkgTTE2Ni42NjcsMjE2LjY2N0g4My4zMzNWMjAwaDgzLjMzM1YyMTYuNjY3eiBNMjE2LjY2NywxODMuMzMzSDgzLjMzM3YtMTYuNjY3aDEzMy4zMzNWMTgzLjMzM3ogTTIxNi42NjcsMTUwSDgzLjMzM3YtMTYuNjY3DQoJCWgxMzMuMzMzVjE1MHogTTIxNi42NjcsMTE2LjY2N0g4My4zMzNWMTAwaDEzMy4zMzNWMTE2LjY2N3oiLz4NCjwvZz4NCjxyZWN0IHg9IjgzLjMzMyIgeT0iMjAwIiBzdHlsZT0iZmlsbDojRkZGRkZGOyIgd2lkdGg9IjgzLjMzMyIgaGVpZ2h0PSIxNi42NjciLz4NCjxyZWN0IHg9IjgzLjMzMyIgeT0iMTY2LjY2NyIgc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIHdpZHRoPSIxMzMuMzMzIiBoZWlnaHQ9IjE2LjY2NyIvPg0KPHJlY3QgeD0iODMuMzMzIiB5PSIxMzMuMzMzIiBzdHlsZT0iZmlsbDojRkZGRkZGOyIgd2lkdGg9IjEzMy4zMzMiIGhlaWdodD0iMTYuNjY3Ii8+DQo8cmVjdCB4PSI4My4zMzMiIHk9IjEwMCIgc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIHdpZHRoPSIxMzMuMzMzIiBoZWlnaHQ9IjE2LjY2NyIvPg0KPC9zdmc+DQo=",
       "key": "business"
@@ -10279,10 +11105,12 @@
     "acmeCo/project_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "color": "#F5A623",
-      "descriptionI18nKey": "jira.project.type.polaris.description",
+      "descriptionKey": "jira.project.type.polaris.description",
       "formattedKey": "Product Discovery",
       "icon": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pg0KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE4LjEuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPg0KPHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCINCgkgdmlld0JveD0iMCAwIDMwMCAzMDAiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDMwMCAzMDA7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxnIGlkPSJMYXllcl8yIj4NCgk8cGF0aCBzdHlsZT0iZmlsbDojRjc5MjMyOyIgZD0iTTE1MCwwQzY2LjY2NywwLDAsNjYuNjY3LDAsMTUwczY2LjY2NywxNTAsMTUwLDE1MHMxNTAtNjYuNjY3LDE1MC0xNTBTMjMzLjMzMywwLDE1MCwweg0KCQkgTTEzNi42NjcsMTc4LjMzM0wxMjUsMTkwbC00MS42NjctNDBMOTUsMTM4LjMzM2wzMC0zMEwxMzYuNjY3LDEyMGwtMzAsMzBMMTM2LjY2NywxNzguMzMzeiBNMjA1LDE2MS42NjdsLTMwLDMwTDE2My4zMzMsMTgwDQoJCWwzMC0zMGwtMzAtMzBMMTc1LDEwOC4zMzNMMjE2LjY2NywxNTBMMjA1LDE2MS42Njd6Ii8+DQo8L2c+DQo8Zz4NCgk8cG9seWdvbiBzdHlsZT0iZmlsbDojRkZGRkZGOyIgcG9pbnRzPSIxNzUsMTkxLjY2NyAyMDUsMTYxLjY2NyAyMTYuNjY3LDE1MCAxNzUsMTA4LjMzMyAxNjMuMzMzLDEyMCAxOTMuMzMzLDE1MCAxNjMuMzMzLDE4MCAJIi8+DQoJPHBvbHlnb24gc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIHBvaW50cz0iMTI1LDEwOC4zMzMgOTUsMTM4LjMzMyA4My4zMzMsMTUwIDEyNSwxOTAgMTM2LjY2NywxNzguMzMzIDEwNi42NjcsMTUwIDEzNi42NjcsMTIwIAkiLz4NCjwvZz4NCjwvc3ZnPg0K",
       "key": "product_discovery"
@@ -10292,10 +11120,12 @@
     "acmeCo/project_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "color": "#67AB49",
-      "descriptionI18nKey": "jira.project.type.servicedesk.description.jsm",
+      "descriptionKey": "jira.project.type.servicedesk.description.jsm",
       "formattedKey": "Service Desk",
       "icon": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pg0KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE4LjEuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPg0KPHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCINCgkgdmlld0JveD0iMCAwIDMwMCAzMDAiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDMwMCAzMDA7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxnIGlkPSJMYXllcl8yIj4NCgk8Zz4NCgkJPHJlY3QgeD0iMTAwIiB5PSIxMDAiIHN0eWxlPSJmaWxsOiM2N0FCNDk7IiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjY2LjY2NyIvPg0KCQk8cGF0aCBzdHlsZT0iZmlsbDojNjdBQjQ5OyIgZD0iTTE1MCwwQzY2LjY2NywwLDAsNjYuNjY3LDAsMTUwczY2LjY2NywxNTAsMTUwLDE1MHMxNTAtNjYuNjY3LDE1MC0xNTBTMjMzLjMzMywwLDE1MCwweg0KCQkJIE0yMTYuNjY3LDEwMHY2Ni42Njd2MTYuNjY3aC01MFYyMDBIMjAwdjE2LjY2N0gxMDBWMjAwaDMzLjMzM3YtMTYuNjY3aC01MHYtMTYuNjY3VjEwMFY4My4zMzNoMTMzLjMzM1YxMDB6Ii8+DQoJPC9nPg0KPC9nPg0KPHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yMTYuNjY3LDE4My4zMzN2LTE2LjY2N1YxMDBWODMuMzMzSDgzLjMzM1YxMDB2NjYuNjY3djE2LjY2N2g1MFYyMDBIMTAwdjE2LjY2N2gxMDBWMjAwaC0zMy4zMzMNCgl2LTE2LjY2N0gyMTYuNjY3eiBNMTAwLDE2Ni42NjdWMTAwaDEwMHY2Ni42NjdIMTAweiIvPg0KPC9zdmc+DQo=",
       "key": "service_desk"
@@ -10305,10 +11135,12 @@
     "acmeCo/project_types",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "color": "#F5A623",
-      "descriptionI18nKey": "jira.project.type.software.description",
+      "descriptionKey": "jira.project.type.software.description",
       "formattedKey": "Software",
       "icon": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/Pg0KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE4LjEuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPg0KPHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCINCgkgdmlld0JveD0iMCAwIDMwMCAzMDAiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDMwMCAzMDA7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4NCjxnIGlkPSJMYXllcl8yIj4NCgk8cGF0aCBzdHlsZT0iZmlsbDojRjc5MjMyOyIgZD0iTTE1MCwwQzY2LjY2NywwLDAsNjYuNjY3LDAsMTUwczY2LjY2NywxNTAsMTUwLDE1MHMxNTAtNjYuNjY3LDE1MC0xNTBTMjMzLjMzMywwLDE1MCwweg0KCQkgTTEzNi42NjcsMTc4LjMzM0wxMjUsMTkwbC00MS42NjctNDBMOTUsMTM4LjMzM2wzMC0zMEwxMzYuNjY3LDEyMGwtMzAsMzBMMTM2LjY2NywxNzguMzMzeiBNMjA1LDE2MS42NjdsLTMwLDMwTDE2My4zMzMsMTgwDQoJCWwzMC0zMGwtMzAtMzBMMTc1LDEwOC4zMzNMMjE2LjY2NywxNTBMMjA1LDE2MS42Njd6Ii8+DQo8L2c+DQo8Zz4NCgk8cG9seWdvbiBzdHlsZT0iZmlsbDojRkZGRkZGOyIgcG9pbnRzPSIxNzUsMTkxLjY2NyAyMDUsMTYxLjY2NyAyMTYuNjY3LDE1MCAxNzUsMTA4LjMzMyAxNjMuMzMzLDEyMCAxOTMuMzMzLDE1MCAxNjMuMzMzLDE4MCAJIi8+DQoJPHBvbHlnb24gc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIHBvaW50cz0iMTI1LDEwOC4zMzMgOTUsMTM4LjMzMyA4My4zMzMsMTUwIDEyNSwxOTAgMTM2LjY2NywxNzguMzMzIDEwNi42NjcsMTUwIDEzNi42NjcsMTIwIAkiLz4NCjwvZz4NCjwvc3ZnPg0K",
       "key": "software"
@@ -10318,6 +11150,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Allows to update all system fields.",
@@ -10329,6 +11163,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "This screen is used in the workflow and enables you to assign issues",
@@ -10340,6 +11176,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Allows to set resolution, change fix versions and assign an issue.",
@@ -10351,6 +11189,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -10368,6 +11208,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -10385,6 +11227,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -10402,6 +11246,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -10419,6 +11265,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -10436,6 +11284,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -10453,6 +11303,8 @@
     "acmeCo/screens",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Testing",
@@ -10464,6 +11316,8 @@
     "acmeCo/screen_tabs",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": 10000,
@@ -10475,6 +11329,8 @@
     "acmeCo/screen_tabs",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": 10001,
@@ -10486,6 +11342,8 @@
     "acmeCo/screen_tabs",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": 10002,
@@ -10497,6 +11355,8 @@
     "acmeCo/screen_tabs",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": 10009,
@@ -10508,6 +11368,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "assignee",
@@ -10520,6 +11382,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 18,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "assignee",
@@ -10532,6 +11396,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 13,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "attachment",
@@ -10544,6 +11410,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "components",
@@ -10556,6 +11424,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "description",
@@ -10568,6 +11438,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "duedate",
@@ -10580,6 +11452,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "environment",
@@ -10592,6 +11466,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "fixVersions",
@@ -10604,6 +11480,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 17,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "fixVersions",
@@ -10616,6 +11494,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "issuetype",
@@ -10628,6 +11508,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 14,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "labels",
@@ -10640,6 +11522,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "priority",
@@ -10652,6 +11536,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "reporter",
@@ -10664,6 +11550,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 16,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "resolution",
@@ -10676,6 +11564,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "security",
@@ -10688,6 +11578,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "summary",
@@ -10700,6 +11592,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "timetracking",
@@ -10712,6 +11606,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "versions",
@@ -10724,6 +11620,8 @@
     "acmeCo/screen_tab_fields",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 19,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "worklog",
@@ -10736,6 +11634,8 @@
     "acmeCo/screen_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "Default Screen Scheme",
@@ -10750,6 +11650,8 @@
     "acmeCo/sprints",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
@@ -10765,6 +11667,8 @@
     "acmeCo/time_tracking",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "key": "JIRA",
@@ -10775,6 +11679,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:0867a421-a9ee-4659-801a-bc0ee4a4487e",
@@ -10794,6 +11700,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:214cdd6a-ff93-4d8b-838b-62dfcf1a2a71",
@@ -10813,6 +11721,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:950f9f5b-3d6d-4e1d-954a-21367ae9ac75",
@@ -10832,6 +11742,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077",
@@ -10851,6 +11763,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5b6c7b3afbc68529c6c47967",
@@ -10870,6 +11784,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5cb4ae0e4b97ab11a18e00c7",
@@ -10889,6 +11805,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5cf112d31552030f1e3a5905",
@@ -10908,6 +11826,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5d53f3cbc6b9320d9ea5bdc2",
@@ -10927,6 +11847,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5dd64082af96bc0efbe55103",
@@ -10946,6 +11868,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "60e5a86a471e61006a4c51fd",
@@ -10965,6 +11889,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "630db2cd9796033b256bc349",
@@ -10984,6 +11910,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "63a22fb348b367d78a14c15b",
@@ -11003,6 +11931,8 @@
     "acmeCo/users",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "712020:3a54029e-8d15-49aa-a939-35bb05752d83",
@@ -11024,6 +11954,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 7,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:0867a421-a9ee-4659-801a-bc0ee4a4487e",
@@ -11065,6 +11997,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:214cdd6a-ff93-4d8b-838b-62dfcf1a2a71",
@@ -11106,6 +12040,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 8,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:950f9f5b-3d6d-4e1d-954a-21367ae9ac75",
@@ -11152,6 +12088,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "557058:f58131cb-b67d-43c7-b30d-6b58d40bd077",
@@ -11198,6 +12136,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5b6c7b3afbc68529c6c47967",
@@ -11239,6 +12179,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 6,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5cb4ae0e4b97ab11a18e00c7",
@@ -11285,6 +12227,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 11,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5cf112d31552030f1e3a5905",
@@ -11326,6 +12270,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 5,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5d53f3cbc6b9320d9ea5bdc2",
@@ -11367,6 +12313,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 9,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "5dd64082af96bc0efbe55103",
@@ -11408,6 +12356,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "60e5a86a471e61006a4c51fd",
@@ -11449,6 +12399,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 12,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "630db2cd9796033b256bc349",
@@ -11495,6 +12447,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 10,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "63a22fb348b367d78a14c15b",
@@ -11541,6 +12495,8 @@
     "acmeCo/users_groups_detailed",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accountId": "712020:3a54029e-8d15-49aa-a939-35bb05752d83",
@@ -11588,10 +12544,13 @@
     "acmeCo/workflows",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "created": "1969-12-31T21:00:00-03:00",
       "description": "Builds Workflow",
+      "entity_id": "Builds Workflow",
       "id": {
         "entityId": "Builds Workflow",
         "name": "Builds Workflow"
@@ -11603,10 +12562,13 @@
     "acmeCo/workflows",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "created": "2024-07-31T13:52:51.103000-03:00",
       "description": "The classic JIRA default workflow",
+      "entity_id": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
       "id": {
         "entityId": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
         "name": "classic default workflow"
@@ -11618,10 +12580,13 @@
     "acmeCo/workflows",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "created": "1969-12-31T21:00:00-03:00",
       "description": "The default Jira workflow.",
+      "entity_id": "jira",
       "id": {
         "entityId": "jira",
         "name": "jira"
@@ -11633,6 +12598,8 @@
     "acmeCo/workflow_schemes",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "defaultWorkflow": "classic default workflow",
@@ -11647,6 +12614,8 @@
     "acmeCo/workflow_statuses",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -11674,6 +12643,8 @@
     "acmeCo/workflow_statuses",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -11701,6 +12672,8 @@
     "acmeCo/workflow_statuses",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -11728,6 +12701,8 @@
     "acmeCo/workflow_status_categories",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "colorName": "medium-gray",
@@ -11741,6 +12716,8 @@
     "acmeCo/workflow_status_categories",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "colorName": "blue-gray",
@@ -11754,6 +12731,8 @@
     "acmeCo/workflow_status_categories",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 3,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "colorName": "green",
@@ -11767,6 +12746,8 @@
     "acmeCo/workflow_status_categories",
     {
       "_meta": {
+        "op": "u",
+        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "colorName": "yellow",

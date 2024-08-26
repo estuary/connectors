@@ -4,8 +4,11 @@ import:
 captures:
   acmeCo/source-jira:
     endpoint:
-      connector:
-        image: "ghcr.io/estuary/source-jira:dev"
+      local:
+        command:
+          - python
+          - "-m"
+          - source_jira_native
         config: config.yaml
     bindings:
       - resource:
