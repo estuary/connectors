@@ -1,0 +1,64 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "api_key"
+      ],
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "title": "API Key",
+          "airbyte_secret": true,
+          "order": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig encodes a configured resource stream",
+      "properties": {
+        "stream": {
+          "description": "Name of this stream",
+          "title": "Stream",
+          "type": "string"
+        },
+        "syncMode": {
+          "description": "Sync this resource incrementally, or fully refresh it every run",
+          "enum": [
+            "full_refresh",
+            "incremental"
+          ],
+          "title": "Sync Mode",
+          "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
+          "type": "string"
+        },
+        "cursorField": {
+          "title": "Cursor Field",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-pendo",
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -25,8 +24,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	perrors "github.com/pingcap/errors"
 	"github.com/sirupsen/logrus"
-
-	mysqlLog "github.com/siddontang/go-log/log"
 
 	_ "time/tzdata"
 )
@@ -49,7 +46,6 @@ var mysqlDriver = &sqlcapture.Driver{
 }
 
 func main() {
-	fixMysqlLogging()
 	boilerplate.RunMain(mysqlDriver)
 }
 
@@ -88,26 +84,6 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 		return nil, err
 	}
 	return db, nil
-}
-
-// fixMysqlLogging works around some unfortunate defaults in the go-log package, which is used by
-// go-mysql. This configures their logger to write to stderr instead of stdout (who does that?) and
-// sets the level filter to match the level used by logrus. Unfortunately, there's no way to configure
-// go-log to log in JSON format, so we'll still end up with interleaved JSON and plain text. But
-// Flow handles that fine, so it's primarily just a visual inconvenience.
-func fixMysqlLogging() {
-	var handler, err = mysqlLog.NewStreamHandler(os.Stderr)
-	// Based on a look at the source code, NewStreamHandler never actually returns an error, so this
-	// is just a bit of future proofing.
-	if err != nil {
-		panic(fmt.Sprintf("failed to intialize mysql logging: %v", err))
-	}
-
-	mysqlLog.SetDefaultLogger(mysqlLog.NewDefault(handler))
-	// Looking at the source code, it seems that the level names pretty much match those used by logrus.
-	// In the event that anything doesn't match, it'll fall back to info level.
-	// Source: https://github.com/siddontang/go-log/blob/1e957dd83bed/log/logger.go#L116
-	mysqlLog.SetLevelByName(logrus.GetLevel().String())
 }
 
 // Config tells the connector how to connect to the source database and
@@ -228,7 +204,7 @@ func (db *mysqlDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
-func (db *mysqlDatabase) connect(ctx context.Context) error {
+func (db *mysqlDatabase) connect(_ context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,
@@ -246,10 +222,11 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	// Normal database connection used for table scanning
 	var conn *client.Conn
 	var err error
-	var withTLS = func(c *client.Conn) {
+	var withTLS = func(c *client.Conn) error {
 		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
 		// if set makes this false and sets 'ServerName' so it will be verified properly.
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+		return nil
 	}
 	if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); err == nil {
 		logrus.WithField("addr", address).Debug("connected with TLS")

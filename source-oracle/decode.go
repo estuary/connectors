@@ -152,6 +152,7 @@ func decodeUnistr(input string) (string, error) {
 
 func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
 	var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
+
 	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return nil, err
@@ -203,7 +204,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		err := sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				if key == "ROWID" {
 					var value = n.Right.(*sqlparser.Literal).Val
 					after[key] = value
@@ -226,10 +228,12 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		if !ok {
 			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
 		}
+
 		err := sqlparser.VisitExpr(update.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				value, err := decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("update sql statement where clause %q, key %q: %w", msg.SQL, key, err)
@@ -260,7 +264,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		err = sqlparser.VisitExpr(undo.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				value, err := decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("update sql undo statement where clause %q, key %q: %w", msg.UndoSQL, key, err)
@@ -292,7 +297,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		err := sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
-				var key = unquote(sqlparser.String(n.Left))
+				var col = n.Left.(*sqlparser.ColName)
+				var key = unquote(sqlparser.String(col.Name))
 				value, err := decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("delete sql statement %q, key %q: %w", msg.SQL, key, err)
@@ -320,7 +326,9 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		if err := translateRecordFields(discovery, after); err != nil {
 			return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 		}
-	} else if before != nil {
+	}
+
+	if before != nil {
 		rowid = before["ROWID"].(string)
 		if err := translateRecordFields(discovery, before); err != nil {
 			return nil, fmt.Errorf("error translating 'before' tuple: %w", err)

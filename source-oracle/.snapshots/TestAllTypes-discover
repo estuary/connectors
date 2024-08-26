@@ -13,12 +13,14 @@ Binding 0:
           "$anchor": "FLOW_TEST_LOGMINERT18110541",
           "properties": {
             "DATEONLY": {
+              "description": "(source type: DATE)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "DATETIME": {
+              "description": "(source type: DATE)",
               "type": [
                 "string",
                 "null"
@@ -26,6 +28,7 @@ Binding 0:
             },
             "DOUBLE_PRECISION": {
               "format": "number",
+              "description": "(source type: FLOAT)",
               "type": [
                 "string",
                 "null"
@@ -33,6 +36,7 @@ Binding 0:
             },
             "FLOAT_126": {
               "format": "number",
+              "description": "(source type: FLOAT)",
               "type": [
                 "string",
                 "null"
@@ -40,18 +44,21 @@ Binding 0:
             },
             "INTEG": {
               "format": "integer",
+              "description": "(source type: NUMBER)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "INTERVAL_DAY": {
+              "description": "(source type: INTERVAL DAY(2) TO SECOND(6))",
               "type": [
                 "string",
                 "null"
               ]
             },
             "INTERVAL_YEAR": {
+              "description": "(source type: INTERVAL YEAR(4) TO MONTH)",
               "type": [
                 "string",
                 "null"
@@ -59,12 +66,14 @@ Binding 0:
             },
             "NUM": {
               "format": "number",
+              "description": "(source type: NUMBER)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "NUM15": {
+              "description": "(source type: NUMBER)",
               "type": [
                 "integer",
                 "null"
@@ -72,18 +81,21 @@ Binding 0:
             },
             "NUM19": {
               "format": "integer",
+              "description": "(source type: NUMBER)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "NVCHAR2": {
+              "description": "(source type: NVARCHAR2)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "R": {
+              "description": "(source type: RAW)",
               "type": [
                 "string",
                 "null"
@@ -91,12 +103,14 @@ Binding 0:
             },
             "REAL_NUM": {
               "format": "number",
+              "description": "(source type: FLOAT)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "SINGLE_NCHAR": {
+              "description": "(source type: NCHAR)",
               "type": [
                 "string",
                 "null"
@@ -104,30 +118,35 @@ Binding 0:
             },
             "SMALL_INT": {
               "format": "integer",
+              "description": "(source type: NUMBER)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "TS": {
+              "description": "(source type: TIMESTAMP(6))",
               "type": [
                 "string",
                 "null"
               ]
             },
             "TS_LOCAL_TZ": {
+              "description": "(source type: TIMESTAMP(6) WITH LOCAL TIME ZONE)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "TS_LOCAL_TZ_NINE": {
+              "description": "(source type: TIMESTAMP(9) WITH LOCAL TIME ZONE)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "TS_NINE": {
+              "description": "(source type: TIMESTAMP(9))",
               "type": [
                 "string",
                 "null"
@@ -135,6 +154,7 @@ Binding 0:
             },
             "TS_TZ": {
               "format": "date-time",
+              "description": "(source type: TIMESTAMP(6) WITH TIME ZONE)",
               "type": [
                 "string",
                 "null"
@@ -142,18 +162,21 @@ Binding 0:
             },
             "TS_TZ_NINE": {
               "format": "date-time",
+              "description": "(source type: TIMESTAMP(9) WITH TIME ZONE)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "VCAHR2": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "VCHAR": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"

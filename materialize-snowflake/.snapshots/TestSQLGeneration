@@ -1,136 +1,157 @@
---- Begin "a-schema".target_table createTargetTable ---
-CREATE TABLE IF NOT EXISTS "a-schema".target_table (
+--- Begin "a-schema".key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	key1 INTEGER NOT NULL,
 	key2 BOOLEAN NOT NULL,
+	"key!binary" TEXT NOT NULL,
+	array VARIANT,
+	binary TEXT,
 	boolean BOOLEAN,
+	flow_published_at TIMESTAMP_LTZ NOT NULL,
 	integer INTEGER,
-	number DOUBLE,
-	string STRING,
+	integerGt64Bit INTEGER,
+	integerWithUserDDL DECIMAL(20),
+	multiple VARIANT,
+	number FLOAT,
+	numberCastToString TEXT,
+	object VARIANT,
+	string TEXT,
+	stringInteger INTEGER,
+	stringInteger39Chars TEXT,
+	stringInteger66Chars TEXT,
+	stringNumber FLOAT,
 	flow_document VARIANT NOT NULL,
 
-	PRIMARY KEY (key1, key2)
+	PRIMARY KEY (key1, key2, "key!binary")
 );
 
-COMMENT ON TABLE "a-schema".target_table IS 'Generated for materialization test/sqlite of collection key/value';
-COMMENT ON COLUMN "a-schema".target_table.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
-COMMENT ON COLUMN "a-schema".target_table.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
-COMMENT ON COLUMN "a-schema".target_table.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
-COMMENT ON COLUMN "a-schema".target_table.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
-COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
---- End "a-schema".target_table createTargetTable ---
+COMMENT ON TABLE "a-schema".key_value IS 'Generated for materialization test/sqlite of collection key/value';
+COMMENT ON COLUMN "a-schema".key_value.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".key_value."key!binary" IS 'auto-generated projection of JSON at: /key!binary with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.array IS 'auto-generated projection of JSON at: /array with inferred types: [array]';
+COMMENT ON COLUMN "a-schema".key_value.binary IS 'auto-generated projection of JSON at: /binary with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".key_value.flow_published_at IS 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerGt64Bit IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerWithUserDDL IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
+COMMENT ON COLUMN "a-schema".key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
+COMMENT ON COLUMN "a-schema".key_value.numberCastToString IS 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]';
+COMMENT ON COLUMN "a-schema".key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
+COMMENT ON COLUMN "a-schema".key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger39Chars IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger66Chars IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringNumber IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
+COMMENT ON COLUMN "a-schema".key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
+--- End "a-schema".key_value createTargetTable ---
 
---- Begin "a-schema".target_table loadQuery ---
-SELECT 0, "a-schema".target_table.flow_document
-	FROM "a-schema".target_table
-	JOIN (
-		SELECT $1[0] AS key1, $1[1] AS key2
-		FROM test-file
-	) AS r
-	ON "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table.key2 = r.key2
---- End "a-schema".target_table loadQuery ---
+--- Begin "a-schema".delta_updates createTargetTable ---
 
---- Begin "a-schema".target_table copyInto ---
-COPY INTO "a-schema".target_table (
-	key1, key2, boolean, integer, number, string, flow_document
-) FROM (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS boolean, $1[3] AS integer, $1[4] AS number, $1[5] AS string, $1[6] AS flow_document
-	FROM test-file
-);
---- End "a-schema".target_table copyInto ---
-
---- Begin "a-schema".target_table mergeInto ---
-MERGE INTO "a-schema".target_table AS l
-USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS boolean, $1[3] AS integer, $1[4] AS number, $1[5] AS string, $1[6] AS flow_document
-	FROM test-file
-) AS r
-ON l.key1 = r.key1 AND l.key2 = r.key2
-WHEN MATCHED AND r.flow_document='delete' THEN
-	DELETE
-WHEN MATCHED THEN
-	UPDATE SET l.boolean = r.boolean, l.integer = r.integer, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
-WHEN NOT MATCHED THEN
-	INSERT (key1, key2, boolean, integer, number, string, flow_document)
-	VALUES (r.key1, r.key2, r.boolean, r.integer, r.number, r.string, r.flow_document);
---- End "a-schema".target_table mergeInto ---
-
---- Begin "Delta Updates" createTargetTable ---
-CREATE TABLE IF NOT EXISTS "Delta Updates" (
-	theKey STRING NOT NULL,
-	aValue INTEGER
+CREATE TABLE IF NOT EXISTS "a-schema".delta_updates (
+	theKey TEXT NOT NULL,
+	aValue INTEGER,
+	flow_published_at TIMESTAMP_LTZ NOT NULL
 );
 
-COMMENT ON TABLE "Delta Updates" IS 'Generated for materialization test/sqlite of collection delta/updates';
-COMMENT ON COLUMN "Delta Updates".theKey IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
-COMMENT ON COLUMN "Delta Updates".aValue IS 'A super-awesome value.
+COMMENT ON TABLE "a-schema".delta_updates IS 'Generated for materialization test/sqlite of collection delta/updates';
+COMMENT ON COLUMN "a-schema".delta_updates.theKey IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".delta_updates.aValue IS 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]';
---- End "Delta Updates" createTargetTable ---
-
---- Begin "Delta Updates" loadQuery ---
-SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
---- End "Delta Updates" loadQuery ---
-
---- Begin "Delta Updates" copyInto ---
-COPY INTO "Delta Updates" (
-	theKey, aValue
-) FROM (
-	SELECT $1[0] AS theKey, $1[1] AS aValue
-	FROM test-file
-);
---- End "Delta Updates" copyInto ---
-
---- Begin "Delta Updates" mergeInto ---
-MERGE INTO "Delta Updates" AS l
-USING (
-	SELECT $1[0] AS theKey, $1[1] AS aValue
-	FROM test-file
-) AS r
-ON l.theKey = r.theKey
-WHEN MATCHED THEN
-	UPDATE SET l.aValue = r.aValue
-WHEN NOT MATCHED THEN
-	INSERT (theKey, aValue)
-	VALUES (r.theKey, r.aValue);
---- End "Delta Updates" mergeInto ---
+COMMENT ON COLUMN "a-schema".delta_updates.flow_published_at IS 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
+--- End "a-schema".delta_updates createTargetTable ---
 
 --- Begin alter table add columns and drop not nulls ---
-ALTER TABLE "a-schema".target_table ADD COLUMN
+
+ALTER TABLE "a-schema".key_value ADD COLUMN
 	first_new_column STRING,
 	second_new_column BOOL;
 
-ALTER TABLE "a-schema".target_table ALTER COLUMN
+ALTER TABLE "a-schema".key_value ALTER COLUMN
 	first_required_column DROP NOT NULL,
 	second_required_column DROP NOT NULL;
 --- End alter table add columns and drop not nulls ---
 
 --- Begin alter table add columns ---
-ALTER TABLE "a-schema".target_table ADD COLUMN
+
+ALTER TABLE "a-schema".key_value ADD COLUMN
 	first_new_column STRING,
 	second_new_column BOOL;
 --- End alter table add columns ---
 
 --- Begin alter table drop not nulls ---
-ALTER TABLE "a-schema".target_table ALTER COLUMN
+
+ALTER TABLE "a-schema".key_value ALTER COLUMN
 	first_required_column DROP NOT NULL,
 	second_required_column DROP NOT NULL;
 --- End alter table drop not nulls ---
 
---- Begin target_table_no_values_materialized mergeInto ---
-MERGE INTO target_table_no_values_materialized AS l
+--- Begin "a-schema".key_value loadQuery ---
+SELECT 0, "a-schema".key_value.flow_document
+	FROM "a-schema".key_value
+	JOIN (
+		SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary"
+		FROM test-file
+	) AS r
+	ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
+--- End "a-schema".key_value loadQuery ---
+
+--- Begin "a-schema".key_value copyInto ---
+COPY INTO "a-schema".key_value (
+	key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
+) FROM (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
+	FROM test-file
+);
+--- End "a-schema".key_value copyInto ---
+
+--- Begin "a-schema".key_value mergeInto ---
+MERGE INTO "a-schema".key_value AS l
 USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
 	FROM test-file
 ) AS r
-ON l.key1 = r.key1 AND l.key2 = r.key2
+ON l.key1 = r.key1 AND l.key2 = r.key2 AND l."key!binary" = r."key!binary"
 WHEN MATCHED AND r.flow_document='delete' THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.flow_document = r.flow_document
+	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
 WHEN NOT MATCHED THEN
-	INSERT (key1, key2, flow_document)
-	VALUES (r.key1, r.key2, r.flow_document);
---- End target_table_no_values_materialized mergeInto ---
+	INSERT (key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
+--- End "a-schema".key_value mergeInto ---
+
+--- Begin "a-schema".delta_updates loadQuery ---
+SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
+--- End "a-schema".delta_updates loadQuery ---
+
+--- Begin "a-schema".delta_updates copyInto ---
+COPY INTO "a-schema".delta_updates (
+	theKey, aValue, flow_published_at
+) FROM (
+	SELECT $1[0] AS theKey, $1[1] AS aValue, $1[2] AS flow_published_at
+	FROM test-file
+);
+--- End "a-schema".delta_updates copyInto ---
+
+--- Begin "a-schema".delta_updates mergeInto ---
+MERGE INTO "a-schema".delta_updates AS l
+USING (
+	SELECT $1[0] AS theKey, $1[1] AS aValue, $1[2] AS flow_published_at
+	FROM test-file
+) AS r
+ON l.theKey = r.theKey
+WHEN MATCHED THEN
+	UPDATE SET l.aValue = r.aValue, l.flow_published_at = r.flow_published_at
+WHEN NOT MATCHED THEN
+	INSERT (theKey, aValue, flow_published_at)
+	VALUES (r.theKey, r.aValue, r.flow_published_at);
+--- End "a-schema".delta_updates mergeInto ---
 
 

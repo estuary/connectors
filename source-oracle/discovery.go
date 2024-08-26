@@ -152,6 +152,11 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 			}
 		}
 
+		if columnInfo == nil {
+			delete(f, id)
+			continue
+		}
+
 		var translated, err = translateRecordField(columnInfo, val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
@@ -162,7 +167,7 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 }
 
 const queryDiscoverTables = `
-  SELECT DISTINCT(NVL(IOT_NAME, TABLE_NAME)) AS table_name, owner FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
+  SELECT DISTINCT(NVL(IOT_NAME, TABLE_NAME)) AS table_name, owner FROM all_tables WHERE tablespace_name NOT IN ('SYSTEM', 'SYSAUX', 'SAMPLESCHEMA') AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'RDSADMIN', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS', 'GGS_ADMIN') and table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')
 `
 
 func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
@@ -272,6 +277,10 @@ type oracleColumnType struct {
 	nullable  bool
 }
 
+func (ct oracleColumnType) String() string {
+	return ct.original
+}
+
 // SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
 const defaultNumericPrecision = 38
 
@@ -356,7 +365,13 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			t = reflect.TypeFor[[]byte]()
 			jsonType = "string"
 		} else {
-			return nil, nil, fmt.Errorf("unsupported data type: %s", dataType)
+			logrus.WithFields(logrus.Fields{
+				"owner":    sc.TableSchema,
+				"table":    sc.TableName,
+				"dataType": dataType,
+				"column":   sc.Name,
+			}).Warn("skipping column, data type is not supported")
+			continue
 		}
 
 		sc.DataType = oracleColumnType{

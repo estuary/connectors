@@ -156,9 +156,9 @@ type postgresSource struct {
 
 // Named constants for the LSN locations within a postgresSource.Location.
 const (
-	pgLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
-	pgLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
-	pgLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
+	PGLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
+	PGLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
+	PGLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
 )
 
 func (s *postgresSource) Common() sqlcapture.SourceCommon {
@@ -676,6 +676,12 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
+	if cursor == "" {
+		// The empty cursor will be acknowledged once at startup when all bindings
+		// are new, because the initial state checkpoint will have an unspecified
+		// cursor value on purpose. We don't need to do anything with those.
+		return nil
+	}
 	var lsn, err = pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
