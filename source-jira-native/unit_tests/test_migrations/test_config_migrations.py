@@ -9,8 +9,8 @@ from typing import Any, Mapping
 
 from airbyte_cdk.models import OrchestratorType, Type
 from airbyte_cdk.sources import Source
-from source_jira.config_migrations import MigrateIssueExpandProperties
-from source_jira.source import SourceJira
+from source_jira_native.config_migrations import MigrateIssueExpandProperties
+from source_jira_native.source import SourceJira
 
 # BASE ARGS
 CMD = "check"
