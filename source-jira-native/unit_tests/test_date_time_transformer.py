@@ -3,8 +3,8 @@
 #
 
 import pytest
-from source_jira.source import SourceJira
-from source_jira.streams import ApplicationRoles
+from source_jira_native.source import SourceJira
+from source_jira_native.streams import ApplicationRoles
 
 
 @pytest.mark.parametrize(
