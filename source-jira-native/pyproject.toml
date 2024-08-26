@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "source-jira"
+name = "source-jira-native"
 version = "0.1.0"
 description = ""
 authors = ["Luishfs <luish1980@hotmail.com>"]
