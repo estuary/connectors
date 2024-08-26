@@ -211,6 +211,7 @@ class HTTPMixin(Mixin, HTTPSession):
     inner: aiohttp.ClientSession
     rate_limiter: RateLimiter
     token_source: TokenSource | None = None
+    auth_headers: dict[str, str] | None = None
 
     async def _mixin_enter(self, _: Logger):
         self.inner = aiohttp.ClientSession()
@@ -237,7 +238,9 @@ class HTTPMixin(Mixin, HTTPSession):
             await asyncio.sleep(cur_delay)
 
             headers = {}
-            if _with_token and self.token_source is not None:
+            if self.auth_headers:
+                headers = self.auth_headers
+            elif _with_token and self.token_source is not None:
                 token_type, token = await self.token_source.fetch_token(log, self)
                 headers["Authorization"] = f"{token_type} {token}"
 
