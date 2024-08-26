@@ -1,198 +1,747 @@
 [
   {
-    "recommendedName": "Page",
-    "resourceConfig": {
-      "stream": "Page",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "The unique ID of the page."
-        },
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "additionalProperties": true,
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
     "recommendedName": "Feature",
     "resourceConfig": {
-      "stream": "Feature",
-      "syncMode": "full_refresh"
+      "name": "Feature",
+      "interval": "PT30S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "The unique identifier of the feature."
-        },
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "Report",
-    "resourceConfig": {
-      "stream": "Report",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique ID of the report"
-        },
         "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
-          "properties": {
-            "row_id": {
-              "type": "integer"
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
             }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
           },
-          "required": [
-            "row_id"
-          ]
+          "description": "Document metadata"
         }
       },
-      "additionalProperties": true,
+      "title": "Resource",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
     "recommendedName": "Guide",
     "resourceConfig": {
-      "stream": "Guide",
-      "syncMode": "full_refresh"
+      "name": "Guide",
+      "interval": "PT30S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier of the guide."
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Resource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "Page",
+    "resourceConfig": {
+      "name": "Page",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Resource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "Report",
+    "resourceConfig": {
+      "name": "Report",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Resource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "AccountMetadata",
+    "resourceConfig": {
+      "name": "AccountMetadata",
+      "interval": "PT300S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Metadata",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "VisitorMetadata",
+    "resourceConfig": {
+      "name": "VisitorMetadata",
+      "interval": "PT300S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Metadata",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "GuideEvents",
+    "resourceConfig": {
+      "name": "GuideEvents",
+      "interval": "PT300S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
         },
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
+        "appId": {
+          "title": "Appid",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "guideTimestamp": {
+          "title": "Guidetimestamp",
+          "type": "integer"
+        },
+        "guideId": {
+          "title": "Guideid",
+          "type": "string"
         }
       },
-      "additionalProperties": true,
+      "required": [
+        "appId",
+        "remoteIp",
+        "guideTimestamp",
+        "guideId"
+      ],
+      "title": "GuideEvent",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/appId",
+      "/guideTimestamp",
+      "/remoteIp",
+      "/guideId"
     ]
   },
   {
-    "recommendedName": "Account Metadata",
+    "recommendedName": "PollEvents",
     "resourceConfig": {
-      "stream": "Account Metadata",
-      "syncMode": "full_refresh"
+      "name": "PollEvents",
+      "interval": "PT300S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "title": "Appid",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "guideTimestamp": {
+          "title": "Guidetimestamp",
+          "type": "integer"
+        },
+        "pollId": {
+          "title": "Pollid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "appId",
+        "remoteIp",
+        "guideTimestamp",
+        "pollId"
+      ],
+      "title": "PollEvent",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/_meta/row_id"
+      "/appId",
+      "/guideTimestamp",
+      "/remoteIp",
+      "/pollId"
     ]
   },
   {
-    "recommendedName": "Visitor Metadata",
+    "recommendedName": "PageEvents",
     "resourceConfig": {
-      "stream": "Visitor Metadata",
-      "syncMode": "full_refresh"
+      "name": "PageEvents",
+      "interval": "PT300S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "title": "Lasttime",
+          "type": "integer"
+        },
+        "pageId": {
+          "title": "Pageid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "appId",
+        "hour",
+        "remoteIp",
+        "lastTime",
+        "pageId"
+      ],
+      "title": "PageEvent",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/_meta/row_id"
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/pageId"
+    ]
+  },
+  {
+    "recommendedName": "FeatureEvents",
+    "resourceConfig": {
+      "name": "FeatureEvents",
+      "interval": "PT300S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "title": "Lasttime",
+          "type": "integer"
+        },
+        "featureId": {
+          "title": "Featureid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "appId",
+        "hour",
+        "remoteIp",
+        "lastTime",
+        "featureId"
+      ],
+      "title": "FeatureEvent",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/featureId"
+    ]
+  },
+  {
+    "recommendedName": "TrackEvents",
+    "resourceConfig": {
+      "name": "TrackEvents",
+      "interval": "PT300S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "title": "Lasttime",
+          "type": "integer"
+        },
+        "trackTypeId": {
+          "title": "Tracktypeid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "appId",
+        "hour",
+        "remoteIp",
+        "lastTime",
+        "trackTypeId"
+      ],
+      "title": "TrackEvent",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/trackTypeId"
     ]
   }
 ]
