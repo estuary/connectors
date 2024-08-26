@@ -3,7 +3,7 @@ import estuary_cdk.pydantic_polyfill  # Must be first.
 import asyncio
 import urllib
 from estuary_cdk import shim_airbyte_cdk, flow
-from source_jira import SourceJira
+from source_jira_native import SourceJira
 
 
 
