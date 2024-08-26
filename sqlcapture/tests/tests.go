@@ -283,7 +283,7 @@ func testDuplicatedScanKey(ctx context.Context, t *testing.T, tb TestBackend) {
 //     increase by exactly one for every successive update. If this is not the
 //     case then some changes have been skipped or duplicated.
 func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
-	const numTotalIDs = 2000
+	const loadGenTime = 90 * time.Second // Run the load generator for this long
 	const numActiveIDs = 100
 
 	if testing.Short() {
@@ -293,25 +293,29 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "51314288"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, counter INTEGER)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &correctnessInvariantsCaptureValidator{
-		NumExpectedIDs: numTotalIDs,
-	}
+	var validator = &correctnessInvariantsCaptureValidator{}
+	cs.Validator = validator
 	cs.Sanitizers[`"backfilled":999`] = regexp.MustCompile(`"backfilled":[0-9]+`)
 	cs.Validator.Reset()
 
+	var loadgenDeadline = time.Now().Add(loadGenTime)
 	var loadgenDone atomic.Bool
+	var numTotalIDs atomic.Int64
 	go func() {
+		log.WithField("runtime", loadGenTime.String()).Info("load generator started")
 		var nextID int
 		var activeIDs = make(map[int]int) // Map from ID to counter value
 		for {
-			// There should always be N active IDs (until we reach the end)
-			for nextID < numTotalIDs && len(activeIDs) < numActiveIDs {
+			// There should always be N active IDs (until we reach the end of the test)
+			for len(activeIDs) < numActiveIDs && time.Now().Before(loadgenDeadline) {
+				if nextID%1000 == 0 {
+					log.WithField("id", nextID).Info("load generator progress")
+				}
 				activeIDs[nextID] = 1
 				nextID++
 			}
 			// Thus if we run out of active IDs we must be done
 			if len(activeIDs) == 0 {
-				log.Info("load generator complete")
 				break
 			}
 
@@ -342,23 +346,28 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 			} else {
 				activeIDs[selected] = counter + 1
 			}
-
-			// Slow down database load generation to at most 500 QPS
-			time.Sleep(2 * time.Millisecond)
 		}
 
+		log.WithField("count", nextID).Info("load generator finished")
+		numTotalIDs.Store(int64(nextID))
 		time.Sleep(1 * time.Second)
 		loadgenDone.Store(true)
 	}()
+
+	// Wait a little while to let some backfill data accumulate.
+	time.Sleep(20 * time.Second)
 
 	// Repeatedly run the capture in parallel with the ongoing database load,
 	// killing and restarting it regularly, until the load generator is done.
 	for !loadgenDone.Load() {
 		var captureCtx, cancelCapture = context.WithCancel(ctx)
-		time.AfterFunc(5*time.Second, cancelCapture)
+		time.AfterFunc(20*time.Second, cancelCapture)
 		cs.Capture(captureCtx, t, nil)
 	}
-	cupaloy.SnapshotT(t, cs.Summary())
+
+	// Run the capture once more and verify the overall results this time.
+	validator.NumExpectedIDs = int(numTotalIDs.Load())
+	VerifiedCapture(ctx, t, cs)
 }
 
 // We can see new IDs occurring out of order, so long as they make it to
