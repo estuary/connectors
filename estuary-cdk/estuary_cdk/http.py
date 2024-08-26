@@ -11,6 +11,7 @@ import time
 from . import Mixin
 from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
 
+DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 
 class HTTPSession(abc.ABC):
     """
@@ -109,6 +110,7 @@ class TokenSource:
 
     oauth_spec: OAuth2Spec | None
     credentials: BaseOAuth2Credentials | AccessToken | BasicAuth
+    authorization_header: str = DEFAULT_AUTHORIZATION_HEADER
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
 
@@ -239,7 +241,8 @@ class HTTPMixin(Mixin, HTTPSession):
             headers = {}
             if _with_token and self.token_source is not None:
                 token_type, token = await self.token_source.fetch_token(log, self)
-                headers["Authorization"] = f"{token_type} {token}"
+                header_value = f"{token_type} {token}" if self.token_source.authorization_header == DEFAULT_AUTHORIZATION_HEADER else f"{token}"
+                headers[self.token_source.authorization_header] = header_value
 
             async with self.inner.request(
                 headers=headers,
