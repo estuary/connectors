@@ -337,7 +337,3 @@ func (db *postgresDatabase) RequestTxIDs(schema, table string) {
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }
-
-func (db *postgresDatabase) StreamingFenceInterval() time.Duration {
-	return 60 * time.Second
-}

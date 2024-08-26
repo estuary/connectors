@@ -257,7 +257,3 @@ func (db *sqlserverDatabase) FallbackCollectionKey() []string {
 }
 
 func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
-
-func (db *sqlserverDatabase) StreamingFenceInterval() time.Duration {
-	return 60 * time.Second
-}

@@ -44,10 +44,20 @@ func (db *mysqlDatabase) discoverTables(ctx context.Context) (map[sqlcapture.Str
 	}
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
-		if streamID == db.WatermarksTable() {
-			// We want to exclude the watermarks table from the output bindings, but we still discover it
+
+		// The connector used to require a watermarks table as part of its operation, and so we
+		// automatically excluded it from the discovered bindings as an implementation detail. Now
+		// the connector no longer uses watermarks, but some number of users will still have the
+		// table lingering around and we don't want to suddenly start capturing it, so for now
+		// we're keeping this logic to filter it out of discovery.
+		//
+		// We filter out both the name from the configuration and the hard-coded default name, so
+		// that even if configuration updates cause the deprecated property to be lost we'll still
+		// keep filtering out the table in the common cases.
+		if streamID == db.config.Advanced.WatermarksTable || streamID == "flow.watermarks" {
 			table.OmitBinding = true
 		}
+
 		tableMap[streamID] = table
 	}
 

@@ -26,6 +26,11 @@ var (
 	// to shut down after replication is all caught up and all tables are fully
 	// backfilled. It is always false in normal operation.
 	TestShutdownAfterCaughtUp = false
+
+	// StreamingFenceInterval is a constant controlling how frequently the capture
+	// will establish a new fence during indefinite streaming. It's declared as a
+	// variable so that it can be overridden during tests.
+	StreamingFenceInterval = 60 * time.Second
 )
 
 // PersistentState represents the part of a connector's state which can be serialized
@@ -439,7 +444,7 @@ func (c *Capture) updateState(_ context.Context) error {
 func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
 	logrus.Info("streaming replication events indefinitely")
 	for ctx.Err() == nil {
-		if err := c.streamToFence(ctx, replStream, c.Database.StreamingFenceInterval(), true); err != nil {
+		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
 			return err
 		}
 	}

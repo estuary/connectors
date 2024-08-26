@@ -26,7 +26,6 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 		db.prerequisiteBinlogEnabled,
 		db.prerequisiteBinlogFormat,
 		db.prerequisiteBinlogExpiry,
-		db.prerequisiteWatermarksTable,
 		db.prerequisiteUserPermissions,
 	} {
 		if err := prereq(ctx); err != nil {
@@ -113,55 +112,13 @@ func (db *mysqlDatabase) prerequisiteBinlogExpiry(ctx context.Context) error {
 	return nil
 }
 
-func (db *mysqlDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
-	var table = db.config.Advanced.WatermarksTable
-	var logEntry = logrus.WithField("table", table)
-
-	// If we can successfully write a watermark then we're satisfied here
-	if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
-		logEntry.Debug("watermarks table already exists")
-		return nil
-	}
-
-	// If we can create the watermarks table and then write a watermark, that also works
-	logEntry.Info("watermarks table doesn't exist, attempting to create it")
-
-	// Try to create the watermarks database if it doesn't already exist. WatermarksTable from the
-	// configuration has already been validated as being in the fully-qualified form of
-	// <database>.<table>.
-	if _, err := db.conn.Execute(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", strings.Split(table, ".")[0])); err != nil {
-		// It is entirely possible that the watermarks database already exists but we don't have
-		// permission to create databases. In this case we will get an "Access Denied" error here.
-		logEntry.WithField("err", err).Debug("failed to create watermarks database")
-	} else if _, err := db.conn.Execute(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot INTEGER PRIMARY KEY, watermark TEXT);", table)); err != nil {
-		logEntry.WithField("err", err).Error("failed to create watermarks table")
-	} else if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
-		logEntry.Info("successfully created watermarks table")
-		return nil
-	}
-
-	return fmt.Errorf("user %q cannot write to the watermarks table %q", db.config.User, table)
-}
-
 func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error {
 	// The SHOW MASTER STATUS / SHOW BINARY LOG STATUS command requires REPLICATION CLIENT
 	// or SUPER privileges, and thus serves as an easy way to test whether the user is
 	// authorized for CDC.
-	var status, err = db.queryBinlogStatus()
-	if err != nil {
+	if _, err := db.queryBinlogStatus(); err != nil {
 		logrus.WithField("err", err).Info("failed to query binlog status")
 		return fmt.Errorf("user %q needs the REPLICATION CLIENT permission", db.config.User)
-	}
-
-	// Blindly splitting and indexing is valid here because validation for the Config
-	// struct already checked that the watermarks table name is fully-qualified.
-	var watermarksSchema = strings.Split(db.config.Advanced.WatermarksTable, ".")[0]
-
-	// The use of strings.Contains here could result in false negatives, but this is
-	// much less of a concern than potential false positives and the extra code needed
-	// to parse this column value into an actual list of schema names.
-	if doDB, ok := status.Extra["Binlog_Do_DB"].(string); ok && doDB != "" && !strings.Contains(doDB, watermarksSchema) {
-		return fmt.Errorf("binlog-do-db is set to %q, which doesn't include the watermark table schema %q", doDB, watermarksSchema)
 	}
 	return nil
 }
