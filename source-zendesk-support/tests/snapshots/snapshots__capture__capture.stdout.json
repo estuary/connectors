@@ -12,7 +12,7 @@
       "group_id": 28835740822676,
       "id": 28835714743188,
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/group_memberships/28835714743188.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/group_memberships/28835714743188.json",
       "user_id": 28835702984212
     }
   ],
@@ -32,7 +32,7 @@
       "is_public": true,
       "name": "Support",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/groups/28835740822676.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/groups/28835740822676.json"
     }
   ],
   [
@@ -63,7 +63,7 @@
       "restriction": null,
       "title": "Take it!",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/macros/28835714801684.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/macros/28835714801684.json"
     }
   ],
   [
@@ -87,7 +87,7 @@
       "shared_tickets": false,
       "tags": [],
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/organizations/28835714737428.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/organizations/28835714737428.json"
     }
   ],
   [
@@ -104,7 +104,7 @@
       "organization_id": 28835714737428,
       "organization_name": "Estuary",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/organization_memberships/28835714744724.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/organization_memberships/28835714744724.json",
       "user_id": 28835702984212,
       "view_tickets": true
     }
@@ -126,7 +126,7 @@
       "featured": false,
       "follower_count": 1,
       "frozen": false,
-      "html_url": "https://d3v-estuary6996.zendesk.com/hc/en-us/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests",
+      "html_url": "https://d3v-estuary.zendesk.com/hc/en-us/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests",
       "id": 28847424303764,
       "non_author_editor_id": null,
       "non_author_updated_at": null,
@@ -135,7 +135,7 @@
       "title": "I'd like a way for users to submit feature requests",
       "topic_id": 28847452157844,
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests.json",
       "vote_count": 1,
       "vote_sum": 1
     }
@@ -151,14 +151,14 @@
       "author_id": 28835702984212,
       "body": "A test post comment.",
       "created_at": "2024-08-01T13:10:11Z",
-      "html_url": "https://d3v-estuary6996.zendesk.com/hc/en-us/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests/comments/29005581511700",
+      "html_url": "https://d3v-estuary.zendesk.com/hc/en-us/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests/comments/29005581511700",
       "id": 29005581511700,
       "non_author_editor_id": null,
       "non_author_updated_at": null,
       "official": false,
       "post_id": 28847424303764,
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/community/posts/28847424303764/comments/29005581511700.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/community/posts/28847424303764/comments/29005581511700.json",
       "vote_count": 1,
       "vote_sum": 1
     }
@@ -176,7 +176,7 @@
       "item_id": 29005581511700,
       "item_type": "PostComment",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/votes/29005807715092.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/votes/29005807715092.json",
       "user_id": 28835702984212,
       "value": 1
     }
@@ -194,7 +194,7 @@
       "item_id": 28847424303764,
       "item_type": "Post",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/help_center/votes/29005734783508.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/votes/29005734783508.json",
       "user_id": 28835702984212,
       "value": 1
     }
@@ -218,7 +218,7 @@
       "score": "offered",
       "ticket_id": 29,
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/satisfaction_ratings/29013431981588.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/satisfaction_ratings/29013431981588.json"
     }
   ],
   [
@@ -290,7 +290,7 @@
       "position": 1,
       "title": "Test SLA Policy",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/slas/policies/29006807867284.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/slas/policies/29006807867284.json"
     }
   ],
   [
@@ -486,7 +486,7 @@
       "title_in_portal": "Subject",
       "type": "subject",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/ticket_fields/28835714573076.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_fields/28835714573076.json",
       "visible_in_portal": true
     }
   ],
@@ -538,7 +538,7 @@
       "status_updated_at": "2024-07-26T15:41:04Z",
       "ticket_id": 1,
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/ticket_metrics/28835715028244.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_metrics/28835715028244.json"
     }
   ],
   [
@@ -623,7 +623,7 @@
         "ticket_form_id": 28835740693908,
         "type": "incident",
         "updated_at": "2024-08-01T14:45:47Z",
-        "url": "https://d3v-estuary6996.zendesk.com/api/v2/tickets/1.json",
+        "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1.json",
         "via": {
           "channel": "sample_ticket",
           "source": {
@@ -699,7 +699,7 @@
       "ticket_form_id": 28835740693908,
       "type": "incident",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/tickets/1.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1.json",
       "via": {
         "channel": "sample_ticket",
         "source": {
@@ -752,7 +752,7 @@
       "time_zone": "America/New_York",
       "two_factor_auth_enabled": null,
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/users/28835702984212.json",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/users/28835702984212.json",
       "user_fields": {},
       "verified": true
     }
@@ -766,7 +766,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "active": true,
-      "brand_url": "https://d3v-estuary6996.zendesk.com",
+      "brand_url": "https://d3v-estuary.zendesk.com",
       "created_at": "2024-07-26T15:40:59Z",
       "default": true,
       "has_help_center": true,
@@ -777,12 +777,12 @@
       "logo": null,
       "name": "Estuary",
       "signature_template": "{{agent.signature}}",
-      "subdomain": "d3v-estuary6996",
+      "subdomain": "d3v-estuary",
       "ticket_form_ids": [
         28835740693908
       ],
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/brands/28835714705684.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/brands/28835714705684.json"
     }
   ],
   [
@@ -928,7 +928,7 @@
         28835767646868
       ],
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/ticket_forms/28835740693908.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_forms/28835740693908.json"
     }
   ],
   [
@@ -943,7 +943,7 @@
       "id": "6149ea30-5004-11ef-ba4d-1fb32c16a1d3",
       "name": "Test attribute",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary6996.zendesk.com/api/v2/routing/attributes/6149ea30-5004-11ef-ba4d-1fb32c16a1d3.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/routing/attributes/6149ea30-5004-11ef-ba4d-1fb32c16a1d3.json"
     }
   ],
   [

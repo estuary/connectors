@@ -16,9 +16,11 @@ Binding 0:
           "properties": {
             "A": {
               "type": "string",
-              "format": "integer"
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
             },
             "B": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"
@@ -26,12 +28,14 @@ Binding 0:
             },
             "C": {
               "format": "number",
+              "description": "(source type: FLOAT)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "D": {
+              "description": "(source type: VARCHAR2)",
               "type": [
                 "string",
                 "null"

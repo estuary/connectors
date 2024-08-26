@@ -520,7 +520,7 @@ func TestCaptureAfterSlotDropped(t *testing.T) {
 	// the replication slot and then start failing because its saved position isn't
 	// valid any longer.
 	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
-	tb.Query(ctx, t, fmt.Sprintf("SELECT pg_drop_replication_slot('flow_slot');"))
+	tb.Query(ctx, t, "SELECT pg_drop_replication_slot('flow_slot');")
 	tb.Insert(ctx, t, tableName, [][]any{{4, "four"}, {5, "five"}})
 	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 

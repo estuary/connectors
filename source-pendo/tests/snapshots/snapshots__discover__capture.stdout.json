@@ -1,0 +1,198 @@
+[
+  {
+    "recommendedName": "Page",
+    "resourceConfig": {
+      "stream": "Page",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique ID of the page."
+        },
+        "_meta": {
+          "type": "object",
+          "description": "Metadata object added by Estuary.",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Feature",
+    "resourceConfig": {
+      "stream": "Feature",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique identifier of the feature."
+        },
+        "_meta": {
+          "type": "object",
+          "description": "Metadata object added by Estuary.",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Report",
+    "resourceConfig": {
+      "stream": "Report",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID of the report"
+        },
+        "_meta": {
+          "type": "object",
+          "description": "Metadata object added by Estuary.",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Guide",
+    "resourceConfig": {
+      "stream": "Guide",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the guide."
+        },
+        "_meta": {
+          "type": "object",
+          "description": "Metadata object added by Estuary.",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Account Metadata",
+    "resourceConfig": {
+      "stream": "Account Metadata",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "_meta": {
+          "type": "object",
+          "description": "Metadata object added by Estuary.",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "Visitor Metadata",
+    "resourceConfig": {
+      "stream": "Visitor Metadata",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "_meta": {
+          "type": "object",
+          "description": "Metadata object added by Estuary.",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  }
+]

@@ -124,7 +124,7 @@ func (c *Config) Validate() error {
 	}
 
 	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline}, c.Advanced.DictionaryMode) {
-		return fmt.Errorf("dictionary mode must be one of %s or %s.", DictionaryModeExtract, DictionaryModeOnline)
+		return fmt.Errorf("dictionary mode must be one of %s or %s", DictionaryModeExtract, DictionaryModeOnline)
 	}
 
 	return nil
@@ -218,7 +218,7 @@ func (db *oracleDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
-func (db *oracleDatabase) connect(ctx context.Context) error {
+func (db *oracleDatabase) connect(_ context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":        db.config.Address,
 		"user":           db.config.User,
@@ -293,8 +293,8 @@ func (db *oracleDatabase) ShouldBackfill(streamID string) bool {
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
-		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
-			if streamID == skipStreamID {
+		for _, skipTableName := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
+			if strings.EqualFold(streamID, skipTableName) {
 				return false
 			}
 		}

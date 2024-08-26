@@ -43,58 +43,46 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 }
 
 var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:  sql.NewStaticMapper("JSON"),
-		sql.ARRAY:   sql.NewStaticMapper("JSON"),
-		sql.BINARY:  sql.NewStaticMapper("LONGTEXT"),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.PrimaryKeyMapper{
-				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-				Delegate:   sql.NewStaticMapper("LONGTEXT"),
-			},
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					Delegate:   sql.NewStaticMapper("NUMERIC(65,0)", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT"),
+				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
+			sql.OBJECT:   sql.MapStatic("JSON"),
+			sql.ARRAY:    sql.MapStatic("JSON"),
+			sql.BINARY:   sql.MapStatic("LONGTEXT"),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToStr)),
+				65,
+			),
+			// We encode as CSV and must send MySQL string sentinels for
+			// non-numeric float values.
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double"), sql.UsingConverter(sql.StrToFloat("NaN", "+inf", "-inf"))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapPrimaryKey(
+					sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
+					sql.MapStatic("LONGTEXT"),
+				),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation))),
+					"time":      sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation))),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					// We encode as CSV and must send MySQL string sentinels.
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat("NaN", "+inf", "-inf"))),
+				WithContentType: map[string]sql.MapProjectionFn{
+					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.MapStatic("LONGBLOB"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.MapStatic("LONGBLOB"),
 				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),
-				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToTZ(tzLocation))),
-			},
-			WithContentType: map[string]sql.TypeMapper{
-				// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
-				// checkpoints can be quite long, so we need to use as large of column size as
-				// possible for these tables.
-				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("LONGBLOB"),
-				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("LONGBLOB"),
-			},
+			}),
 		},
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		// "decimal" is for NUMERIC(65,0) that is used for { type: string, format: integer }
-		sql.ColValidation{Types: []string{"bigint", "decimal"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"tinyint"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"varchar", "longtext"}, Validate: sql.StringCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"datetime"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
+		sql.WithNotNullText("NOT NULL"),
 	)
 
 	return sql.Dialect{
@@ -117,7 +105,6 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    64,
 		CaseInsensitiveColumns: true,
 	}

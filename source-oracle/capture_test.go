@@ -151,6 +151,42 @@ func TestNullValues(t *testing.T) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestUnsupportedTypes(t *testing.T) {
+	var unique = "18110541"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var typesAndValues = [][]any{
+		{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
+		{"anycol", "ANYDATA", NewRawTupleValue("NULL")},
+	}
+
+	var columnDefs = "("
+	var vals []any
+	for idx, tv := range typesAndValues {
+		if idx > 0 {
+			columnDefs += ", "
+		}
+		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
+		vals = append(vals, tv[2])
+	}
+	columnDefs += ")"
+	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)
+
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestStringKey(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()

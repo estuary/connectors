@@ -12,6 +12,7 @@ var DUCKDB_RESERVED_WORDS = []string{
 	"AS",
 	"ASC_P",
 	"ASYMMETRIC",
+	"BINARY",
 	"BOTH",
 	"CASE",
 	"CAST",

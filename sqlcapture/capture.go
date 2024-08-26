@@ -319,7 +319,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	return nil
 }
 
-func (c *Capture) updateState(ctx context.Context) error {
+func (c *Capture) updateState(_ context.Context) error {
 	// Create the Streams map if nil
 	if c.State.Streams == nil {
 		c.State.Streams = make(map[boilerplate.StateKey]*TableState)
@@ -528,47 +528,51 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	var eventCount int
 	defer func() { logrus.WithField("events", eventCount).Info("processed replication events") }()
 
-	for event := range replStream.Events() {
-		eventCount++
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-replStream.Events():
+			if !ok {
+				return errWatermarkNotReached
+			}
+			eventCount++
 
-		// Flush events update the checkpointed LSN and trigger a state update.
-		// If this is the commit after the target watermark, it also ends the loop.
-		if event, ok := event.(*FlushEvent); ok {
-			c.State.Cursor = event.Cursor
-			if reportFlush {
-				if err := c.emitState(); err != nil {
-					return fmt.Errorf("error emitting state update: %w", err)
+			// Flush events update the checkpointed LSN and trigger a state update.
+			// If this is the commit after the target watermark, it also ends the loop.
+			if event, ok := event.(*FlushEvent); ok {
+				c.State.Cursor = event.Cursor
+				if reportFlush {
+					if err := c.emitState(); err != nil {
+						return fmt.Errorf("error emitting state update: %w", err)
+					}
+				}
+				if watermarkReached {
+					return nil
+				}
+				continue
+			}
+
+			// Check for watermark change events and set a flag when the target watermark is reached.
+			// The subsequent FlushEvent will exit the loop.
+			if event, ok := event.(*ChangeEvent); ok {
+				if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
+					var actual = event.After["watermark"]
+					if actual == nil {
+						actual = event.After["WATERMARK"]
+					}
+					logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
+					if actual == watermark {
+						watermarkReached = true
+					}
 				}
 			}
-			if watermarkReached {
-				return nil
-			}
-			continue
-		}
 
-		// Check for watermark change events and set a flag when the target watermark is reached.
-		// The subsequent FlushEvent will exit the loop.
-		if event, ok := event.(*ChangeEvent); ok {
-			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
-				var actual = event.After["watermark"]
-				if actual == nil {
-					actual = event.After["WATERMARK"]
-				}
-				logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
-				if actual == watermark {
-					watermarkReached = true
-				}
+			if err := c.handleReplicationEvent(event); err != nil {
+				return err
 			}
-		}
-
-		if err := c.handleReplicationEvent(event); err != nil {
-			return err
 		}
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return errWatermarkNotReached
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
@@ -830,8 +834,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 		"count":  count,
 		"cursor": cursor,
 	}).Debug("acknowledged up to cursor")
-	replStream.Acknowledge(ctx, cursor)
-	return nil
+	return replStream.Acknowledge(ctx, cursor)
 }
 
 type StreamID = string

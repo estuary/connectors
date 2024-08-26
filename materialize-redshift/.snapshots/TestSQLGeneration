@@ -1,144 +1,187 @@
---- Begin "a-schema".target_table createTargetTable ---
-CREATE TABLE IF NOT EXISTS "a-schema".target_table (
+--- Begin "a-schema".key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	key1 BIGINT,
-	"key!2" BOOLEAN,
-	"Camel_Case" BIGINT,
-	"a Time" TIMESTAMPTZ,
+	key2 BOOLEAN,
+	"key!binary" TEXT,
 	"array" SUPER,
-	lower_case BIGINT,
-	value TEXT,
+	"binary" TEXT,
+	boolean BOOLEAN,
+	flow_published_at TIMESTAMPTZ,
+	integer BIGINT,
+	"integerGt64Bit" NUMERIC(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple SUPER,
+	number DOUBLE PRECISION,
+	"numberCastToString" TEXT,
+	object SUPER,
+	string TEXT,
+	"stringInteger" NUMERIC(38,0),
+	"stringInteger39Chars" TEXT,
+	"stringInteger66Chars" TEXT,
+	"stringNumber" DOUBLE PRECISION,
 	flow_document SUPER
 );
 
-COMMENT ON TABLE "a-schema".target_table IS 'Generated for materialization test/sqlite of collection key/value';
-COMMENT ON COLUMN "a-schema".target_table.key1 IS 'Key One Title
-Key One Description
-auto-generated projection of JSON at: /key1 with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table."key!2" IS 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]';
-COMMENT ON COLUMN "a-schema".target_table."Camel_Case" IS 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table."a Time" IS 'auto-generated projection of JSON at: /a Time with inferred types: [string]';
-COMMENT ON COLUMN "a-schema".target_table."array" IS 'This is an array!
-auto-generated projection of JSON at: /array with inferred types: [array]';
-COMMENT ON COLUMN "a-schema".target_table.lower_case IS 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]';
-COMMENT ON COLUMN "a-schema".target_table.value IS 'auto-generated projection of JSON at: /value with inferred types: [string]';
-COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
---- End "a-schema".target_table createTargetTable ---
+COMMENT ON TABLE "a-schema".key_value IS 'Generated for materialization test/sqlite of collection key/value';
+COMMENT ON COLUMN "a-schema".key_value.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".key_value."key!binary" IS 'auto-generated projection of JSON at: /key!binary with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value."array" IS 'auto-generated projection of JSON at: /array with inferred types: [array]';
+COMMENT ON COLUMN "a-schema".key_value."binary" IS 'auto-generated projection of JSON at: /binary with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".key_value.flow_published_at IS 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value."integerGt64Bit" IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value."integerWithUserDDL" IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
+COMMENT ON COLUMN "a-schema".key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
+COMMENT ON COLUMN "a-schema".key_value."numberCastToString" IS 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]';
+COMMENT ON COLUMN "a-schema".key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
+COMMENT ON COLUMN "a-schema".key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value."stringInteger" IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value."stringInteger39Chars" IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value."stringInteger66Chars" IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value."stringNumber" IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
+COMMENT ON COLUMN "a-schema".key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
+--- End "a-schema".key_value createTargetTable ---
 
---- Begin "Delta Updates" createTargetTable ---
-CREATE TABLE IF NOT EXISTS "Delta Updates" (
+--- Begin "a-schema".delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS "a-schema".delta_updates (
 	"theKey" TEXT,
-	"aValue" BIGINT
+	"aValue" BIGINT,
+	flow_published_at TIMESTAMPTZ
 );
 
-COMMENT ON TABLE "Delta Updates" IS 'Generated for materialization test/sqlite of collection delta/updates';
-COMMENT ON COLUMN "Delta Updates"."theKey" IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
-COMMENT ON COLUMN "Delta Updates"."aValue" IS 'A super-awesome value.
+COMMENT ON TABLE "a-schema".delta_updates IS 'Generated for materialization test/sqlite of collection delta/updates';
+COMMENT ON COLUMN "a-schema".delta_updates."theKey" IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".delta_updates."aValue" IS 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]';
---- End "Delta Updates" createTargetTable ---
+COMMENT ON COLUMN "a-schema".delta_updates.flow_published_at IS 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
+--- End "a-schema".delta_updates createTargetTable ---
 
---- Begin "a-schema".target_table createStoreTable ---
+--- Begin "a-schema".key_value createStoreTable ---
+
 CREATE TEMPORARY TABLE flow_temp_table_0 (
-	LIKE "a-schema".target_table
+	LIKE "a-schema".key_value
 );
---- End "a-schema".target_table createStoreTable ---
+--- End "a-schema".key_value createStoreTable ---
 
---- Begin "Delta Updates" createStoreTable ---
+--- Begin "a-schema".delta_updates createStoreTable ---
+
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-	LIKE "Delta Updates"
+	LIKE "a-schema".delta_updates
 );
---- End "Delta Updates" createStoreTable ---
+--- End "a-schema".delta_updates createStoreTable ---
 
---- Begin "a-schema".target_table mergeInto ---
-MERGE INTO "a-schema".target_table
+--- Begin "a-schema".key_value mergeInto ---
+
+MERGE INTO "a-schema".key_value
 USING flow_temp_table_0 AS r
-ON "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table."key!2" = r."key!2"
+ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
 WHEN MATCHED THEN
-	UPDATE SET "Camel_Case" = r."Camel_Case", "a Time" = r."a Time", "array" = r."array", lower_case = r.lower_case, value = r.value, flow_document = r.flow_document
+	UPDATE SET "array" = r."array", "binary" = r."binary", boolean = r.boolean, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
 WHEN NOT MATCHED THEN
-	INSERT (key1, "key!2", "Camel_Case", "a Time", "array", lower_case, value, flow_document)
-	VALUES (r.key1, r."key!2", r."Camel_Case", r."a Time", r."array", r.lower_case, r.value, r.flow_document);
---- End "a-schema".target_table mergeInto ---
+	INSERT (key1, key2, "key!binary", "array", "binary", boolean, flow_published_at, integer, "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", object, string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r.boolean, r.flow_published_at, r.integer, r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger39Chars", r."stringInteger66Chars", r."stringNumber", r.flow_document);
+--- End "a-schema".key_value mergeInto ---
 
---- Begin "Delta Updates" mergeInto ---
-MERGE INTO "Delta Updates"
+--- Begin "a-schema".delta_updates mergeInto ---
+
+MERGE INTO "a-schema".delta_updates
 USING flow_temp_table_1 AS r
-ON "Delta Updates"."theKey" = r."theKey"
+ON "a-schema".delta_updates."theKey" = r."theKey"
 WHEN MATCHED THEN
-	UPDATE SET "aValue" = r."aValue"
+	UPDATE SET "aValue" = r."aValue", flow_published_at = r.flow_published_at
 WHEN NOT MATCHED THEN
-	INSERT ("theKey", "aValue")
-	VALUES (r."theKey", r."aValue");
---- End "Delta Updates" mergeInto ---
+	INSERT ("theKey", "aValue", flow_published_at)
+	VALUES (r."theKey", r."aValue", r.flow_published_at);
+--- End "a-schema".delta_updates mergeInto ---
 
---- Begin "a-schema".target_table loadQuery ---
+--- Begin "a-schema".key_value loadQuery ---
+
 SELECT 0, r.flow_document
 	FROM flow_temp_table_0 AS l
-	JOIN "a-schema".target_table AS r
+	JOIN "a-schema".key_value AS r
 		 ON  l.key1 = r.key1
-		 AND l."key!2" = r."key!2"
---- End "a-schema".target_table loadQuery ---
+		 AND l.key2 = r.key2
+		 AND l."key!binary" = r."key!binary"
+--- End "a-schema".key_value loadQuery ---
 
---- Begin "Delta Updates" loadQuery ---
+--- Begin "a-schema".delta_updates loadQuery ---
+
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
---- End "Delta Updates" loadQuery ---
+--- End "a-schema".delta_updates loadQuery ---
 
---- Begin "a-schema".target_table createDeleteTable ---
+--- Begin "a-schema".key_value createDeleteTable ---
+
 CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
   key1 BIGINT,
-  "key!2" BOOLEAN
+  key2 BOOLEAN,
+  "key!binary" TEXT
 );
---- End "a-schema".target_table createDeleteTable ---
+--- End "a-schema".key_value createDeleteTable ---
 
---- Begin "Delta Updates" createDeleteTable ---
+--- Begin "a-schema".delta_updates createDeleteTable ---
+
 CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
   "theKey" TEXT
 );
---- End "Delta Updates" createDeleteTable ---
+--- End "a-schema".delta_updates createDeleteTable ---
 
---- Begin "a-schema".target_table deleteQuery ---
-DELETE FROM "a-schema".target_table
+--- Begin "a-schema".key_value deleteQuery ---
+
+DELETE FROM "a-schema".key_value
 USING flow_temp_table_0_deleted AS r
-WHERE "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table."key!2" = r."key!2"
---- End "a-schema".target_table deleteQuery ---
+WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
+--- End "a-schema".key_value deleteQuery ---
 
---- Begin "Delta Updates" deleteQuery ---
+--- Begin "a-schema".delta_updates deleteQuery ---
 
---- End "Delta Updates" deleteQuery ---
 
---- Begin "a-schema".target_table createLoadTable (no varchar length) ---
-CREATE TEMPORARY TABLE flow_temp_table_0 (
-	key1 BIGINT,
-	"key!2" BOOLEAN
-);
---- End "a-schema".target_table createLoadTable (no varchar length) ---
-
---- Begin "Delta Updates" createLoadTable (no varchar length) ---
-CREATE TEMPORARY TABLE flow_temp_table_1 (
-	"theKey" TEXT
-);
---- End "Delta Updates" createLoadTable (no varchar length) ---
-
---- Begin "a-schema".target_table createLoadTable (with varchar length) ---
-CREATE TEMPORARY TABLE flow_temp_table_0 (
-	key1 BIGINT,
-	"key!2" BOOLEAN
-);
---- End "a-schema".target_table createLoadTable (with varchar length) ---
-
---- Begin "Delta Updates" createLoadTable (with varchar length) ---
-CREATE TEMPORARY TABLE flow_temp_table_1 (
-	"theKey" VARCHAR(400)
-);
---- End "Delta Updates" createLoadTable (with varchar length) ---
+--- End "a-schema".delta_updates deleteQuery ---
 
 --- Begin Fence Update ---
-UPDATE path."To".checkpoints
+UPDATE path."to".checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
 	WHERE materialization = 'some/Materialization'
 	AND   key_begin = 1122867
 	AND   key_end   = 4293844428
 	AND   fence     = 123;
 --- End Fence Update ---
+
+--- Begin "a-schema".key_value createLoadTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" TEXT
+);
+--- End "a-schema".key_value createLoadTable (no varchar length) ---
+
+--- Begin "a-schema".delta_updates createLoadTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+	"theKey" TEXT
+);
+--- End "a-schema".delta_updates createLoadTable (no varchar length) ---
+
+--- Begin "a-schema".key_value createLoadTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" VARCHAR(400)
+);
+--- End "a-schema".key_value createLoadTable (with varchar length) ---
+
+--- Begin "a-schema".delta_updates createLoadTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+	"theKey" VARCHAR(400)
+);
+--- End "a-schema".delta_updates createLoadTable (with varchar length) ---
 
 --- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---
 COPY my_temp_table

@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-pendo:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_pendo
+        config: {}
+    bindings: []

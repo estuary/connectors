@@ -80,6 +80,9 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		// and fail+restart the capture within a few minutes at worst.
 		HeartbeatPeriod: 30 * time.Second,
 		ReadTimeout:     5 * time.Minute,
+
+		// Output replication log messages with Logrus the same as our own connector messages.
+		Logger: logrus.StandardLogger(),
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
@@ -493,7 +496,11 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 
 	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
-		return fmt.Errorf("unable to parse query %q: %w", query, err)
+		logrus.WithFields(logrus.Fields{
+			"query": query,
+			"err":   err,
+		}).Warn("failed to parse query event, ignoring it")
+		return nil
 	}
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
@@ -722,15 +729,6 @@ func unquoteEnumValues(values []string) []string {
 		unquoted = append(unquoted, decodeMySQLString(qval))
 	}
 	return unquoted
-}
-
-func findStr(needle string, cols []string) int {
-	for idx, val := range cols {
-		if val == needle {
-			return idx
-		}
-	}
-	return -1
 }
 
 func resolveTableName(defaultSchema string, name sqlparser.TableName) string {

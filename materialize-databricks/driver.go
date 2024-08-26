@@ -14,6 +14,7 @@ import (
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -152,7 +153,7 @@ func newTransactor(
 	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId), cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId)); err != nil {
 		return nil, err
 	} else if useSched {
 		d.sched = sched
@@ -244,7 +245,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		b.loadFile.start(ctx)
+		if err := b.loadFile.start(ctx); err != nil {
+			return fmt.Errorf("starting load file: %w", err)
+		}
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -464,6 +467,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	d.cpRecovery = false
+
+	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+			return nil, fmt.Errorf("triggering dbt job: %w", err)
+		}
+	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again

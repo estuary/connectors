@@ -147,7 +147,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	return backfillComplete, rows.Err()
 }
 
-func (db *sqlserverDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+func (db *sqlserverDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
 	fmt.Fprintf(query, " ORDER BY %%%%physloc%%%%")

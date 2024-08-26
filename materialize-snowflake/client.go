@@ -146,7 +146,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 			errs.Err(fmt.Errorf("checking for active warehouse: %w", err))
 		} else {
 			if currentWarehouse == nil {
-				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.User))
+				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.Credentials.User))
 			}
 		}
 	}

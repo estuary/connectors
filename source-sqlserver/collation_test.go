@@ -20,7 +20,7 @@ import (
 func TestVarcharKeyDiscovery(t *testing.T) {
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
 	var uniqueID = "42325208"
-	tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id VARCHAR(32) PRIMARY KEY, data TEXT)"))
+	tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(32) PRIMARY KEY, data TEXT)")
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }
 
@@ -40,7 +40,7 @@ func TestCollatedCapture(t *testing.T) {
 			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id %s(32) COLLATE SQL_Latin1_General_CP1_CI_AS PRIMARY KEY, data TEXT)", columnType))
 
 			var testRows [][]any
-			var testRunes = []rune("?abcdef€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß÷ÿ") // 100 distinct runes
+			var testRunes = []rune("?abcdef€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ ¡¢£¤¥¦§¨©ª«¬\u00AD®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß÷ÿ") // 100 distinct runes
 			for idx, r := range testRunes {
 				testRows = append(testRows, []any{fmt.Sprintf("a%sa %03d", string(r), idx), fmt.Sprintf("Row A%03d", idx)})
 				testRows = append(testRows, []any{fmt.Sprintf("a%sb %03d", string(r), idx), fmt.Sprintf("Row B%03d", idx)})

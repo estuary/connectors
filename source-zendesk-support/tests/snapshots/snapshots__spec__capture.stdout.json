@@ -50,16 +50,20 @@
                 "access_token": {
                   "type": "string",
                   "title": "Access Token",
-                  "description": "The value of the API token generated. See the <a href=\"https://docs.airbyte.com/integrations/sources/zendesk-support\">docs</a> for more information.",
+                  "description": "The OAuth access token. See the <a href=\"https://developer.zendesk.com/documentation/ticketing/working-with-oauth/creating-and-using-oauth-tokens-with-the-api/\">Zendesk docs</a> for more information.",
                   "airbyte_secret": true
                 },
                 "client_id": {
                   "airbyte_secret": true,
-                  "type": "string"
+                  "type": "string",
+                  "title": "Client ID",
+                  "description": "The OAuth client ID. See the <a href=\"https://developer.zendesk.com/documentation/ticketing/working-with-oauth/creating-and-using-oauth-tokens-with-the-api/\">Zendesk docs</a> for more information."
                 },
                 "client_secret": {
                   "airbyte_secret": true,
-                  "type": "string"
+                  "type": "string",
+                  "title": "Client Secret",
+                  "description": "The OAuth client secret. See the <a href=\"https://developer.zendesk.com/documentation/ticketing/working-with-oauth/creating-and-using-oauth-tokens-with-the-api/\">Zendesk docs</a> for more information."
                 }
               }
             },
@@ -142,11 +146,11 @@
     "documentationUrl": "https://go.estuary.dev/an43nb",
     "oauth2": {
       "provider": "zendesk",
-      "authUrlTemplate": "https://estuarysupport.zendesk.com/oauth/authorizations/new?response_type=code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=read&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
-      "accessTokenUrlTemplate": "https://estuarysupport.zendesk.com/oauth/tokens",
-      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+      "authUrlTemplate": "https://{{{ config.subdomain }}}.zendesk.com/oauth/authorizations/new?response_type=code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=read&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://{{{ config.subdomain }}}.zendesk.com/oauth/tokens",
+      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"code\": \"{{{ code }}}\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"scope\": \"read\"}",
       "accessTokenHeaders": {
-        "content-type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/json"
       },
       "accessTokenResponseMap": {
         "access_token": "/access_token"

@@ -165,7 +165,7 @@ var columnBinaryKeyComparison = map[string]bool{
 	"longtext":   true,
 }
 
-func (db *mysqlDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+func (db *mysqlDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
 	fmt.Fprintf(query, " LIMIT %d", db.config.Advanced.BackfillChunkSize)

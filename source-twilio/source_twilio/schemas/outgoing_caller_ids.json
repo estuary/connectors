@@ -1,0 +1,30 @@
+{
+  "properties": {
+    "account_sid": {
+      "type": ["null", "string"]
+    },
+    "date_created": {
+      "format": "date-time",
+      "type": ["null", "string"]
+    },
+    "date_updated": {
+      "format": "date-time",
+      "type": ["null", "string"]
+    },
+    "friendly_name": {
+      "type": ["null", "string"]
+    },
+    "phone_number": {
+      "type": ["null", "string"]
+    },
+    "sid": {
+      "type": "string"
+    },
+    "uri": {
+      "type": ["null", "string"]
+    }
+  },
+  "type": "object",
+  "required": ["sid"],
+  "additionalProperties": true
+}

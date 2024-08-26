@@ -176,7 +176,6 @@ properties:
       - boolean
   id:
     type:
-      - "null"
       - string
   io_number:
     type:
@@ -340,4 +339,5 @@ properties:
         type: integer
     required:
       - row_id
-x-infer-schema: true
+required:
+  - id

@@ -22,6 +22,8 @@ on:
       - "source-stripe-native/**"
       - "source-zendesk-support/**"
       - "source-iterable/**"
+      - "source-pendo/**"
+      - "source-twilio/**"
       - "source-jira-native/**"
   pull_request:
     branches: [main]
@@ -46,6 +48,9 @@ on:
       - "source-stripe-native/**"
       - "source-zendesk-support/**"
       - "source-iterable/**"
+      - "source-jira-native/**"
+      - "source-pendo/**"
+      - "source-twilio/**"
       - "source-jira-native/**"
 
 concurrency:
@@ -127,6 +132,14 @@ jobs:
             version: v2
             usage_rate: "1.0"
           - name: source-iterable
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-pendo
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-twilio
             type: capture
             version: v2
             usage_rate: "1.0"

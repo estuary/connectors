@@ -196,7 +196,7 @@ var columnBinaryKeyComparison = map[string]bool{
 	"text":    true,
 }
 
-func (db *postgresDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
 	fmt.Fprintf(query, ` WHERE ctid > $1`)

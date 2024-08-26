@@ -97,7 +97,7 @@
        "schema": {
        "properties": {
            "id": { "type": "integer" },
-           "unsigned_bigint": { "type": "integer" },
+           "unsigned_bigint": { "type": "integer", "maximum": 18446744073709551615 },
           },
           "required": ["id"],
           "type": "object"

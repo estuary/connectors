@@ -82,6 +82,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		}
 
 		// The anchor by which we'll reference the table schema.
+		//lint:ignore SA1019 We don't need the title-casing to handle punctuation properly so strings.Title() is sufficient
 		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
 
 		// Build `properties` schemas for each table column.

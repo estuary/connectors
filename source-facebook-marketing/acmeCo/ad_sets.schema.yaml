@@ -49,7 +49,6 @@ properties:
           - string
   id:
     type:
-      - "null"
       - string
   account_id:
     type:
@@ -1745,4 +1744,5 @@ properties:
         type: integer
     required:
       - row_id
-x-infer-schema: true
+required:
+  - id

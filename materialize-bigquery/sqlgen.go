@@ -9,7 +9,6 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // Identifiers matching the this pattern do not need to be quoted. See
@@ -49,6 +48,11 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	case json.RawMessage:
 		return string(ii), nil
 	case nil:
+		// TODO(whb): This actually materializes NULL values as empty strings in
+		// BigQuery. It's only used for objects and arrays, and we eventually
+		// want to have those materialized as JSON anyway, so I'm leaving this
+		// alone for now to maintain historical consistency in case somebody is
+		// relying on the pre-existing (incorrect, I would argue) behavior.
 		return string(json.RawMessage(nil)), nil
 	default:
 		return nil, fmt.Errorf("invalid type %#v for variant", te)
@@ -56,46 +60,41 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 var bqDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("STRING"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
-		sql.INTEGER:  sql.NewStaticMapper("INT64"),
-		sql.NUMBER:   sql.NewStaticMapper("FLOAT64"),
-		sql.OBJECT:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("STRING"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("BIGNUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.ARRAY:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.BINARY:  sql.MapStatic("STRING"),
+			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("INTEGER"),
+				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
+			),
+			// We used to materialize these as "BIGNUMERIC(38,0)", so
+			// pre-existing columns of that type are allowed for
+			// backward-compatibility.
+			sql.NUMBER:   sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float", "bignumeric")),
+			sql.OBJECT:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				// BigQuery's table metadata APIs include the precision and
+				// scale with BIGNUMERIC columns, and we strip that off when
+				// creating the InfoSchema so that a BIGNUMERIC(38,0) is
+				// compatible with any BIGNUMERIC column.
+				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("STRING", sql.UsingConverter(sql.ToStr)),
+				38,
+			),
+			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
+			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("STRING"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
+					"date-time": sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime)),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
-					Delegate: sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
-				},
-				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
-				"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(sql.ClampDatetime())),
-			},
+			}),
 		},
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"integer"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.MultipleCompatible},
-		sql.ColValidation{Types: []string{"bignumeric"}, Validate: bignumericCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
+		sql.WithNotNullText("NOT NULL"),
 	)
 
 	return sql.Dialect{
@@ -120,31 +119,10 @@ var bqDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    300,
 		CaseInsensitiveColumns: true,
 	}
 }()
-
-// bignumericCompatible allows either integers or numbers, since we used to create number columns as
-// "bignumeric" (now they are float64), and currently create strings formatted as integers as
-// "bignumeric". This is needed for compatibility for older materializations.
-func bignumericCompatible(p pf.Projection) bool {
-	return sql.IntegerCompatible(p) || sql.NumberCompatible(p)
-}
-
-// stringCompatible allow strings of any format, arrays, or objects to be materialized.
-func stringCompatible(p pf.Projection) bool {
-	if sql.StringCompatible(p) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"array"}) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"object"}) {
-		return true
-	}
-
-	return false
-}
 
 var (
 	tplAll = sql.MustParseTemplate(bqDialect, "root", `

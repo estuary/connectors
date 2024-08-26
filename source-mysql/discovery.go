@@ -413,7 +413,7 @@ const queryDiscoverTables = `
   WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
     AND table_schema != 'mysql' AND table_schema != 'sys';`
 
-func getTables(ctx context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
 	var results, err = conn.Execute(queryDiscoverTables)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
@@ -436,7 +436,7 @@ const queryDiscoverColumns = `
   FROM information_schema.columns
   ORDER BY table_schema, table_name, ordinal_position;`
 
-func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, error) {
+func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, error) {
 	var results, err = conn.Execute(queryDiscoverColumns)
 	if err != nil {
 		return nil, fmt.Errorf("error querying columns: %w", err)
@@ -642,7 +642,7 @@ SELECT table_schema, table_name, column_name, seq_in_index
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(ctx context.Context, conn *client.Conn) (map[string][]string, error) {
+func getPrimaryKeys(_ context.Context, conn *client.Conn) (map[string][]string, error) {
 	var results, err = conn.Execute(queryDiscoverPrimaryKeys)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)
@@ -675,7 +675,7 @@ SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, st
   ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index
 `
 
-func getSecondaryIndexes(ctx context.Context, conn *client.Conn) (map[string]map[string][]string, error) {
+func getSecondaryIndexes(_ context.Context, conn *client.Conn) (map[string]map[string][]string, error) {
 	var results, err = conn.Execute(queryDiscoverSecondaryIndices)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)

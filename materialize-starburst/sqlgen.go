@@ -11,7 +11,6 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/trinodb/trino-go-client/trino"
 )
 
@@ -54,49 +53,37 @@ var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (inter
 
 // starburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
 var starburstTrinoDialect = func() sql.Dialect {
-	dateTimeMapper := sql.NewStaticMapper("TIMESTAMP(6) WITH TIME ZONE", sql.WithElementConverter(timestampConverter))
-	return starburstDialect(sql.NewStaticMapper("DATE"), dateTimeMapper)
+	dateTimeMapper := sql.MapStatic("TIMESTAMP(6) WITH TIME ZONE", sql.UsingConverter(timestampConverter))
+	return starburstDialect(sql.MapStatic("DATE"), dateTimeMapper)
 }()
 
 // starburstHiveDialect returns a representation of the Starburst Hive format SQL dialect used for temp table.
 var starburstHiveDialect = func() sql.Dialect {
-	return starburstDialect(sql.NewStaticMapper("VARCHAR"), sql.NewStaticMapper("VARCHAR"))
+	return starburstDialect(sql.MapStatic("VARCHAR"), sql.MapStatic("VARCHAR"))
 }()
 
-var starburstDialect = func(dateMapper sql.TypeMapper, dateTimeMapper sql.TypeMapper) sql.Dialect {
-
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.ARRAY:    sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.BINARY:   sql.NewStaticMapper("VARCHAR"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(doubleConverter)),
-		sql.OBJECT:   sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.MULTIPLE: sql.NewStaticMapper("VARCHAR", sql.WithElementConverter(jsonConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("VARCHAR"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
+var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.MapProjectionFn) sql.Dialect {
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.ARRAY:          sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
+			sql.BINARY:         sql.MapStatic("VARCHAR"),
+			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
+			sql.INTEGER:        sql.MapStatic("BIGINT"),
+			sql.NUMBER:         sql.MapStatic("DOUBLE", sql.UsingConverter(doubleConverter)),
+			sql.OBJECT:         sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
+			sql.MULTIPLE:       sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
+			sql.STRING_INTEGER: sql.MapStatic("BIGINT", sql.UsingConverter(sql.StrToInt)),
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "inf", "-inf"))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("VARCHAR"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      dateMapper,
+					"date-time": dateTimeMapper,
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "inf", "-inf"))),
-				},
-				"date":      dateMapper,
-				"date-time": dateTimeMapper,
-			},
+			}),
 		},
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"varchar"}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp(6) with time zone"}, Validate: sql.DateTimeCompatible},
+		// We are not using NOT NULL TEXT so that all columns are created as nullable. This is
+		// necessary because Hive temp table which does not support NOT NULL
 	)
 
 	return sql.Dialect{
@@ -128,26 +115,9 @@ var starburstDialect = func(dateMapper sql.TypeMapper, dateTimeMapper sql.TypeMa
 		// We are not using sql.NullableMapper so that all columns are created as nullable. This is
 		// necessary because Hive temp table which does not support NOT NULL
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Starburst has no limit on how long column names can be that I can find
 		CaseInsensitiveColumns: true,
 	}
-}
-
-// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
-// be materialized, since these are all materialized as VARCHAR columns.
-func stringCompatible(p pf.Projection) bool {
-	if sql.StringCompatible(p) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"array"}) {
-		return true
-	} else if sql.TypesOrNull(p.Inference.Types, []string{"object"}) {
-		return true
-	} else if sql.MultipleCompatible(p) {
-		return true
-	}
-
-	return false
 }
 
 type templates struct {
