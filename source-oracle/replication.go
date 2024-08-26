@@ -19,10 +19,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (db *oracleDatabase) StreamingFenceInterval() time.Duration {
-	return 60 * time.Second
-}
-
 // Specify default formats for DATE, TIMESTAMP and TIMESTAMP_TZ types so
 // their formats are predictable when we receive SQL statements from Logminer
 const ORACLE_DATE_FORMAT = "YYYY-MM-DD HH24:MI:SS"

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	_ "github.com/go-mysql-org/go-mysql/driver"
@@ -55,6 +56,9 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
 		return nil
 	}
+
+	// During tests, establish a fence every 3 seconds during indefinite streaming.
+	sqlcapture.StreamingFenceInterval = 3 * time.Second
 
 	logrus.WithFields(logrus.Fields{
 		"user": *dbControlUser,

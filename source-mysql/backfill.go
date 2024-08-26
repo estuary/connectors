@@ -10,22 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (db *mysqlDatabase) WriteWatermark(ctx context.Context, watermark string) error {
-	logrus.WithField("watermark", watermark).Debug("writing watermark")
-
-	var query = fmt.Sprintf(`REPLACE INTO %s (slot, watermark) VALUES (?,?);`, db.config.Advanced.WatermarksTable)
-	var results, err = db.conn.Execute(query, db.config.Advanced.NodeID, watermark)
-	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %d: %w", db.config.Advanced.NodeID, err)
-	}
-	results.Close()
-	return nil
-}
-
-func (db *mysqlDatabase) WatermarksTable() string {
-	return db.config.Advanced.WatermarksTable
-}
-
 func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned

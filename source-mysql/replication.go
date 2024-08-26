@@ -190,20 +190,6 @@ func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
 		return fmt.Errorf("internal error: replication stream already started")
 	}
 
-	// Activate replication for the watermarks table.
-	var discovery, err = rs.db.DiscoverTables(ctx)
-	if err != nil {
-		return err
-	}
-	var watermarks = rs.db.config.Advanced.WatermarksTable
-	var watermarksInfo = discovery[watermarks]
-	if watermarksInfo == nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
-	}
-	if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
-	}
-
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	rs.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	rs.errCh = make(chan error)
@@ -936,8 +922,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		// Since we're still at a valid fence position and those are always between
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
-		// there's a lot of implicit assumptions of regular events / flushes caused
-		// by the old watermark table behavior.
+		// there's a lot of implicit assumptions of regular events / flushes.
 		return callback(&sqlcapture.FlushEvent{
 			Cursor: fmt.Sprintf("%s:%d", fencePosition.Name, fencePosition.Pos),
 		})
