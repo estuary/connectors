@@ -7,5 +7,7 @@ captures:
           - python
           - "-m"
           - source_pendo
-        config: {}
+        config: 
+          startDate: "2024-08-27T00:00:00Z"
+          apiToken: "notarealapikey"
     bindings: []

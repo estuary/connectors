@@ -1,100 +1,58 @@
 [
   {
-    "recommendedName": "Page",
-    "resourceConfig": {
-      "stream": "Page",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "The unique ID of the page."
-        },
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "additionalProperties": true,
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
     "recommendedName": "Feature",
     "resourceConfig": {
-      "stream": "Feature",
-      "syncMode": "full_refresh"
+      "name": "Feature",
+      "interval": "PT30S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "The unique identifier of the feature."
-        },
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "Report",
-    "resourceConfig": {
-      "stream": "Report",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique ID of the report"
-        },
         "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
-          "properties": {
-            "row_id": {
-              "type": "integer"
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
             }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
           },
-          "required": [
-            "row_id"
-          ]
+          "description": "Document metadata"
+        },
+        "id": {
+          "default": "",
+          "title": "Id",
+          "type": "string"
         }
       },
-      "additionalProperties": true,
+      "title": "Resource",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
@@ -104,31 +62,57 @@
   {
     "recommendedName": "Guide",
     "resourceConfig": {
-      "stream": "Guide",
-      "syncMode": "full_refresh"
+      "name": "Guide",
+      "interval": "PT30S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier of the guide."
-        },
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "default": "",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "title": "Resource",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
@@ -136,29 +120,174 @@
     ]
   },
   {
-    "recommendedName": "Account Metadata",
+    "recommendedName": "Page",
     "resourceConfig": {
-      "stream": "Account Metadata",
-      "syncMode": "full_refresh"
+      "name": "Page",
+      "interval": "PT30S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "default": "",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "title": "Resource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Report",
+    "resourceConfig": {
+      "name": "Report",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "default": "",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "title": "Resource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "AccountMetadata",
+    "resourceConfig": {
+      "name": "AccountMetadata",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Metadata",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
@@ -166,33 +295,843 @@
     ]
   },
   {
-    "recommendedName": "Visitor Metadata",
+    "recommendedName": "VisitorMetadata",
     "resourceConfig": {
-      "stream": "Visitor Metadata",
-      "syncMode": "full_refresh"
+      "name": "VisitorMetadata",
+      "interval": "PT30S"
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
-      "properties": {
-        "_meta": {
-          "type": "object",
-          "description": "Metadata object added by Estuary.",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
       "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "Metadata",
+      "type": "object",
       "x-infer-schema": true
     },
     "key": [
       "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "PageEvents",
+    "resourceConfig": {
+      "name": "PageEvents",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "default": -1,
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "default": -1,
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "default": "",
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lasttime"
+        },
+        "guideTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guidetimestamp"
+        },
+        "pageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pageid"
+        },
+        "featureId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Featureid"
+        },
+        "trackTypeId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tracktypeid"
+        },
+        "guideId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guideid"
+        },
+        "pollId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pollid"
+        }
+      },
+      "title": "Event",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/pageId"
+    ]
+  },
+  {
+    "recommendedName": "FeatureEvents",
+    "resourceConfig": {
+      "name": "FeatureEvents",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "default": -1,
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "default": -1,
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "default": "",
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lasttime"
+        },
+        "guideTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guidetimestamp"
+        },
+        "pageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pageid"
+        },
+        "featureId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Featureid"
+        },
+        "trackTypeId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tracktypeid"
+        },
+        "guideId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guideid"
+        },
+        "pollId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pollid"
+        }
+      },
+      "title": "Event",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/featureId"
+    ]
+  },
+  {
+    "recommendedName": "TrackEvents",
+    "resourceConfig": {
+      "name": "TrackEvents",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "default": -1,
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "default": -1,
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "default": "",
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lasttime"
+        },
+        "guideTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guidetimestamp"
+        },
+        "pageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pageid"
+        },
+        "featureId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Featureid"
+        },
+        "trackTypeId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tracktypeid"
+        },
+        "guideId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guideid"
+        },
+        "pollId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pollid"
+        }
+      },
+      "title": "Event",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/trackTypeId"
+    ]
+  },
+  {
+    "recommendedName": "GuideEvents",
+    "resourceConfig": {
+      "name": "GuideEvents",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "default": -1,
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "default": -1,
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "default": "",
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lasttime"
+        },
+        "guideTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guidetimestamp"
+        },
+        "pageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pageid"
+        },
+        "featureId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Featureid"
+        },
+        "trackTypeId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tracktypeid"
+        },
+        "guideId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guideid"
+        },
+        "pollId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pollid"
+        }
+      },
+      "title": "Event",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/guideId"
+    ]
+  },
+  {
+    "recommendedName": "PollEvents",
+    "resourceConfig": {
+      "name": "PollEvents",
+      "interval": "PT30S"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Meta"
+            }
+          ],
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "appId": {
+          "default": -1,
+          "title": "Appid",
+          "type": "integer"
+        },
+        "hour": {
+          "default": -1,
+          "title": "Hour",
+          "type": "integer"
+        },
+        "remoteIp": {
+          "default": "",
+          "title": "Remoteip",
+          "type": "string"
+        },
+        "lastTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lasttime"
+        },
+        "guideTimestamp": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guidetimestamp"
+        },
+        "pageId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pageid"
+        },
+        "featureId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Featureid"
+        },
+        "trackTypeId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tracktypeid"
+        },
+        "guideId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guideid"
+        },
+        "pollId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pollid"
+        }
+      },
+      "title": "Event",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/appId",
+      "/hour",
+      "/remoteIp",
+      "/pollId"
     ]
   }
 ]

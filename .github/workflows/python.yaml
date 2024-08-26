@@ -137,7 +137,7 @@ jobs:
             usage_rate: "1.0"
           - name: source-pendo
             type: capture
-            version: v1
+            version: v2
             usage_rate: "1.0"
           - name: source-twilio
             type: capture
