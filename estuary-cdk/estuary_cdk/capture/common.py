@@ -395,11 +395,6 @@ def open(
                 binding.stateKey
             )
 
-            task.log.debug(
-                "open._run",
-                {"binding": binding.stateKey, "state": state},
-            )
-
             if state is None:
                 # Checkpoint the binding's initialized state prior to any processing.
                 task.checkpoint(
