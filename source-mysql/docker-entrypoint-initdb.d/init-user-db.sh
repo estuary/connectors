@@ -12,8 +12,4 @@ mysql --user="root" --password="secret1234" --database="mysql" <<-EOSQL
 
     GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
     GRANT SELECT ON *.* TO 'flow_capture';
-
-    CREATE DATABASE IF NOT EXISTS flow;
-    CREATE TABLE IF NOT EXISTS flow.watermarks (slot INTEGER PRIMARY KEY, watermark TEXT);
-    GRANT INSERT, UPDATE, DELETE ON flow.watermarks TO 'flow_capture';
 EOSQL

@@ -100,13 +100,15 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	WatermarksTable          string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=The name of the table used for watermark writes. Must be fully-qualified in '<schema>.<table>' form."`
 	DBName                   string `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
 	SkipBinlogRetentionCheck bool   `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need."`
 	NodeID                   uint32 `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	SkipBackfills            string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize        int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	HeartbeatInterval        string `json:"heartbeat_interval,omitempty" jsonschema:"title=Heartbeat Interval,default=60s,description=How frequently to issue watermark writes as a heartbeat during replication streaming. Must be a valid Go duration string." jsonschema_extras:"pattern=^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"`
+
+	// Deprecated config options which no longer do anything.
+	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"-"`
+	HeartbeatInterval string `json:"heartbeat_interval,omitempty" jsonschema:"-"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -130,19 +132,11 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
-	}
 	if c.Advanced.SkipBackfills != "" {
 		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
 			if !strings.Contains(skipStreamID, ".") {
 				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
 			}
-		}
-	}
-	if c.Advanced.HeartbeatInterval != "" {
-		if _, err := time.ParseDuration(c.Advanced.HeartbeatInterval); err != nil {
-			return fmt.Errorf("invalid 'heartbeat_interval' configuration: interval %q must be a valid Go duration string", c.Advanced.HeartbeatInterval)
 		}
 	}
 	return nil
@@ -152,9 +146,6 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaults(name string) {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
-	if c.Advanced.WatermarksTable == "" {
-		c.Advanced.WatermarksTable = "flow.watermarks"
-	}
 	if c.Advanced.DBName == "" {
 		c.Advanced.DBName = "mysql"
 	}
@@ -165,7 +156,7 @@ func (c *Config) SetDefaults(name string) {
 		// derive a default value by hashing the task name.
 		var nameHash = sha256.Sum256([]byte(name))
 		c.Advanced.NodeID = binary.BigEndian.Uint32(nameHash[:])
-		c.Advanced.NodeID &= 0x7FFFFFFF // Clear MSB because watermark writes use the node ID as an integer key
+		c.Advanced.NodeID &= 0x7FFFFFFF // Clear MSB for legacy reasons. Probably not necessary any longer but changing it would change the node ID.
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
@@ -414,14 +405,6 @@ func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
 		db.includeTxIDs = make(map[string]bool)
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
-}
-
-func (db *mysqlDatabase) StreamingFenceInterval() time.Duration {
-	if db.config.Advanced.HeartbeatInterval != "" {
-		var dt, _ = time.ParseDuration(db.config.Advanced.HeartbeatInterval)
-		return dt
-	}
-	return 60 * time.Second
 }
 
 // mysqlSourceInfo is source metadata for data capture events.

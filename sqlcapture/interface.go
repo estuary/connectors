@@ -120,9 +120,6 @@ type Database interface {
 	// a neverending sequence of change events can be read.
 	ReplicationStream(ctx context.Context, startCursor string) (ReplicationStream, error)
 
-	// Once the capture is indefinitely streaming changes, it will establish new fences at this interval.
-	StreamingFenceInterval() time.Duration
-
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
 	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)
