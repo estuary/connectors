@@ -1,0 +1,52 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-mixpanel:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/source-mixpanel:dev"
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: annotations
+          syncMode: full_refresh
+          cursorField:
+            - id
+        target: acmeCo/annotations
+      - resource:
+          stream: cohorts
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/cohorts
+      - resource:
+          stream: funnels
+          syncMode: incremental
+          cursorField:
+            - date
+        target: acmeCo/funnels
+      - resource:
+          stream: revenue
+          syncMode: incremental
+          cursorField:
+            - date
+        target: acmeCo/revenue
+      - resource:
+          stream: cohort_members
+          syncMode: incremental
+          cursorField:
+            - last_seen
+        target: acmeCo/cohort_members
+      - resource:
+          stream: engage
+          syncMode: incremental
+          cursorField:
+            - last_seen
+        target: acmeCo/engage
+      - resource:
+          stream: export
+          syncMode: incremental
+          cursorField:
+            - time
+        target: acmeCo/export
