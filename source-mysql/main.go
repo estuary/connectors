@@ -293,6 +293,35 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		logrus.WithField("err", err).Warn("failed to query database version")
 	}
 
+	// Query and log the default storage engine for the database.
+	//
+	// There exist users out there who have very legacy databases which still use MyISAM
+	// for all their tables, and these present an issue for us because changes to MyISAM
+	// tables never write commit events into the binlog (because MyISAM doesn't support
+	// transactions).
+	//
+	// For correctness, we require commit events to tell us when it's okay to emit Flow
+	// checkpoints. If all of the user's data tables are using MyISAM then they'll need
+	// to generate some periodic transactional writes, probably using a heartbeat table
+	// explicitly on InnoDB and a scheduled event to update that table at some rate.
+	//
+	// Strictly speaking this check doesn't tell us whether that's an issue, but it's a
+	// pretty reliable guess that if the capture isn't capturing *and* we see the default
+	// storage engine set to something other than InnoDB, this is what's happening. Thus
+	// we check it here so there will be a useful hint in the task logs.
+	if results, err := db.conn.Execute("SELECT @@default_storage_engine;"); err != nil {
+		logrus.WithField("err", err).Warn("failed to query default storage engine")
+	} else {
+		if len(results.Values) == 1 && len(results.Values[0]) == 1 {
+			var defaultEngine = string(results.Values[0][0].AsString())
+			logrus.WithField("engine", defaultEngine).Info("queried default storage engine")
+			if defaultEngine != "InnoDB" {
+				logrus.WithField("engine", defaultEngine).Warn("default storage engine is not InnoDB")
+			}
+		}
+		results.Close()
+	}
+
 	return nil
 }
 
