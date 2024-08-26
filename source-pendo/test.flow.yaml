@@ -7,5 +7,9 @@ captures:
           - python
           - "-m"
           - source_pendo
-        config: {}
+        config: 
+          startDate: "2024-08-27T00:00:00Z"
+          credentials:
+            access_token: notarealapikey
+            credentials_title: Private App Credentials
     bindings: []

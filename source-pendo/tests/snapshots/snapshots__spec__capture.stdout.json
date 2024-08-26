@@ -2,63 +2,83 @@
   {
     "protocol": 3032023,
     "configSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "required": [
-        "api_key"
-      ],
-      "properties": {
-        "api_key": {
-          "type": "string",
-          "title": "API Key",
-          "airbyte_secret": true,
-          "order": 0
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "enum": [
+                "Private App Credentials"
+              ],
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
         }
       },
-      "additionalProperties": true
+      "properties": {
+        "startDate": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any event data generated before this date will not be replicated. If left blank, the start date will be set to one hour before the present date.",
+          "examples": [
+            "2024-08-27T00:00:00Z"
+          ],
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
     },
     "resourceConfigSchema": {
       "additionalProperties": false,
-      "description": "ResourceConfig encodes a configured resource stream",
+      "description": "ResourceConfig is a common resource configuration shape.",
       "properties": {
-        "stream": {
-          "description": "Name of this stream",
-          "title": "Stream",
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
           "type": "string"
         },
-        "syncMode": {
-          "description": "Sync this resource incrementally, or fully refresh it every run",
-          "enum": [
-            "full_refresh",
-            "incremental"
-          ],
-          "title": "Sync Mode",
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
           "type": "string"
-        },
-        "namespace": {
-          "title": "Namespace",
-          "description": "Enclosing schema namespace of this resource",
-          "type": "string"
-        },
-        "cursorField": {
-          "title": "Cursor Field",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       },
       "required": [
-        "stream",
-        "syncMode"
+        "name"
       ],
       "title": "ResourceConfig",
       "type": "object"
     },
     "documentationUrl": "https://go.estuary.dev/source-pendo",
     "resourcePathPointers": [
-      "/namespace",
-      "/stream"
+      "/name"
     ]
   }
 ]
