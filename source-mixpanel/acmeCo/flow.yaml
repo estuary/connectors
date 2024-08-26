@@ -1,0 +1,115 @@
+---
+collections:
+  acmeCo/annotations:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      properties:
+        date:
+          format: date-time
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        project_id:
+          type:
+            - "null"
+            - integer
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/cohort_members:
+    schema: cohort_members.schema.yaml
+    key:
+      - /distinct_id
+  acmeCo/cohorts:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      additionalProperties: true
+      properties:
+        count:
+          type:
+            - "null"
+            - integer
+        created:
+          format: date-time
+          type:
+            - "null"
+            - string
+        data_group_id:
+          type:
+            - "null"
+            - integer
+        description:
+          type:
+            - "null"
+            - string
+        id:
+          type: integer
+        is_visible:
+          type:
+            - "null"
+            - integer
+        name:
+          type:
+            - "null"
+            - string
+        project_id:
+          type:
+            - "null"
+            - integer
+      required:
+        - id
+      type: object
+    key:
+      - /id
+  acmeCo/engage:
+    schema: engage.schema.yaml
+    key:
+      - /distinct_id
+  acmeCo/export:
+    schema: export.schema.yaml
+    key:
+      - /distinct_id
+      - /time
+  acmeCo/funnels:
+    schema: funnels.schema.yaml
+    key:
+      - /funnel_id
+      - /date
+  acmeCo/revenue:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      properties:
+        amount:
+          multipleOf: 1e-20
+          type:
+            - "null"
+            - number
+        count:
+          type:
+            - "null"
+            - integer
+        date:
+          format: date
+          type: string
+        datetime:
+          format: date-time
+          type:
+            - "null"
+            - string
+        paid_count:
+          type:
+            - "null"
+            - integer
+      required:
+        - date
+      type: object
+    key:
+      - /date

@@ -1,0 +1,335 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+properties:
+  Adopting:
+    type:
+      - "null"
+      - boolean
+  Birth Date:
+    format: date-time
+    type:
+      - "null"
+      - string
+  City:
+    type:
+      - "null"
+      - string
+  Companies:
+    items: {}
+    type:
+      - "null"
+      - array
+  Company:
+    items: {}
+    type:
+      - "null"
+      - array
+  Company Id:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  Company Name:
+    type:
+      - "null"
+      - string
+  Country:
+    type:
+      - "null"
+      - string
+  Device API Level:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  Due Date:
+    format: date-time
+    type:
+      - "null"
+      - string
+  Environment:
+    type:
+      - "null"
+      - string
+  Experienced A Loss:
+    type:
+      - "null"
+      - boolean
+  Family Id:
+    type:
+      - "null"
+      - string
+  Family Status:
+    type:
+      - "null"
+      - string
+  Family Timezone:
+    type:
+      - "null"
+      - string
+  Feature Flag Journeys:
+    type:
+      - "null"
+      - boolean
+  Feature Flag Questionnaire:
+    type:
+      - "null"
+      - boolean
+  Feature Flag Testflag:
+    type:
+      - "null"
+      - boolean
+  Guide Id:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  Guide Name:
+    type:
+      - "null"
+      - string
+  Guides:
+    items: {}
+    type:
+      - "null"
+      - array
+  Is Demo:
+    type:
+      - "null"
+      - boolean
+  Is Staff:
+    type:
+      - "null"
+      - boolean
+  Package Id:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  Package Name:
+    type:
+      - "null"
+      - string
+  Product Types:
+    items: {}
+    type:
+      - "null"
+      - array
+  Relation To Employee:
+    type:
+      - "null"
+      - string
+  State:
+    type:
+      - "null"
+      - string
+  Surrogate:
+    type:
+      - "null"
+      - boolean
+  VIP:
+    type:
+      - "null"
+      - string
+  ae_first_app_open_date:
+    format: date-time
+    type:
+      - "null"
+      - string
+  ae_total_app_session_length:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  ae_total_app_sessions:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  android_app_version:
+    type:
+      - "null"
+      - string
+  android_app_version_code:
+    type:
+      - "null"
+      - string
+  android_brand:
+    type:
+      - "null"
+      - string
+  android_lib_version:
+    type:
+      - "null"
+      - string
+  android_manufacturer:
+    type:
+      - "null"
+      - string
+  android_model:
+    type:
+      - "null"
+      - string
+  android_os:
+    type:
+      - "null"
+      - string
+  android_os_version:
+    type:
+      - "null"
+      - string
+  android_version_code:
+    type:
+      - "null"
+      - string
+  anonymousId:
+    type:
+      - "null"
+      - string
+  bluetooth_enabled:
+    type:
+      - "null"
+      - boolean
+  browser:
+    type:
+      - "null"
+      - string
+  browser_version:
+    type:
+      - "null"
+      - string
+  carrier:
+    type:
+      - "null"
+      - string
+  city:
+    type:
+      - "null"
+      - string
+  country_code:
+    type:
+      - "null"
+      - string
+  distinct_id:
+    type: string
+  email:
+    type:
+      - "null"
+      - string
+  first_name:
+    type:
+      - "null"
+      - string
+  geo_source:
+    type:
+      - "null"
+      - string
+  has_telephone:
+    type:
+      - "null"
+      - boolean
+  id:
+    type:
+      - "null"
+      - string
+  ios_app_release:
+    type:
+      - "null"
+      - string
+  ios_app_version:
+    type:
+      - "null"
+      - string
+  ios_device_model:
+    type:
+      - "null"
+      - string
+  ios_ifa:
+    type:
+      - "null"
+      - string
+  ios_lib_version:
+    type:
+      - "null"
+      - string
+  ios_version:
+    type:
+      - "null"
+      - string
+  last_name:
+    type:
+      - "null"
+      - string
+  last_seen:
+    format: date-time
+    type:
+      - "null"
+      - string
+  manufacturer:
+    type:
+      - "null"
+      - string
+  model:
+    type:
+      - "null"
+      - string
+  name:
+    type:
+      - "null"
+      - string
+  os:
+    type:
+      - "null"
+      - string
+  os_version:
+    type:
+      - "null"
+      - string
+  region:
+    type:
+      - "null"
+      - string
+  screen_dpi:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  screen_height:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  screen_width:
+    multipleOf: 1e-20
+    type:
+      - "null"
+      - number
+  swift_lib_version:
+    type:
+      - "null"
+      - string
+  timezone:
+    type:
+      - "null"
+      - string
+  transactions:
+    items: {}
+    type:
+      - "null"
+      - array
+  unblocked:
+    type:
+      - "null"
+      - string
+  userId:
+    type:
+      - "null"
+      - string
+  wifi:
+    type:
+      - "null"
+      - boolean
+required:
+  - distinct_id
+type: object

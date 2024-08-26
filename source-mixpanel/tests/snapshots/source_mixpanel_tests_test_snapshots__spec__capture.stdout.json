@@ -1,0 +1,183 @@
+[
+  {
+    "configSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "attribution_window": {
+          "default": 5,
+          "description": " A period of time for attributing results to ads and the lookback period after those actions occur during which ad results are counted. Default attribution window is 5 days.",
+          "order": 2,
+          "title": "Attribution Window",
+          "type": "integer"
+        },
+        "credentials": {
+          "description": "Choose how to authenticate to Mixpanel",
+          "oneOf": [
+            {
+              "properties": {
+                "option_title": {
+                  "const": "Service Account",
+                  "order": 0,
+                  "type": "string"
+                },
+                "secret": {
+                  "airbyte_secret": true,
+                  "description": "Mixpanel Service Account Secret. See the <a href=\"https://developer.mixpanel.com/reference/service-accounts\">docs</a> for more information on how to obtain this.",
+                  "order": 2,
+                  "title": "Secret",
+                  "type": "string"
+                },
+                "username": {
+                  "description": "Mixpanel Service Account Username. See the <a href=\"https://developer.mixpanel.com/reference/service-accounts\">docs</a> for more information on how to obtain this.",
+                  "order": 1,
+                  "title": "Username",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "username",
+                "secret"
+              ],
+              "title": "Service Account",
+              "type": "object"
+            },
+            {
+              "properties": {
+                "api_secret": {
+                  "airbyte_secret": true,
+                  "description": "Mixpanel project secret. See the <a href=\"https://developer.mixpanel.com/reference/project-secret#managing-a-projects-secret\">docs</a> for more information on how to obtain this.",
+                  "order": 1,
+                  "title": "Project Secret",
+                  "type": "string"
+                },
+                "option_title": {
+                  "const": "Project Secret",
+                  "order": 0,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "api_secret"
+              ],
+              "title": "Project Secret",
+              "type": "object"
+            }
+          ],
+          "order": 0,
+          "title": "Authentication *",
+          "type": "object"
+        },
+        "date_window_size": {
+          "default": 30,
+          "description": "Defines window size in days, that used to slice through data. You can reduce it, if amount of data in each window is too big for your environment.",
+          "minimum": 1,
+          "order": 8,
+          "title": "Date slicing window",
+          "type": "integer"
+        },
+        "end_date": {
+          "description": "The date in the format YYYY-MM-DD. Any data after this date will not be replicated. Left empty to always sync to most recent date",
+          "examples": [
+            "2021-11-16"
+          ],
+          "format": "date-time",
+          "order": 6,
+          "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$",
+          "title": "End Date",
+          "type": "string"
+        },
+        "project_id": {
+          "description": "Your project ID number. See the docs for more information on how to obtain this: https://help.mixpanel.com/hc/en-us/articles/115004490503-Project-Settings#project-id",
+          "order": 1,
+          "title": "Project ID",
+          "type": "integer"
+        },
+        "project_timezone": {
+          "default": "US/Pacific",
+          "description": "Time zone in which integer date times are stored. The project timezone may be found in the project settings in the Mixpanel console: https://help.mixpanel.com/hc/en-us/articles/115004547203-Manage-Timezones-for-Projects-in-Mixpanel",
+          "examples": [
+            "US/Pacific",
+            "UTC"
+          ],
+          "order": 3,
+          "title": "Project Timezone",
+          "type": "string"
+        },
+        "region": {
+          "default": "US",
+          "description": "The region of mixpanel domain instance either US or EU.",
+          "enum": [
+            "US",
+            "EU"
+          ],
+          "order": 7,
+          "title": "Region",
+          "type": "string"
+        },
+        "select_properties_by_default": {
+          "default": true,
+          "description": "Setting this config parameter to TRUE ensures that new properties on events and engage records are captured. Otherwise new properties will be ignored.",
+          "order": 4,
+          "title": "Select Properties By Default",
+          "type": "boolean"
+        },
+        "start_date": {
+          "description": "The date in the format YYYY-MM-DD. Any data before this date will not be replicated. If this option is not set, the connector will replicate data from up to one year ago by default.",
+          "examples": [
+            "2021-11-16"
+          ],
+          "format": "date-time",
+          "order": 5,
+          "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$",
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "title": "Source Mixpanel Spec",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/kC5MzU",
+    "oauth2": {},
+    "protocol": 3032023,
+    "resourceConfigSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "cursorField": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ],
+      "title": "ResourceSpec",
+      "type": "object"
+    },
+    "resourcePathPointers": [
+      "/namespace",
+      "/stream"
+    ]
+  }
+]

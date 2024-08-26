@@ -1,0 +1,140 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  analysis:
+    properties:
+      completion:
+        type:
+          - "null"
+          - integer
+      starting_amount:
+        type:
+          - "null"
+          - integer
+      steps:
+        type:
+          - "null"
+          - integer
+      worst:
+        type:
+          - "null"
+          - integer
+    type:
+      - "null"
+      - object
+  date:
+    format: date
+    type: string
+  datetime:
+    format: date-time
+    type:
+      - "null"
+      - string
+  funnel_id:
+    type: integer
+  name:
+    type:
+      - "null"
+      - string
+  steps:
+    items:
+      additionalProperties: true
+      properties:
+        avg_time:
+          type:
+            - "null"
+            - number
+        avg_time_from_start:
+          type:
+            - "null"
+            - number
+        count:
+          type:
+            - "null"
+            - integer
+        event:
+          type:
+            - "null"
+            - string
+        goal:
+          type:
+            - "null"
+            - string
+        overall_conv_ratio:
+          type:
+            - "null"
+            - number
+        selector:
+          type:
+            - "null"
+            - string
+        selector_params:
+          additionalProperties: true
+          properties:
+            step_label:
+              type:
+                - "null"
+                - string
+          type:
+            - "null"
+            - object
+        session_event:
+          type:
+            - "null"
+            - string
+        step_conv_ratio:
+          type:
+            - "null"
+            - number
+        step_label:
+          type:
+            - "null"
+            - string
+        time_buckets_from_prev:
+          properties:
+            buckets:
+              items:
+                type: integer
+              type:
+                - "null"
+                - array
+            higher:
+              type:
+                - "null"
+                - integer
+            lower:
+              type:
+                - "null"
+                - integer
+          type:
+            - "null"
+            - object
+        time_buckets_from_start:
+          properties:
+            buckets:
+              items:
+                type: integer
+              type:
+                - "null"
+                - array
+            higher:
+              type:
+                - "null"
+                - integer
+            lower:
+              type:
+                - "null"
+                - integer
+          type:
+            - "null"
+            - object
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+required:
+  - funnel_id
+  - date
+type: object
