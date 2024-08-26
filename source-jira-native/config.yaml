@@ -1,0 +1,26 @@
+api_token_sops: ENC[AES256_GCM,data:kaZEZfAFqeUZhsBcE1zK7bWd7U/Qzl3ocbXCPzhGvUDOBir2urScZx2yrJxL5p3jnimz8fdm8VK6m/Ey1dqvkHXMK945dK/bBvtPf6HAs5hdUzmO4cTNFTITUbK2WnC1Blrt53bcZojY98euZU5CyNl1vzf0xmQuNuxAQoY3tK1lvKzChOgpUjlwOpbImTgRQr1w8sscHbjySwTBL8bOOVegiyFfy/BMijputYtuIBOYOfWWSKzfnIRwDH3VsRl5,iv:TC+9NiH46OlJv9AkUfUAuwoYs99pyOP3Q2gb2FAqC3E=,tag:7VkZYy3Du9BsAyUlFcrcWA==,type:str]
+domain: sourcejira.atlassian.net
+email: sourcegithub@outlook.com
+enable_experimental_streams: false
+expand_issue_changelog: false
+expand_issue_transition: false
+issues_stream_expand_with:
+    - transitions
+lookback_window_minutes: 0
+projects: []
+render_fields: false
+start_date: "2018-07-01T00:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-07-31T18:45:08Z"
+          enc: CiQAdmEdwm7re68nniqNxttYp4lZZMgtJoqZxb6yXyl3G8wla6wSSQD5lVw4JpJbZfQ1KWpeD9MQfvO+IXKrRKdfmKT4A7t3HHC8MvpReLbgkfom/QixBGR3pR8w6IRnlbd499daiAsP9RrvTJYrPzw=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-07-31T18:45:09Z"
+    mac: ENC[AES256_GCM,data:Cdy1vFf1NcDc1DnkrygICUWe/QS/rCSIyIr0KCh5Tg7RJGPxpMTjYqh9v/XFzU6VQHPsjStB6xZ9+xL79TaNlSN/6LIVTEQtbGdQyXtF1NdkRkyThgnU75GhtnBFwfIXp/OZtqkSa/zVvHGle+jaZspX+LW/kDe36T+oLBz3rqQ=,iv:CIuqWuJX5e09kNasBoloVUavYaJqaEubHKiM3Q+3ny4=,tag:7sZ1xSgtyByikC06iRLTuA==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
