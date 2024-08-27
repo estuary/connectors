@@ -207,6 +207,10 @@ type DiscoveryInfo struct {
 	// been reached yet) because we can't actually answer the question of whether some
 	// arbitrary key lies before or after the current backfill cursor.
 	UnpredictableKeyOrdering bool
+
+	// ExtraDetails may hold additional details about a table, in cases where there are
+	// things a specific connector needs to know about a table for its own use.
+	ExtraDetails any
 }
 
 // ColumnInfo holds metadata about a specific column of some table in the
