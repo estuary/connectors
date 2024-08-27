@@ -1,0 +1,35 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+properties:
+  boardId:
+    description: Used to determine which board the sprint is a part of. (Not always the same as originBoardId)
+    type: integer
+  completeDate:
+    format: date-time
+    type: string
+  createdDate:
+    format: date-time
+    type:
+      - "null"
+      - string
+  endDate:
+    format: date-time
+    type: string
+  goal:
+    type: string
+  id:
+    type: integer
+  name:
+    type: string
+  originBoardId:
+    type: integer
+  self:
+    type: string
+  startDate:
+    format: date-time
+    type: string
+  state:
+    type: string
+required:
+  - id
+type: object

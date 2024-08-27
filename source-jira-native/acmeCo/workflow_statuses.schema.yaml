@@ -1,0 +1,61 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+additionalProperties: true
+description: A status.
+properties:
+  description:
+    description: The description of the status.
+    readOnly: true
+    type: string
+  iconUrl:
+    description: The URL of the icon used to represent the status.
+    readOnly: true
+    type: string
+  id:
+    description: The ID of the status.
+    readOnly: true
+    type: string
+  name:
+    description: The name of the status.
+    readOnly: true
+    type: string
+  scope:
+    type:
+      - "null"
+      - object
+  self:
+    description: The URL of the status.
+    readOnly: true
+    type: string
+  statusCategory:
+    description: The category assigned to the status.
+    properties:
+      colorName:
+        description: The name of the color used to represent the status category.
+        readOnly: true
+        type: string
+      id:
+        description: The ID of the status category.
+        readOnly: true
+        type: integer
+      key:
+        description: The key of the status category.
+        readOnly: true
+        type: string
+      name:
+        description: The name of the status category.
+        readOnly: true
+        type: string
+      self:
+        description: The URL of the status category.
+        readOnly: true
+        type: string
+    readOnly: true
+    type: object
+  untranslatedName:
+    type:
+      - "null"
+      - string
+required:
+  - id
+type: object

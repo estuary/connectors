@@ -24,7 +24,9 @@ on:
       - "source-iterable/**"
       - "source-pendo/**"
       - "source-twilio/**"
+      - "source-jira-native/**"
       - "source-mixpanel-native/**"
+
   pull_request:
     branches: [main]
     paths:
@@ -48,8 +50,10 @@ on:
       - "source-stripe-native/**"
       - "source-zendesk-support/**"
       - "source-iterable/**"
+      - "source-jira-native/**"
       - "source-pendo/**"
       - "source-twilio/**"
+      - "source-jira-native/**"
       - "source-mixpanel-native/**"
 
 concurrency:
@@ -139,6 +143,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-twilio
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-jira-native
             type: capture
             version: v2
             usage_rate: "1.0"
