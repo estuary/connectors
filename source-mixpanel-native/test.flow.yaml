@@ -1,0 +1,53 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-mixpanel:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_mixpanel
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: cohorts
+          syncMode: incremental
+          cursorField:
+            - created
+        target: acmeCo/cohorts
+      - resource:
+          stream: cohort_members
+          syncMode: incremental
+          cursorField:
+            - last_seen
+        target: acmeCo/cohort_members
+      - resource:
+          stream: funnels
+          syncMode: incremental
+          cursorField:
+            - date
+        target: acmeCo/funnels
+      - resource:
+          stream: revenue
+          syncMode: incremental
+          cursorField:
+            - date
+        target: acmeCo/revenue
+      - resource:
+          stream: export
+          syncMode: incremental
+          cursorField:
+            - time
+        target: acmeCo/export
+      - resource:
+          stream: annotations
+          syncMode: full_refresh
+        target: acmeCo/annotations
+      - resource:
+          stream: engage
+          syncMode: incremental
+          cursorField:
+            - last_seen
+        target: acmeCo/engage
