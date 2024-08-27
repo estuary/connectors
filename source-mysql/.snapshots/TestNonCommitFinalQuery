@@ -6,9 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FNonCommitFinalQuery_82446880":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
-# ================================
-# Captures Terminated With Errors
-# ================================
-error streaming until fence: replication became idle while streaming to an established fence
+{"bindingStateV1":{"test%2FNonCommitFinalQuery_82446880":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","extra":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

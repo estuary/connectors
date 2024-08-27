@@ -170,9 +170,8 @@ type mysqlReplicationStream struct {
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 	gtidString    string    // The GTID value of the last GTID event, formatted as a "<uuid>:<counter>" string.
 
-	// A count of how many changes have been made on non-transactional tables since
-	// the last commit was processed.
-	nonTransactionalChanges int
+	uncommittedChanges      int // A count of row changes since the last commit was processed.
+	nonTransactionalChanges int // A count of row changes *on non-transactional tables* since the last commit was processed.
 
 	// The active tables set and associated metadata, guarded by a
 	// mutex so it can be modified from the main goroutine while it's
@@ -232,6 +231,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		if event.Header.LogPos > 0 {
 			cursor.Pos = event.Header.LogPos
 		}
+
+		// Events which are neither row changes nor commits need to be reported as an
+		// implicit FlushEvent if and only if there are no uncommitted changes. This
+		// avoids certain edge cases in the positional fence implementation.
+		var implicitFlush = false
 
 		switch data := event.Event.(type) {
 		case *replication.RowsEvent:
@@ -298,6 +302,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					}); err != nil {
 						return err
 					}
+					rs.uncommittedChanges++ // Keep a count of all uncommitted changes
 					if nonTransactionalTable {
 						rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
 					}
@@ -341,6 +346,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						}); err != nil {
 							return err
 						}
+						rs.uncommittedChanges++ // Keep a count of all uncommitted changes
 						if nonTransactionalTable {
 							rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
 						}
@@ -375,6 +381,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					}); err != nil {
 						return err
 					}
+					rs.uncommittedChanges++ // Keep a count of all uncommitted changes
 					if nonTransactionalTable {
 						rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
 					}
@@ -392,10 +399,13 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			}); err != nil {
 				return err
 			}
+			rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
 			rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 		case *replication.TableMapEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("data", data).Trace("Table Map Event")
 		case *replication.GTIDEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("data", data).Trace("GTID Event")
 			rs.gtidTimestamp = data.OriginalCommitTime()
 
@@ -409,23 +419,27 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				rs.gtidString = fmt.Sprintf("%s:%d", sourceUUID.String(), data.GNO)
 			}
 		case *replication.PreviousGTIDsEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			if string(data.Query) == "COMMIT" {
-				if rs.nonTransactionalChanges > 0 {
-					// If there are uncommitted non-transactional changes, we should treat a
-					// "COMMIT" query event as a transaction commit.
-					if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-						Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
-					}); err != nil {
-						return err
-					}
-					rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
+			if string(data.Query) == "COMMIT" && rs.nonTransactionalChanges > 0 {
+				// If there are uncommitted non-transactional changes, we should treat a
+				// "COMMIT" query event as a transaction commit.
+				if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+					Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+				}); err != nil {
+					return err
 				}
-			} else if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
-				return fmt.Errorf("error processing query event: %w", err)
+				rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
+				rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
+			} else {
+				implicitFlush = true // Implicit FlushEvent conversion permitted
+				if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
+					return fmt.Errorf("error processing query event: %w", err)
+				}
 			}
 		case *replication.RotateEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			cursor.Name = string(data.NextLogName)
 			cursor.Pos = uint32(data.Position)
 			logrus.WithFields(logrus.Fields{
@@ -433,17 +447,32 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				"pos":  cursor.Pos,
 			}).Trace("Rotate Event")
 		case *replication.FormatDescriptionEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("data", data).Trace("Format Description Event")
 		case *replication.GenericEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			if event.Header.EventType == replication.HEARTBEAT_EVENT {
 				logrus.Debug("received server heartbeat")
 			} else {
 				logrus.WithField("event", event.Header.EventType.String()).Debug("Generic Event")
 			}
 		case *replication.RowsQueryEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("query", string(data.Query)).Debug("ignoring Rows Query Event")
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
+		}
+
+		// If the binlog event is eligible for implicit FlushEvent reporting and there
+		// are no uncommitted changes currently pending (for which we would want to wait
+		// until a real commit event to flush the output) then report a new FlushEvent
+		// with the latest position.
+		if implicitFlush && rs.uncommittedChanges == 0 {
+			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+				Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+			}); err != nil {
+				return err
+			}
 		}
 	}
 }
