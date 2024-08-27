@@ -60,6 +60,9 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 	// During tests, establish a fence every 3 seconds during indefinite streaming.
 	sqlcapture.StreamingFenceInterval = 3 * time.Second
 
+	// During tests, the stream-to-fence watchdog timeout should be much lower.
+	streamToFenceWatchdogTimeout = 2 * time.Second
+
 	logrus.WithFields(logrus.Fields{
 		"user": *dbControlUser,
 		"addr": *dbAddress,
@@ -597,4 +600,25 @@ func TestComplexDataset(t *testing.T) {
 		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
 	})
+}
+
+// TestNonCommitFinalQuery sets up a situation where the capture needs to resume
+// and stream to a fence, but the database is idle and the final event in the WAL
+// is not a transaction commit.
+//
+// This can be a tricky situation for a positional fence mechanism to handle.
+func TestNonCommitFinalQuery(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "82446880"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, "aaa"}, {1, "bbb"}})
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	tests.RunCapture(ctx, t, cs)
+	cs.Reset()
+
+	// The ALTER TABLE query here should be a no-op
+	tb.Insert(ctx, t, tableName, [][]any{{2, "ccc"}, {3, "ddd"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableName))
+	tests.VerifiedCapture(ctx, t, cs)
 }

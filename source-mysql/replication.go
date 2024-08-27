@@ -34,6 +34,12 @@ var (
 	// binlogEventCacheCount controls how many binlog events will be buffered inside
 	// the client library before we receive them.
 	binlogEventCacheCount = 256
+
+	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
+	// operation will error out if no further events are received when there ought to be
+	// some. This should never be hit in normal operation, and exists only so that certain
+	// rare failure modes produce an error rather than blocking forever.
+	streamToFenceWatchdogTimeout = 5 * time.Minute
 )
 
 func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
@@ -976,12 +982,21 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		})
 	}
 
+	// Given that the early-exit fast path was not taken, there must be further data for
+	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
+	// our fence position, something is wrong and we should error out instead of blocking
+	// forever.
+	var fenceWatchdog = time.NewTimer(streamToFenceWatchdogTimeout)
+
 	// Stream replication events until the fence is reached.
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-fenceWatchdog.C:
+			return fmt.Errorf("replication became idle while streaming to an established fence")
 		case event, ok := <-rs.events:
+			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
 			if !ok {
 				return sqlcapture.ErrFenceNotReached
 			} else if err := callback(event); err != nil {
