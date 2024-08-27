@@ -1,0 +1,32 @@
+---
+collections:
+  acmeCo/annotations:
+    schema: annotations.schema.yaml
+    key:
+      - /id
+  acmeCo/cohort_members:
+    schema: cohort_members.schema.yaml
+    key:
+      - /id
+  acmeCo/cohorts:
+    schema: cohorts.schema.yaml
+    key:
+      - /id
+  acmeCo/engage:
+    schema: engage.schema.yaml
+    key:
+      - /id
+  acmeCo/export:
+    schema: export.schema.yaml
+    key:
+      - /distinct_id
+      - /time
+  acmeCo/funnels:
+    schema: funnels.schema.yaml
+    key:
+      - /funnel_id
+      - /date
+  acmeCo/revenue:
+    schema: revenue.schema.yaml
+    key:
+      - /date

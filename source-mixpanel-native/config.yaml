@@ -1,0 +1,10 @@
+attribution_window: 5
+credentials:
+  secret: ""
+  username: ""
+  project_id: 1
+date_window_size: 120
+project_timezone: US/Pacific
+region: US
+select_properties_by_default: true
+start_date: "2024-01-01T00:00:00Z"
