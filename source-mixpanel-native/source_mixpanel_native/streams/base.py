@@ -14,7 +14,7 @@ from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.streams.http.auth import HttpAuthenticator
 from airbyte_cdk.utils import AirbyteTracedException
 from pendulum import Date
-from source_mixpanel.utils import fix_date_time
+from source_mixpanel_native.utils import fix_date_time
 
 
 class MixpanelStream(HttpStream, ABC):

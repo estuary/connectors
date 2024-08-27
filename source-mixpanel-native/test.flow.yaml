@@ -8,7 +8,7 @@ captures:
         command:
           - python
           - "-m"
-          - source_mixpanel
+          - source_mixpanel_native
         config: config.yaml
     bindings:
       - resource:
