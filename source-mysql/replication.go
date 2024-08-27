@@ -119,6 +119,7 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 	stream.tables.discovery = make(map[string]sqlcapture.DiscoveryInfo)
 	stream.tables.metadata = make(map[string]*mysqlTableMetadata)
 	stream.tables.keyColumns = make(map[string][]string)
+	stream.tables.nonTransactional = make(map[string]bool)
 	return stream, nil
 }
 
@@ -163,16 +164,21 @@ type mysqlReplicationStream struct {
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 	gtidString    string    // The GTID value of the last GTID event, formatted as a "<uuid>:<counter>" string.
 
+	// A count of how many changes have been made on non-transactional tables since
+	// the last commit was processed.
+	nonTransactionalChanges int
+
 	// The active tables set and associated metadata, guarded by a
 	// mutex so it can be modified from the main goroutine while it's
 	// read from the replication goroutine.
 	tables struct {
 		sync.RWMutex
-		active        map[string]struct{}
-		discovery     map[string]sqlcapture.DiscoveryInfo
-		metadata      map[string]*mysqlTableMetadata
-		keyColumns    map[string][]string
-		dirtyMetadata []string
+		active           map[sqlcapture.StreamID]struct{}
+		discovery        map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo
+		metadata         map[sqlcapture.StreamID]*mysqlTableMetadata
+		keyColumns       map[sqlcapture.StreamID][]string
+		nonTransactional map[sqlcapture.StreamID]bool
+		dirtyMetadata    []sqlcapture.StreamID
 	}
 }
 
@@ -255,6 +261,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				return fmt.Errorf("unknown key columns for stream %q", streamID)
 			}
 
+			var nonTransactionalTable = rs.isNonTransactional(streamID)
+
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for rowIdx, row := range data.Rows {
@@ -283,6 +291,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						Source:    sourceInfo,
 					}); err != nil {
 						return err
+					}
+					if nonTransactionalTable {
+						rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
 					}
 				}
 			case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
@@ -324,6 +335,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						}); err != nil {
 							return err
 						}
+						if nonTransactionalTable {
+							rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+						}
 					}
 				}
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
@@ -355,6 +369,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					}); err != nil {
 						return err
 					}
+					if nonTransactionalTable {
+						rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+					}
 				}
 			default:
 				return fmt.Errorf("unknown row event type: %q", event.Header.EventType)
@@ -369,6 +386,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			}); err != nil {
 				return err
 			}
+			rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")
 		case *replication.GTIDEvent:
@@ -387,7 +405,18 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		case *replication.PreviousGTIDsEvent:
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
+			if string(data.Query) == "COMMIT" {
+				if rs.nonTransactionalChanges > 0 {
+					// If there are uncommitted non-transactional changes, we should treat a
+					// "COMMIT" query event as a transaction commit.
+					if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+						Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+					}); err != nil {
+						return err
+					}
+					rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
+				}
+			} else if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
 				return fmt.Errorf("error processing query event: %w", err)
 			}
 		case *replication.RotateEvent:
@@ -753,6 +782,16 @@ func (rs *mysqlReplicationStream) schemaActive(schema string) bool {
 	return false
 }
 
+// isNonTransactional returns true if the stream ID refers to a table which
+// uses a storage engine such as MyISAM which doesn't support transactions.
+// Changes to non-transactional tables are never followed by a commit event,
+// so we have to take care of that for ourselves.
+func (rs *mysqlReplicationStream) isNonTransactional(streamID string) bool {
+	rs.tables.RLock()
+	defer rs.tables.RUnlock()
+	return rs.tables.nonTransactional[streamID]
+}
+
 // splitStreamID is the inverse of JoinStreamID and splits a stream name back into
 // separate schema and table name components. Its use is generally kind of a hack
 // and suggests that the surrounding plumbing is probably subtly wrong, because the
@@ -776,6 +815,14 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 	// Do nothing if the table is already active.
 	if _, ok := rs.tables.active[streamID]; ok {
 		return nil
+	}
+
+	// Extract some details from the provided discovery info, if present.
+	var nonTransactional bool
+	if discovery != nil {
+		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
+			nonTransactional = extraDetails.StorageEngine == "MyISAM"
+		}
 	}
 
 	// If metadata JSON is present then parse it into a usable object. Otherwise
@@ -848,6 +895,7 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 	rs.tables.active[streamID] = struct{}{}
 	rs.tables.keyColumns[streamID] = keyColumns
 	rs.tables.metadata[streamID] = metadata
+	rs.tables.nonTransactional[streamID] = nonTransactional
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
 	return nil
 }

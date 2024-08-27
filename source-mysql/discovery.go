@@ -436,7 +436,7 @@ func normalizeMySQLTimestamp(ts string) string {
 }
 
 const queryDiscoverTables = `
-  SELECT table_schema, table_name, table_type
+  SELECT table_schema, table_name, table_type, engine
   FROM information_schema.tables
   WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
     AND table_schema != 'mysql' AND table_schema != 'sys';`
@@ -454,9 +454,16 @@ func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInf
 			Schema:    string(row[0].AsString()),
 			Name:      string(row[1].AsString()),
 			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+			ExtraDetails: &mysqlTableDiscoveryDetails{
+				StorageEngine: string(row[3].AsString()),
+			},
 		})
 	}
 	return tables, nil
+}
+
+type mysqlTableDiscoveryDetails struct {
+	StorageEngine string
 }
 
 const queryDiscoverColumns = `
