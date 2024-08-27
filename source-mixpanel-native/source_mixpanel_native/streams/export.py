@@ -164,31 +164,31 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
 
             yield item
 
-    @cache
-    def get_json_schema(self) -> Mapping[str, Any]:
-        """
-        :return: A dict of the JSON schema representing this stream.
+    # @cache
+    # def get_json_schema(self) -> Mapping[str, Any]:
+    #     """
+    #     :return: A dict of the JSON schema representing this stream.
 
-        The default implementation of this method looks for a JSONSchema file with the same name as this stream's "name" property.
-        Override as needed.
-        """
+    #     The default implementation of this method looks for a JSONSchema file with the same name as this stream's "name" property.
+    #     Override as needed.
+    #     """
 
-        schema = super().get_json_schema()
+    #     schema = super().get_json_schema()
 
-        # Set whether to allow additional properties for engage and export endpoints
-        # Event and Engage properties are dynamic and depend on the properties provided on upload,
-        #   when the Event or Engage (user/person) was created.
-        schema["additionalProperties"] = self.additional_properties
+    #     # Set whether to allow additional properties for engage and export endpoints
+    #     # Event and Engage properties are dynamic and depend on the properties provided on upload,
+    #     #   when the Event or Engage (user/person) was created.
+    #     schema["additionalProperties"] = self.additional_properties
 
-        # read existing Export schema from API
-        schema_properties = ExportSchema(**self.get_stream_params()).read_records(sync_mode=SyncMode.full_refresh)
-        for result in transform_property_names(schema_properties):
-            # Schema does not provide exact property type
-            # string ONLY for event properties (no other datatypes)
-            # Reference: https://help.mixpanel.com/hc/en-us/articles/360001355266-Event-Properties#field-size-character-limits-for-event-properties
-            schema["properties"][result.transformed_name] = {"type": ["null", "string"]}
+    #     # read existing Export schema from API
+    #     schema_properties = ExportSchema(**self.get_stream_params()).read_records(sync_mode=SyncMode.full_refresh)
+    #     for result in transform_property_names(schema_properties):
+    #         # Schema does not provide exact property type
+    #         # string ONLY for event properties (no other datatypes)
+    #         # Reference: https://help.mixpanel.com/hc/en-us/articles/360001355266-Event-Properties#field-size-character-limits-for-event-properties
+    #         schema["properties"][result.transformed_name] = {"type": ["null", "string"]}
 
-        return schema
+    #     return schema
 
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None

@@ -1,0 +1,1246 @@
+[
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "count": {
+          "description": "The total count or number associated with the cohort data.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "created": {
+          "description": "The date and time when the cohort data was created.",
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "data_group_id": {
+          "description": "The identifier of the data group to which the cohort belongs.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "description": {
+          "description": "A brief description or summary of the cohort data.",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "description": "The unique identifier of the cohort data.",
+          "type": "integer"
+        },
+        "is_visible": {
+          "description": "A flag indicating the visibility status of the cohort data.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "name": {
+          "description": "The name or title of the cohort data.",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "project_id": {
+          "description": "The identifier of the project to which the cohort data belongs.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "cohorts",
+    "resourceConfig": {
+      "cursorField": [
+        "created"
+      ],
+      "stream": "cohorts",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "browser": {
+          "description": "The web browser used by the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "browser_version": {
+          "description": "The version of the web browser used by the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "city": {
+          "description": "The city where the cohort member is located",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cohort_id": {
+          "description": "The unique identifier of the cohort to which the member belongs",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "country_code": {
+          "description": "The country code of the country where the cohort member is located",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "distinct_id": {
+          "description": "The distinct identifier of the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "description": "The email address of the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_name": {
+          "description": "The first name of the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "description": "The unique identifier of the cohort member",
+          "type": "string"
+        },
+        "last_name": {
+          "description": "The last name of the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_seen": {
+          "description": "The date and time when the cohort member was last seen",
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "name": {
+          "description": "The name of the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "region": {
+          "description": "The region where the cohort member is located",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "timezone": {
+          "description": "The timezone of the cohort member",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "unblocked": {
+          "description": "Indicator of whether the cohort member is unblocked",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "cohort_members",
+    "resourceConfig": {
+      "cursorField": [
+        "last_seen"
+      ],
+      "stream": "cohort_members",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "analysis": {
+          "description": "Describes the analysis metrics for the funnel data.",
+          "properties": {
+            "completion": {
+              "description": "Completion metric value.",
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "starting_amount": {
+              "description": "Starting amount of users in the funnel.",
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "steps": {
+              "description": "Total number of steps in the funnel.",
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "worst": {
+              "description": "Worst performing step in the funnel.",
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "date": {
+          "description": "Date field for the funnel data.",
+          "format": "date",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "datetime": {
+          "description": "Date and time field for the funnel data.",
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "funnel_id": {
+          "description": "Unique identifier for the funnel.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "name": {
+          "description": "Name of the funnel.",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "steps": {
+          "description": "List of steps involved in the funnel.",
+          "items": {
+            "additionalProperties": true,
+            "description": "Properties of each step in the funnel.",
+            "properties": {
+              "avg_time": {
+                "description": "Average time taken in the step.",
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "avg_time_from_start": {
+                "description": "Average time taken from the start to this step.",
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "count": {
+                "description": "Count of users in this step.",
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "custom_event": {
+                "description": "Custom event associated with the step.",
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "custom_event_id": {
+                "description": "Unique identifier for the custom event.",
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "event": {
+                "description": "Event triggered in this step.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "goal": {
+                "description": "Goal set for the step.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "overall_conv_ratio": {
+                "description": "Overall conversion ratio for the step.",
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "selector": {
+                "description": "Selector for the step.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "selector_params": {
+                "additionalProperties": true,
+                "description": "Parameters for the selector used.",
+                "properties": {
+                  "step_label": {
+                    "description": "Label for the step selector.",
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                },
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "session_event": {
+                "description": "Session event recorded for the step.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "step_conv_ratio": {
+                "description": "Conversion ratio for the step.",
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "step_label": {
+                "description": "Label for the step.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "time_buckets_from_prev": {
+                "description": "Time buckets measured from the previous step.",
+                "properties": {
+                  "buckets": {
+                    "description": "Buckets for time measurement from previous step.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "higher": {
+                    "description": "Higher range boundary for time buckets.",
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "lower": {
+                    "description": "Lower range boundary for time buckets.",
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  }
+                },
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "time_buckets_from_start": {
+                "description": "Time buckets measured from the start.",
+                "properties": {
+                  "buckets": {
+                    "description": "Buckets for time measurement from the start.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "higher": {
+                    "description": "Higher range boundary for time buckets.",
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "lower": {
+                    "description": "Lower range boundary for time buckets.",
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  }
+                },
+                "type": [
+                  "null",
+                  "object"
+                ]
+              }
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/funnel_id",
+      "/date"
+    ],
+    "recommendedName": "funnels",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "funnels",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "amount": {
+          "description": "Total revenue amount for the specified date",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "count": {
+          "description": "Number of revenue transactions for the specified date",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "date": {
+          "description": "Date for which the revenue data is recorded",
+          "format": "date",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "datetime": {
+          "description": "Date and time for which the revenue data is recorded",
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "paid_count": {
+          "description": "Number of successful paid transactions for the specified date",
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/date"
+    ],
+    "recommendedName": "revenue",
+    "resourceConfig": {
+      "cursorField": [
+        "date"
+      ],
+      "stream": "revenue",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "Abandon Cart Count": {
+          "description": "Number of times a user abandoned their shopping cart without completing a purchase",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Account Created Count": {
+          "description": "Number of new accounts created",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Add To Cart Count": {
+          "description": "Number of times an item was added to the shopping cart",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Affiliate": {
+          "description": "Indicates if the user was referred by an affiliate",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Browse Count": {
+          "description": "Number of times a user browsed products",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Browse Filter": {
+          "description": "Items filtered during browsing",
+          "items": {
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "Campaign Name": {
+          "description": "Name of the marketing campaign",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Campaign Source": {
+          "description": "Source of the marketing campaign",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Card Type": {
+          "description": "Type of payment card used",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Cart Items": {
+          "description": "Items in the shopping cart",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Cart Size": {
+          "description": "Size of the shopping cart",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Cart Size (# of Items)": {
+          "description": "Number of items in the shopping cart",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Cart Value": {
+          "description": "Total value of items in the shopping cart",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Complete Purchase Count": {
+          "description": "Number of completed purchases",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Coupon": {
+          "description": "Indicates if a coupon was used",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Coupon Count Used": {
+          "description": "Number of times a coupon was used",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Date of Last Item Detail View": {
+          "description": "Date of the last detailed view of an item",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Delivery Day": {
+          "description": "Day of delivery scheduled",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Delivery Fee": {
+          "description": "Fee charged for delivery",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Delivery Fees": {
+          "description": "Breakdown of delivery fees",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Delivery Method": {
+          "description": "Selected delivery method",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Delivery Method Added Count": {
+          "description": "Number of times a delivery method was added during checkout",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Gender": {
+          "description": "Gender of the user",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Item Category": {
+          "description": "Category of the viewed/item in cart",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Item Cost": {
+          "description": "Cost of the item",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Item Detail Page Count": {
+          "description": "Number of times an item detail page was viewed",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Item Name": {
+          "description": "Name of the item",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Item Rating": {
+          "description": "Rating given to the item",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Items in Browse": {
+          "description": "Items viewed during browsing",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Landing Page Loaded Count": {
+          "description": "Number of times landing page loaded",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Last Cart Abandonment": {
+          "description": "Date of the last cart abandonment",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Last Event": {
+          "description": "Type of last event tracked",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Last Purchase": {
+          "description": "Date of the last completed purchase",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Last Search": {
+          "description": "Last search term used",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Marketing A/B Test": {
+          "description": "Indicates participation in a marketing A/B test",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Misc Fee": {
+          "description": "Additional miscellaneous fee",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Misc Fees": {
+          "description": "Breakdown of miscellaneous fees",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Number of Cards Added": {
+          "description": "Number of payment cards added",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Number of Cart Abandons": {
+          "description": "Total number of cart abandonments",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Number of Item Details Viewed": {
+          "description": "Total number of item detail views",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Number of Purchases": {
+          "description": "Total number of purchases",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Number of Searches": {
+          "description": "Total number of search queries performed",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Page Version": {
+          "description": "Version of the web page viewed",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Payment Method Added Count": {
+          "description": "Number of times a payment method was added during checkout",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Platform": {
+          "description": "Operating platform used",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Referred by": {
+          "description": "Source of user referral",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Registration Date": {
+          "description": "Date of user registration",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Registration Method": {
+          "description": "Method used for user registration",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Review Payment Count": {
+          "description": "Number of payment reviews performed",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Search Count": {
+          "description": "Total number of search actions",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Search Page": {
+          "description": "Page where search was performed",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Search Results Count": {
+          "description": "Number of search results displayed",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "Search Term": {
+          "description": "Search term used",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Suggested Item": {
+          "description": "Items suggested to the user",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "Total Charge": {
+          "description": "Total charge incurred",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "URL": {
+          "description": "URL of the event",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "UTM_Medium": {
+          "description": "Medium specified in UTM tracking",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "UTM_Term": {
+          "description": "Term specified in UTM tracking",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "UTM_source": {
+          "description": "Source specified in UTM tracking",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Within Checkout Process": {
+          "description": "Indicates if the event occurred within the checkout process",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "browser": {
+          "description": "User's browser information",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created": {
+          "description": "Date and time of creation",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "dataset": {
+          "description": "Name of the dataset",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "distinct_id": {
+          "description": "Unique identifier for the event",
+          "type": "string"
+        },
+        "email": {
+          "description": "User's email address",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "event": {
+          "description": "Event type captured",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_name": {
+          "description": "User's first name",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "import": {
+          "description": "Indicates if the event/data was imported",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "initial_referrer": {
+          "description": "Initial referrer of the event",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "insert_id": {
+          "description": "Unique insertion identifier",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "labels": {
+          "description": "Labels associated with the event",
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "last_name": {
+          "description": "User's last name",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mp_api_endpoint": {
+          "description": "API endpoint through which the data was captured",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mp_api_timestamp_ms": {
+          "description": "Timestamp of API data retrieval",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mp_lib": {
+          "description": "Library used to capture data",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "mp_processing_time_ms": {
+          "description": "Processing time in milliseconds by Mixpanel",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "os": {
+          "description": "User's operating system information",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "sampling_factor": {
+          "description": "Sampling rate used for data collection",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "time": {
+          "description": "Timestamp of the event",
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/distinct_id",
+      "/time"
+    ],
+    "recommendedName": "export",
+    "resourceConfig": {
+      "cursorField": [
+        "time"
+      ],
+      "stream": "export",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "date": {
+          "description": "The date of the annotation in ISO 8601 date-time format.",
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "description": {
+          "description": "The description or notes associated with the annotation.",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "description": "The unique identifier of the annotation.",
+          "type": "integer"
+        },
+        "project_id": {
+          "description": "The identifier of the project to which the annotation belongs.",
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "user": {
+          "description": "Information about the user who created the annotation.",
+          "properties": {
+            "first_name": {
+              "description": "The first name of the user.",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "description": "The unique identifier of the user.",
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "last_name": {
+              "description": "The last name of the user.",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "annotations",
+    "resourceConfig": {
+      "stream": "annotations",
+      "syncMode": "full_refresh"
+    }
+  }
+]
