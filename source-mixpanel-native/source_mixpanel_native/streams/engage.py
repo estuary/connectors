@@ -42,15 +42,6 @@ class Engage(IncrementalMixpanelStream):
     @property
     def supports_incremental(self) -> bool:
         return True
-    
-    @property
-    def reqs_per_hour_limit(self):
-        # https://help.mixpanel.com/hc/en-us/articles/115004602563-Rate-Limits-for-Export-API-Endpoints#api-export-endpoint-rate-limits
-        return self._reqs_per_hour_limit
-
-    @reqs_per_hour_limit.setter
-    def reqs_per_hour_limit(self, value):
-        self._reqs_per_hour_limit = 180
 
     # enable automatic object mutation to align with desired schema before outputting to the destination
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
