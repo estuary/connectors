@@ -23,7 +23,7 @@ class Engage(IncrementalMixpanelStream):
 
     http_method: str = "POST"
     data_field: str = "results"
-    primary_key: str = "id"
+    primary_key: str = "distinct_id"
     page_size: int = 50000  # min 100
     _total: Any = None
     cursor_field = "last_seen"

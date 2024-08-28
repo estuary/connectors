@@ -15,7 +15,7 @@ collections:
   acmeCo/engage:
     schema: engage.schema.yaml
     key:
-      - /id
+      - /distinct_id
   acmeCo/export:
     schema: export.schema.yaml
     key:
