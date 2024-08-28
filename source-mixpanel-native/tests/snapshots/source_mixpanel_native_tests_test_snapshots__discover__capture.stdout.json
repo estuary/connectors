@@ -1356,7 +1356,7 @@
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/distinct_id"
     ],
     "recommendedName": "engage",
     "resourceConfig": {
