@@ -24,11 +24,17 @@ import (
 	"vitess.io/vitess/go/vt/sqlparser"
 )
 
-// replicationBufferSize controls how many change events can be buffered in the
-// replicationStream before it stops receiving further events from MySQL.
-// In normal use it's a constant, it's just a variable so that tests are more
-// likely to exercise blocking sends and backpressure.
-var replicationBufferSize = 1024
+var (
+	// replicationBufferSize controls how many change events can be buffered in the
+	// replicationStream before it stops receiving further events from MySQL.
+	// In normal use it's a constant, it's just a variable so that tests are more
+	// likely to exercise blocking sends and backpressure.
+	replicationBufferSize = 256
+
+	// binlogEventCacheCount controls how many binlog events will be buffered inside
+	// the client library before we receive them.
+	binlogEventCacheCount = 256
+)
 
 func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	var address = db.config.Address
@@ -83,6 +89,9 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 
 		// Output replication log messages with Logrus the same as our own connector messages.
 		Logger: logrus.StandardLogger(),
+
+		// Allow the binlog syncer to buffer a few events internally for speed, but not too many.
+		EventCacheCount: binlogEventCacheCount,
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
