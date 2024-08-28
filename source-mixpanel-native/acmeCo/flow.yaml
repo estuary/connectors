@@ -7,7 +7,7 @@ collections:
   acmeCo/cohort_members:
     schema: cohort_members.schema.yaml
     key:
-      - /id
+      - /distinct_id
   acmeCo/cohorts:
     schema: cohorts.schema.yaml
     key:

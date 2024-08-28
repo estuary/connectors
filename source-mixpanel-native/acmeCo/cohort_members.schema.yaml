@@ -9,9 +9,7 @@ properties:
       - integer
   distinct_id:
     description: The distinct identifier of the cohort member
-    type:
-      - "null"
-      - string
+    type: string
   browser:
     description: The web browser used by the cohort member
     type:
