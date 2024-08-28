@@ -31,7 +31,7 @@ class MixpanelStream(HttpStream, ABC):
         # to meet the requirement of emitting state at least once per 15 minutes,
         # we assume there's at least 1 record per request returned. Given that each request is followed by a 60 seconds sleep
         # we'll have to emit state every 15 records
-        return 15
+        return 10000
 
     @property
     def url_base(self):

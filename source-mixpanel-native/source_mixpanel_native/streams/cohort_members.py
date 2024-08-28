@@ -14,6 +14,8 @@ from .engage import Engage
 class CohortMembers(Engage):
     """Return list of users grouped by cohort"""
 
+    primary_key: str = "distinct_id"
+
     @property
     def state_checkpoint_interval(self) -> int:
         # to meet the requirement of emitting state at least once per 15 minutes,
