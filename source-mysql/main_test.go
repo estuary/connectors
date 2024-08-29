@@ -30,6 +30,8 @@ var (
 	dbControlPass = flag.String("db_control_pass", "secret1234", "The password the the test setup/control user")
 	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
 	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+
+	useMyISAM = flag.Bool("use_myisam_engine", false, "When set, all test tables will be created using the MyISAM storage engine")
 )
 
 const testSchemaName = "test"
@@ -70,6 +72,10 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 	var conn, err = client.Connect(*dbAddress, *dbControlUser, *dbControlPass, *dbName)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
+
+	if *useMyISAM { // Allow manual testing against MyISAM tables
+		conn.Execute("SET default_storage_engine = MyISAM;")
+	}
 
 	// Construct the capture config
 	var captureConfig = Config{
