@@ -23,15 +23,18 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db_address", "localhost:3306", "The database server address to use for tests")
-	dbName    = flag.String("db_name", "mysql", "Use the named database for tests")
+	dbName = flag.String("db_name", "mysql", "Use the named database for tests")
 
-	dbControlUser = flag.String("db_control_user", "root", "The user for test setup/control operations")
-	dbControlPass = flag.String("db_control_pass", "secret1234", "The password the the test setup/control user")
-	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
-	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+	dbCaptureAddress = flag.String("db_capture_address", "localhost:3306", "The database server address to use for test captures")
+	dbCaptureUser    = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass    = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 
-	useMyISAM = flag.Bool("use_myisam_engine", false, "When set, all test tables will be created using the MyISAM storage engine")
+	dbControlAddress = flag.String("db_control_address", "localhost:3306", "The database server address to use for test setup/control operations. Leave unset to use capture settings.")
+	dbControlUser    = flag.String("db_control_user", "root", "The user for test setup/control operations. Leave unset to use capture settings.")
+	dbControlPass    = flag.String("db_control_pass", "secret1234", "The password the the test setup/control user. Leave unset to use capture settings.")
+
+	useMyISAM                = flag.Bool("use_myisam_engine", false, "When set, all test tables will be created using the MyISAM storage engine")
+	skipBinlogRetentionCheck = flag.Bool("skip_binlog_retention_check", false, "When set, skips the binlog retention sanity check")
 )
 
 const testSchemaName = "test"
@@ -67,9 +70,9 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 
 	logrus.WithFields(logrus.Fields{
 		"user": *dbControlUser,
-		"addr": *dbAddress,
+		"addr": *dbControlAddress,
 	}).Info("opening control connection")
-	var conn, err = client.Connect(*dbAddress, *dbControlUser, *dbControlPass, *dbName)
+	var conn, err = client.Connect(*dbControlAddress, *dbControlUser, *dbControlPass, *dbName)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 
@@ -79,11 +82,12 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 
 	// Construct the capture config
 	var captureConfig = Config{
-		Address:  *dbAddress,
+		Address:  *dbCaptureAddress,
 		User:     *dbCaptureUser,
 		Password: *dbCapturePass,
 		Advanced: advancedConfig{
-			DBName: *dbName,
+			DBName:                   *dbName,
+			SkipBinlogRetentionCheck: *skipBinlogRetentionCheck,
 		},
 	}
 	captureConfig.Advanced.BackfillChunkSize = 16
@@ -111,8 +115,8 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
-	sanitizers[`"binlog.000123:56789:123"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+:[0-9]+"`)
-	sanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
+	sanitizers[`"cursor":"binlog.000123:56789:123"`] = regexp.MustCompile(`"cursor":".+\.[0-9]+:[0-9]+:[0-9]+"`)
+	sanitizers[`"cursor":"binlog.000123:56789"`] = regexp.MustCompile(`"cursor":".+\.[0-9]+:[0-9]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 	sanitizers[`"txid":"11111111-1111-1111-1111-111111111111:111"`] = regexp.MustCompile(`"txid":"[0-9a-f-]+:[0-9]+"`)
 
