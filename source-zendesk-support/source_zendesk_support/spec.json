@@ -88,8 +88,7 @@
       "ignore_pagination": {
         "type": "boolean",
         "default": false,
-        "description": "Makes each stream read a single page of data.",
-        "title": "Should the connector read the second and further pages of data."
+        "title": "Read a single page per sweep. Should be left unchecked in most situations."
       }
     }
   },
