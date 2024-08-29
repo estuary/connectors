@@ -7,11 +7,6 @@
       "type": ["null", "string"],
       "format": "date"
     },
-    "datetime": {
-      "description": "Date and time for which the revenue data is recorded",
-      "type": ["null", "string"],
-      "format": "date-time"
-    },
     "count": {
       "description": "Number of revenue transactions for the specified date",
       "type": ["null", "integer"]
