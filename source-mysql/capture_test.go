@@ -76,6 +76,10 @@ func TestTrickyTableNames(t *testing.T) {
 }
 
 func TestPartitionedTable(t *testing.T) {
+	if *useMyISAM {
+		t.Skipf("MyISAM does not support partitioned tables")
+	}
+
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var uniqueID = "83812828"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, `(
