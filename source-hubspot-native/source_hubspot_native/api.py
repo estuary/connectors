@@ -294,54 +294,65 @@ async def process_changes(
     '''
     assert isinstance(log_cursor, datetime)
 
+    fetch_recent_start_time = datetime.now(UTC)
     max_ts: datetime = log_cursor
+    had_recent_docs = False
     async for ts, key, obj in fetch_recent(log, http, log_cursor):
         if ts > log_cursor:
             max_ts = max(max_ts, ts)
             cache.add_recent(object_name, key, ts)
+            had_recent_docs = True
             yield obj
         else:
             break
+    
+    if not had_recent_docs:
+        # No recent docs, but the delayed stream may still be advanced if enough
+        # time has passed since it last was. A synthetic timestamp will be used
+        # as the updated cursor in this case, and this increases the likelihood
+        # that recent documents will be "missed" from the recent APIs. This
+        # cursor will only ever be emitted if there periods of time where there
+        # are no recent documents but there are some delayed documents, and we
+        # are guaranteed to eventually get any documents that are missed by the
+        # recent stream via this whole convoluted strategy anyway.
+        if fetch_recent_start_time <= max_ts:
+            # Unlikely clock drift edge case; bail out.
+            return
+        max_ts = fetch_recent_start_time
 
-    if max_ts > log_cursor:
-        # There were some documents from the recent stream, so see if we should
-        # poll the delayed stream. This does mean that the delayed stream is not
-        # polled unless there is a steady stream of documents from the recent
-        # stream to "drive" it. We can only emit documents if also emitting a
-        # checkpoint, and we can only emit a checkpoint if there are recent
-        # documents.
-        since = last_delayed_fetch_end.setdefault(
-            object_name, log_cursor - delayed_offset - delayed_fetch_minimum_window
-        )
-        until = max_ts - delayed_offset
+    delayed_fetch_next_start = last_delayed_fetch_end.setdefault(
+        object_name, log_cursor - delayed_offset - delayed_fetch_minimum_window
+    )
+    delayed_fetch_next_end = max_ts - delayed_offset
 
+    cache_hits = 0
+    delayed_emitted = 0
+    if delayed_fetch_next_end - delayed_fetch_next_start > delayed_fetch_minimum_window:
         # Poll the delayed stream for documents if we need to.
-        cache_hits = 0
-        delayed_emitted = 0
-        if until - since > delayed_fetch_minimum_window:
-            async for ts, key, obj in fetch_delayed(log, http, since, until):
-                if ts > until:
-                    # In case the FetchDelayedFn is unable to filter based on
-                    # `until`.
+        async for ts, key, obj in fetch_delayed(log, http, delayed_fetch_next_start, delayed_fetch_next_end):
+            if ts > delayed_fetch_next_end:
+                # In case the FetchDelayedFn is unable to filter based on
+                # `delayed_fetch_next_end`.
+                continue
+            elif ts > delayed_fetch_next_start:
+                if cache.has_as_recent_as(object_name, key, ts):
+                    cache_hits += 1
                     continue
-                elif ts > since:
-                    if cache.has_as_recent_as(object_name, key, ts):
-                        cache_hits += 1
-                        continue
 
-                    delayed_emitted += 1
-                    yield obj
-                else:
-                    break
+                delayed_emitted += 1
+                yield obj
+            else:
+                break
 
-            last_delayed_fetch_end[object_name] = until
-            evicted = cache.cleanup(object_name, until)
+        last_delayed_fetch_end[object_name] = delayed_fetch_next_end
+        evicted = cache.cleanup(object_name, delayed_fetch_next_end)
 
-            log.info(
-                "fetched delayed events for stream",
-                {"object_name": object_name, "emitted": delayed_emitted, "cache_hits": cache_hits, "evicted": evicted, "new_size": cache.count_for(object_name)}
-            )
+        log.info(
+            "fetched delayed events for stream",
+            {"object_name": object_name, "emitted": delayed_emitted, "cache_hits": cache_hits, "evicted": evicted, "new_size": cache.count_for(object_name)}
+        )
 
+    if had_recent_docs or delayed_emitted:
         yield max_ts
 
 
