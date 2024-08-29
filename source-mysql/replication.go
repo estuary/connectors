@@ -115,11 +115,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 	}
 
 	var stream = &mysqlReplicationStream{
-		db:          db,
-		syncer:      syncer,
-		streamer:    streamer,
-		startCursor: pos,
-		fenceCursor: pos,
+		db:            db,
+		syncer:        syncer,
+		streamer:      streamer,
+		startPosition: pos,
+		fencePosition: pos,
 	}
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.discovery = make(map[string]sqlcapture.DiscoveryInfo)
@@ -157,12 +157,12 @@ func splitHostPort(addr string) (string, int64, error) {
 }
 
 type mysqlReplicationStream struct {
-	db          *mysqlDatabase
-	syncer      *replication.BinlogSyncer
-	streamer    *replication.BinlogStreamer
-	startCursor mysql.Position                // The start position when the stream was created. Never updated.
-	fenceCursor mysql.Position                // The latest fence position, updated at the end of each StreamToFence cycle.
-	events      chan sqlcapture.DatabaseEvent // Output channel from replication worker goroutine
+	db            *mysqlDatabase
+	syncer        *replication.BinlogSyncer
+	streamer      *replication.BinlogStreamer
+	startPosition mysql.Position                // The start position when the stream was created. Never updated.
+	fencePosition mysql.Position                // The latest fence position, updated at the end of each StreamToFence cycle.
+	events        chan sqlcapture.DatabaseEvent // Output channel from replication worker goroutine
 
 	cancel context.CancelFunc // Cancellation thunk for the replication worker goroutine
 	errCh  chan error         // Error output channel for the replication worker goroutine
@@ -207,7 +207,7 @@ func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
 	rs.cancel = streamCancel
 
 	go func() {
-		var err = rs.run(streamCtx, rs.startCursor)
+		var err = rs.run(streamCtx, rs.startPosition)
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
@@ -965,7 +965,9 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 	rs.tables.RUnlock()
 
 	// Time-based event streaming until the fenceAfter duration is reached.
-	var timedPhaseEvents int
+	var timedEventsSinceFlush int
+	var latestFlushCursor = fmt.Sprintf("%s:%d", rs.fencePosition.Name, rs.fencePosition.Pos)
+	logrus.WithField("cursor", latestFlushCursor).Debug("beginning timed streaming phase")
 	if fenceAfter > 0 {
 		var deadline = time.NewTimer(fenceAfter)
 		defer deadline.Stop()
@@ -982,33 +984,40 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 				} else if err := callback(event); err != nil {
 					return err
 				}
-				timedPhaseEvents++
+				timedEventsSinceFlush++
+				if event, ok := event.(*sqlcapture.FlushEvent); ok {
+					latestFlushCursor = event.Cursor
+					timedEventsSinceFlush = 0
+				}
 			}
 		}
 	}
+	logrus.WithField("cursor", latestFlushCursor).Debug("finished timed streaming phase")
 
 	// Establish a binlog-position fence.
 	var fencePosition, err = rs.db.queryBinlogPosition()
 	if err != nil {
 		return fmt.Errorf("error establishing binlog fence position: %w", err)
 	}
-	// If we're currently at the fence, no further event relaying is required
-	// and we'll exit early.
-	if fencePosition == rs.fenceCursor {
+	logrus.WithField("cursor", latestFlushCursor).WithField("target", fencePosition.Pos).Debug("beginning fenced streaming phase")
+	if latestFlushPosition, err := parseCursor(latestFlushCursor); err != nil {
+		return fmt.Errorf("internal error: failed to parse flush cursor value %q", latestFlushCursor)
+	} else if fencePosition == latestFlushPosition {
 		// As an internal sanity check, we assert that it should never be possible
-		// to hit this early exit unless the database has been idle since the prev
-		// fence was reached.
-		if timedPhaseEvents > 0 {
-			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d events during timed phase", timedPhaseEvents)
+		// to hit this early exit unless the database has been idle since the last
+		// flush event we observed.
+		if timedEventsSinceFlush > 0 {
+			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d changes during timed phase", timedEventsSinceFlush)
 		}
 
-		// Since we're still at a valid fence position and those are always between
+		// Mark the position of the flush event as the latest fence before returning.
+		rs.fencePosition = latestFlushPosition
+
+		// Since we're still at a valid flush position and those are always between
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{
-			Cursor: fmt.Sprintf("%s:%d", fencePosition.Name, fencePosition.Pos),
-		})
+		return callback(&sqlcapture.FlushEvent{Cursor: latestFlushCursor})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -1023,7 +1032,8 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-fenceWatchdog.C:
-			return fmt.Errorf("replication became idle while streaming to an established fence")
+			var fenceCursor = fmt.Sprintf("%s:%d", fencePosition.Name, fencePosition.Pos)
+			return fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceCursor)
 		case event, ok := <-rs.events:
 			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
 			if !ok {
@@ -1043,7 +1053,8 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
 				if eventPosition.Compare(fencePosition) >= 0 {
-					rs.fenceCursor = eventPosition
+					logrus.WithField("cursor", event.Cursor).Debug("finished fenced streaming phase")
+					rs.fencePosition = eventPosition
 					return nil
 				}
 			}
