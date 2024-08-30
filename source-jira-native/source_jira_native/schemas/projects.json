@@ -52,8 +52,7 @@
     "assigneeType": {
       "description": "The default assignee when creating issues for this project.",
       "type": "string",
-      "readOnly": true,
-      "enum": ["PROJECT_LEAD", "UNASSIGNED"]
+      "readOnly": true
     },
     "versions": {
       "description": "The versions defined in the project. For more information, see [Create version](#api-rest-api-3-version-post).",
@@ -82,8 +81,7 @@
     "projectTypeKey": {
       "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
       "type": "string",
-      "readOnly": true,
-      "enum": ["software", "service_desk", "business"]
+      "readOnly": true
     },
     "simplified": {
       "description": "Whether the project is simplified.",
@@ -93,8 +91,7 @@
     "style": {
       "description": "The type of the project.",
       "type": "string",
-      "readOnly": true,
-      "enum": ["classic", "next-gen"]
+      "readOnly": true
     },
     "favourite": {
       "description": "Whether the project is selected as a favorite.",
