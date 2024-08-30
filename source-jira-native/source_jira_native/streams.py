@@ -1126,7 +1126,7 @@ class ProjectTypes(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-project-types/#api-rest-api-3-project-type-get
     """
 
-    primary_key = "self"
+    primary_key = "key"
 
     def path(self, **kwargs) -> str:
         return "project/type"

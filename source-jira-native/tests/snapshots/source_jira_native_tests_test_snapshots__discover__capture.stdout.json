@@ -13204,10 +13204,6 @@
         },
         "assigneeType": {
           "description": "The default assignee when creating issues for this project.",
-          "enum": [
-            "PROJECT_LEAD",
-            "UNASSIGNED"
-          ],
           "readOnly": true,
           "type": "string"
         },
@@ -13306,11 +13302,6 @@
         },
         "projectTypeKey": {
           "description": "The [project type](https://confluence.atlassian.com/x/GwiiLQ#Jiraapplicationsoverview-Productfeaturesandprojecttypes) of the project.",
-          "enum": [
-            "software",
-            "service_desk",
-            "business"
-          ],
           "readOnly": true,
           "type": "string"
         },
@@ -13344,10 +13335,6 @@
         },
         "style": {
           "description": "The type of the project.",
-          "enum": [
-            "classic",
-            "next-gen"
-          ],
           "readOnly": true,
           "type": "string"
         },
@@ -14517,7 +14504,7 @@
       "x-infer-schema": true
     },
     "key": [
-      "/self"
+      "/key"
     ],
     "recommendedName": "project_types",
     "resourceConfig": {
