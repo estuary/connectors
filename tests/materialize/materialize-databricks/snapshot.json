@@ -598,7 +598,7 @@
     {
       "flow_published_at": "1970-01-01T00:00:28Z",
       "id": 1,
-      "unsigned_bigint": 18446744073709552000
+      "unsigned_bigint": 18446744073709551615
     }
   ],
   "table": "`main`.`some-schema`.unsigned_bigint"

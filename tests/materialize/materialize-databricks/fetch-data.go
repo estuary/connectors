@@ -43,12 +43,14 @@ func mustDSN() string {
 	return strings.TrimLeft(uri.String(), "/")
 }
 
+var runQuery = flag.Bool("run-query", false, "just run a query and exit")
+
 func main() {
 	flag.Parse()
 
-	tables := flag.Args()
-	if len(tables) != 1 {
-		log.Fatal("must provide single table name as an argument")
+	args := flag.Args()
+	if len(args) != 1 {
+		log.Fatal("must provide a single argument")
 	}
 
 	ctx := context.Background()
@@ -59,7 +61,15 @@ func main() {
 	}
 	defer db.Close()
 
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id, flow_published_at;", tables[0])
+	if *runQuery {
+		if _, err := db.ExecContext(ctx, args[0]); err != nil {
+			fmt.Println(fmt.Errorf("could not exec query %s: %w", args[0], err))
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id, flow_published_at;", args[0])
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
