@@ -211,14 +211,17 @@
           "description": "Timestamp of the event",
           "format": "date-time",
           "type": "string"
+        },
+        "insert_id": {
+            "description": "Unique insertion identifier",
+            "type": "string"
         }
       },
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/distinct_id",
-      "/time"
+      "/insert_id"
     ],
     "recommendedName": "export",
     "resourceConfig": {
