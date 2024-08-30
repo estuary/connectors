@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM rust:1.69-slim-buster as builder
+FROM rust:1.70-slim-bullseye as builder
 
 RUN rustup component add clippy
 
