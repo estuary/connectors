@@ -343,12 +343,13 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	}
 
 	return &transactor{
-		catalog:        newGlueCatalog(cfg, resourcePaths, open.Materialization),
-		bindings:       bindings,
-		bucket:         cfg.Bucket,
-		prefix:         cfg.Prefix,
-		store:          s3store,
-		uploadInterval: interval,
+		materialization: open.Materialization.Name.String(),
+		catalog:         newGlueCatalog(cfg, resourcePaths, open.Materialization),
+		bindings:        bindings,
+		bucket:          cfg.Bucket,
+		prefix:          cfg.Prefix,
+		store:           s3store,
+		uploadInterval:  interval,
 	}, &pm.Response_Opened{}, nil
 }
 
