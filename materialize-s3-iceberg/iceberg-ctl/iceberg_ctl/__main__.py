@@ -258,6 +258,7 @@ def alter_table(
 
 
 @run.command()
+@click.argument("materialization", type=str)
 @click.argument("table", type=str)
 @click.argument("prev-checkpoint", type=str)
 @click.argument("next-checkpoint", type=str)
@@ -265,6 +266,7 @@ def alter_table(
 @click.pass_context
 def append_files(
     ctx: Context,
+    materialization: str,
     table: str,
     prev_checkpoint: str,
     next_checkpoint: str,
@@ -305,44 +307,33 @@ def append_files(
     assert isinstance(catalog, Catalog)
 
     tbl = catalog.load_table(table)
-    snap = tbl.current_snapshot()
+    checkpoints = TypeAdapter(dict[str, str]).validate_json(tbl.properties.get("flow_checkpoints_v1", "{}"))
+    cp = checkpoints.get(materialization, "") # prev_checkpoint will be unset if this is the first commit to the table
 
-    cp = None
-    if snap is not None and snap.summary is not None:
-        cp = snap.summary["checkpoint"]
-        if cp is None:
-            print("table snapshot existed but checkpoint was not set", snap.summary)
-
-    if cp is not None:
-        assert isinstance(cp, str)
-
-        if cp == next_checkpoint:
-            print(f"checkpoint is already '{next_checkpoint}'")
-            return  # already appended these files
-        elif cp != prev_checkpoint:
-            raise Exception(
-                f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
-            )
-        
+    if cp == next_checkpoint:
+        print(f"checkpoint is already '{next_checkpoint}'")
+        return  # already appended these files
+    elif cp != prev_checkpoint:
+        raise Exception(
+            f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
+        )
+    
     # Files are only added if the table checkpoint property has the prior checkpoint. The checkpoint
     # property is updated to the current checkpoint in an atomic operation with appending the files.
     # Note that this is not 100% correct exactly-once semantics, since there is a potential race
-    # between retrieving the table snapshot and appending the files, where a zombie process could
+    # between retrieving the table properties and appending the files, where a zombie process could
     # append the same files concurrently. In principal Iceberg catalogs support the atomic
     # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
     # at a lower level than PyIceberg currently makes available.
-    tbl.add_files(
-        file_paths.split(","), snapshot_properties={"checkpoint": next_checkpoint}
-    )
+    checkpoints[materialization] = next_checkpoint
+    with tbl.transaction() as txn:
+        txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
+        txn.add_files(file_paths.split(","))
 
-    # TODO(whb): This additional checking should not really be necessary, but is
+    # TODO(whb): This additional logging should not really be necessary, but is
     # included for now to assist in troubleshooting potential errors.
     tbl = catalog.load_table(table)
-    snap = tbl.current_snapshot()
-    assert snap is not None
-    assert snap.summary is not None
-    cp = snap.summary["checkpoint"]
-    print(f"set checkpoint to {cp}")
+    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get("flow_checkpoints_v1")}") 
 
 if __name__ == "__main__":
     run(auto_envvar_prefix="ICEBERG")

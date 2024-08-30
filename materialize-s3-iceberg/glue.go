@@ -183,6 +183,7 @@ func (c *glueCatalog) UpdateResource(_ context.Context, spec *pf.Materialization
 }
 
 func (c *glueCatalog) appendFiles(
+	materialization string,
 	tablePath []string,
 	filePaths []string,
 	prevCheckpoint string,
@@ -193,6 +194,7 @@ func (c *glueCatalog) appendFiles(
 	b, err := runIcebergctl(
 		c.cfg,
 		"append-files",
+		materialization,
 		fqn,
 		prevCheckpoint,
 		nextCheckpoint,
