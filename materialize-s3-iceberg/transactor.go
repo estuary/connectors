@@ -61,13 +61,14 @@ func hashCheckpoint(cp *protocol.Checkpoint) (string, error) {
 }
 
 type transactor struct {
-	catalog        *glueCatalog
-	bindings       []binding
-	bucket         string
-	prefix         string
-	store          *filesink.S3Store
-	state          connectorState
-	uploadInterval time.Duration
+	materialization string
+	catalog         *glueCatalog
+	bindings        []binding
+	bucket          string
+	prefix          string
+	store           *filesink.S3Store
+	state           connectorState
+	uploadInterval  time.Duration
 }
 
 func (t *transactor) Schedule() (schedule.Schedule, bool) {
@@ -229,7 +230,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		})
 
 		ll.Info("starting appendFiles for table")
-		if err := t.catalog.appendFiles(b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
+		if err := t.catalog.appendFiles(t.materialization, b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
 			return nil, fmt.Errorf("appendFiles for %s: %w", b.path, err)
 		}
 		ll.Info("finished appendFiles for table")
