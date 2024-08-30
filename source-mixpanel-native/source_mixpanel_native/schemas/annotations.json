@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["id"],
   "properties": {
     "date": {
       "description": "The date of the annotation in ISO 8601 date-time format.",

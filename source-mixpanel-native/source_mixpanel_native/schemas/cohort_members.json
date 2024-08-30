@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["distinct_id"],
   "properties": {
     "cohort_id": {
       "description": "The unique identifier of the cohort to which the member belongs",
