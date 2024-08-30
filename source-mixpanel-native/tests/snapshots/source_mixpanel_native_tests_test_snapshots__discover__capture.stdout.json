@@ -3,6 +3,9 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "required": [
+        "id"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -38,6 +41,9 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "distinct_id"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -84,6 +90,10 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "date",
+        "funnel_id"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -98,18 +108,11 @@
         },
         "date": {
           "description": "Date field for the funnel data.",
-          "format": "date",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "funnel_id": {
           "description": "Unique identifier for the funnel.",
-          "type": [
-            "null",
-            "integer"
-          ]
+          "type": "integer"
         }
       },
       "type": "object",
@@ -131,6 +134,9 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "date"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -159,11 +165,7 @@
         },
         "date": {
           "description": "Date for which the revenue data is recorded",
-          "format": "date",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "paid_count": {
           "description": "Number of successful paid transactions for the specified date",
@@ -191,6 +193,9 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "insert_id"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -235,6 +240,9 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "id"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -281,6 +289,9 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": [
+        "distinct_id"
+      ],
       "properties": {
         "_meta": {
           "properties": {
@@ -295,10 +306,7 @@
         },
         "distinct_id": {
           "description": "The unique identifier for the user.",
-          "type": [
-            "null",
-            "string"
-          ]
+          "type": "string"
         },
         "id": {
           "description": "The unique ID associated with the user.",

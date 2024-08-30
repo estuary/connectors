@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["insert_id"],
   "properties": {
     "distinct_id": {
       "description": "Unique identifier for the event",

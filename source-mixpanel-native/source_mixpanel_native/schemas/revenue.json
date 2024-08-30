@@ -1,11 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "required": ["date"],
   "properties": {
     "date": {
       "description": "Date for which the revenue data is recorded",
-      "type": ["null", "string"],
-      "format": "date"
+      "type": "string"
     },
     "count": {
       "description": "Number of revenue transactions for the specified date",
