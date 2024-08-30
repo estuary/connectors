@@ -8,8 +8,11 @@ from typing import Any, Iterable, Mapping, MutableMapping
 
 import pendulum
 import requests
+from pendulum import Date
+
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
+from airbyte_cdk.sources.streams.http.auth import HttpAuthenticator
 
 from ..property_transformation import transform_property_names
 from .base import DateSlicesMixin, IncrementalMixpanelStream, MixpanelStream
@@ -86,6 +89,40 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
     cursor_field: str = "time"
 
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
+
+    def __init__(
+        self,
+        authenticator: HttpAuthenticator,
+        region: str,
+        project_timezone: str,
+        start_date: Date = None,
+        end_date: Date = None,
+        date_window_size: int = 30,  # in days
+        attribution_window: int = 0,  # in days
+        select_properties_by_default: bool = True,
+        project_id: int = None,
+        reqs_per_hour_limit: int = MixpanelStream.DEFAULT_REQS_PER_HOUR_LIMIT,
+        **kwargs,
+    ):
+        # This stream has a ton of data, so we can't use large date windows or we'll OOM the connector.
+        # 30 days seems to work for existing connectors.
+        MAX_DATE_WINDOW_SIZE = 30
+        smaller_date_window = min([date_window_size, MAX_DATE_WINDOW_SIZE])
+
+        super().__init__(
+            authenticator=authenticator,
+            region=region,
+            project_timezone=project_timezone,
+            start_date=start_date,
+            end_date=end_date,
+            date_window_size=smaller_date_window,
+            attribution_window=attribution_window,
+            select_properties_by_default=select_properties_by_default,
+            project_id=project_id,
+            reqs_per_hour_limit=reqs_per_hour_limit,
+            **kwargs,
+        )
+
 
     @property
     def url_base(self):
