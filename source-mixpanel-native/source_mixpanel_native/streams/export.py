@@ -85,7 +85,7 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
      3 queries per second and 60 queries per hour.
     """
 
-    primary_key: list[str] = ["distinct_id", "time"]
+    primary_key: str = "insert_id"
     cursor_field: str = "time"
 
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
