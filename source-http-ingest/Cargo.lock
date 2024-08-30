@@ -325,9 +325,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.5.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2bd12c1caf447e69cd4528f47f94d203fd2582878ecb9e9465484c4148a8223"
+checksum = "8318a53db07bb3f8dca91a600466bdb3f2eaadeedfdbcf02e1accbad9271ba50"
 
 [[package]]
 name = "cc"
@@ -460,9 +460,10 @@ dependencies = [
 [[package]]
 name = "doc"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#316cf3c5d106e92018ee4ffe3fb31c878dbc6baf"
+source = "git+https://github.com/estuary/flow#60536f4c560dde8a6832dcafe29a50dd75e8066c"
 dependencies = [
  "base64 0.13.1",
+ "bigdecimal",
  "bumpalo",
  "bytes",
  "fancy-regex",
@@ -471,6 +472,7 @@ dependencies = [
  "itertools 0.10.5",
  "json",
  "lz4",
+ "proto-gazette",
  "rkyv",
  "schemars",
  "serde",
@@ -766,24 +768,15 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "heck"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hermit-abi"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd5256b483761cd23699d0da46cc6fd2ee3be420bbe6d020ae4a091e70b7e9fd"
-
-[[package]]
-name = "home"
-version = "0.5.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
-dependencies = [
- "windows-sys 0.52.0",
-]
 
 [[package]]
 name = "http"
@@ -998,9 +991,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -1023,7 +1016,7 @@ dependencies = [
 [[package]]
 name = "json"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#316cf3c5d106e92018ee4ffe3fb31c878dbc6baf"
+source = "git+https://github.com/estuary/flow#60536f4c560dde8a6832dcafe29a50dd75e8066c"
 dependencies = [
  "addr",
  "bigdecimal",
@@ -1288,9 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "pbjson"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1030c719b0ec2a2d25a5df729d6cff1acf3cc230bf766f4f97833591f7577b90"
+checksum = "c7e6349fa080353f4a597daffd05cb81572a9c031a6d4fff7e504947496fcc68"
 dependencies = [
  "base64 0.21.7",
  "serde",
@@ -1298,21 +1291,21 @@ dependencies = [
 
 [[package]]
 name = "pbjson-build"
-version = "0.6.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2580e33f2292d34be285c5bc3dba5259542b083cfad6037b6d70345f24dcb735"
+checksum = "6eea3058763d6e656105d1403cb04e0a41b7bbac6362d413e7c33be0c32279c9"
 dependencies = [
  "heck",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "prost",
  "prost-types",
 ]
 
 [[package]]
 name = "pbjson-types"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18f596653ba4ac51bdecbb4ef6773bc7f56042dc13927910de1684ad3d32aa12"
+checksum = "e54e5e7bfb1652f95bc361d76f3c780d8e526b134b85417e774166ee941f0887"
 dependencies = [
  "bytes",
  "chrono",
@@ -1443,9 +1436,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.12.3"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "146c289cda302b98a28d40c8b3b90498d6e526dd24ac2ecea73e4e491685b94a"
+checksum = "e13db3d3fde688c61e2446b4d843bc27a7e8af269a69440c0308021dc92333cc"
 dependencies = [
  "bytes",
  "prost-derive",
@@ -1453,13 +1446,13 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.12.3"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c55e02e35260070b6f716a2423c2ff1c3bb1642ddca6f99e1f26d06268a0e2d2"
+checksum = "5bb182580f71dd070f88d01ce3de9f4da5021db7115d2e1c3605a754153b77c1"
 dependencies = [
  "bytes",
  "heck",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "log",
  "multimap",
  "once_cell",
@@ -1470,17 +1463,16 @@ dependencies = [
  "regex",
  "syn 2.0.50",
  "tempfile",
- "which",
 ]
 
 [[package]]
 name = "prost-derive"
-version = "0.12.3"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efb6c9a1dd1def8e2124d17e83a20af56f1570d6c2d2bd9e266ccb768df3840e"
+checksum = "18bec9b0adc4eba778b33684b7ba3e7137789434769ee3ce3930463ef904cfca"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.50",
@@ -1488,9 +1480,9 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.12.3"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "193898f59edcf43c26227dcd4c8427f00d99d61e95dcde58dabd49fa291d470e"
+checksum = "cee5168b05f49d4b0ca581206eb14a7b22fafd963efe729ac48eb03266e25cc2"
 dependencies = [
  "prost",
 ]
@@ -1498,7 +1490,7 @@ dependencies = [
 [[package]]
 name = "proto-flow"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#316cf3c5d106e92018ee4ffe3fb31c878dbc6baf"
+source = "git+https://github.com/estuary/flow#60536f4c560dde8a6832dcafe29a50dd75e8066c"
 dependencies = [
  "bytes",
  "pbjson",
@@ -1513,13 +1505,15 @@ dependencies = [
 [[package]]
 name = "proto-gazette"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#316cf3c5d106e92018ee4ffe3fb31c878dbc6baf"
+source = "git+https://github.com/estuary/flow#60536f4c560dde8a6832dcafe29a50dd75e8066c"
 dependencies = [
  "bytes",
  "pbjson",
  "pbjson-types",
  "prost",
  "serde",
+ "thiserror",
+ "uuid",
 ]
 
 [[package]]
@@ -2513,7 +2507,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 [[package]]
 name = "tuple"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#316cf3c5d106e92018ee4ffe3fb31c878dbc6baf"
+source = "git+https://github.com/estuary/flow#60536f4c560dde8a6832dcafe29a50dd75e8066c"
 dependencies = [
  "memchr",
  "serde_json",
@@ -2746,18 +2740,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd7c23921eeb1713a4e851530e9b9756e4fb0e89978582942612524cf09f01cd"
 dependencies = [
  "rustls-pki-types",
-]
-
-[[package]]
-name = "which"
-version = "4.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87ba24419a2078cd2b0f2ede2691b6c66d8e47836da3b6db8265ebad47afbfc7"
-dependencies = [
- "either",
- "home",
- "once_cell",
- "rustix",
 ]
 
 [[package]]
