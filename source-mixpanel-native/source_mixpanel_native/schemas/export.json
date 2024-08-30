@@ -10,6 +10,10 @@
       "description": "Timestamp of the event",
       "type": "string",
       "format": "date-time"
-    }
+    },
+    "insert_id": {
+        "description": "Unique insertion identifier",
+        "type": "string"
+      }
   }
 }
