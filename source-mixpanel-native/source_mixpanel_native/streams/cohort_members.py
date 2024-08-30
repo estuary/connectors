@@ -41,7 +41,9 @@ class CohortMembers(Engage):
         # full refresh is needed because even though some cohorts might already have been read
         # they can still have new members added
         cohorts = Cohorts(**self.get_stream_params()).read_records(SyncMode.full_refresh)
-        for cohort in cohorts:
+        # A single cohort could be empty (i.e. no members), so we only check for members in non-empty cohorts. 
+        filtered_cohorts = [cohort for cohort in cohorts if cohort["count"] > 0]
+        for cohort in filtered_cohorts:
             yield {"id": cohort["id"]}
 
     def process_response(self, response: requests.Response, stream_slice: Mapping[str, Any] = None, **kwargs) -> Iterable[Mapping]:
