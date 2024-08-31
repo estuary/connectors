@@ -655,6 +655,7 @@ async def _binding_incremental_task(
                 pending = True
             elif item == Triggers.BACKFILL:
                 task.log.debug("incremental task triggered backfill")
+                task.stopping.event.set()
                 task.checkpoint(
                     ConnectorState(
                         bindingStateV1={binding.stateKey: None}
