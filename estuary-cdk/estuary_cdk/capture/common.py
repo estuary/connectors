@@ -174,6 +174,7 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
     bindingStateV1: dict[str, _BaseResourceState | None] = {}
+    backfillRequests: dict[str, bool | None] = {}
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
@@ -390,12 +391,27 @@ def open(
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
 
     async def _run(task: Task):
+        backfill_requests = []
+        if open.state.backfillRequests is not None:
+            for stateKey in open.state.backfillRequests.keys():
+                task.log.debug(
+                    "clearing checkpoint due to backfill trigger",
+                    {"stateKey": stateKey},
+                )
+                backfill_requests.append(stateKey)
+                task.checkpoint(
+                    ConnectorState(
+                        bindingStateV1={stateKey: None},
+                        backfillRequests={stateKey: None},
+                    )
+                )
+
         for index, (binding, resource) in enumerate(resolved_bindings):
             state: _ResourceState | None = open.state.bindingStateV1.get(
                 binding.stateKey
             )
 
-            if state is None:
+            if state is None or binding.stateKey in backfill_requests:
                 # Checkpoint the binding's initialized state prior to any processing.
                 task.checkpoint(
                     ConnectorState(
@@ -658,7 +674,7 @@ async def _binding_incremental_task(
                 task.stopping.event.set()
                 task.checkpoint(
                     ConnectorState(
-                        bindingStateV1={binding.stateKey: None}
+                        backfillRequests={binding.stateKey: True}
                     )
                 )
                 return
