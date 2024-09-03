@@ -10,7 +10,7 @@
         "iceberg-test%2Fsimple_delta": {
           "currentCheckpoint": "ce03a88604a70da2",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/<UUID>.parquet"
+            "s3://estuary-iceberg-test/test-data/iceberg-test_simple_delta_1AF85F8D8FFC3C9B/<UUID>.parquet"
           ]
         }
       }
@@ -26,7 +26,7 @@
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/<UUID>.parquet"
+            "s3://estuary-iceberg-test/test-data/iceberg-test_simple_delta_1AF85F8D8FFC3C9B/<UUID>.parquet"
           ]
         }
       }
@@ -42,7 +42,7 @@
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/<UUID>.parquet"
+            "s3://estuary-iceberg-test/test-data/iceberg-test_simple_delta_1AF85F8D8FFC3C9B/<UUID>.parquet"
           ]
         }
       }

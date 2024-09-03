@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"regexp"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
@@ -27,6 +28,41 @@ const (
 	// write.
 	fileSizeLimit = 512 * 1024 * 1024
 )
+
+var identifierSanitizerRegexp = regexp.MustCompile(`[^\-_0-9a-zA-Z]`)
+
+// sanitizeTable adapts a table name into a reasonably human-readable
+// representation, sanitizing problematic characters from the table name and
+// including a hash of the "original" value to guarantee uniqueness.
+// Alphanumerics, hyphens, and underscores are left as-is and others are
+// converted to underscores. S3 object names are actually very flexible in the
+// characters they allow but generally characters outside of these common ones
+// can cause issues with clients trying to read the named objects.
+func sanitizeTable(namespace, table string) string {
+	prefix := fmt.Sprintf(
+		"%s_%s",
+		identifierSanitizerRegexp.ReplaceAllString(namespace, "_"),
+		identifierSanitizerRegexp.ReplaceAllString(table, "_"),
+	)
+
+	hash := xxhash.Sum64String(fmt.Sprintf("%s_%s", namespace, table))
+	return fmt.Sprintf("%s_%016X", prefix, hash)
+}
+
+func tablePath(bucket, prefix, namespace, table string) string {
+	return fmt.Sprintf("s3://%s/", path.Join(bucket, prefix, sanitizeTable(namespace, table)))
+}
+
+// filePath returns path information for a new file, including both the object
+// key and full s3Path in s3:// format.
+func filePath(bucket, prefix, namespace, table string) (fileKey string, s3Path string) {
+	fName := uuid.New().String() + ".parquet"
+
+	fileKey = path.Join(prefix, sanitizeTable(namespace, table), fName)
+	s3Path = tablePath(bucket, prefix, namespace, table) + fName
+
+	return
+}
 
 type binding struct {
 	path       []string
@@ -112,13 +148,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// got sufficiently large.
 		r, w := io.Pipe()
 
-		key := path.Join(t.prefix, uuid.New().String()+".parquet")
-		s3path := fmt.Sprintf("s3://%s/%s", t.bucket, key)
-		states[b.stateKey].FileKeys = append(states[b.stateKey].FileKeys, s3path)
+		key, s3Path := filePath(t.bucket, t.prefix, b.path[0], b.path[1])
+		states[b.stateKey].FileKeys = append(states[b.stateKey].FileKeys, s3Path)
 
 		group.Go(func() error {
 			ll := log.WithFields(log.Fields{
-				"path":  s3path,
+				"path":  s3Path,
 				"table": pathToFQN(b.path),
 			})
 

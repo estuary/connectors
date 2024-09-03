@@ -25,6 +25,7 @@ export AWS_REGION="$(echo $CONNECTOR_CONFIG | jq -r .region)"
 export AWS_BUCKET="$(echo $CONNECTOR_CONFIG | jq -r .bucket)"
 export PREFIX="$(echo $CONNECTOR_CONFIG | jq -r .prefix)"
 export NAMESPACE=$(echo $CONNECTOR_CONFIG | jq -r .namespace)
+export WAREHOUSE=$(echo $CONNECTOR_CONFIG | jq -r .catalog.warehouse)
 
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
@@ -35,7 +36,7 @@ docker compose -f materialize-s3-iceberg/docker-compose.yaml up --wait
 
 # Create the test warehouse.
 create_warehouse_json_template='{
-  "warehouse-name": "test_warehouse",
+  "warehouse-name": "${WAREHOUSE}",
   "project-id": "00000000-0000-0000-0000-000000000000",
   "storage-profile": {
     "type": "s3",
