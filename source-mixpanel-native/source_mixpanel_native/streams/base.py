@@ -27,13 +27,6 @@ class MixpanelStream(HttpStream, ABC):
     DEFAULT_REQS_PER_HOUR_LIMIT = 60
 
     @property
-    def state_checkpoint_interval(self) -> int:
-        # to meet the requirement of emitting state at least once per 15 minutes,
-        # we assume there's at least 1 record per request returned. Given that each request is followed by a 60 seconds sleep
-        # we'll have to emit state every 15 records
-        return 10000
-
-    @property
     def url_base(self):
         prefix = "eu." if self.region == "EU" else ""
         return f"https://{prefix}mixpanel.com/api/2.0/"
