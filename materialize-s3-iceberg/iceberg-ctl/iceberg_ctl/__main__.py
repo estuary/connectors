@@ -3,10 +3,11 @@ from typing import Any, Literal
 
 import click
 from click import Context
-from iceberg_ctl.models import EndpointConfig
+from iceberg_ctl.models import EndpointConfig, GlueCatalogConfig, RestCatalogConfig
 from pydantic import BaseModel, TypeAdapter
 from pyiceberg.catalog import Catalog
 from pyiceberg.catalog.glue import GlueCatalog
+from pyiceberg.catalog.rest import RestCatalog
 from pyiceberg.io import PY_IO_IMPL
 from pyiceberg.schema import Schema
 from pyiceberg.types import (
@@ -60,19 +61,32 @@ def run(
     if endpoint_config_json is not None:
         cfg = EndpointConfig.model_validate_json(endpoint_config_json)
 
-        ctx.obj["catalog"] = GlueCatalog(
-            "default",
-            **{
-                "region_name": cfg.region,
-                "aws_access_key_id": cfg.aws_access_key_id,
-                "aws_secret_access_key": cfg.aws_secret_access_key,
-                PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
-                "s3.region": cfg.region,
-                "s3.access-key-id": cfg.aws_access_key_id,
-                "s3.secret-access-key": cfg.aws_secret_access_key,
-            },
-        )
+        match cfg.catalog:
+            case RestCatalogConfig():
+                ctx.obj["catalog"] = RestCatalog(
+                    "default",
+                    **{
+                        "uri": cfg.catalog.uri,
+                        "credential": cfg.catalog.credential,
+                        "token": cfg.catalog.token,
+                        "warehouse": cfg.catalog.warehouse,
+                        PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
+                    },
+                )
 
+            case GlueCatalogConfig():
+                ctx.obj["catalog"] = GlueCatalog(
+                    "default",
+                    **{
+                        "client.region": cfg.region,
+                        "client.access-key-id": cfg.aws_access_key_id,
+                        "client.secret-access-key": cfg.aws_secret_access_key,
+                        PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
+                    },
+                )
+
+            case _:
+                raise Exception(f"unhandled catalog type: {cfg.catalog.catalog_type}")
 
 @run.command()
 def print_config_schema():

@@ -1,5 +1,84 @@
 {
   "config_schema_json": {
+    "$defs": {
+      "GlueCatalogConfig": {
+        "properties": {
+          "catalog_type": {
+            "const": "AWS Glue",
+            "default": "AWS Glue",
+            "enum": [
+              "AWS Glue"
+            ],
+            "title": "Catalog Type",
+            "type": "string"
+          }
+        },
+        "title": "AWS Glue",
+        "type": "object"
+      },
+      "RestCatalogConfig": {
+        "properties": {
+          "catalog_type": {
+            "const": "Iceberg REST Server",
+            "default": "Iceberg REST Server",
+            "enum": [
+              "Iceberg REST Server"
+            ],
+            "order": 0,
+            "title": "Catalog Type",
+            "type": "string"
+          },
+          "uri": {
+            "description": "URI identifying the REST catalog, in the format of 'https://yourserver.com/catalog'.",
+            "order": 1,
+            "title": "URI",
+            "type": "string"
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Credential for connecting to the catalog.",
+            "order": 2,
+            "secret": true,
+            "title": "Credential"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Token for connecting to the catalog.",
+            "order": 3,
+            "secret": true,
+            "title": "Token"
+          },
+          "warehouse": {
+            "description": "Warehouse to connect to.",
+            "order": 4,
+            "title": "Warehouse",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri",
+          "warehouse"
+        ],
+        "title": "REST",
+        "type": "object"
+      }
+    },
     "properties": {
       "aws_access_key_id": {
         "description": "Access Key ID for accessing AWS services.",
@@ -47,6 +126,25 @@
         "order": 6,
         "title": "Upload Interval",
         "type": "string"
+      },
+      "catalog": {
+        "discriminator": {
+          "mapping": {
+            "AWS Glue": "#/$defs/GlueCatalogConfig",
+            "Iceberg REST Server": "#/$defs/RestCatalogConfig"
+          },
+          "propertyName": "catalog_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/RestCatalogConfig"
+          },
+          {
+            "$ref": "#/$defs/GlueCatalogConfig"
+          }
+        ],
+        "order": 7,
+        "title": "Catalog"
       }
     },
     "required": [
@@ -54,7 +152,8 @@
       "aws_secret_access_key",
       "bucket",
       "region",
-      "namespace"
+      "namespace",
+      "catalog"
     ],
     "title": "EndpointConfig",
     "type": "object"

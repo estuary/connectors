@@ -1,0 +1,66 @@
+services:
+  server:
+    image: quay.io/hansetag/tip-catalog:v0.3
+    pull_policy: always
+    environment:
+      - ICEBERG_REST__BASE_URI=http://server:8080
+      # - ICEBERG_REST__BASE_URI=http://localhost:8090
+      - ICEBERG_REST__PG_ENCRYPTION_KEY=something
+      - ICEBERG_REST__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
+      - ICEBERG_REST__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
+      - ICEBERG_REST__DEFAULT_PROJECT_ID=00000000-0000-0000-0000-000000000000
+      - RUST_LOG=trace,axum=trace,sqlx=trace,iceberg-catalog=trace
+    command: [ "serve" ]
+    healthcheck:
+      test: [ "CMD", "/home/nonroot/iceberg-catalog", "healthcheck" ]
+      interval: 1s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    networks:
+      flow-test:
+    ports:
+      - "8090:8080" # expose as port 8090 since gazette uses 8080 in a local stack
+
+  migrate:
+    image: quay.io/hansetag/tip-catalog:v0.3
+    pull_policy: always
+    environment:
+      - ICEBERG_REST__PG_ENCRYPTION_KEY=something
+      - ICEBERG_REST__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
+      - ICEBERG_REST__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
+      - RUST_LOG=info
+    restart: "no"
+    entrypoint: [ "/home/nonroot/iceberg-catalog", "migrate" ]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      flow-test:
+
+
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - PGUSER=postgres
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -p 5432 -d postgres" ]
+      interval: 2s
+      timeout: 10s
+      retries: 2
+      start_period: 10s
+    networks:
+      flow-test:
+
+
+networks:
+  flow-test:
+    external: true
