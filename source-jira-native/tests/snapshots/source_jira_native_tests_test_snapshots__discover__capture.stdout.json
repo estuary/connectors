@@ -1569,6 +1569,9 @@
         }
       },
       "readOnly": true,
+      "required": [
+        "id"
+      ],
       "type": "object",
       "x-infer-schema": true
     },
