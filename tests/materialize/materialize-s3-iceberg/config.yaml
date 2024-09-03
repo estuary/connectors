@@ -5,6 +5,11 @@ region: us-east-2
 prefix: test-data
 namespace: iceberg-test
 upload_interval: PT5M
+catalog:
+    catalog_type: Iceberg REST Server
+    uri: http://server:8080/catalog
+    token_sops: ENC[AES256_GCM,data:MsENQ9bSzBP8gQ==,iv:d2g3r6jezHIEerQdZRf3LjI7kS6XVzDfwVlOqJlqTOQ=,tag:mP7emY9fXQE75OxGhaNraA==,type:str]
+    warehouse: test_warehouse
 sops:
     kms: []
     gcp_kms:
@@ -14,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-07-10T20:22:33Z"
-    mac: ENC[AES256_GCM,data:crPG9r9KWvYlJl9vlnLv1PH1oUwq5SIXXEy6jkwgQlwCSrMRfj9tQh9ja2ZQ68UERORNWlYQA0O1sfcJ0ETip1t6kQtcyMrZDfTdOQcLis57RkP9Y5KK8RTgHnRyIle4P+cabPIeEJ4FGusrymvkv6aNGgk0f++Qk6i4Ajag2ew=,iv:lI1xXqmQbZBqkzEc5LdZWhFtH17s3UlWIuMjVcfS9SU=,tag:IUBHTMC6qk1cBLfif6tcfA==,type:str]
+    lastmodified: "2024-08-30T20:47:17Z"
+    mac: ENC[AES256_GCM,data:yoFCBjJKI2qmdc9tw7hrodXMcAcoiRLAEZYrlaq5O3vh4VOiWWQQcU/dUyl4PoGMNnLyc4qQPM4S5Q7tcxsZLxgikp66Ws9WZHkrCLe2hekrLmD9v4R0l0Z1baWt4PW9v7SLxAEmWiw1Yfqu95S0Cc5f8/3tw4mmYueIcRbUr50=,iv:aU67KJpr4oWctHh7nq3nV0EB2KUVUJn4Ld0OO4vwdv8=,tag:OZvupW4L7GbIgpMJmS1RFg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

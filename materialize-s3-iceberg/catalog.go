@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type glueCatalog struct {
+type catalog struct {
 	cfg *config
 	// TODO(whb): Including the lastSpec from the validate or apply request is a temporary hack
 	// until we get around to removing the "load/persist a spec in the destination" concept more
@@ -22,8 +22,8 @@ type glueCatalog struct {
 	resourcePaths [][]string
 }
 
-func newGlueCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.MaterializationSpec) *glueCatalog {
-	return &glueCatalog{
+func newCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.MaterializationSpec) *catalog {
+	return &catalog{
 		cfg:           &cfg,
 		resourcePaths: resourcePaths,
 		lastSpec:      lastSpec,
@@ -31,7 +31,7 @@ func newGlueCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.Materiali
 	}
 }
 
-func (c *glueCatalog) infoSchema() (*boilerplate.InfoSchema, error) {
+func (c *catalog) infoSchema() (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
 		func(rp []string) []string { return rp },
 		func(f string) string { return f },
@@ -75,7 +75,7 @@ func (c *glueCatalog) infoSchema() (*boilerplate.InfoSchema, error) {
 	return is, nil
 }
 
-func (c *glueCatalog) listNamespaces() ([]string, error) {
+func (c *catalog) listNamespaces() ([]string, error) {
 	var got []string
 
 	if b, err := runIcebergctl(c.cfg, "list-namespaces"); err != nil {
@@ -87,12 +87,12 @@ func (c *glueCatalog) listNamespaces() ([]string, error) {
 	return got, nil
 }
 
-func (c *glueCatalog) createNamespace(namespace string) error {
+func (c *catalog) createNamespace(namespace string) error {
 	_, err := runIcebergctl(c.cfg, "create-namespace", namespace)
 	return err
 }
 
-func (c *glueCatalog) CreateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) CreateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
 	b := spec.Bindings[bindingIndex]
 
 	tc := tableCreate{Location: c.tableLocation}
@@ -126,7 +126,7 @@ func (c *glueCatalog) CreateResource(_ context.Context, spec *pf.Materialization
 	}, nil
 }
 
-func (c *glueCatalog) DeleteResource(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) DeleteResource(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
 	fqn := pathToFQN(path)
 
 	return fmt.Sprintf("drop table %q", fqn), func(_ context.Context) error {
@@ -138,7 +138,7 @@ func (c *glueCatalog) DeleteResource(_ context.Context, path []string) (string, 
 	}, nil
 }
 
-func (c *glueCatalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 {
 		// Nothing to do, since only adding new columns or dropping nullability
 		// constraints is supported currently.
@@ -182,7 +182,7 @@ func (c *glueCatalog) UpdateResource(_ context.Context, spec *pf.Materialization
 	}, nil
 }
 
-func (c *glueCatalog) appendFiles(
+func (c *catalog) appendFiles(
 	materialization string,
 	tablePath []string,
 	filePaths []string,
@@ -216,14 +216,14 @@ func (c *glueCatalog) appendFiles(
 
 // These functions are vestigial from the age of persisting specs in the destination.
 
-func (c *glueCatalog) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
 	return "", nil, nil
 }
 
-func (c *glueCatalog) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
+func (c *catalog) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
 	return c.lastSpec, nil
 }
 
-func (c *glueCatalog) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, exists bool) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, exists bool) (string, boilerplate.ActionApplyFn, error) {
 	return "", nil, nil
 }

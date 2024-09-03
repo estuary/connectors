@@ -62,7 +62,7 @@ func hashCheckpoint(cp *protocol.Checkpoint) (string, error) {
 
 type transactor struct {
 	materialization string
-	catalog         *glueCatalog
+	catalog         *catalog
 	bindings        []binding
 	bucket          string
 	prefix          string
