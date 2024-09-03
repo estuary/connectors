@@ -3,6 +3,7 @@
 #
 
 import json
+import re
 from functools import cache
 from typing import Any, Iterable, Mapping, MutableMapping
 
@@ -17,6 +18,8 @@ from airbyte_cdk.sources.streams.http.auth import HttpAuthenticator
 from ..property_transformation import transform_property_names
 from .base import DateSlicesMixin, IncrementalMixpanelStream, MixpanelStream
 
+
+INSERT_ID_PATTERN = r'^insert_id.+'
 
 class ExportSchema(MixpanelStream):
     """
@@ -194,7 +197,13 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
             for result in transform_property_names(properties.keys()):
                 # Convert all values to string (this is default property type)
                 # because API does not provide properties type information
-                item[result.transformed_name] = str(properties[result.source_name])
+
+                # Sometimes, the API returns a document that has a `insert_id�` property instead of `insert_id`. 
+                # When this happens, we have to remove the extra byte(s).
+                if re.match(INSERT_ID_PATTERN, result.transformed_name):
+                    item["insert_id"] = str(properties[result.source_name])
+                else:
+                    item[result.transformed_name] = str(properties[result.source_name])
 
             # convert timestamp to datetime string
             item["time"] = pendulum.from_timestamp(int(item["time"]), tz="UTC").to_iso8601_string()
