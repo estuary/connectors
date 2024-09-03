@@ -101,7 +101,11 @@ func (rs rowSize) estSize(row []any) int {
 		case nil:
 			// No additional overhead is assumed for nil values.
 		default:
-			panic(fmt.Sprintf("estSize unknown type: %T", v))
+			// All other values are assumed to have a fixed overhead of 16
+			// bytes. This is applicable to fields which have multiple types
+			// where the Parquet type is a string or byte array but the field's
+			// value is some other scalar type.
+			out += 16
 		}
 	}
 
@@ -622,6 +626,14 @@ func getStringVal(val any) (got parquet.ByteArray, err error) {
 		got = v
 	case json.RawMessage:
 		got = []byte(v)
+	case bool:
+		got = []byte(strconv.FormatBool(v))
+	case int64:
+		got = []byte(strconv.Itoa(int(v)))
+	case uint64:
+		got = []byte(strconv.FormatUint(v, 10))
+	case float64:
+		got = []byte(strconv.FormatFloat(v, 'f', -1, 64))
 	default:
 		err = fmt.Errorf("getStringVal unhandled type: %T", v)
 	}
