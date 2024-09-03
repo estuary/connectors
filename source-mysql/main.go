@@ -106,9 +106,9 @@ type advancedConfig struct {
 	SkipBackfills            string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize        int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 
-	// Deprecated config options which no longer do anything.
-	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"-"`
-	HeartbeatInterval string `json:"heartbeat_interval,omitempty" jsonschema:"-"`
+	// Deprecated config options which no longer do much of anything.
+	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present."`
+	HeartbeatInterval string `json:"heartbeat_interval,omitempty" jsonschema:"title=Heartbeat Interval,default=60s,description=This property is deprecated and will be removed in the near future. Has no effect." jsonschema_extras:"pattern=^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"`
 }
 
 // Validate checks that the configuration possesses all required properties.
