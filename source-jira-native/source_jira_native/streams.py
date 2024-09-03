@@ -1462,7 +1462,7 @@ class Workflows(JiraStream):
     """
 
     extract_field = "values"
-    primary_key = "entity_id"
+    primary_key = "name"
 
     def path(self, **kwargs) -> str:
         return "workflow/search"
@@ -1470,7 +1470,7 @@ class Workflows(JiraStream):
     def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
         try:
             for record in super().read_records(**kwargs):
-                record["entity_id"] = record["id"]["entityId"]
+                record["name"] = record["id"]["name"]
                 yield record
         except HTTPError as e:
             if not (self.skip_http_status_codes and e.response.status_code in self.skip_http_status_codes):
