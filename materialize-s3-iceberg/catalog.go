@@ -18,7 +18,6 @@ type catalog struct {
 	// thoroughly. As of this writing, the iceberg materialization is the first one to actually use
 	// the lastSpec from the validate or apply request.
 	lastSpec      *pf.MaterializationSpec
-	tableLocation string
 	resourcePaths [][]string
 }
 
@@ -27,7 +26,6 @@ func newCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.Materializati
 		cfg:           &cfg,
 		resourcePaths: resourcePaths,
 		lastSpec:      lastSpec,
-		tableLocation: fmt.Sprintf("s3://%s/%s/", cfg.Bucket, cfg.Prefix),
 	}
 }
 
@@ -95,7 +93,7 @@ func (c *catalog) createNamespace(namespace string) error {
 func (c *catalog) CreateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
 	b := spec.Bindings[bindingIndex]
 
-	tc := tableCreate{Location: c.tableLocation}
+	tc := tableCreate{Location: tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1])}
 
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
 	if err != nil {
