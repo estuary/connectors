@@ -4,6 +4,13 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+# TODO(whb): The "formatted strings" collection is not included becuase the
+# extreme minimum & maximum timestamps crash something within pyiceberg. I don't
+# want to make code changes for the connector to handle this via clamping etc.
+# yet because these values are perfectly valid to write to a parquet file, and
+# the limitation seems to be only in the pyiceberg implementation. I am hoping
+# the underlying siutation improves, or we start to write Iceberg data files
+# differently, before this becomes a more pressing problem.
 resources_json_template='[
   {
     "resource": {
@@ -11,6 +18,29 @@ resources_json_template='[
       "delta_updates": true
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
+  },
+  {
+    "resource": {
+      "table": "duplicate_keys_delta",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+  },
+  {
+    "resource": {
+      "table": "multiple_types_delta",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
+    "fields": {
+      "recommended": true,
+      "exclude": ["nested/id"],
+      "include": {
+        "nested": {},
+        "array_int": {},
+        "multiple": {}
+      }
+    }
   }
 ]'
 
