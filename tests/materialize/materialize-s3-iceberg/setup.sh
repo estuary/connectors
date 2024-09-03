@@ -30,5 +30,25 @@ export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
 export S3_DATA_URI="s3://${AWS_BUCKET}/${PREFIX}"
 
-echo "Creating database: ${NAMESPACE}"
-aws glue create-database --database-input "{\"Name\": \"${NAMESPACE}\"}"
+# Start the rest catalog.
+docker compose -f materialize-s3-iceberg/docker-compose.yaml up --wait
+
+# Create the test warehouse.
+create_warehouse_json_template='{
+  "warehouse-name": "test_warehouse",
+  "project-id": "00000000-0000-0000-0000-000000000000",
+  "storage-profile": {
+    "type": "s3",
+    "bucket": "${AWS_BUCKET}",
+    "region": "${AWS_REGION}",
+    "sts-enabled": false
+  },
+  "storage-credential": {
+    "type": "s3",
+    "credential-type": "access-key",
+    "aws-access-key-id": "${AWS_ACCESS_KEY_ID}",
+    "aws-secret-access-key": "${AWS_SECRET_ACCESS_KEY}"
+  }
+}'
+
+curl -X POST -H "Content-Type: application/json" -d "$(echo "$create_warehouse_json_template" | envsubst | jq -c)" http://localhost:8090/management/v1/warehouse

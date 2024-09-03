@@ -27,16 +27,34 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type catalogType string
+
+const (
+	catalogTypeGlue catalogType = "AWS Glue"
+	catalogTypeRest catalogType = "Iceberg REST Server"
+)
+
 // There is an equivalent pydantic model in iceberg-ctl, and the config schema is generated from
 // that. The fields of this struct must be compatible with that model.
 type config struct {
-	Bucket             string `json:"bucket"`
-	AWSAccessKeyID     string `json:"aws_access_key_id"`
-	AWSSecretAccessKey string `json:"aws_secret_access_key"`
-	Namespace          string `json:"namespace"`
-	Region             string `json:"region"`
-	UploadInterval     string `json:"upload_interval"`
-	Prefix             string `json:"prefix,omitempty"`
+	Bucket             string        `json:"bucket"`
+	AWSAccessKeyID     string        `json:"aws_access_key_id"`
+	AWSSecretAccessKey string        `json:"aws_secret_access_key"`
+	Namespace          string        `json:"namespace"`
+	Region             string        `json:"region"`
+	UploadInterval     string        `json:"upload_interval"`
+	Prefix             string        `json:"prefix,omitempty"`
+	Catalog            catalogConfig `json:"catalog"`
+}
+
+type catalogConfig struct {
+	CatalogType catalogType `json:"catalog_type"`
+
+	// Rest catalog configuration.
+	URI        string `json:"uri,omitempty"`
+	Credential string `json:"credential,omitempty"`
+	Token      string `json:"token,omitempty"`
+	Warehouse  string `json:"warehouse,omitempty"`
 }
 
 func (c config) Validate() error {
@@ -51,6 +69,22 @@ func (c config) Validate() error {
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+
+	if c.Catalog.CatalogType == "" {
+		return fmt.Errorf("missing 'catalog_type'")
+	}
+
+	if c.Catalog.CatalogType == catalogTypeRest {
+		var requiredProperties = [][]string{
+			{"uri", c.Catalog.URI},
+			{"warehouse", c.Catalog.Warehouse},
+		}
+		for _, req := range requiredProperties {
+			if req[1] == "" {
+				return fmt.Errorf("REST catalog config missing '%s'", req[0])
+			}
 		}
 	}
 
@@ -222,7 +256,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		resourcePaths = append(resourcePaths, res.path())
 	}
 
-	catalog := newGlueCatalog(cfg, resourcePaths, req.LastMaterialization)
+	catalog := newCatalog(cfg, resourcePaths, req.LastMaterialization)
 
 	is, err := catalog.infoSchema()
 	if err != nil {
@@ -270,7 +304,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
 
-	catalog := newGlueCatalog(cfg, resourcePaths, req.LastMaterialization)
+	catalog := newCatalog(cfg, resourcePaths, req.LastMaterialization)
 
 	existingNamespaces, err := catalog.listNamespaces()
 	if err != nil {
@@ -344,7 +378,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 
 	return &transactor{
 		materialization: open.Materialization.Name.String(),
-		catalog:         newGlueCatalog(cfg, resourcePaths, open.Materialization),
+		catalog:         newCatalog(cfg, resourcePaths, open.Materialization),
 		bindings:        bindings,
 		bucket:          cfg.Bucket,
 		prefix:          cfg.Prefix,

@@ -43,6 +43,12 @@ func testConfig(t *testing.T) config {
 		Region:             os.Getenv("ICEBERG_REGION_NAME"),
 		UploadInterval:     "PT5M",
 		Prefix:             os.Getenv("ICEBERG_PREFIX"),
+		Catalog: catalogConfig{
+			CatalogType: catalogTypeRest,
+			URI:         "http://localhost:8090/catalog",
+			Token:       "some_token",
+			Warehouse:   "test_warehouse",
+		},
 	}
 
 	return cfg
@@ -59,7 +65,7 @@ func TestValidateAndApply(t *testing.T) {
 		Delta:     true,
 	}
 
-	catalog := glueCatalog{
+	catalog := catalog{
 		cfg:           &cfg,
 		resourcePaths: [][]string{{"test_namespace", "test_table"}},
 	}
