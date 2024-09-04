@@ -326,7 +326,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Query    string
+	Query    string   `json:",omitempty"` // deprecated, kept for backward compatibility
+	Queries  []string `json:",omitempty"`
 	ToDelete []string
 }
 
@@ -346,6 +347,8 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 		}
 	}
 }
+
+const queryBatchSize = 128
 
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
@@ -395,24 +398,41 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toCopy)
 
-		var query string
+		var queries []string
 		// In case of delta updates or if there are no existing keys being stored
 		// we directly copy from staged files into the target table. Note that this is retriable
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		if b.target.DeltaUpdates || !b.needsMerge {
-			if query, err = RenderTableWithFiles(b.target, toCopy, b.rootStagingPath, tplCopyIntoDirect); err != nil {
-				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+			for i := 0; i < len(toCopy); i += queryBatchSize {
+				end := i + queryBatchSize
+				if end > len(toCopy) {
+					end = len(toCopy)
+				}
+
+				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect); err != nil {
+					return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+				} else {
+					queries = append(queries, query)
+				}
 			}
 		} else {
-			if query, err = RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplMergeInto); err != nil {
-				return nil, fmt.Errorf("mergeInto template: %w", err)
+			for i := 0; i < len(toCopy); i += queryBatchSize {
+				end := i + queryBatchSize
+				if end > len(toCopy) {
+					end = len(toCopy)
+				}
+				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto); err != nil {
+					return nil, fmt.Errorf("mergeInto template: %w", err)
+				} else {
+					queries = append(queries, query)
+				}
 			}
 		}
 
 		d.cp[b.target.StateKey] = &checkpointItem{
-			Query:    query,
+			Queries:  queries,
 			ToDelete: fullPaths,
 		}
 	}
@@ -451,15 +471,24 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		if _, err := db.ExecContext(ctx, item.Query); err != nil {
-			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-			// it is okay to skip them in this case
-			if d.cpRecovery {
-				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-					continue
-				}
+		var queries = item.Queries
+		if item.Query != "" {
+			if len(queries) != 0 {
+				return nil, fmt.Errorf("checkpoint has both query and queries, this is unexpected")
 			}
-			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+			queries = []string{item.Query}
+		}
+		for _, query := range queries {
+			if _, err := db.ExecContext(ctx, query); err != nil {
+				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+				// it is okay to skip them in this case
+				if d.cpRecovery {
+					if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+						continue
+					}
+				}
+				return nil, fmt.Errorf("query %q failed: %w", query, err)
+			}
 		}
 
 		// Cleanup files.
