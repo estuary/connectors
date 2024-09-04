@@ -19,8 +19,6 @@ from ..property_transformation import transform_property_names
 from .base import DateSlicesMixin, IncrementalMixpanelStream, MixpanelStream
 
 
-INSERT_ID_PATTERN = r'^insert_id.+'
-
 class ExportSchema(MixpanelStream):
     """
     Export helper stream for dynamic schema extraction.
@@ -200,8 +198,11 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
 
                 # Sometimes, the API returns a document that has a `insert_id�` property instead of `insert_id`. 
                 # When this happens, we have to remove the extra byte(s).
-                if re.match(INSERT_ID_PATTERN, result.transformed_name):
+                if "insert_id" == result.transformed_name[:9]:
                     item["insert_id"] = str(properties[result.source_name])
+                # Cancelled Session events have an "Id" property instead of an "id" property. We force the property to be "id".
+                elif "id" == result.transformed_name.casefold():
+                    item["id"] = str(properties[result.source_name])
                 else:
                     item[result.transformed_name] = str(properties[result.source_name])
 
