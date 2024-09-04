@@ -20,7 +20,7 @@ from .api import (
     fetch_delayed_engagements,
     fetch_delayed_tickets,
     fetch_email_events_page,
-    fetch_page_with_assocations,
+    fetch_page_with_associations,
     fetch_properties,
     fetch_recent_companies,
     fetch_recent_contacts,
@@ -114,7 +114,7 @@ def crm_object_with_associations(
                 fetch_delayed,
                 http,
             ),
-            fetch_page=functools.partial(fetch_page_with_assocations, cls, http, object_name),
+            fetch_page=functools.partial(fetch_page_with_associations, cls, http, object_name),
         )
 
     started_at = datetime.now(tz=UTC)
