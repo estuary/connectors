@@ -32,8 +32,8 @@ const volumeName = "flow_staging"
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {

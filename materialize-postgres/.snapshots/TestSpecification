@@ -169,7 +169,8 @@
       "schema": {
         "type": "string",
         "title": "Alternative Schema",
-        "description": "Alternative schema for this table (optional)"
+        "description": "Alternative schema for this table (optional)",
+        "x-schema-name": true
       },
       "additional_table_create_sql": {
         "type": "string",
@@ -181,7 +182,8 @@
         "type": "boolean",
         "title": "Delta Update",
         "description": "Should updates to this table be done via delta updates. Default is false.",
-        "default": false
+        "default": false,
+        "x-delta-updates": true
       }
     },
     "type": "object",

@@ -179,13 +179,15 @@
       "dataset": {
         "type": "string",
         "title": "Alternative Dataset",
-        "description": "Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration."
+        "description": "Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration.",
+        "x-schema-name": true
       },
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Update",
         "description": "Should updates to this table be done via delta updates. Defaults is false.",
-        "default": false
+        "default": false,
+        "x-delta-updates": true
       }
     },
     "type": "object",
