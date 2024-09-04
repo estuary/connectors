@@ -38,27 +38,28 @@ var identifierSanitizerRegexp = regexp.MustCompile(`[^\-_0-9a-zA-Z]`)
 // converted to underscores. S3 object names are actually very flexible in the
 // characters they allow but generally characters outside of these common ones
 // can cause issues with clients trying to read the named objects.
-func sanitizeTable(namespace, table string) string {
-	prefix := fmt.Sprintf(
-		"%s_%s",
-		identifierSanitizerRegexp.ReplaceAllString(namespace, "_"),
-		identifierSanitizerRegexp.ReplaceAllString(table, "_"),
-	)
+func sanitizeTable(table string) string {
+	sanitized := identifierSanitizerRegexp.ReplaceAllString(table, "_")
+	if len(sanitized) > 64 {
+		// Limit the length of the "human readable" part of the table name to
+		// something reasonable.
+		sanitized = sanitized[:64]
+	}
 
-	hash := xxhash.Sum64String(fmt.Sprintf("%s_%s", namespace, table))
-	return fmt.Sprintf("%s_%016X", prefix, hash)
+	hash := xxhash.Sum64String(table)
+	return fmt.Sprintf("%s_%016X", sanitized, hash)
 }
 
 func tablePath(bucket, prefix, namespace, table string) string {
-	return fmt.Sprintf("s3://%s/", path.Join(bucket, prefix, sanitizeTable(namespace, table)))
+	return fmt.Sprintf("s3://%s/", path.Join(bucket, prefix, namespace, sanitizeTable(table)))
 }
 
 // filePath returns path information for a new file, including both the object
 // key and full s3Path in s3:// format.
 func filePath(bucket, prefix, namespace, table string) (fileKey string, s3Path string) {
-	fName := uuid.New().String() + ".parquet"
+	fName := path.Join("data", uuid.New().String()+".parquet")
 
-	fileKey = path.Join(prefix, sanitizeTable(namespace, table), fName)
+	fileKey = path.Join(prefix, namespace, sanitizeTable(table), fName)
 	s3Path = tablePath(bucket, prefix, namespace, table) + fName
 
 	return
