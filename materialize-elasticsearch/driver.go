@@ -277,7 +277,7 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 
 type resource struct {
 	Index        string `json:"index" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false"`
+	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false" jsonschema_extras:"x-delta-updates=true"`
 	Shards       *int   `json:"number_of_shards,omitempty"`
 }
 

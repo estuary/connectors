@@ -237,12 +237,14 @@
       "schema": {
         "type": "string",
         "title": "Alternative Schema",
-        "description": "Alternative schema for this table (optional)"
+        "description": "Alternative schema for this table (optional)",
+        "x-schema-name": true
       },
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Updates",
-        "description": "Use Private Key authentication to enable Snowpipe for Delta Update bindings"
+        "description": "Use Private Key authentication to enable Snowpipe for Delta Update bindings",
+        "x-delta-updates": true
       }
     },
     "type": "object",

@@ -124,7 +124,8 @@
       "delta_updates": {
         "type": "boolean",
         "description": "Should updates to this table be done via delta updates. Default is false.",
-        "default": false
+        "default": false,
+        "x-delta-updates": true
       },
       "number_of_shards": {
         "type": "integer",

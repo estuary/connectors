@@ -76,7 +76,7 @@ func (c *config) ToURI() string {
 
 type resource struct {
 	Collection   string `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false"`
+	DeltaUpdates bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false" jsonschema_extras:"x-delta-updates=true"`
 }
 
 func (r resource) Validate() error {

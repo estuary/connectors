@@ -135,7 +135,8 @@
       "schema": {
         "type": "string",
         "title": "Schema",
-        "description": "Schema where the table resides"
+        "description": "Schema where the table resides",
+        "x-schema-name": true
       }
     },
     "type": "object",

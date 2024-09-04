@@ -76,7 +76,7 @@ func (c *config) Validate() error {
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
