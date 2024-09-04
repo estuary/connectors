@@ -64,7 +64,7 @@ async def fetch_properties(
     return properties_cache[object_name]
 
 
-async def fetch_page_with_assocations(
+async def fetch_page_with_associations(
     # Closed over via functools.partial:
     cls: type[CRMObject],
     http: HTTPSession,
@@ -411,7 +411,7 @@ async def fetch_changes_with_associations(
         batch = list(batch_it)
 
         # Enable lookup of datetimes for IDs from the result batch.
-        dts = {r[1]: r[0] for r in batch}
+        dts = {id: dt for dt, id in batch}
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
             log, cls, http, object_name, [id for _, id in batch]
