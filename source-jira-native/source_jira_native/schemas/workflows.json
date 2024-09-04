@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["name"],
+  "required": ["entity_id"],
   "properties": {
-    "name": {
+    "entity_id": {
       "type": "string"
     }
   },

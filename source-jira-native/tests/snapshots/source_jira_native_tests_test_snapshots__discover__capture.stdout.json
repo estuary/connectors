@@ -1936,19 +1936,19 @@
           ],
           "type": "object"
         },
-        "name": {
+        "entity_id": {
           "type": "string"
         }
       },
       "readOnly": true,
       "required": [
-        "name"
+        "entity_id"
       ],
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/name"
+      "/entity_id"
     ],
     "recommendedName": "workflows",
     "resourceConfig": {
