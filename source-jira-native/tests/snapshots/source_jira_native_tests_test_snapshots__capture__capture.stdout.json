@@ -1385,16 +1385,16 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
-      "created": "2024-07-31T14:34:30.639000-03:00",
+      "created": "2024-07-31T14:34:30.639-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-07-31T14:34:30.639000-03:00",
-        "updated": "2024-07-31T14:34:30.704000-03:00"
+        "created": "2024-07-31T14:34:30.639-0300",
+        "updated": "2024-07-31T14:34:30.704-0300"
       },
       "id": "10000",
       "key": "TES-1",
       "self": "https://sourcejira.atlassian.net/rest/agile/1.0/issue/10000",
-      "updated": "2024-07-31T14:34:30.704000-03:00"
+      "updated": "2024-07-31T14:34:30.704-0300"
     }
   ],
   [
@@ -1406,16 +1406,16 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
-      "created": "2024-07-31T14:34:33.473000-03:00",
+      "created": "2024-07-31T14:34:33.473-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-07-31T14:34:33.473000-03:00",
-        "updated": "2024-07-31T14:34:33.524000-03:00"
+        "created": "2024-07-31T14:34:33.473-0300",
+        "updated": "2024-07-31T14:34:33.524-0300"
       },
       "id": "10001",
       "key": "TES-2",
       "self": "https://sourcejira.atlassian.net/rest/agile/1.0/issue/10001",
-      "updated": "2024-07-31T14:34:33.524000-03:00"
+      "updated": "2024-07-31T14:34:33.524-0300"
     }
   ],
   [
@@ -1427,16 +1427,16 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
-      "created": "2024-07-31T14:34:36.287000-03:00",
+      "created": "2024-07-31T14:34:36.287-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-07-31T14:34:36.287000-03:00",
-        "updated": "2024-07-31T14:34:36.335000-03:00"
+        "created": "2024-07-31T14:34:36.287-0300",
+        "updated": "2024-07-31T14:34:36.335-0300"
       },
       "id": "10002",
       "key": "TES-3",
       "self": "https://sourcejira.atlassian.net/rest/agile/1.0/issue/10002",
-      "updated": "2024-07-31T14:34:36.335000-03:00"
+      "updated": "2024-07-31T14:34:36.335-0300"
     }
   ],
   [
@@ -1448,16 +1448,16 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
-      "created": "2024-07-31T14:34:39.236000-03:00",
+      "created": "2024-07-31T14:34:39.236-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,renderedFields",
       "fields": {
-        "created": "2024-07-31T14:34:39.236000-03:00",
-        "updated": "2024-07-31T14:34:39.295000-03:00"
+        "created": "2024-07-31T14:34:39.236-0300",
+        "updated": "2024-07-31T14:34:39.295-0300"
       },
       "id": "10003",
       "key": "TES-4",
       "self": "https://sourcejira.atlassian.net/rest/agile/1.0/issue/10003",
-      "updated": "2024-07-31T14:34:39.295000-03:00"
+      "updated": "2024-07-31T14:34:39.295-0300"
     }
   ],
   [
@@ -1583,7 +1583,7 @@
         "startAt": 0,
         "total": 0
       },
-      "created": "2024-07-31T14:34:30.639000-03:00",
+      "created": "2024-07-31T14:34:30.639-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
@@ -1599,7 +1599,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-07-31T14:34:30.639000-03:00",
+        "created": "2024-07-31T14:34:30.639-0300",
         "creator": {
           "accountId": "712020:3a54029e-8d15-49aa-a939-35bb05752d83",
           "accountType": "atlassian",
@@ -1643,7 +1643,7 @@
           "subtask": false
         },
         "labels": [],
-        "lastViewed": "2024-07-31T15:19:24.517000-03:00",
+        "lastViewed": "2024-07-31T15:19:24.517-0300",
         "priority": {
           "iconUrl": "https://sourcejira.atlassian.net/images/icons/priorities/medium.svg",
           "id": "3",
@@ -1697,11 +1697,11 @@
             "self": "https://sourcejira.atlassian.net/rest/api/3/statuscategory/2"
           }
         },
-        "statuscategorychangedate": "2024-07-31T14:34:31.027000-03:00",
+        "statuscategorychangedate": "2024-07-31T14:34:31.027-0300",
         "subtasks": [],
         "summary": "Test!",
         "timetracking": {},
-        "updated": "2024-07-31T14:34:30.704000-03:00",
+        "updated": "2024-07-31T14:34:30.704-0300",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -1824,7 +1824,7 @@
           }
         }
       ],
-      "updated": "2024-07-31T14:34:30.704000-03:00"
+      "updated": "2024-07-31T14:34:30.704-0300"
     }
   ],
   [
@@ -1841,7 +1841,7 @@
         "startAt": 0,
         "total": 0
       },
-      "created": "2024-07-31T14:34:33.473000-03:00",
+      "created": "2024-07-31T14:34:33.473-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
@@ -1857,7 +1857,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-07-31T14:34:33.473000-03:00",
+        "created": "2024-07-31T14:34:33.473-0300",
         "creator": {
           "accountId": "712020:3a54029e-8d15-49aa-a939-35bb05752d83",
           "accountType": "atlassian",
@@ -1901,7 +1901,7 @@
           "subtask": false
         },
         "labels": [],
-        "lastViewed": "2024-07-31T15:18:06.736000-03:00",
+        "lastViewed": "2024-07-31T15:18:06.736-0300",
         "priority": {
           "iconUrl": "https://sourcejira.atlassian.net/images/icons/priorities/medium.svg",
           "id": "3",
@@ -1955,11 +1955,11 @@
             "self": "https://sourcejira.atlassian.net/rest/api/3/statuscategory/2"
           }
         },
-        "statuscategorychangedate": "2024-07-31T14:34:33.769000-03:00",
+        "statuscategorychangedate": "2024-07-31T14:34:33.769-0300",
         "subtasks": [],
         "summary": "Test2",
         "timetracking": {},
-        "updated": "2024-07-31T14:34:33.524000-03:00",
+        "updated": "2024-07-31T14:34:33.524-0300",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -2082,7 +2082,7 @@
           }
         }
       ],
-      "updated": "2024-07-31T14:34:33.524000-03:00"
+      "updated": "2024-07-31T14:34:33.524-0300"
     }
   ],
   [
@@ -2099,7 +2099,7 @@
         "startAt": 0,
         "total": 0
       },
-      "created": "2024-07-31T14:34:36.287000-03:00",
+      "created": "2024-07-31T14:34:36.287-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
@@ -2115,7 +2115,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-07-31T14:34:36.287000-03:00",
+        "created": "2024-07-31T14:34:36.287-0300",
         "creator": {
           "accountId": "712020:3a54029e-8d15-49aa-a939-35bb05752d83",
           "accountType": "atlassian",
@@ -2212,11 +2212,11 @@
             "self": "https://sourcejira.atlassian.net/rest/api/3/statuscategory/2"
           }
         },
-        "statuscategorychangedate": "2024-07-31T14:34:36.564000-03:00",
+        "statuscategorychangedate": "2024-07-31T14:34:36.564-0300",
         "subtasks": [],
         "summary": "Test3",
         "timetracking": {},
-        "updated": "2024-07-31T14:34:36.335000-03:00",
+        "updated": "2024-07-31T14:34:36.335-0300",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -2338,7 +2338,7 @@
           }
         }
       ],
-      "updated": "2024-07-31T14:34:36.335000-03:00"
+      "updated": "2024-07-31T14:34:36.335-0300"
     }
   ],
   [
@@ -2355,7 +2355,7 @@
         "startAt": 0,
         "total": 0
       },
-      "created": "2024-07-31T14:34:39.236000-03:00",
+      "created": "2024-07-31T14:34:39.236-0300",
       "expand": "operations,versionedRepresentations,editmeta,changelog,customfield_10010.requestTypePractice,transitions,renderedFields",
       "fields": {
         "aggregateprogress": {
@@ -2371,7 +2371,7 @@
           "total": 0
         },
         "components": [],
-        "created": "2024-07-31T14:34:39.236000-03:00",
+        "created": "2024-07-31T14:34:39.236-0300",
         "creator": {
           "accountId": "712020:3a54029e-8d15-49aa-a939-35bb05752d83",
           "accountType": "atlassian",
@@ -2468,11 +2468,11 @@
             "self": "https://sourcejira.atlassian.net/rest/api/3/statuscategory/2"
           }
         },
-        "statuscategorychangedate": "2024-07-31T14:34:39.557000-03:00",
+        "statuscategorychangedate": "2024-07-31T14:34:39.557-0300",
         "subtasks": [],
         "summary": "Test4",
         "timetracking": {},
-        "updated": "2024-07-31T14:34:39.295000-03:00",
+        "updated": "2024-07-31T14:34:39.295-0300",
         "versions": [],
         "votes": {
           "hasVoted": false,
@@ -2594,7 +2594,7 @@
           }
         }
       ],
-      "updated": "2024-07-31T14:34:39.295000-03:00"
+      "updated": "2024-07-31T14:34:39.295-0300"
     }
   ],
   [
@@ -11655,7 +11655,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "boardId": 1,
-      "createdDate": "2024-07-31T17:29:09.331000+00:00",
+      "createdDate": "2024-07-31T17:29:09.331Z",
       "id": 1,
       "name": "quadro Sprint 1",
       "originBoardId": 1,
@@ -12545,17 +12545,17 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created": "1969-12-31T21:00:00-03:00",
-      "description": "Builds Workflow",
-      "entity_id": "Builds Workflow",
+      "created": "2024-07-31T13:52:51.103-0300",
+      "description": "The classic JIRA default workflow",
+      "entity_id": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
       "id": {
-        "entityId": "Builds Workflow",
-        "name": "Builds Workflow"
+        "entityId": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
+        "name": "classic default workflow"
       },
-      "updated": "1969-12-31T21:00:00-03:00"
+      "updated": "2024-07-31T13:52:51.103-0300"
     }
   ],
   [
@@ -12563,17 +12563,17 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created": "2024-07-31T13:52:51.103000-03:00",
-      "description": "The classic JIRA default workflow",
-      "entity_id": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
+      "created": "1969-12-31T21:00:00.000-0300",
+      "description": "Builds Workflow",
+      "entity_id": "Builds Workflow",
       "id": {
-        "entityId": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
-        "name": "classic default workflow"
+        "entityId": "Builds Workflow",
+        "name": "Builds Workflow"
       },
-      "updated": "2024-07-31T13:52:51.103000-03:00"
+      "updated": "1969-12-31T21:00:00.000-0300"
     }
   ],
   [
@@ -12584,14 +12584,14 @@
         "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created": "1969-12-31T21:00:00-03:00",
+      "created": "1969-12-31T21:00:00.000-0300",
       "description": "The default Jira workflow.",
       "entity_id": "jira",
       "id": {
         "entityId": "jira",
         "name": "jira"
       },
-      "updated": "1969-12-31T21:00:00-03:00"
+      "updated": "1969-12-31T21:00:00.000-0300"
     }
   ],
   [

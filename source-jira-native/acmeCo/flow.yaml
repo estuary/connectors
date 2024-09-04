@@ -1,31 +1,157 @@
 ---
 collections:
   acmeCo/application_roles:
-    schema: application_roles.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          description: The key identifier of the application role.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an application role.
+      x-infer-schema: true
     key:
       - /key
   acmeCo/avatars:
-    schema: avatars.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the avatar.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: List of system avatars.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/board_issues:
-    schema: board_issues.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique identifier of the issue
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/boards:
-    schema: boards.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: Unique identifier of the board.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/dashboards:
-    schema: dashboards.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the dashboard.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of a dashboard.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/filter_sharing:
-    schema: filter_sharing.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+          description: The unique identifier of the share permission.
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of a share permission for the filter.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/filters:
-    schema: filters.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the filter.
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of a filter.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/groups:
@@ -33,23 +159,113 @@ collections:
     key:
       - /groupId
   acmeCo/issue_comments:
-    schema: issue_comments.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the comment.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_custom_field_contexts:
-    schema: issue_custom_field_contexts.schema.yaml
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      description: The details of a custom field context.
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the context.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_custom_field_options:
-    schema: issue_custom_field_options.schema.yaml
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      description: Details of the custom field options for a context.
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the custom field option.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_field_configurations:
-    schema: issue_field_configurations.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the field configuration.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of a field configuration.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_fields:
-    schema: issue_fields.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the field.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about a field.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_link_types:
@@ -59,26 +275,67 @@ collections:
   acmeCo/issue_navigator_settings:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: Details of an issue navigator column item.
-      properties:
-        label:
-          description: The issue navigator column label.
-          type: string
-        value:
-          description: The issue navigator column value.
-          type: string
+      type: object
       required:
         - value
-      type: object
+      properties:
+        value:
+          description: The actual value/data associated with the label in the issue navigator column.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an issue navigator column item.
+      x-infer-schema: true
     key:
       - /value
   acmeCo/issue_notification_schemes:
-    schema: issue_notification_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the notification scheme.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about a notification scheme.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_priorities:
-    schema: issue_priorities.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the issue priority.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: An issue priority.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_properties:
@@ -86,204 +343,701 @@ collections:
     key:
       - /key
   acmeCo/issue_remote_links:
-    schema: issue_remote_links.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the link.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an issue remote link.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_resolutions:
-    schema: issue_resolutions.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the issue resolution.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an issue resolution.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_security_schemes:
-    schema: issue_security_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the issue security scheme.
+          type: integer
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: List of security schemes.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_transitions:
-    schema: issue_transitions.schema.yaml
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      title: Issue Transitions
+      type: object
+      required:
+        - id
+        - issueId
+      properties:
+        id:
+          description: Unique identifier for the issue transition
+          type:
+            - string
+        issueId:
+          description: Identifier of the issue associated with the transition
+          type:
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /issueId
       - /id
   acmeCo/issue_type_schemes:
-    schema: issue_type_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique identifier for the issue type scheme.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an issue type scheme.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_type_screen_schemes:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: Details of an issue type screen scheme.
+      type: object
+      required:
+        - id
       properties:
-        description:
-          description: The description of the issue type screen scheme.
-          type: string
         id:
           description: The ID of the issue type screen scheme.
           type: string
-        name:
-          description: The name of the issue type screen scheme.
-          type: string
-      required:
-        - id
-      type: object
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an issue type screen scheme.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_types:
-    schema: issue_types.schema.yaml
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      description: Details about an issue type.
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the issue type.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issue_votes:
-    schema: issue_votes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - self
+      properties:
+        self:
+          description: The URL of these issue vote details.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: The details of votes on an issue.
+      x-infer-schema: true
     key:
       - /self
   acmeCo/issue_watchers:
-    schema: issue_watchers.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - self
+      properties:
+        self:
+          description: The URL of these issue watcher details.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: The details of watchers on an issue.
+      x-infer-schema: true
     key:
       - /self
   acmeCo/issue_worklogs:
-    schema: issue_worklogs.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the worklog record.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of a worklog.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/issues:
-    schema: issues.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique ID of the issue.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/jira_settings:
-    schema: jira_settings.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique ID of the application property. The ID is the same as the key.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details of an application property.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/labels:
     schema:
-      properties:
-        label:
-          type: string
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
       required:
         - label
-      type:
-        - object
+      properties:
+        label:
+          description: The label associated with the issue in Jira.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /label
   acmeCo/permission_schemes:
-    schema: permission_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the permission scheme.
+          type: integer
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: List of all permission schemes.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/permissions:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: Details about permissions.
-      properties:
-        description:
-          type:
-            - "null"
-            - string
-        key:
-          type: string
-        name:
-          type:
-            - "null"
-            - string
-        type:
-          type:
-            - "null"
-            - string
+      type: object
       required:
         - key
-      type: object
+      properties:
+        key:
+          description: Unique key identifier for the permission
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about permissions.
+      x-infer-schema: true
     key:
       - /key
   acmeCo/project_avatars:
-    schema: project_avatars.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the avatar.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: List of project avatars.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/project_categories:
-    schema: project_categories.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the project category.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: A project category.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/project_components:
-    schema: project_components.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique identifier for the component.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about a project component.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/project_email:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: "A project's sender email address."
-      properties:
-        emailAddress:
-          description: The email address.
-          type: string
-        projectId:
-          type: string
+      type: object
       required:
         - projectId
-      type: object
+      properties:
+        projectId:
+          description: The unique identifier for the project.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: "A project's sender email address."
+      x-infer-schema: true
     key:
       - /projectId
   acmeCo/project_permission_schemes:
-    schema: project_permission_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the issue level security item.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about a security scheme.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/project_roles:
-    schema: project_roles.schema.yaml
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      description: Project Roles
+      properties:
+        id:
+          description: The ID of the project role.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/project_types:
-    schema: project_types.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          description: The key of the project type.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about a project type.
+      x-infer-schema: true
     key:
       - /key
   acmeCo/project_versions:
-    schema: project_versions.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique ID of the version.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      readOnly: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/projects:
-    schema: projects.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the project.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about a project.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/screen_schemes:
-    schema: screen_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the screen scheme.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: A screen scheme.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/screen_tab_fields:
-    schema: screen_tab_fields.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the screen tab field.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: A screen tab field.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/screen_tabs:
     schema:
       $schema: "http://json-schema.org/draft-07/schema#"
-      additionalProperties: true
-      description: A screen tab.
+      required:
+        - id
+      type: object
       properties:
         id:
           description: The ID of the screen tab.
-          readOnly: true
           type: integer
-        name:
-          description: The name of the screen tab. The maximum length is 255 characters.
-          type: string
-        screenId:
-          description: Id of the related screen.
-          type:
-            - "null"
-            - integer
-      required:
-        - name
-        - id
-      type: object
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: A screen tab.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/screens:
-    schema: screens.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the screen.
+          type: integer
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/sprint_issues:
-    schema: sprint_issues.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: ID of the issue
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/sprints:
-    schema: sprints.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The unique identifier for the sprint.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/time_tracking:
-    schema: time_tracking.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      required:
+        - key
+      type: object
+      properties:
+        key:
+          description: The key associated with the time tracking provider.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: Details about the time tracking provider.
+      x-infer-schema: true
     key:
       - /key
   acmeCo/users:
@@ -295,18 +1049,92 @@ collections:
     key:
       - /accountId
   acmeCo/workflow_schemes:
-    schema: workflow_schemes.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the workflow scheme.
+          type: integer
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      readOnly: true
+      additionalProperties: true
+      x-infer-schema: true
     key:
       - /id
   acmeCo/workflow_status_categories:
-    schema: workflow_status_categories.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the status category.
+          type: integer
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: A status category.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/workflow_statuses:
-    schema: workflow_statuses.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: The ID of the status.
+          type: string
+          readOnly: true
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      additionalProperties: true
+      description: A status.
+      x-infer-schema: true
     key:
       - /id
   acmeCo/workflows:
-    schema: workflows.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      readOnly: true
+      additionalProperties: true
+      x-infer-schema: true
     key:
-      - /id/name
+      - /entity_id
