@@ -47,7 +47,7 @@ func (c *config) Validate() error {
 
 type resource struct {
 	Table        string `json:"table" jsonschema:"title=Table Name,description=The name of the table to be materialized to." jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false"`
+	DeltaUpdates bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false" jsonschema_extras:"x-delta-updates=true"`
 }
 
 func (r *resource) Validate() error {
