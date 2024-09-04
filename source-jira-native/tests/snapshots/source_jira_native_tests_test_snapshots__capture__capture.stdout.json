@@ -12545,17 +12545,17 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 0,
+        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created": "1969-12-31T21:00:00.000-0300",
-      "description": "Builds Workflow",
+      "created": "2024-07-31T13:52:51.103-0300",
+      "description": "The classic JIRA default workflow",
+      "entity_id": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
       "id": {
-        "entityId": "Builds Workflow",
-        "name": "Builds Workflow"
+        "entityId": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
+        "name": "classic default workflow"
       },
-      "name": "Builds Workflow",
-      "updated": "1969-12-31T21:00:00.000-0300"
+      "updated": "2024-07-31T13:52:51.103-0300"
     }
   ],
   [
@@ -12563,17 +12563,17 @@
     {
       "_meta": {
         "op": "u",
-        "row_id": 1,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created": "2024-07-31T13:52:51.103-0300",
-      "description": "The classic JIRA default workflow",
+      "created": "1969-12-31T21:00:00.000-0300",
+      "description": "Builds Workflow",
+      "entity_id": "Builds Workflow",
       "id": {
-        "entityId": "39545028-ce4a-4af1-bdd4-0ab8f9f976a1",
-        "name": "classic default workflow"
+        "entityId": "Builds Workflow",
+        "name": "Builds Workflow"
       },
-      "name": "classic default workflow",
-      "updated": "2024-07-31T13:52:51.103-0300"
+      "updated": "1969-12-31T21:00:00.000-0300"
     }
   ],
   [
@@ -12586,11 +12586,11 @@
       },
       "created": "1969-12-31T21:00:00.000-0300",
       "description": "The default Jira workflow.",
+      "entity_id": "jira",
       "id": {
         "entityId": "jira",
         "name": "jira"
       },
-      "name": "jira",
       "updated": "1969-12-31T21:00:00.000-0300"
     }
   ],
