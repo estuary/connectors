@@ -405,6 +405,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		if b.target.DeltaUpdates || !b.needsMerge {
+			// TODO: switch to slices.Chunk once we switch to go1.23
 			for i := 0; i < len(toCopy); i += queryBatchSize {
 				end := i + queryBatchSize
 				if end > len(toCopy) {
