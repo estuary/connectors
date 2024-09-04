@@ -12,9 +12,6 @@ from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from .base import IncrementalMixpanelStream, MixpanelStream
 
 
-
-
-
 class Engage(IncrementalMixpanelStream):
     """Return list of all users
     API Docs: https://developer.mixpanel.com/reference/engage

@@ -18,9 +18,6 @@ class CohortMembers(Engage):
 
     @property
     def state_checkpoint_interval(self) -> int:
-        # to meet the requirement of emitting state at least once per 15 minutes,
-        # we assume there's at least 1 record per request returned. Given that each request is followed by a 60 seconds sleep
-        # we'll have to emit state every 15 records
         return 10000
 
     def request_body_json(
