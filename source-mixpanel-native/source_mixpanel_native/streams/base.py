@@ -95,13 +95,22 @@ class MixpanelStream(HttpStream, ABC):
         **kwargs,
     ) -> Iterable[Mapping]:
         # parse the whole response
+        start_time = time.time()
         yield from self.process_response(response, stream_state=stream_state, **kwargs)
+        end_time = time.time()
+        response_processing_duration = int(end_time - start_time)
 
-        if self.reqs_per_hour_limit > 0:
-            # we skip this block, if self.reqs_per_hour_limit = 0,
-            # in all other cases wait for X seconds to match API limitations
-            self.logger.info(f"Sleep for {3600 / self.reqs_per_hour_limit} seconds to match API limitations after reading from {self.name}")
-            time.sleep(3600 / self.reqs_per_hour_limit)
+        # Don't execute the sleep logic if there's no API request limit.
+        if self.reqs_per_hour_limit <= 0:
+            return
+
+        # Sleep for N seconds to spread out requests & avoid hitting the API limit.
+        remaining_wait_time = (3600 / self.reqs_per_hour_limit) - response_processing_duration
+        if remaining_wait_time > 0:
+            self.logger.info(f"Sleep for {remaining_wait_time} seconds to match API limitations after reading from {self.name}")
+            time.sleep(remaining_wait_time)
+        else:
+            self.logger.info(f"Processing response from {self.name} took {response_processing_duration} seconds.")
 
     @property
     def max_retries(self) -> Union[int, None]:
