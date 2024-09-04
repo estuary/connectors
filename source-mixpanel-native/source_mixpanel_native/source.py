@@ -152,17 +152,4 @@ class SourceMixpanel(AbstractSource):
             reqs_per_hour_limit = int(os.environ.get("REQS_PER_HOUR_LIMIT", stream.DEFAULT_REQS_PER_HOUR_LIMIT))
             stream.reqs_per_hour_limit = reqs_per_hour_limit
             streams.append(stream)
-            # try:
-            #     stream.get_json_schema()
-            #     next(read_full_refresh(stream), None)
-            # except requests.HTTPError as e:
-            #     if e.response.status_code != 402:
-            #         raise e
-            #     logger.warning("Stream '%s' - is disabled, reason: 402 Payment Required", stream.name)
-            # else:
-            #     reqs_per_hour_limit = int(os.environ.get("REQS_PER_HOUR_LIMIT", stream.DEFAULT_REQS_PER_HOUR_LIMIT))
-            #     # We preserve sleeping between requests in case this is not a running acceptance test.
-            #     # Otherwise, we do not want to wait as each API call is followed by sleeping ~60 seconds.
-            #     stream.reqs_per_hour_limit = reqs_per_hour_limit
-            #     streams.append(stream)
         return streams
