@@ -300,7 +300,6 @@ class TestAllStreams:
             (TicketComments, "incremental/ticket_events.json"),
             (TicketFields, "ticket_fields"),
             (TicketForms, "ticket_forms"),
-            (TicketMetrics, "ticket_metrics"),
             (TicketMetricEvents, "incremental/ticket_metric_events"),
             (Tickets, "incremental/tickets/cursor"),
             (Users, "incremental/users/cursor"),
@@ -322,7 +321,6 @@ class TestAllStreams:
             "TicketComments",
             "TicketFields",
             "TicketForms",
-            "TicketMetrics",
             "TicketMetricEvents",
             "Tickets",
             "Users",
@@ -346,7 +344,6 @@ class TestSourceZendeskSupportStream:
             (Groups),
             (SatisfactionRatings),
             (TicketFields),
-            (TicketMetrics),
         ],
         ids=[
             "Macros",
@@ -354,7 +351,6 @@ class TestSourceZendeskSupportStream:
             "Groups",
             "SatisfactionRatings",
             "TicketFields",
-            "TicketMetrics",
         ],
     )
     def test_parse_response(self, requests_mock, stream_cls):
@@ -403,7 +399,6 @@ class TestSourceZendeskSupportStream:
             (Groups, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (SatisfactionRatings, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (TicketFields, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
-            (TicketMetrics, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
         ],
         ids=[
             "Macros",
@@ -411,7 +406,6 @@ class TestSourceZendeskSupportStream:
             "Groups",
             "SatisfactionRatings",
             "TicketFields",
-            "TicketMetrics",
         ],
     )
     def test_get_updated_state(self, stream_cls, current_state, last_record, expected):
@@ -567,17 +561,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (TicketForms, {}, None),
             (TicketMetricEvents, {}, None),
             (TicketAudits, {}, None),
-            (
-                TicketMetrics,
-                {
-                    "meta": {"has_more": True, "after_cursor": "<after_cursor>", "before_cursor": "<before_cursor>"},
-                    "links": {
-                        "prev": "https://subdomain.zendesk.com/api/v2/ticket_metrics.json?page%5Bbefore%5D=<before_cursor>%3D&page%5Bsize%5D=2",
-                        "next": "https://subdomain.zendesk.com/api/v2/ticket_metrics.json?page%5Bafter%5D=<after_cursor>%3D&page%5Bsize%5D=2",
-                    },
-                },
-                {"page[after]": "<after_cursor>"},
-            ),
             (SatisfactionRatings, {}, None),
             (
                 OrganizationMemberships,
@@ -596,7 +579,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             "TicketForms",
             "TicketMetricEvents",
             "TicketAudits",
-            "TicketMetrics",
             "SatisfactionRatings",
             "OrganizationMemberships",
         ],
@@ -636,10 +618,9 @@ class TestSourceZendeskSupportCursorPaginationStream:
         [
             (GroupMemberships, {"page[size]": 100, "start_time": 1622505600, "sort_by": "asc"}),
             (TicketForms, {}),
-            (TicketMetricEvents, {"page[size]": 100, "start_time": 1622505600}),
+            (TicketMetricEvents, {"page[size]": 1000, "start_time": 1622505600}),
             (TicketAudits, {"limit": 200}),
             (SatisfactionRatings, {"page[size]": 100, "start_time": 1622505600}),
-            (TicketMetrics, {"page[size]": 100, "start_time": 1622505600}),
             (OrganizationMemberships, {"page[size]": 100, "start_time": 1622505600})
         ],
         ids=[
@@ -648,7 +629,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             "TicketMetricEvents",
             "TicketAudits",
             "SatisfactionRatings",
-            "TicketMetrics",
             "OrganizationMemberships",
         ],
     )
@@ -664,10 +644,12 @@ class TestSourceZendeskIncrementalExportStream:
         [
             (Users),
             (Tickets),
+            (TicketMetrics),
         ],
         ids=[
             "Users",
             "Tickets",
+            "TicketMetrics",
         ],
     )
     def test_check_start_time_param(self, stream_cls):
@@ -681,10 +663,12 @@ class TestSourceZendeskIncrementalExportStream:
         [
             (Users, "incremental/users/cursor"),
             (Tickets, "incremental/tickets/cursor"),
+            (TicketMetrics, "incremental/tickets/cursor"),
         ],
         ids=[
             "Users",
             "Tickets",
+            "TicketMetrics",
         ],
     )
     def test_path(self, stream_cls, expected):
@@ -697,10 +681,12 @@ class TestSourceZendeskIncrementalExportStream:
         [
             (Users),
             (Tickets),
+            (TicketMetrics),
         ],
         ids=[
             "Users",
             "Tickets",
+            "TicketMetrics"
         ],
     )
     def test_next_page_token(self, requests_mock, stream_cls):
@@ -716,10 +702,12 @@ class TestSourceZendeskIncrementalExportStream:
         [
             (Users, {"start_time": 1622505600}),
             (Tickets, {"start_time": 1622505600}),
+            (TicketMetrics, {"start_time": 1622505600, "include": "metric_sets"}),
         ],
         ids=[
             "Users",
             "Tickets",
+            "TicketMetrics"
         ],
     )
     def test_request_params(self, stream_cls, expected):
@@ -742,6 +730,26 @@ class TestSourceZendeskIncrementalExportStream:
         stream = stream_cls(**STREAM_ARGS)
         stream_name = snake_case(stream.__class__.__name__)
         expected = [{"updated_at": "2022-03-17T16:03:07Z"}]
+        requests_mock.get(STREAM_URL, json={stream_name: expected})
+        test_response = requests.get(STREAM_URL)
+        output = list(stream.parse_response(test_response))
+        assert expected == output
+
+
+class TestTicketMetricsStream:
+    @pytest.mark.parametrize(
+        "stream_cls",
+        [
+            (TicketMetrics),
+        ],
+        ids=[
+            "TicketMetrics",
+        ],
+    )
+    def test_parse_response(self, requests_mock, stream_cls):
+        stream = stream_cls(**STREAM_ARGS)
+        stream_name = snake_case(stream.__class__.__name__)
+        expected = []
         requests_mock.get(STREAM_URL, json={stream_name: expected})
         test_response = requests.get(STREAM_URL)
         output = list(stream.parse_response(test_response))
