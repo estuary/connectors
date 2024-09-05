@@ -217,16 +217,20 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the query across all tables.
-	query := t.client.newQuery(strings.Join(subqueries, "\nUNION ALL\n") + ";")
+	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
+	ll := log.WithField("query", queryStr)
 
 	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
+		ll.WithError(err).Error("client runQuery failed")
 		return fmt.Errorf("load query: %w", err)
 	}
 
 	bqit, err := job.Read(ctx)
 	if err != nil {
+		ll.WithError(err).Error("job read failed")
 		return fmt.Errorf("load job read: %w", err)
 	}
 
@@ -235,6 +239,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err = bqit.Next(&bd); err == iterator.Done {
 			break
 		} else if err != nil {
+			ll.WithError(err).Error("query results iterator failed")
 			return fmt.Errorf("load row read: %w", err)
 		}
 
