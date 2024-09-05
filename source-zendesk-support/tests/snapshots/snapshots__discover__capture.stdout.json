@@ -2886,7 +2886,7 @@
       "stream": "ticket_metrics",
       "syncMode": "incremental",
       "cursorField": [
-        "updated_at"
+        "after_cursor"
       ]
     },
     "documentSchema": {

@@ -805,8 +805,27 @@ class TicketForms(SourceZendeskSupportCursorPaginationStream):
         return {}
 
 
-class TicketMetrics(SourceZendeskSupportCursorPaginationStream):
-    """TicketMetric stream: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metrics/"""
+class TicketMetrics(Tickets):
+    """TicketMetrics stream: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metrics
+
+    Ticket metrics are obtained by sideloading the Tickets stream. https://developer.zendesk.com/documentation/ticketing/using-the-zendesk-api/side_loading/#supported-endpoints
+    """
+    sideload_param: str = "metric_sets"
+    response_target_entity: str = "metric_set"
+
+    def request_params(
+        self, stream_state: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
+        params = super().request_params(stream_state=stream_state, next_page_token=next_page_token, **kwargs)
+        params.update({"include": self.sideload_param})
+        return params
+
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        for record in super().parse_response(response=response, **kwargs):
+            metric_set = record.get(self.response_target_entity, None)
+            # Deleted tickets have no metrics, so we have to check that the metric set exists before yielding it.
+            if metric_set is not None:
+                yield metric_set
 
 
 class TicketMetricEvents(SourceZendeskSupportCursorPaginationStream):
