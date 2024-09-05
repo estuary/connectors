@@ -458,3 +458,18 @@ func TestAlterationAddColumn(t *testing.T) {
 		})
 	}
 }
+
+func TestDeletedTextColumn(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "41823101"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, v_text TEXT NOT NULL, v_varchar VARCHAR(32), v_int INTEGER)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero", "zero", 100}, {1, "one", "one", 101}})
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]any{{2, "two", "two", 102}, {3, "three", "three", 103}})
+	tb.Delete(ctx, t, tableName, "id", 1)
+	tb.Delete(ctx, t, tableName, "id", 2)
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
