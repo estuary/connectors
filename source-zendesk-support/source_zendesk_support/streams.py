@@ -815,6 +815,7 @@ class TicketMetricEvents(SourceZendeskSupportCursorPaginationStream):
     """
 
     cursor_field = "time"
+    page_size = 1000
 
     def path(self, **kwargs):
         return "incremental/ticket_metric_events"
@@ -833,6 +834,15 @@ class TicketMetricEvents(SourceZendeskSupportCursorPaginationStream):
             # need start time param for subsequent requests to this endpoint.
             params.update(next_page_token)
         return params
+
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        last_date = None
+        for record in super().parse_response(response=response, **kwargs):
+            yield record
+            last_date = record.get(self.cursor_field)
+
+        if last_date:
+            logger.info(f"Read TicketMetricEvents documents up to {last_date}.")
 
 
 class Macros(SourceZendeskSupportStream):
