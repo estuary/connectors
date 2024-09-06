@@ -378,6 +378,8 @@ func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 			return nil, fmt.Errorf("error parsing uuid: %w", err)
 		}
 		return id.String(), nil
+	case net.HardwareAddr: // column types 'macaddr' and 'macaddr8'
+		return key.String(), nil
 	case time.Time:
 		return key.Format(sortableRFC3339Nano), nil
 	case pgtype.Numeric:
