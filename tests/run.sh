@@ -77,19 +77,6 @@ DATA_PLANE_PID=$!
 # Arrange to stop the data plane on exit.
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
 
-# Get the spec from the connector and ensure it's valid json.
-cat >"$TESTDIR/spec.yaml" <<EOF
-captures:
-  tests/${CONNECTOR}/from-source:
-    endpoint:
-      connector:
-        image: "${CONNECTOR_IMAGE}"
-        config: {}
-    bindings: []
-EOF
-
-flowctl raw spec --source "$TESTDIR/spec.yaml" | jq -cM || bail "failed to validate spec"
-
 # Execute test-specific setup steps.
 echo -e "\nexecuting setup"
 source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
@@ -100,6 +87,20 @@ fi
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
   bail "setup did not set CONNECTOR_CONFIG"
 fi
+
+# Get the spec from the connector and ensure it's valid json.
+cat >"$TESTDIR/spec.yaml" <<EOF
+captures:
+  tests/${CONNECTOR}/from-source:
+    endpoint:
+      connector:
+        image: "${CONNECTOR_IMAGE}"
+        config: ${CONNECTOR_CONFIG}
+    bindings: []
+EOF
+
+flowctl raw spec --source "$TESTDIR/spec.yaml" | jq -cM || bail "failed to validate spec"
+
 TEST_STATUS="Test Failed"
 function test_shutdown() {
   kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh
@@ -114,8 +115,7 @@ trap "test_shutdown" EXIT
 export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
-SPEC_WITH_CONFIG=$(cat $TESTDIR/spec.yaml | yq ".captures.\"tests/${CONNECTOR}/from-source\".endpoint.connector.config = $CONNECTOR_CONFIG")
-flowctl raw discover --network flow-test --source <(echo $SPEC_WITH_CONFIG) >${TESTDIR}/discover_output.json || bail "Discover failed."
+flowctl raw discover --network flow-test --source $TESTDIR/spec.yaml >${TESTDIR}/discover_output.json || bail "Discover failed."
 cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
