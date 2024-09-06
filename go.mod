@@ -65,7 +65,7 @@ require (
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
 	go.gazette.dev/core v0.89.1-0.20240418133910-d612fdcfd24a
-	go.mongodb.org/mongo-driver v1.12.1
+	go.mongodb.org/mongo-driver v1.16.1
 	golang.org/x/crypto v0.24.0
 	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.7.0

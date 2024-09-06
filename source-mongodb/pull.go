@@ -63,7 +63,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			index:    idx,
 			stateKey: sk,
 		}
-		resourceBindingInfo[resourceId(res)] = bindings[idx]
+		resourceBindingInfo[resourceId(res.Database, res.Collection)] = bindings[idx]
 	}
 
 	var ctx = stream.Context()
