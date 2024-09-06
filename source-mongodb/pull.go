@@ -79,16 +79,15 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}()
 
-	log.Info("connected to database")
-
-	// Log some basic information about the database we are connected to. Even
-	// though this is an "admin" command, it always works with valid
-	// credentials, regardless of the user's actual permissions.
-	info, err := getBuildInfo(ctx, client)
+	serverInfo, err := getServerInfo(ctx, client, bindings[0].resource.Database)
 	if err != nil {
-		return fmt.Errorf("could not query buildInfo: %w", err)
+		return fmt.Errorf("checking server info: %w", err)
 	}
-	log.WithFields(log.Fields{"version": info.Version}).Info("buildInfo")
+	log.WithFields(log.Fields{
+		"version":               serverInfo.version,
+		"supportsChangeStreams": serverInfo.supportsChangeStreams,
+		"supportsPreImages":     serverInfo.supportsPreImages,
+	}).Info("connected to database")
 
 	var prevState captureState
 	if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
@@ -125,11 +124,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return nil
 	}
 
-	requestPreImages, err := supportsPreImages(ctx, info, bindings[0].resource.Database, client)
-	if err != nil {
-		return fmt.Errorf("checking if server supports pre-images: %w", err)
-	}
-
 	didBackfill := false
 	for !prevState.isBackfillComplete(bindings) {
 		didBackfill = true
@@ -138,7 +132,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
 		// and streamCatchup catches up the streams to the present and closes the cursors out while
 		// the backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, bindings, requestPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+		if streams, err := c.initializeStreams(ctx, bindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
 		} else if err := c.streamCatchup(ctx, streams); err != nil {
 			return err
@@ -152,7 +146,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, bindings, requestPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+	if streams, err := c.initializeStreams(ctx, bindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 		return err
 	} else if err := c.streamForever(ctx, streams); err != nil {
 		return fmt.Errorf("streaming changes forever: %w", err)
@@ -323,20 +317,53 @@ func idToString(value interface{}) string {
 	return string(j)
 }
 
+type serverInfo struct {
+	version               string
+	supportsPreImages     bool
+	supportsChangeStreams bool
+}
+
 type buildInfo struct {
 	Version      string `bson:"version"`
 	VersionArray []int  `bson:"versionArray"`
 }
 
-func getBuildInfo(ctx context.Context, client *mongo.Client) (buildInfo, error) {
-	var info buildInfo
-	if res := client.Database("admin").RunCommand(ctx, bson.D{{"buildInfo", 1}}); res.Err() != nil {
-		return info, res.Err()
-	} else if err := res.Decode(&info); err != nil {
-		return info, err
-	} else {
-		return info, nil
+func getServerInfo(ctx context.Context, client *mongo.Client, database string) (*serverInfo, error) {
+	var buildInfo buildInfo
+	if res := client.Database("admin").RunCommand(ctx, bson.D{{Key: "buildInfo", Value: 1}}); res.Err() != nil {
+		return nil, fmt.Errorf("running 'buildInfo' command: %w", res.Err())
+	} else if err := res.Decode(&buildInfo); err != nil {
+		return nil, fmt.Errorf("decoding buildInfo: %w", err)
 	}
+
+	changeStreams, err := supportsChangeStreams(ctx, client, database)
+	if err != nil {
+		return nil, fmt.Errorf("checking change stream support: %w", err)
+	}
+
+	var preImages bool
+	if changeStreams {
+		if preImages, err = supportsPreImages(ctx, client, database, buildInfo); err != nil {
+			return nil, fmt.Errorf("checking change stream pre-image support: %w", err)
+		}
+	}
+
+	return &serverInfo{
+		version:               buildInfo.Version,
+		supportsPreImages:     preImages,
+		supportsChangeStreams: changeStreams,
+	}, nil
+}
+
+func supportsChangeStreams(ctx context.Context, client *mongo.Client, database string) (bool, error) {
+	if cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{}); err != nil {
+		log.WithError(err).Info("connected server does not support change streams")
+		return false, nil
+	} else if err := cs.Close(ctx); err != nil {
+		return false, fmt.Errorf("closing change stream: %w", err)
+	}
+
+	return true, nil
 }
 
 // supportsPreImages returns true if the server supports pre-images. To support
@@ -352,7 +379,7 @@ func getBuildInfo(ctx context.Context, client *mongo.Client) (buildInfo, error) 
 // short of using the MongoDB Atlas admin API (which requires a separate API
 // key) is to just try opening a change stream with the option enabled and
 // seeing if it works or not.
-func supportsPreImages(ctx context.Context, b buildInfo, database string, client *mongo.Client) (bool, error) {
+func supportsPreImages(ctx context.Context, client *mongo.Client, database string, b buildInfo) (bool, error) {
 	ll := log.WithField("version", b.Version)
 
 	if len(b.VersionArray) < 3 {
