@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -365,4 +368,34 @@ func translateArray(_ *sqlcapture.ColumnInfo, x pgtype.Array[any]) (any, error) 
 		"dimensions": dims,
 		"elements":   x.Elements,
 	}, nil
+}
+
+func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
+	switch key := key.(type) {
+	case [16]uint8:
+		var id, err = uuid.FromBytes(key[:])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing uuid: %w", err)
+		}
+		return id.String(), nil
+	case time.Time:
+		return key.Format(sortableRFC3339Nano), nil
+	case pgtype.Numeric:
+		return encodePgNumericKeyFDB(key)
+	default:
+		return key, nil
+	}
+}
+
+func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	switch t := t.(type) {
+	case tuple.Tuple:
+		if d := maybeDecodePgNumericTuple(t); d != nil {
+			return d, nil
+		}
+
+		return nil, errors.New("failed in decoding the fdb tuple")
+	default:
+		return t, nil
+	}
 }

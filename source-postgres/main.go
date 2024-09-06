@@ -16,12 +16,9 @@ import (
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -286,36 +283,6 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 
 func (db *postgresDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/loc/0", "/_meta/source/loc/1", "/_meta/source/loc/2"}
-}
-
-func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
-	switch key := key.(type) {
-	case [16]uint8:
-		var id, err = uuid.FromBytes(key[:])
-		if err != nil {
-			return nil, fmt.Errorf("error parsing uuid: %w", err)
-		}
-		return id.String(), nil
-	case time.Time:
-		return key.Format(sortableRFC3339Nano), nil
-	case pgtype.Numeric:
-		return encodePgNumericKeyFDB(key)
-	default:
-		return key, nil
-	}
-}
-
-func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
-	switch t := t.(type) {
-	case tuple.Tuple:
-		if d := maybeDecodePgNumericTuple(t); d != nil {
-			return d, nil
-		}
-
-		return nil, errors.New("failed in decoding the fdb tuple")
-	default:
-		return t, nil
-	}
 }
 
 func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
