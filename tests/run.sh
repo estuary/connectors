@@ -114,7 +114,8 @@ trap "test_shutdown" EXIT
 export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
-flowctl-go api discover --image="${CONNECTOR_IMAGE}" --network "flow-test" --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) >${TESTDIR}/discover_output.json || bail "Discover failed."
+SPEC_WITH_CONFIG=$(cat $TESTDIR/spec.yaml | yq ".captures.\"tests/${CONNECTOR}/from-source\".endpoint.connector.config = $CONNECTOR_CONFIG")
+flowctl raw discover --network flow-test --source <(echo $SPEC_WITH_CONFIG) >${TESTDIR}/discover_output.json || bail "Discover failed."
 cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
