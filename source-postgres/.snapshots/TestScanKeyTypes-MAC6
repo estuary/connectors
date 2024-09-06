@@ -1,0 +1,62 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_mac6_28040015": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac6_28040015","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"47:7a:51:62:c3:aa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fscankeytypes_mac6_28040015":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"AjQ3OjdhOjUxOjYyOmMzOmFhAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "AjQ3OjdhOjUxOjYyOmMzOmFhAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_mac6_28040015": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac6_28040015","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"65:d0:73:5a:5a:c9"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fscankeytypes_mac6_28040015":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"AjY1OmQwOjczOjVhOjVhOmM5AA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "AjY1OmQwOjczOjVhOjVhOmM5AA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_mac6_28040015": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac6_28040015","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"6f:cf:f3:49:e0:b1"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fscankeytypes_mac6_28040015":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"AjZmOmNmOmYzOjQ5OmUwOmIxAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "AjZmOmNmOmYzOjQ5OmUwOmIxAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_mac6_28040015": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac6_28040015","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"88:61:08:5b:ae:54"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fscankeytypes_mac6_28040015":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"Ajg4OjYxOjA4OjViOmFlOjU0AA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "Ajg4OjYxOjA4OjViOmFlOjU0AA=="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fscankeytypes_mac6_28040015":{"backfilled":4,"key_columns":["key"],"mode":"Active"}},"cursor":"0/1111111"}
+
+
+

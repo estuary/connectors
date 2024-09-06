@@ -177,21 +177,23 @@ func TestScanKeyTypes(t *testing.T) {
 		ColumnType string
 		Values     []interface{}
 	}{
-		{"Bool", "BOOLEAN", []interface{}{"true", "false"}},
-		{"Integer", "INTEGER", []interface{}{0, -3, 2, 1723}},
-		{"SmallInt", "SMALLINT", []interface{}{0, -3, 2, 1723}},
-		{"BigInt", "BIGINT", []interface{}{0, -3, 2, 1723}},
-		{"Serial", "SERIAL", []interface{}{0, -3, 2, 1723}},
-		{"SmallSerial", "SMALLSERIAL", []interface{}{0, -3, 2, 1723}},
-		{"BigSerial", "BIGSERIAL", []interface{}{0, -3, 2, 1723}},
-		{"Real", "REAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"Double", "DOUBLE PRECISION", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"Decimal", "DECIMAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"Numeric", "NUMERIC(4,3)", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"VarChar", "VARCHAR(10)", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
-		{"Char", "CHAR(3)", []interface{}{"   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
-		{"Text", "TEXT", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
-		{"UUID", "UUID", []interface{}{"66b968a7-aeca-4401-8239-5d57958d1572", "4ab4044a-9aab-415c-96c6-17fa338060fa", "c32fb585-fc7f-4347-8fe2-97448f4e93cd"}},
+		{"Bool", "BOOLEAN", []any{"true", "false"}},
+		{"Integer", "INTEGER", []any{0, -3, 2, 1723}},
+		{"SmallInt", "SMALLINT", []any{0, -3, 2, 1723}},
+		{"BigInt", "BIGINT", []any{0, -3, 2, 1723}},
+		{"Serial", "SERIAL", []any{0, -3, 2, 1723}},
+		{"SmallSerial", "SMALLSERIAL", []any{0, -3, 2, 1723}},
+		{"BigSerial", "BIGSERIAL", []any{0, -3, 2, 1723}},
+		{"Real", "REAL", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Double", "DOUBLE PRECISION", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Decimal", "DECIMAL", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Numeric", "NUMERIC(4,3)", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"VarChar", "VARCHAR(10)", []any{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"Char", "CHAR(3)", []any{"   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"Text", "TEXT", []any{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"UUID", "UUID", []any{"66b968a7-aeca-4401-8239-5d57958d1572", "4ab4044a-9aab-415c-96c6-17fa338060fa", "c32fb585-fc7f-4347-8fe2-97448f4e93cd"}},
+		{"MAC6", "macaddr", []any{"47:7a:51:62:c3:aa", "6f:cf:f3:49:e0:b1", "65:d0:73:5a:5a:c9", "88:61:08:5b:ae:54"}},
+		{"MAC8", "macaddr8", []any{"5f:99:67:ac:0d:df:88:3a ", "70:26:74:4c:ac:2c:38:59", "e3:70:99:89:b9:d8:e8:21 ", "a5:35:55:da:06:38:39:43"}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("2804%04d", idx)
