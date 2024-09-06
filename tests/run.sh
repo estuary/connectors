@@ -116,7 +116,7 @@ export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
 flowctl raw discover --network flow-test --source $TESTDIR/spec.yaml -o json --emit-raw >${TESTDIR}/discover_output.json || bail "Discover failed."
-cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
+cat ${TESTDIR}/discover_output.json | jq "select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
   cat ${TESTDIR}/bindings.json
