@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -82,6 +83,13 @@ func (c *config) Validate() error {
 
 	if err := c.DBTJobTrigger.Validate(); err != nil {
 		return err
+	}
+
+	// Connection poolers cause all sorts of problems with the materialization's
+	// use of temporary tables and prepared statements, so the most common
+	// addresses that use connection poolers are not allowed.
+	if strings.HasSuffix(c.Address, ".pooler.supabase.com:6543") || strings.HasSuffix(c.Address, ".pooler.supabase.com") {
+		return cerrors.NewUserError(nil, fmt.Sprintf("address must be a direct connection: address %q is using the Supabase connection pooler, consult go.estuary.dev/supabase-direct-address for details", c.Address))
 	}
 
 	return nil
