@@ -402,7 +402,6 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
 			rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 		case *replication.TableMapEvent:
-			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("data", data).Trace("Table Map Event")
 		case *replication.GTIDEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
