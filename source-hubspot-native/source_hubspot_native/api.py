@@ -216,7 +216,7 @@ async def fetch_batch_with_associations(
 
 
 FetchRecentFn = Callable[
-    [Logger, HTTPSession, datetime],
+    [Logger, HTTPSession, datetime, datetime | None],
     AsyncGenerator[tuple[datetime, str, Any], None],
 ]
 '''
@@ -227,6 +227,10 @@ cache with the timestamp of the document.
 
 Documents may be returned in any order, but iteration will be stopped upon
 seeing an entry that's as-old or older than the datetime cursor.
+
+The first datetime parameter represents the "since" value, which is the oldest
+documents that are required. The second datetime parameter is an "until" value,
+which if not None is a hint that more recent documents are not needed.
 '''
 
 FetchDelayedFn = Callable[
@@ -248,8 +252,33 @@ and should usually not even be retrieved if possible.
 # In-memory cache of how far along the "delayed" change stream is.
 last_delayed_fetch_end: dict[str, datetime] = {}
 
+# How far back the delayed stream will search up until. This needs to be far
+# back enough that the HubSpot APIs return consistent data.
 delayed_offset = timedelta(hours=1)
+
+# The minimum amount of time must be available for the delay stream to be
+# called. It can't be called every time `process_changes` is invoked since
+# FetchDelayedFn is usually using a slower API than FetchRecentFn, and calling
+# FetchDelayedFn every time would negate the benefit of having a faster
+# FetchRecentFn.
 delayed_fetch_minimum_window = timedelta(minutes=5)
+
+# Limit the maximum time window we will ask FetchRecentFn to get changes for.
+# This is to prevent the time window from becoming excessively large if there
+# are relatively brief outages in the connector (on the order of a day or two),
+# which otherwise would require a checkpoint containing all of the documents
+# from the last log_cursor up until the present time. This allows for a form of
+# incremental progress to be made, which is helpful if there are ~millions of
+# documents to catch up on. The HubSpot APIs are pretty flaky and will
+# occasionally return non-retryable errors for no reason and a successful
+# checkpoint requires that to never happen, so really large checkpoints can
+# become effectively impossible to complete.
+#
+# Generally moving the cursor forward in these fixed windows is a bad idea when
+# trying to cover time windows on the scales of ~years (as in for a backfill),
+# but incremental bindings shouldn't fall more than ~days behind in the worst of
+# cases so requesting an hour at a time won't take too long.
+max_fetch_recent_window = timedelta(hours=1)
 
 
 async def process_changes(
@@ -294,31 +323,32 @@ async def process_changes(
     '''
     assert isinstance(log_cursor, datetime)
 
-    fetch_recent_start_time = datetime.now(UTC)
+    now_time = datetime.now(UTC)
+    fetch_recent_end_time: datetime | None = None
+    if now_time - log_cursor > max_fetch_recent_window:
+        # Limit the maximum requested window for FetchRecentFn if it's been a
+        # while since the LogCursor was updated.
+        fetch_recent_end_time = log_cursor + max_fetch_recent_window
+
     max_ts: datetime = log_cursor
-    had_recent_docs = False
-    async for ts, key, obj in fetch_recent(log, http, log_cursor):
-        if ts > log_cursor:
+    async for ts, key, obj in fetch_recent(log, http, log_cursor, fetch_recent_end_time):
+        if fetch_recent_end_time and ts > fetch_recent_end_time:
+            continue
+        elif ts > log_cursor:
             max_ts = max(max_ts, ts)
             cache.add_recent(object_name, key, ts)
-            had_recent_docs = True
             yield obj
         else:
             break
-    
-    if not had_recent_docs:
-        # No recent docs, but the delayed stream may still be advanced if enough
-        # time has passed since it last was. A synthetic timestamp will be used
-        # as the updated cursor in this case, and this increases the likelihood
-        # that recent documents will be "missed" from the recent APIs. This
-        # cursor will only ever be emitted if there periods of time where there
-        # are no recent documents but there are some delayed documents, and we
-        # are guaranteed to eventually get any documents that are missed by the
-        # recent stream via this whole convoluted strategy anyway.
-        if fetch_recent_start_time <= max_ts:
-            # Unlikely clock drift edge case; bail out.
-            return
-        max_ts = fetch_recent_start_time
+
+    if fetch_recent_end_time:
+        # Assume all recent documents up until fetch_recent_end_time were
+        # returned by FetchRecentFn. It's fine if this is not strictly true
+        # since FetchDelayedFn will eventually fill in any missed documents.
+        # This also ensures that the cursor is always kept moving forward even
+        # if there are no new recent documents for a long time, which is
+        # important since it moves the delayed stream forward in that case.
+        max_ts = fetch_recent_end_time
 
     delayed_fetch_next_start = last_delayed_fetch_end.setdefault(
         object_name, log_cursor - delayed_offset - delayed_fetch_minimum_window
@@ -352,7 +382,7 @@ async def process_changes(
             {"object_name": object_name, "emitted": delayed_emitted, "cache_hits": cache_hits, "evicted": evicted, "new_size": cache.count_for(object_name)}
         )
 
-    if had_recent_docs or delayed_emitted:
+    if max_ts != log_cursor:
         yield max_ts
 
 
@@ -376,7 +406,7 @@ async def fetch_changes_with_associations(
     log: Logger,
     http: HTTPSession,
     since: datetime,
-    until: datetime | None = None
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
     
     # Walk pages of recent IDs until we see one which is as-old
@@ -468,14 +498,14 @@ async def fetch_search_objects(
 
 
 def fetch_recent_custom_objects(
-    object_name: str, log: Logger, http: HTTPSession, since: datetime
+    object_name: str, log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
 
     async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(object_name, log, http, since, None, page)
+        return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_changes_with_associations(
-        object_name, CustomObject, do_fetch, log, http, since,
+        object_name, CustomObject, do_fetch, log, http, since, until
     )
 
 
@@ -487,11 +517,11 @@ def fetch_delayed_custom_objects(
         return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_changes_with_associations(
-        object_name, CustomObject, do_fetch, log, http, since,
+        object_name, CustomObject, do_fetch, log, http, since, until
     )
 
 def fetch_recent_companies(
-    log: Logger, http: HTTPSession, since: datetime
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Company], None]:
 
     async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
@@ -512,7 +542,7 @@ def fetch_recent_companies(
 
 
     return fetch_changes_with_associations(
-        Names.companies, Company, do_fetch, log, http, since,
+        Names.companies, Company, do_fetch, log, http, since, until
     )
 
 
@@ -524,12 +554,12 @@ def fetch_delayed_companies(
         return await fetch_search_objects(Names.companies, log, http, since, until, page)
 
     return fetch_changes_with_associations(
-        Names.companies, Company, do_fetch, log, http, since
+        Names.companies, Company, do_fetch, log, http, since, until
     )
 
 
 def fetch_recent_contacts(
-    log: Logger, http: HTTPSession, since: datetime
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
 
     async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
@@ -549,7 +579,7 @@ def fetch_recent_contacts(
 
 
     return fetch_changes_with_associations(
-        Names.contacts, Contact, do_fetch, log, http, since,
+        Names.contacts, Contact, do_fetch, log, http, since, until
     )
 
 
@@ -561,12 +591,12 @@ def fetch_delayed_contacts(
         return await fetch_search_objects(Names.contacts, log, http, since, until, page, "lastmodifieddate")
 
     return fetch_changes_with_associations(
-        Names.contacts, Contact, do_fetch, log, http, since
+        Names.contacts, Contact, do_fetch, log, http, since, until
     )
 
 
 def fetch_recent_deals(
-    log: Logger, http: HTTPSession, since: datetime
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, Deal], None]:
 
     async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
@@ -588,7 +618,7 @@ def fetch_recent_deals(
 
 
     return fetch_changes_with_associations(
-        Names.deals, Deal, do_fetch, log, http, since,
+        Names.deals, Deal, do_fetch, log, http, since, until
     )
 
 
@@ -600,7 +630,7 @@ def fetch_delayed_deals(
         return await fetch_search_objects(Names.deals, log, http, since, until, page)
 
     return fetch_changes_with_associations(
-        Names.deals, Deal, do_fetch, log, http, since
+        Names.deals, Deal, do_fetch, log, http, since, until
     )
 
 
@@ -628,7 +658,7 @@ async def _fetch_engagements(
 
 
 def fetch_recent_engagements(
-    log: Logger, http: HTTPSession, since: datetime
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, Engagement], None]:
     return fetch_changes_with_associations(
         Names.engagements,
@@ -637,6 +667,7 @@ def fetch_recent_engagements(
         log,
         http,
         since,
+        until,
     )
 
 
@@ -659,7 +690,7 @@ def fetch_delayed_engagements(
 
 
 def fetch_recent_tickets(
-    log: Logger, http: HTTPSession, since: datetime
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, Ticket], None]:
 
     async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
@@ -676,7 +707,7 @@ def fetch_recent_tickets(
 
 
     return fetch_changes_with_associations(
-        Names.tickets, Ticket, do_fetch, log, http, since,
+        Names.tickets, Ticket, do_fetch, log, http, since, until
     )
 
 
@@ -688,7 +719,7 @@ def fetch_delayed_tickets(
         return await fetch_search_objects(Names.tickets, log, http, since, until, page)
 
     return fetch_changes_with_associations(
-        Names.tickets, Ticket, do_fetch, log, http, since
+        Names.tickets, Ticket, do_fetch, log, http, since, until
     )
 
 
@@ -762,10 +793,10 @@ async def _fetch_email_events(
 
 
 def fetch_recent_email_events(
-    log: Logger, http: HTTPSession, since: datetime
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, EmailEvent], None]:
 
-    return _fetch_email_events(log, http, since + timedelta(milliseconds=1), None)
+    return _fetch_email_events(log, http, since + timedelta(milliseconds=1), until)
 
 def fetch_delayed_email_events(
     log: Logger, http: HTTPSession, since: datetime, until: datetime
