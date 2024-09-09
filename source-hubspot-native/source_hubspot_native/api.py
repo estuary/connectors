@@ -468,46 +468,111 @@ async def fetch_search_objects(
     http: HTTPSession,
     since: datetime,
     until: datetime | None,
-    cursor: PageCursor,
+    _: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate"
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    '''
+    Retrieve all records between 'since' and 'until' (or the present time).
+
+    The HubSpot Search API has an undocumented maximum offset of 10,000 items,
+    so the logic here will completely enumerate all available records, kicking
+    off new searches if needed to work around that limit. The returned
+    PageCursor is always None.
+
+    Multiple records can have the same "last modified" property value, and
+    indeed large runs of these may have the same value. So a "new" search will
+    inevitably grab some records again, and deduplication is handled here.
+    Technically it is possible for this strategy to not work at all if there are
+    more than 10,000 records with the same modification time, but we'll cross
+    our fingers and hope that is impossible in practice.
+    '''
     
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
+    limit = 200
+    output_items: set[tuple[datetime, str]] = set()
+    cursor: int | None = None
+    max_updated: datetime = since
+    original_since = since
+    original_total: int | None = None
 
-    filter = {
-        "propertyName": last_modified_property_name,
-        "operator": "BETWEEN",
-        "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "highValue": until.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    } if until else {
-        "propertyName": last_modified_property_name,
-        "operator": "GTE",
-        "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-    }
+    while True:
+        filter = {
+            "propertyName": last_modified_property_name,
+            "operator": "BETWEEN",
+            "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "highValue": until.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        } if until else {
+            "propertyName": last_modified_property_name,
+            "operator": "GTE",
+            "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        }
 
-    input = {
-        "filters": [filter],
-        # Sort newest to oldest since paging stops when an item as old or older than `since` is
-        # encountered per the handling in `fetch_changes`.
-        "sorts": [
-            {
-                "propertyName": last_modified_property_name,
-                "direction": "DESCENDING"
-            }
-        ],
-        "limit": 100,
-    }
-    if cursor:
-        input["after"] = cursor
+        input = {
+            "filters": [filter],
+            "sorts": [
+                {
+                    "propertyName": last_modified_property_name,
+                    "direction": "ASCENDING"
+                }
+            ],
+            "limit": limit,
+        }
+        if cursor:
+            input["after"] = cursor
 
-    log.debug("fetching search objects", {"url": url, "input": input})
+        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
+            await http.request(log, url, method="POST", json=input)
+        )
 
-    result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
-        await http.request(log, url, method="POST", json=input)
-    )
+        if not original_total:
+            # Record the total from the original entire request range for
+            # logging.
+            original_total = result.total
 
-    newCursor = result.paging.next.after if result.paging else None
-    return ((r.properties.hs_lastmodifieddate, str(r.id)) for r in result.results), newCursor
+        for r in result.results:
+            this_mod_time = r.properties.hs_lastmodifieddate
+            if this_mod_time < max_updated:
+                # This should never happen since results are requested in
+                # ASCENDING order by the last modified time.
+                raise Exception(f"last modified date {this_mod_time} is before {max_updated} for {r.id}")
+            
+            max_updated = this_mod_time
+            output_items.add((this_mod_time, str(r.id)))
+
+        if not result.paging:
+            if since is not original_since:
+                log.info(
+                    "finished multi-request fetch",
+                    {
+                        "final_count": len(output_items),
+                        "total": original_total,
+                    }
+                )
+            break
+
+        cursor = int(result.paging.next.after)
+        if cursor + limit > 10_000:
+            # Further attempts to read this search result will not accepted by
+            # the search API, so a new search must be initiated to complete the
+            # request.
+            cursor = None
+            since = max_updated
+            log.info(
+                "initiating a new search to satisfy requested time range",
+                {
+                    "object_name": object_name,
+                    "since": since,
+                    "until": until,
+                    "original_since": original_since,
+                    "count": len(output_items),
+                    "total": original_total,
+                },
+            )
+
+
+    # Sort newest to oldest to match the convention of most of "fetch ID"
+    # functions.
+    return sorted(list(output_items), reverse=True), None
 
 
 def fetch_recent_custom_objects(
