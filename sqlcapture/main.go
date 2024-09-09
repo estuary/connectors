@@ -2,6 +2,7 @@ package sqlcapture
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -257,6 +258,38 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if len(open.StateJson) > 0 {
 		if err := pf.UnmarshalStrict(open.StateJson, &state); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)
+		}
+	}
+
+	// This is a very hacky feature. Occasionally, connector bugs allow a capture task
+	// to get into a bad state which would be easy to fix if we could issue some sort
+	// of `flowctl secret edit-checkpoint <task>` command to manually edit the state
+	// checkpoint, but which is very difficult to fix without such an ability.
+	//
+	// This bit of logic here allows us to simulate that sort of ability in extraordinary
+	// cases, by adding an entry to this table of replacements and then doing a connector
+	// release. The table is keyed by a hash of the task name and by the binlog cursor
+	// value at which the replacement should occur, so the replacements are very narrowly
+	// scoped.
+	var hackyCursorReplacements = map[string]map[string]string{
+		"TASKHASH415b69936fe1324600d67943e50235fc57fb7e0196b8f5f0TASKHASH": {"binlog.000123:456789": "binlog.000123:456789"}, // Example
+		"de08a75a8d0f4c2eeea9eb4b464b2777f91cb359930d90029f08245ad2db9a07": {"mysql-bin.044234:69425717": "mysql-bin.044234:63645378"},
+	}
+	var hasher = sha256.New()
+	hasher.Write([]byte(open.Capture.Name))
+	var nameHash = fmt.Sprintf("%x", hasher.Sum(nil))
+	log.WithFields(log.Fields{
+		"namehash": nameHash,
+		"cursor":   state.Cursor,
+	}).Debug("checking for cursor replacements")
+	if replacementsForTask, ok := hackyCursorReplacements[nameHash]; ok {
+		if replacementForCursor, ok := replacementsForTask[state.Cursor]; ok {
+			log.WithFields(log.Fields{
+				"namehash":  nameHash,
+				"oldCursor": state.Cursor,
+				"newCursor": replacementForCursor,
+			}).Warn("cursor replacement triggered")
+			state.Cursor = replacementForCursor
 		}
 	}
 
