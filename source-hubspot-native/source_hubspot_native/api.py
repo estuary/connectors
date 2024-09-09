@@ -413,11 +413,13 @@ async def fetch_changes_with_associations(
     # as `since`, or no pages remain.
     recent: list[tuple[datetime, str]] = []
     next_page: PageCursor = None
+    count = 0
 
     while True:
-        iter, next_page = await fetcher(next_page, len(recent))
+        iter, next_page = await fetcher(next_page, count)
 
         for ts, id in iter:
+            count += 1
             if until and ts > until:
                 continue
             elif ts > since:
@@ -561,10 +563,17 @@ def fetch_delayed_companies(
 def fetch_recent_contacts(
     log: Logger, http: HTTPSession, since: datetime, until: datetime | None
 ) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
-
     async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        # There is no documented limit on the number of contacts that can be
-        # returned by this API, other than that it goes back a maximum of 30 days.
+        if count >= 9_900:
+            # There is actually no documented limit on the number of contacts
+            # that can be returned by this API, other than that it goes back a
+            # maximum of 30 days. But since there is no way to filter the
+            # response by `until`, we impose the same limit on the number of
+            # recent IDs that will be fetched here as other ID fetchers to
+            # prevent cases of trying to cycle through huge numbers of results
+            # if the LogCursor hasn't been updated in a long time.
+            log.warn("limit of 9,900 recent contacts reached")
+            return [], None
 
         url = f"{HUB}/contacts/v1/lists/recently_updated/contacts/recent"
         params = {"count": 100, "timeOffset": page} if page else {"count": 1}
