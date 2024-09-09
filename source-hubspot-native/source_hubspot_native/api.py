@@ -15,6 +15,7 @@ from typing import (
 from estuary_cdk.capture.common import (
     LogCursor,
     PageCursor,
+    Triggers,
 )
 from estuary_cdk.http import HTTPSession
 from pydantic import TypeAdapter
@@ -281,6 +282,10 @@ delayed_fetch_minimum_window = timedelta(minutes=5)
 max_fetch_recent_window = timedelta(hours=1)
 
 
+class MustBackfillBinding(Exception):
+    pass
+
+
 async def process_changes(
     object_name: str,
     fetch_recent: FetchRecentFn,
@@ -331,15 +336,19 @@ async def process_changes(
         fetch_recent_end_time = log_cursor + max_fetch_recent_window
 
     max_ts: datetime = log_cursor
-    async for ts, key, obj in fetch_recent(log, http, log_cursor, fetch_recent_end_time):
-        if fetch_recent_end_time and ts > fetch_recent_end_time:
-            continue
-        elif ts > log_cursor:
-            max_ts = max(max_ts, ts)
-            cache.add_recent(object_name, key, ts)
-            yield obj
-        else:
-            break
+    try: 
+        async for ts, key, obj in fetch_recent(log, http, log_cursor, fetch_recent_end_time):
+            if fetch_recent_end_time and ts > fetch_recent_end_time:
+                continue
+            elif ts > log_cursor:
+                max_ts = max(max_ts, ts)
+                cache.add_recent(object_name, key, ts)
+                yield obj
+            else:
+                break
+    except MustBackfillBinding:
+        log.info("triggering automatic backfill for %s", object_name)
+        yield Triggers.BACKFILL
 
     if fetch_recent_end_time:
         # Assume all recent documents up until fetch_recent_end_time were
@@ -379,7 +388,7 @@ async def process_changes(
 
         log.info(
             "fetched delayed events for stream",
-            {"object_name": object_name, "emitted": delayed_emitted, "cache_hits": cache_hits, "evicted": evicted, "new_size": cache.count_for(object_name)}
+            {"object_name": object_name, "since": delayed_fetch_next_start, "until": delayed_fetch_next_end, "emitted": delayed_emitted, "cache_hits": cache_hits, "evicted": evicted, "new_size": cache.count_for(object_name)}
         )
 
     if max_ts != log_cursor:
@@ -647,12 +656,12 @@ async def _fetch_engagements(
     log: Logger, http:  HTTPSession, page: PageCursor, count: int
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     if count >= 9_900:
-        # TODO(whb): Consider implementing some kind of automatic re-backfill
-        # functionality to better support this. "Engagements" as we are
-        # capturing them has a 10k limit on how many items the API can return,
-        # and there is no other API that can be used to get them within a
-        # certain time window. The only option here is to re-backfill.
-        raise Exception("Recent engagements limit of 9,900 items reached. This binding must be re-backfilled for the capture to continue.")
+        # "Engagements" as we are capturing them has a 10k limit on how many
+        # items the API can return, and there is no other API that can be used
+        # to get them within a certain time window. The only option here is to
+        # re-backfill.
+        log.warn("limit of 9,900 recent engagements reached")
+        raise MustBackfillBinding
 
     url = f"{HUB}/engagements/v1/engagements/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
