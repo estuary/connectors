@@ -500,6 +500,8 @@ async def fetch_search_objects(
     if cursor:
         input["after"] = cursor
 
+    log.debug("fetching search objects", {"url": url, "input": input})
+
     result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
         await http.request(log, url, method="POST", json=input)
     )
