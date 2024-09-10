@@ -480,6 +480,11 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		eventCount++
 
+		// Keepalive events do nothing other than increment the event count.
+		if _, ok := event.(*KeepaliveEvent); ok {
+			return nil
+		}
+
 		// Flush events update the checkpoint LSN and may trigger a state update.
 		if event, ok := event.(*FlushEvent); ok {
 			c.State.Cursor = event.Cursor
