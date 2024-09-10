@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t14026504": 3 Documents
+# Collection "acmeCo/test/flow_test_logminer/t14026504": 3 Documents
 # ================================
 {"DATA":"eleven","ID":"11","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 {"DATA":"ten","ID":"10","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T14026504","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}

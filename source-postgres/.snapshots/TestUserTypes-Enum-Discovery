@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test_usertypes_enum_64812435",
+    "recommended_name": "test/usertypes_enum_64812435",
     "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_enum_64812435"
