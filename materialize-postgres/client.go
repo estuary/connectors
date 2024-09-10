@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgconn"
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -112,15 +112,32 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		}
 	}
 
-	statements := []string{}
 	if res.AdditionalSql != "" {
-		statements = append(statements, txnStatements(tc.TableCreateSql, res.AdditionalSql))
+		txn, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("db.BeginTx: %w", err)
+		}
+		defer txn.Rollback()
+
+		if _, err := txn.ExecContext(ctx, tc.TableCreateSql); err != nil {
+			return fmt.Errorf("executing CREATE TABLE statement: %w", err)
+		} else if _, err := txn.ExecContext(ctx, res.AdditionalSql); err != nil {
+			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
+		} else if err := txn.Commit(); err != nil {
+			return fmt.Errorf("committing transaction: %w", err)
+		}
+
+		log.WithFields(log.Fields{
+			"table": tc.Identifier,
+			"query": res.AdditionalSql,
+		}).Info("executed AdditionalSql")
 	} else {
-		statements = append(statements, tc.TableCreateSql)
+		if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
+			return err
+		}
 	}
 
-	_, err := c.db.ExecContext(ctx, strings.Join(statements, "\n"))
-	return err
+	return nil
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
@@ -167,8 +184,4 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 func (c *client) Close() {
 	c.db.Close()
-}
-
-func txnStatements(stmts ...string) string {
-	return strings.Join(slices.Insert([]string{"BEGIN;", "COMMIT;"}, 1, stmts...), "\n")
 }
