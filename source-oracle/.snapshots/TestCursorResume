@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# Collection "acmeCo/test/flow_test_logminer/t95911555": 1 Documents
 # ================================
 {"COUNT":"3","DATA":"gboj","EPOCH":"   ","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AiAgIAACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDMA"
 ####################################
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# Collection "acmeCo/test/flow_test_logminer/t95911555": 1 Documents
 # ================================
 {"COUNT":"-1","DATA":"kvxr","EPOCH":".","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "Ai4AAi0wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
+# Collection "acmeCo/test/flow_test_logminer/t95911555": 1 Documents
 # ================================
 {"COUNT":"0","DATA":"xakg","EPOCH":".","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================
@@ -41,178 +41,31 @@
 ### Capture from Key "Ai4AAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"1","DATA":"bvzf","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":4,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":3,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
+# ================================
+# Captures Terminated With Errors
+# ================================
+failed to poll messages: adding logfile "/rdsdbdata/db/ORCL_A/arch/redolog-309-1-1174867013.arc" (ARCHIVED, 1539205, YES, YES) to logminer: ORA-01284: file /rdsdbdata/db/ORCL_A/arch/redolog-309-1-1174867013.arc cannot be opened
+ORA-00308: cannot open archived log '/rdsdbdata/db/ORCL_A/arch/redolog-309-1-1174867013.arc'
+ORA-27037: unable to obtain file status
+Linux-x86_64 Error: 2: No such file or directory
+Additional information: 7
+ORA-06512: at "SYS.DBMS_LOGMNR", line 82
+ORA-06512: at line 1
 
-
-####################################
-### Capture from Key "AmFhYQACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"2","DATA":"ukwh","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":5,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
 
 
 ####################################
-### Capture from Key "AmFhYQACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIA"
+### Terminating Capture due to Errors
 ####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"3","DATA":"lntg","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":6,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmFhYQACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDMA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"-100","DATA":"bycz","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":7,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmJiYgACLTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxMDAA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"2","DATA":"ajgp","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":8,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"333","DATA":"zljj","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":9,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAzMzMA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"4096","DATA":"lhnw","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":10,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQwOTYA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"800000","DATA":"iask","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":11,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA4MDAwMDAA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"1234","DATA":"bikh","EPOCH":"ccc","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":12,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmNjYwACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEyMzQA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"-10000","DATA":"dhqc","EPOCH":"ddd","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":13,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AmRkZAACLTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMTAwMDAA"
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"1","DATA":"djsf","EPOCH":"x","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":14,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AngAAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"1","DATA":"iwnx","EPOCH":"y","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":15,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AnkAAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/flow_test_logminer_t95911555": 1 Documents
-# ================================
-{"COUNT":"1","DATA":"qmjp","EPOCH":"z","_meta":{"op":"c","source":{"schema":"FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA"}}}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":16,"key_columns":["EPOCH","COUNT"],"mode":"Backfill","scanned":"AAAAAAAAAAAAAAAA=="}},"cursor":"11111111"}
-
-
-####################################
-### Capture from Key "AnoAAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
-####################################
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT95911555":{"backfilled":16,"key_columns":["EPOCH","COUNT"],"mode":"Active"}},"cursor":"11111111"}
-
+failed to poll messages: adding logfile "/rdsdbdata/db/ORCL_A/arch/redolog-309-1-1174867013.arc" (ARCHIVED, 1539205, YES, YES) to logminer: ORA-01284: file /rdsdbdata/db/ORCL_A/arch/redolog-309-1-1174867013.arc cannot be opened
+ORA-00308: cannot open archived log '/rdsdbdata/db/ORCL_A/arch/redolog-309-1-1174867013.arc'
+ORA-27037: unable to obtain file status
+Linux-x86_64 Error: 2: No such file or directory
+Additional information: 7
+ORA-06512: at "SYS.DBMS_LOGMNR", line 82
+ORA-06512: at line 1
 
 
