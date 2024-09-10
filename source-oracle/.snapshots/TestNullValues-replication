@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t18110541": 1 Documents
+# Collection "acmeCo/test/flow_test_logminer/t18110541": 1 Documents
 # ================================
 {"DATEONLY":null,"DATETIME":null,"DOUBLE_PRECISION":null,"FLOAT_126":null,"INTEG":null,"INTERVAL_DAY":null,"INTERVAL_YEAR":null,"NUM":null,"NUM15":null,"NUM19":null,"NVCHAR2":null,"R":null,"REAL_NUM":null,"SINGLE_NCHAR":null,"SMALL_INT":null,"TS":null,"TS_LOCAL_TZ":null,"TS_LOCAL_TZ_NINE":null,"TS_NINE":null,"TS_TZ":null,"TS_TZ_NINE":null,"VCAHR2":null,"VCHAR":null,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
 # ================================

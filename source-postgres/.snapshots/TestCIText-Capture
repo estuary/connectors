@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_citext_58810479": 6 Documents
+# Collection "acmeCo/test/test/citext_58810479": 6 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"citext_58810479","loc":[11111111,11111111,11111111]}},"arr":{"dimensions":[2],"elements":["a","b"]},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"citext_58810479","loc":[11111111,11111111,11111111]}},"arr":{"dimensions":[2],"elements":["c","d"]},"data":"one","id":1}

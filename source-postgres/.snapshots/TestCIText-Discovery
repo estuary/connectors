@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test_citext_58810479",
+    "recommended_name": "test/citext_58810479",
     "resource_config_json": {
       "namespace": "test",
       "stream": "citext_58810479"

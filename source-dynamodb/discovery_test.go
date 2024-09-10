@@ -31,7 +31,7 @@ func TestDiscovery(t *testing.T) {
 		})
 
 		var sanitizers = make(map[string]*regexp.Regexp)
-		sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
+		sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 		cs := &st.CaptureSpec{
 			Driver:       driver{},
 			EndpointSpec: &cfg,
