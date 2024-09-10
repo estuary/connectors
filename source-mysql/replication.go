@@ -241,8 +241,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		case *replication.RowsEvent:
 			var schema, table = string(data.Table.Schema), string(data.Table.Table)
 			var streamID = sqlcapture.JoinStreamID(schema, table)
-			// Skip change events from tables which aren't being captured
+
+			// Skip change events from tables which aren't being captured. Send a KeepaliveEvent
+			// to indicate that we are actively receiving events, just not ones that need to be
+			// decoded and processed further.
 			if !rs.tableActive(streamID) {
+				if err := rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{}); err != nil {
+					return err
+				}
 				continue
 			}
 
