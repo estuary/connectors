@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_mac8_28040016": 1 Documents
+# Collection "acmeCo/test/test/scankeytypes_mac8_28040016": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac8_28040016","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"5f:99:67:ac:0d:df:88:3a"}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AjVmOjk5OjY3OmFjOjBkOmRmOjg4OjNhAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_mac8_28040016": 1 Documents
+# Collection "acmeCo/test/test/scankeytypes_mac8_28040016": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac8_28040016","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"70:26:74:4c:ac:2c:38:59"}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "AjcwOjI2Ojc0OjRjOmFjOjJjOjM4OjU5AA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_mac8_28040016": 1 Documents
+# Collection "acmeCo/test/test/scankeytypes_mac8_28040016": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac8_28040016","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"a5:35:55:da:06:38:39:43"}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "AmE1OjM1OjU1OmRhOjA2OjM4OjM5OjQzAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_mac8_28040016": 1 Documents
+# Collection "acmeCo/test/test/scankeytypes_mac8_28040016": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_mac8_28040016","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"e3:70:99:89:b9:d8:e8:21"}
 # ================================

@@ -97,7 +97,7 @@ func (tb *testBackend) UpperCaseMode() bool { return false }
 
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
-	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
+	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"cursor":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"cursor":"[0-9A-Za-z+/=]+"`)
 	sanitizers[`"lsn":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`)
 	sanitizers[`"seqval":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`)

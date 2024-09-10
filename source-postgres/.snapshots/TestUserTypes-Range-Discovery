@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test_usertypes_range_91324557",
+    "recommended_name": "test/usertypes_range_91324557",
     "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_range_91324557"

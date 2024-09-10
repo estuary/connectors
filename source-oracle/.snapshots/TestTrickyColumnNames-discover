@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_t39256824",
+    "recommended_name": "flow_test_logminer/t39256824",
     "resource_config_json": {
       "namespace": "FLOW_TEST_LOGMINER",
       "stream": "T39256824"
@@ -22,9 +22,12 @@ Binding 0:
               ]
             },
             "`Meta/'wtf'~ID`": {
-              "type": "string",
               "format": "integer",
-              "description": "(source type: non-nullable NUMBER)"
+              "description": "(source type: NUMBER)",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }
@@ -132,7 +135,7 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "flow_test_logminer_t42531495",
+    "recommended_name": "flow_test_logminer/t42531495",
     "resource_config_json": {
       "namespace": "FLOW_TEST_LOGMINER",
       "stream": "T42531495"
@@ -154,9 +157,12 @@ Binding 1:
               ]
             },
             "table": {
-              "type": "string",
               "format": "integer",
-              "description": "(source type: non-nullable NUMBER)"
+              "description": "(source type: NUMBER)",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }
