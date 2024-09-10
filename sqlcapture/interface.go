@@ -88,19 +88,25 @@ type MetadataEvent struct {
 	Metadata json.RawMessage
 }
 
-// A DatabaseEvent can be a ChangeEvent, FlushEvent, or MetadataEvent.
+// KeepaliveEvent informs the generic sqlcapture logic that the replication stream
+// is still active and processing WAL entries which don't require other events.
+type KeepaliveEvent struct{}
+
+// A DatabaseEvent can be a ChangeEvent, FlushEvent, MetadataEvent, or KeepaliveEvent.
 type DatabaseEvent interface {
 	isDatabaseEvent()
 	String() string
 }
 
-func (*ChangeEvent) isDatabaseEvent()   {}
-func (*FlushEvent) isDatabaseEvent()    {}
-func (*MetadataEvent) isDatabaseEvent() {}
+func (*ChangeEvent) isDatabaseEvent()    {}
+func (*FlushEvent) isDatabaseEvent()     {}
+func (*MetadataEvent) isDatabaseEvent()  {}
+func (*KeepaliveEvent) isDatabaseEvent() {}
 
 func (*ChangeEvent) String() string    { return "ChangeEvent" }
 func (evt *FlushEvent) String() string { return "FlushEvent" }
 func (*MetadataEvent) String() string  { return "MetadataEvent" }
+func (*KeepaliveEvent) String() string { return "KeepaliveEvent" }
 
 // KeyFields returns suitable fields for extracting the event primary key.
 func (e *ChangeEvent) KeyFields() map[string]interface{} {
