@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -63,5 +64,5 @@ func runIcebergctl(cfg *config, args ...string) ([]byte, error) {
 		return nil, err
 	}
 
-	return out, nil
+	return bytes.TrimSuffix(out, []byte("\n")), nil
 }

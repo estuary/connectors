@@ -7,6 +7,7 @@ import (
 	"io"
 	"path"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
@@ -56,20 +57,20 @@ func tablePath(bucket, prefix, namespace, table string) string {
 
 // filePath returns path information for a new file, including both the object
 // key and full s3Path in s3:// format.
-func filePath(bucket, prefix, namespace, table string) (fileKey string, s3Path string) {
-	fName := path.Join("data", uuid.New().String()+".parquet")
-
-	fileKey = path.Join(prefix, namespace, sanitizeTable(table), fName)
-	s3Path = tablePath(bucket, prefix, namespace, table) + fName
+func filePath(catalogTablePath string) (fileKey string, s3Path string) {
+	s3Path = strings.TrimSuffix(catalogTablePath, "/") + "/data/" + uuid.New().String() + ".parquet"
+	parts := strings.Split(strings.TrimPrefix(s3Path, "s3://"), "/")
+	fileKey = strings.Join(parts[1:], "/")
 
 	return
 }
 
 type binding struct {
-	path       []string
-	pqSchema   enc.ParquetSchema
-	includeDoc bool
-	stateKey   string
+	path             []string
+	pqSchema         enc.ParquetSchema
+	includeDoc       bool
+	stateKey         string
+	catalogTablePath string
 }
 
 type connectorState struct {
@@ -149,7 +150,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// got sufficiently large.
 		r, w := io.Pipe()
 
-		key, s3Path := filePath(t.bucket, t.prefix, b.path[0], b.path[1])
+		key, s3Path := filePath(b.catalogTablePath)
 		states[b.stateKey].FileKeys = append(states[b.stateKey].FileKeys, s3Path)
 
 		group.Go(func() error {

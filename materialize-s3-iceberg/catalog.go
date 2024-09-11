@@ -73,6 +73,15 @@ func (c *catalog) infoSchema() (*boilerplate.InfoSchema, error) {
 	return is, nil
 }
 
+func (c *catalog) tablePath(resourcePath []string) (string, error) {
+	b, err := runIcebergctl(c.cfg, "table-path", pathToFQN(resourcePath))
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
+}
+
 func (c *catalog) listNamespaces() ([]string, error) {
 	var got []string
 
