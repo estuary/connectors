@@ -1,9 +1,9 @@
 Binding 0:
 {
-    "recommended_name": "test/collection1",
+    "recommended_name": "db/collection",
     "resource_config_json": {
-      "database": "test",
-      "collection": "collection1",
+      "database": "db",
+      "collection": "collection",
       "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
@@ -87,11 +87,98 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "test/collection2",
+    "recommended_name": "db/timeseries",
     "resource_config_json": {
-      "database": "test",
-      "collection": "collection2",
-      "captureMode": "Change Stream Incremental"
+      "database": "db",
+      "collection": "timeseries",
+      "captureMode": "Batch Snapshot"
+    },
+    "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+Binding 2:
+{
+    "recommended_name": "db/view",
+    "resource_config_json": {
+      "database": "db",
+      "collection": "view",
+      "captureMode": "Batch Snapshot"
     },
     "document_schema_json": {
       "if": {
