@@ -532,3 +532,22 @@ func TestCaptureAfterSlotDropped(t *testing.T) {
 	cs.Bindings[0].StateKey += ".v2"
 	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
+
+// TestCaptureDomainJSONB exercises an edge case where a user-defined domain type
+// has a concrete type which uses a custom decoder registered in the PGX type map.
+func TestCaptureDomainJSONB(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "40925847"
+
+	tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
+	tb.Query(ctx, t, `CREATE DOMAIN UserDomain AS JSONB`)
+	t.Cleanup(func() { tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
+
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data UserDomain NOT NULL)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, `{}`}, {1, `{"foo": "bar"}`}})
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]any{{2, `{"baz": [1, 2, 3]}`}, {3, `{"asdf": {"a": 1, "b": 2}}`}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
