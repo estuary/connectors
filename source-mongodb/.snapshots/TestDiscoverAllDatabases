@@ -3,7 +3,8 @@ Binding 0:
     "recommended_name": "bar/collection1",
     "resource_config_json": {
       "database": "bar",
-      "collection": "collection1"
+      "collection": "collection1",
+      "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
       "if": {
@@ -89,7 +90,8 @@ Binding 1:
     "recommended_name": "bar/collection2",
     "resource_config_json": {
       "database": "bar",
-      "collection": "collection2"
+      "collection": "collection2",
+      "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
       "if": {
@@ -175,7 +177,8 @@ Binding 2:
     "recommended_name": "baz/collection1",
     "resource_config_json": {
       "database": "baz",
-      "collection": "collection1"
+      "collection": "collection1",
+      "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
       "if": {
@@ -261,7 +264,8 @@ Binding 3:
     "recommended_name": "baz/collection2",
     "resource_config_json": {
       "database": "baz",
-      "collection": "collection2"
+      "collection": "collection2",
+      "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
       "if": {
@@ -347,7 +351,8 @@ Binding 4:
     "recommended_name": "foo/collection1",
     "resource_config_json": {
       "database": "foo",
-      "collection": "collection1"
+      "collection": "collection1",
+      "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
       "if": {
@@ -433,7 +438,8 @@ Binding 5:
     "recommended_name": "foo/collection2",
     "resource_config_json": {
       "database": "foo",
-      "collection": "collection2"
+      "collection": "collection2",
+      "captureMode": "Change Stream Incremental"
     },
     "document_schema_json": {
       "if": {
