@@ -361,6 +361,16 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		})
 	}
 
+	catalog := newCatalog(cfg, resourcePaths, open.Materialization)
+	for idx := range bindings {
+		catalogTablePath, err := catalog.tablePath(bindings[idx].path)
+		if err != nil {
+			return nil, nil, fmt.Errorf("getting catalog table path: %w", err)
+		}
+
+		bindings[idx].catalogTablePath = catalogTablePath
+	}
+
 	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
 		Bucket:             cfg.Bucket,
 		AWSAccessKeyID:     cfg.AWSAccessKeyID,
@@ -378,7 +388,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 
 	return &transactor{
 		materialization: open.Materialization.Name.String(),
-		catalog:         newCatalog(cfg, resourcePaths, open.Materialization),
+		catalog:         catalog,
 		bindings:        bindings,
 		bucket:          cfg.Bucket,
 		prefix:          cfg.Prefix,

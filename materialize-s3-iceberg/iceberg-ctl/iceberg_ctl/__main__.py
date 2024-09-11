@@ -171,6 +171,19 @@ def info_schema(
 
 @run.command()
 @click.pass_context
+@click.argument("table", type=str)
+def table_path(
+    ctx: Context,
+    table: str,
+):
+    catalog = ctx.obj["catalog"]
+    assert isinstance(catalog, Catalog)
+
+    print(catalog.load_table(table).location())
+
+
+@run.command()
+@click.pass_context
 def list_namespaces(ctx: Context):
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
