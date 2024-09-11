@@ -16,6 +16,27 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+type mongoCollectionType string
+
+const (
+	mongoCollectionTypeCollection mongoCollectionType = "collection"
+	mongoCollectionTypeView       mongoCollectionType = "view"
+	mongoCollectionTimeTimeseries mongoCollectionType = "timeseries"
+)
+
+func (m mongoCollectionType) validate() error {
+	switch m {
+	case mongoCollectionTypeCollection, mongoCollectionTypeView, mongoCollectionTimeTimeseries:
+		return nil
+	default:
+		return fmt.Errorf("invalid collection type: %s", m)
+	}
+}
+
+func (m mongoCollectionType) canChangeStream() bool {
+	return m == mongoCollectionTypeCollection
+}
+
 // minimalSchema is the maximally-permissive schema which just specifies the
 // _id key. The schema of collections is minimalSchema as we
 // rely on Flow's schema inference to infer the collection schema
@@ -118,7 +139,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 	}()
 
-	var systemDatabases = []string{"config", "local"}
+	var systemDatabases = []string{"admin", "config", "local"}
 
 	var databaseNames []string
 	// If no databases are provided in config, we discover across all databases
@@ -143,6 +164,15 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 
 	var bindings = []*pc.Response_Discovered_Binding{}
 
+	if len(databaseNames) == 0 {
+		return &pc.Response_Discovered{Bindings: bindings}, nil
+	}
+
+	serverInfo, err := getServerInfo(ctx, client, databaseNames[0])
+	if err != nil {
+		return nil, fmt.Errorf("getting server info: %w", err)
+	}
+
 	for _, dbName := range databaseNames {
 		var db = client.Database(dbName)
 
@@ -152,15 +182,23 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 
 		for _, collection := range collections {
-			// Views cannot be used with change streams, so we don't support them for
-			// capturing at the moment
-			if collection.Type == "view" {
+			collectionType := mongoCollectionType(collection.Type)
+			if err := collectionType.validate(); err != nil {
+				return nil, fmt.Errorf("unsupported discovered collection type: %w", err)
+			}
+
+			if serverInfo.supportsChangeStreams && !collectionType.canChangeStream() && !cfg.BatchAndChangeStream {
+				continue
+			} else if strings.HasPrefix(collection.Name, "system.") {
 				continue
 			}
-			if strings.HasPrefix(collection.Name, "system.") {
-				continue
+
+			mode := captureModeChangeStream
+			if !collectionType.canChangeStream() {
+				mode = captureModeSnapshot
 			}
-			resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
+
+			resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name, Mode: mode})
 			if err != nil {
 				return nil, fmt.Errorf("serializing resource json: %w", err)
 			}
