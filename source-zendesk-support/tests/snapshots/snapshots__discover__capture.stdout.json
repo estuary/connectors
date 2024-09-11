@@ -3082,6 +3082,20 @@
             }
           }
         },
+        "reply_time_in_seconds": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "calendar": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            }
+          }
+        },
         "requester_updated_at": {
           "type": [
             "null",
