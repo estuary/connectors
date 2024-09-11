@@ -432,11 +432,49 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		}).Trace("ignoring Origin message")
 		return nil, nil
 	case *pglogrepl.TypeMessage:
+		// There are five kinds of user-defined datatype in Postgres:
+		//  - Domain types declared via 'CREATE DOMAIN name AS data_type'
+		//  - Tuples declared via 'CREATE TYPE name AS (...elements...)'
+		//  - Ranges declared via 'CREATE TYPE name AS RANGE (SUBTYPE = subtype, ...)'
+		//  - Enums declared via 'CREATE TYPE name AS ENUM (...values...)'
+		//  - Custom scalars defined with input and output functions
+		//
+		// We ignore custom scalar types as an option because they're incredibly niche.
+		//
+		// When a TypeMessage informs us about a tuple, range, or enum type it gives
+		// us the OID of the type and the 'schema.typename' name of the custom type.
+		// We receive no information about the element types or legal values of the
+		// user-defined type, and so we don't bother to do anything with the info and
+		// instead just let our unknown OID handling treat them as generic text.
+		//
+		// When a TypeMessage informs us about a *domain* type however, it gives us
+		// the OID of the type and the 'schema.typename' of the *base type*. When the
+		// base type is a builtin Postgres datatype the schema is omitted, and this
+		// implicitly means 'pg_catalog'.
+		//
+		// Ideally we want domain types to be decoded the same as a value of whichever
+		// base datatype it corresponds to. This is accomplished using a bit of logic
+		// that looks up the base name in the type map and then registers the user type
+		// OID as having the same name and codec.
 		logrus.WithFields(logrus.Fields{
-			"datatype":  msg.DataType,
+			"oid":       msg.DataType,
 			"namespace": msg.Namespace,
 			"name":      msg.Name,
-		}).Trace("user type definition")
+		}).Debug("user type definition")
+		if msg.Namespace == "" {
+			if baseType, ok := s.typeMap.TypeForName(msg.Name); ok {
+				s.typeMap.RegisterType(&pgtype.Type{
+					OID:   msg.DataType,
+					Name:  baseType.Name,
+					Codec: baseType.Codec,
+				})
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"oid":  msg.DataType,
+					"name": msg.Name,
+				}).Warn("unknown type name for user-defined type")
+			}
+		}
 		return nil, nil
 	case *pglogrepl.BeginMessage:
 		if s.nextTxnFinalLSN != 0 {
@@ -653,6 +691,10 @@ func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (
 	if !ok {
 		// Replication values always use the text encoding, and in the absence of any specific
 		// data type mapping we want to treat them as generic text strings, which is just a cast.
+		logrus.WithFields(logrus.Fields{
+			"oid":  dataType,
+			"text": string(data),
+		}).Trace("unknown OID, decoding as generic text")
 		return string(data), nil
 	}
 
