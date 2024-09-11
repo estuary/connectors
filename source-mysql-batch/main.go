@@ -89,8 +89,8 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		log.WithField("addr", cfg.Address).Debug("connected with TLS")
 	} else if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName); err == nil {
 		log.WithField("addr", cfg.Address).Warn("connected without TLS")
-	} else if err, ok := perrors.Cause(err).(*mysql.MyError); ok && err.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		return nil, cerrors.NewUserError(err, "incorrect username or password")
+	} else if mysqlErr, ok := perrors.Cause(err).(*mysql.MyError); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
