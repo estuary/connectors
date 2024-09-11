@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,15 +64,7 @@ func (c *capture) initializeStreams(
 		collsPerDb[b.resource.Database] = append(collsPerDb[b.resource.Database], b.resource.Collection)
 	}
 
-	started := make(map[string]bool)
-	for _, b := range bindings {
-		var db = b.resource.Database
-
-		if started[db] {
-			continue
-		}
-		started[db] = true
-
+	for _, db := range databasesForBindings(bindings) {
 		logEntry := log.WithField("db", db)
 
 		// Use a pipeline to project the fields we need from the change stream. Importantly, this
@@ -136,7 +129,7 @@ func (c *capture) initializeStreams(
 	return out, nil
 }
 
-// streamForever repeatedly calls `(*ChangeStream).TryNext` via (*capture).pullStream, emitting and
+// streamChanges repeatedly calls `(*ChangeStream).TryNext` via (*capture).pullStream, emitting and
 // checkpointing any documents that result. `TryNext` is used instead of the forever-blocking `Next`
 // to allow for checkpoint of "post-batch resume tokens", even if the change stream did emit any
 // change events. `TryNext` uses a default time window of 1 second in which events can arrive before
@@ -145,15 +138,12 @@ func (c *capture) initializeStreams(
 // well. See
 // https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.md#why-do-we-need-to-expose-the-postbatchresumetoken
 // for more information about post-batch resume tokens.
-func (c *capture) streamForever(
+func (c *capture) streamChanges(
 	ctx context.Context,
+	coordinator *streamBackfillCoordinator,
 	streams []changeStream,
+	stopWhenCaughtUp bool,
 ) error {
-	c.startStreamLogger()
-	defer c.stopStreamLogger()
-
-	log.Info("streaming change events indefinitely")
-
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
@@ -162,88 +152,45 @@ func (c *capture) streamForever(
 			defer s.ms.Close(groupCtx)
 
 			for {
-				if _, err := c.pullStream(groupCtx, s); err != nil {
+				if opTime, err := c.pullStream(groupCtx, s); err != nil {
 					return fmt.Errorf("change stream for %q: %w", s.db, err)
+				} else if coordinator.gotCaughtUp(s.db, opTime) && stopWhenCaughtUp {
+					return nil
 				}
 			}
 		})
 	}
 
-	return group.Wait()
-}
+	streamsDone := m.RunAsyncOperation(func() error { return group.Wait() })
 
-// serverHello is used to get information regarding the most recent operation time from the server
-// to use as a high watermark for catching up change streams.
-type serverHello struct {
-	OperationTime primitive.Timestamp `bson:"operationTime"`
-}
-
-// streamCatchup is similar to streamForever, but returns when `TryNext` yields no documents, or
-// when we are sufficiently caught up on reading the change stream as determined by comparing the
-// cluster time of the received event to the last majority-committed operation time of the cluster
-// at the start of catching up the stream.
-func (c *capture) streamCatchup(
-	ctx context.Context,
-	streams []changeStream,
-) error {
-	c.startStreamLogger()
-	defer c.stopStreamLogger()
-
-	// First get the current majority-committed operation time, which will be our high watermark for
-	// catching up the stream. Generally we will reach the "end" of the stream and TryNext will
-	// return `false`, but in cases where the stream has a high rate of changes we could end up
-	// tailing it forever and need some point to know that we are sufficiently caught up to stop.
-
-	// Note: Although we are using the "admin" database, this command works for any database, even
-	// if it doesn't exist, no matter what permissions the connecting user has.
-	result := c.client.Database("admin").RunCommand(ctx, bson.M{"hello": "1"})
-	var helloRes serverHello
-	if err := result.Decode(&helloRes); err != nil {
-		return fmt.Errorf("decoding server 'hello' response: %w", err)
-	}
-
-	ts := time.Now()
-	opTime := helloRes.OperationTime
-	log.WithField("lastWriteOpTime", opTime).Info("catching up streams")
-	defer func() { log.WithField("took", time.Since(ts).String()).Info("finished catching up streams") }()
-
-	group, groupCtx := errgroup.WithContext(ctx)
-
-	for _, s := range streams {
-		s := s
-		group.Go(func() error {
-			defer s.ms.Close(groupCtx)
-
-			ts := time.Now()
-			logEntry := log.WithField("database", s.db)
-			logEntry.Debug("started catching up stream for database")
-			defer func() {
-				logEntry.WithField("took", time.Since(ts).String()).Debug("finished catching up stream for database")
-			}()
-
-			for {
-				if lastTs, err := c.pullStream(groupCtx, s); err != nil {
-					return fmt.Errorf("change stream for %q: %w", s.db, err)
-				} else if lastTs.IsZero() {
-					log.WithFields(log.Fields{
-						"database": s.db,
-					}).Debug("catch up stream reached end of change stream")
-					break
-				} else if lastTs.After(opTime) {
-					log.WithFields(log.Fields{
-						"database": s.db,
-						"opTime":   opTime,
-						"lastTs":   lastTs,
-					}).Debug("catch up stream reached cluster OpTime high watermark")
-					break
-				}
+	// Log progress while the change streams are running.
+	initialProcessed, initialEmitted, _ := c.changeStreamProgress()
+	for {
+		select {
+		case <-time.After(streamLoggerInterval):
+			nextProcessed, nextEmitted, clusterTimes := c.changeStreamProgress()
+			currentOpTime, err := getClusterOpTime(ctx, c.client)
+			if err != nil {
+				return fmt.Errorf("getting cluster op time: %w", err)
 			}
 
-			return nil
-		})
-	}
+			if nextProcessed != initialProcessed {
+				log.WithFields(log.Fields{
+					"events":                nextProcessed - initialProcessed,
+					"docs":                  nextEmitted - initialEmitted,
+					"latestClusterOpTime":   currentOpTime,
+					"lastEventClusterTimes": clusterTimes,
+				}).Info("processed change stream events")
+			} else {
+				log.Info("change stream idle")
+			}
 
-	return group.Wait()
+			initialProcessed = nextProcessed
+			initialEmitted = nextEmitted
+		case <-streamsDone.Done():
+			return streamsDone.Err()
+		}
+	}
 }
 
 func getToken(s changeStream) bson.Raw {
@@ -494,49 +441,11 @@ func makeEventDocument(ev changeEvent, database string, collection string) (json
 	return docBytes, nil
 }
 
-func (c *capture) startStreamLogger() {
-	c.streamLoggerStop = make(chan struct{})
-	c.streamLoggerActive.Add(1)
+func (c *capture) changeStreamProgress() (int, int, map[string]primitive.Timestamp) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	eventInfo := func() (int, int, map[string]primitive.Timestamp) {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-
-		return c.processedStreamEvents, c.emittedStreamDocs, c.lastEventClusterTime
-	}
-
-	go func() {
-		defer func() { c.streamLoggerActive.Done() }()
-
-		initialProcessed, initialEmitted, _ := eventInfo()
-
-		for {
-			select {
-			case <-time.After(streamLoggerInterval):
-				nextProcessed, nextEmitted, clusterTimes := eventInfo()
-
-				if nextProcessed != initialProcessed {
-					log.WithFields(log.Fields{
-						"events":                nextProcessed - initialProcessed,
-						"docs":                  nextEmitted - initialEmitted,
-						"lastEventClusterTimes": clusterTimes,
-					}).Info("processed change stream events")
-				} else {
-					log.Info("change stream idle")
-				}
-
-				initialProcessed = nextProcessed
-				initialEmitted = nextEmitted
-			case <-c.streamLoggerStop:
-				return
-			}
-		}
-	}()
-}
-
-func (c *capture) stopStreamLogger() {
-	close(c.streamLoggerStop)
-	c.streamLoggerActive.Wait()
+	return c.processedStreamEvents, c.emittedStreamDocs, c.lastEventClusterTime
 }
 
 func resourceId(database string, collection string) string {

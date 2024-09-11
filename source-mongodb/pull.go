@@ -124,17 +124,25 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return nil
 	}
 
+	coordinator := newBatchStreamCoordinator(bindings, func(ctx context.Context) (primitive.Timestamp, error) {
+		return getClusterOpTime(ctx, client)
+	})
+
 	didBackfill := false
 	for !prevState.isBackfillComplete(bindings) {
+		if !didBackfill {
+			log.Info("backfilling incremental change stream collections")
+		}
 		didBackfill = true
+
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
-		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
-		// and streamCatchup catches up the streams to the present and closes the cursors out while
-		// the backfill is in progress.
+		// backfill is in progress.
 		if streams, err := c.initializeStreams(ctx, bindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
-		} else if err := c.streamCatchup(ctx, streams); err != nil {
+		} else if err := coordinator.startCatchingUp(ctx); err != nil {
+			return err
+		} else if err := c.streamChanges(ctx, coordinator, streams, true); err != nil {
 			return err
 		} else if err := c.backfillCollections(ctx, bindings, backfillFor); err != nil {
 			return err
@@ -142,13 +150,14 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	if didBackfill {
-		log.Info("backfill complete")
+		log.Info("finished backfill of incremental change stream collections")
 	}
+	log.Info("streaming change events indefinitely")
 
 	// Once all tables are done backfilling, we can read change streams forever.
 	if streams, err := c.initializeStreams(ctx, bindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 		return err
-	} else if err := c.streamForever(ctx, streams); err != nil {
+	} else if err := c.streamChanges(ctx, coordinator, streams, false); err != nil {
 		return fmt.Errorf("streaming changes forever: %w", err)
 	}
 
@@ -167,10 +176,22 @@ type capture struct {
 	processedStreamEvents int
 	emittedStreamDocs     int
 	lastEventClusterTime  map[string]primitive.Timestamp
+}
 
-	// Controls for starting and stopping the stream progress logger.
-	streamLoggerStop   chan (struct{})
-	streamLoggerActive sync.WaitGroup
+func getClusterOpTime(ctx context.Context, client *mongo.Client) (primitive.Timestamp, error) {
+	var out primitive.Timestamp
+
+	// Note: Although we are using the "admin" database, this command works for any database, even
+	// if it doesn't exist, no matter what permissions the connecting user has.
+	if raw, err := client.Database("admin").RunCommand(ctx, bson.M{"hello": "1"}).Raw(); err != nil {
+		return out, fmt.Errorf("running 'hello' command: %w", err)
+	} else if opRaw, err := raw.LookupErr("operationTime"); err != nil {
+		return out, fmt.Errorf("looking up 'operationTime' field: %w", err)
+	} else if err := opRaw.Unmarshal(&out); err != nil {
+		return out, fmt.Errorf("unmarshaling 'operationTime' field: %w", err)
+	}
+
+	return out, nil
 }
 
 type bindingInfo struct {
