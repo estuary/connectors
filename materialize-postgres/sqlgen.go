@@ -54,6 +54,9 @@ var pgDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
+		MigratableTypes: map[sql.FlatType][]string{
+			sql.STRING: {"numeric", "integer", "double precision"},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
@@ -79,9 +82,6 @@ var pgDialect = func() sql.Dialect {
 		TypeMapper:             mapper,
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
 		CaseInsensitiveColumns: false,
-		MigratableTypes: {
-			sql.STRING: {"numeric", "decimal", "integer", "bigint"},
-		},
 	}
 }()
 
