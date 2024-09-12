@@ -85,7 +85,7 @@ func generateMinimalSchema() json.RawMessage {
 		Then: &jsonschema.Schema{
 			Extras: map[string]interface{}{
 				"reduce": map[string]interface{}{
-					"strategy": "lastWriteWins",
+					"strategy": "merge",
 					"delete":   true,
 				},
 			},

@@ -20,7 +20,7 @@ Binding 0:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
@@ -106,7 +106,7 @@ Binding 1:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
