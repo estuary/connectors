@@ -72,6 +72,46 @@ func TestValidateAndApply(t *testing.T) {
 	)
 }
 
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := testConfig()
+
+	resourceConfig := tableConfig{
+		Table: "target",
+	}
+
+	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newSqlServerDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, "dbo", resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				testDialect.Identifier(sql.DefaultFlowMaterializations),
+				testDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
 func TestApplyChanges(t *testing.T) {
 	ctx := context.Background()
 
