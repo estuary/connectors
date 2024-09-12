@@ -20,7 +20,7 @@ Binding 0:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
@@ -106,7 +106,7 @@ Binding 1:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
@@ -192,7 +192,7 @@ Binding 2:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
@@ -278,7 +278,7 @@ Binding 3:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
@@ -364,7 +364,7 @@ Binding 4:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
@@ -450,7 +450,7 @@ Binding 5:
       "then": {
         "reduce": {
           "delete": true,
-          "strategy": "lastWriteWins"
+          "strategy": "merge"
         }
       },
       "type": "object",
