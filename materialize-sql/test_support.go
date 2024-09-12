@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"math"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"text/template"
@@ -13,6 +16,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
@@ -289,4 +293,189 @@ func RunSqlGenTests(
 	}
 
 	return &snap, tables
+}
+
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/migratable-changes.flow.yaml
+
+//go:embed testdata/validate/generated_specs
+var validateFS embed.FS
+
+func loadValidateSpec(t *testing.T, path string) *pf.MaterializationSpec {
+	t.Helper()
+
+	specBytes, err := validateFS.ReadFile(filepath.Join("testdata/validate/generated_specs", path))
+	require.NoError(t, err)
+	var spec pf.MaterializationSpec
+	require.NoError(t, spec.Unmarshal(specBytes))
+
+	return &spec
+}
+
+func RunValidateAndApplyMigrationsTests(
+	t *testing.T,
+	driver boilerplate.Connector,
+	config any,
+	resourceConfig any,
+	dumpSchema func(t *testing.T) string,
+	cleanup func(t *testing.T, materialization pf.Materialization),
+) {
+	ctx := context.Background()
+	var snap strings.Builder
+
+	configJson, err := json.Marshal(config)
+	require.NoError(t, err)
+
+	resourceConfigJson, err := json.Marshal(resourceConfig)
+	require.NoError(t, err)
+
+	t.Run("validate and apply migratable type changes", func(t *testing.T) {
+		defer cleanup(t, pf.Materialization("test/sqlite"))
+
+		fixture := loadValidateSpec(t, "base.flow.proto")
+
+		// Initial validation with no previously existing table.
+		validateRes, err := driver.Validate(ctx, validateReq(fixture, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("Base Initial Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		// Initial apply with no previously existing table.
+		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
+		require.NoError(t, err)
+
+		sch := dumpSchema(t)
+
+		// Validate again.
+		validateRes, err = driver.Validate(ctx, validateReq(fixture, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("\nBase Re-validated Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		// Apply again - this should be a no-op.
+		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
+		require.NoError(t, err)
+		require.Equal(t, sch, dumpSchema(t))
+
+		snap.WriteString("\nMigratable Changes Before Apply Schema:\n")
+		snap.WriteString(dumpSchema(t) + "\n")
+
+		// Validate with migratable changes
+		changed := loadValidateSpec(t, "migratable-changes.flow.proto")
+		validateRes, err = driver.Validate(ctx, validateReq(changed, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("\nMigratable Changes Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		_, err = driver.Apply(ctx, applyReq(changed, configJson, resourceConfigJson, validateRes, true))
+		require.NoError(t, err)
+
+		snap.WriteString("\nMigratable Changes Applied Schema:\n")
+		snap.WriteString(dumpSchema(t) + "\n")
+	})
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+// validateReq makes a mock Validate request object from a built spec fixture. It only works with a
+// single binding.
+func validateReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
+	req := &pm.Request_Validate{
+		Name:          spec.Name,
+		ConnectorType: spec.ConnectorType,
+		ConfigJson:    config,
+		Bindings: []*pm.Request_Validate_Binding{{
+			ResourceConfigJson: resourceConfig,
+			Collection:         spec.Bindings[0].Collection,
+			FieldConfigJsonMap: spec.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			Backfill:           spec.Bindings[0].Backfill,
+		}},
+	}
+
+	return req
+}
+
+// applyReq conjures a pm.Request_Apply from a spec and validate response.
+func applyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
+	spec.ConfigJson = config
+	spec.Bindings[0].ResourceConfigJson = resourceConfig
+	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
+	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
+	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
+
+	req := &pm.Request_Apply{
+		Materialization: spec,
+		Version:         "someVersion",
+	}
+
+	return req
+}
+
+// selectedFields creates a field selection that includes all possible fields.
+func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
+	out := pf.FieldSelection{}
+
+	for field, constraint := range binding.Constraints {
+		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
+			continue
+		}
+
+		proj := collection.GetProjection(field)
+		if proj.IsPrimaryKey {
+			out.Keys = append(out.Keys, field)
+		} else if proj.IsRootDocumentProjection() {
+			if out.Document == "" {
+				out.Document = field
+			} else {
+				// Handle cases with more than one root document projection selected - the "first"
+				// one is the document, and the rest are materialized as values.
+				out.Values = append(out.Values, field)
+			}
+		} else {
+			out.Values = append(out.Values, field)
+		}
+	}
+
+	slices.Sort(out.Keys)
+	slices.Sort(out.Values)
+
+	return out
+}
+
+// snapshotConstraints makes a compact string representation of a set of constraints, with one
+// constraint printed per line.
+func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+	t.Helper()
+
+	type constraintRow struct {
+		Field      string
+		Type       int
+		TypeString string
+		Reason     string
+	}
+
+	rows := make([]constraintRow, 0, len(cs))
+	for f, c := range cs {
+		rows = append(rows, constraintRow{
+			Field:      f,
+			Type:       int(c.Type),
+			TypeString: c.Type.String(),
+			Reason:     c.Reason,
+		})
+	}
+
+	slices.SortFunc(rows, func(i, j constraintRow) int {
+		return strings.Compare(i.Field, j.Field)
+	})
+
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, r := range rows {
+		require.NoError(t, enc.Encode(r))
+	}
+
+	return out.String()
 }

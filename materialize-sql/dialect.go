@@ -18,6 +18,10 @@ type Dialect struct {
 	MaxColumnCharLength int
 	// CaseInsensitiveColumns is provided as the "caseInsensitiveFields" parameter to boilerplate.NewValidator.
 	CaseInsensitiveColumns bool
+
+	// MigratableTypes is a mapp of target mapped type (the type to be migrated to) as key, and a slice of endpoint
+	// types (as represented by endpoint) which can be migrated to the key type
+	MigratableTypes map[FlatType][]string
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.
