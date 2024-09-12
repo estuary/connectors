@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -22,7 +23,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
-	perrors "github.com/pingcap/errors"
 	"github.com/sirupsen/logrus"
 
 	_ "time/tzdata"
@@ -211,29 +211,23 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		address = "localhost:3306"
 	}
 
-	// Normal database connection used for table scanning
-	var conn *client.Conn
-	var err error
 	var withTLS = func(c *client.Conn) error {
-		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
-		// if set makes this false and sets 'ServerName' so it will be verified properly.
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 		return nil
 	}
-	if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); err == nil {
-		logrus.WithField("addr", address).Debug("connected with TLS")
-		db.conn = conn
-	} else if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); err == nil {
-		logrus.WithField("addr", address).Warn("connected without TLS")
-		db.conn = conn
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
+		logrus.WithField("addr", address).Info("connected with TLS")
+		db.conn = connWithTLS
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
+		logrus.WithField("addr", address).Info("connected without TLS")
+		db.conn = connWithoutTLS
 	} else {
-		if err, ok := perrors.Cause(err).(*mysql.MyError); ok {
-			if err.Code == mysql.ER_ACCESS_DENIED_ERROR {
-				return cerrors.NewUserError(err, "incorrect username or password")
-			}
+		var mysqlErr *mysql.MyError
+		if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+			return cerrors.NewUserError(mysqlErr, "incorrect username or password")
+		} else {
+			return fmt.Errorf("unable to connect to database: %w", errWithTLS)
 		}
-
-		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
 	// Debug logging hook so we can get the server config variables when needed
@@ -257,7 +251,8 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		// Infer the location in which captured DATETIME values will be interpreted from the system
 		// variable 'time_zone' if it is set on the database.
 		var tzName string
-		if tzName, err = queryTimeZone(conn); err == nil {
+		var err error
+		if tzName, err = queryTimeZone(db.conn); err == nil {
 			var loc *time.Location
 			if loc, err = schedule.ParseTimezone(tzName); err == nil {
 				logrus.WithFields(logrus.Fields{
