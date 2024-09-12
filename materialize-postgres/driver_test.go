@@ -68,6 +68,47 @@ func TestValidateAndApply(t *testing.T) {
 	)
 }
 
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := testConfig()
+
+	resourceConfig := tableConfig{
+		Table:  "target",
+		Schema: "public",
+	}
+
+	db, err := stdsql.Open("pgx", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newPostgresDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				pgDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				pgDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 

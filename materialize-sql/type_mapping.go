@@ -155,10 +155,10 @@ type MappedType struct {
 	NullableDDL string
 	// Converter of tuple elements for this mapping, into SQL runtime values.
 	Converter ElementConverter `json:"-"`
-	// The list of compatible column types for this mapping. Any columns with
-	// types not in this list will produce an "unsatisfiable" constraint. The
-	// DDL used to create the column is included by default.
-	CompatibleColumnnTypes CompatibleColumnTypes
+	// The list of compatible column types for this mapping. The
+	// DDL used to create the column is included by default. Any columns with
+	// types not in this list or the migratable list will produce an "unsatisfiable" constraint.
+	CompatibleColumnTypes CompatibleColumnTypes
 	// If the column is using user-defined DDL or not. The selected field will
 	// always pass validation if this is true.
 	UserDefinedDDL bool
@@ -390,11 +390,11 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 	}
 
 	out := MappedType{
-		DDL:                    ddl,
-		NullableDDL:            ddl,
-		Converter:              converter,
-		CompatibleColumnnTypes: compatibleTypes,
-		UserDefinedDDL:         fc.DDL != "",
+		DDL:                   ddl,
+		NullableDDL:           ddl,
+		Converter:             converter,
+		CompatibleColumnTypes: compatibleTypes,
+		UserDefinedDDL:        fc.DDL != "",
 	}
 
 	if mustExist && d.notNullText != "" {
@@ -466,9 +466,19 @@ func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *p
 		return true, nil
 	}
 
-	return slices.ContainsFunc(mapped.CompatibleColumnnTypes, func(compatibleType string) bool {
+	isCompatibleType := slices.ContainsFunc(mapped.CompatibleColumnTypes, func(compatibleType string) bool {
 		return strings.EqualFold(existing.Type, compatibleType)
-	}), nil
+	})
+
+	isMigratableType := false
+	proposedFlatType, _ := proj.AsFlatType()
+	if migratableList, ok := c.dialect.MigratableTypes[proposedFlatType]; ok {
+		isMigratableType = slices.ContainsFunc(migratableList, func(migratableType string) bool {
+			return strings.EqualFold(existing.Type, migratableType)
+		})
+	}
+
+	return isCompatibleType || isMigratableType, nil
 }
 
 func (c constrainter) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
