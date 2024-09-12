@@ -318,6 +318,8 @@ pub async fn read_capture_request(stdin: &mut io::BufReader<io::Stdin>) -> anyho
     if buf.trim().is_empty() {
         anyhow::bail!("unexpected EOF reading request from stdin");
     }
+    eprintln!("got request (len={}):", buf.len());
+    eprintln!("{}", &buf[..buf.len().min(12000)]);
     let deser = serde_json::from_str(&buf).context("deserializing request")?;
     Ok(deser)
 }
