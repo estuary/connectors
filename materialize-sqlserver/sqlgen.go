@@ -85,6 +85,9 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 	)
 
 	return sql.Dialect{
+		MigratableTypes: map[sql.FlatType][]string{
+			sql.STRING: {"float", "bigint"},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any
@@ -188,7 +191,13 @@ END;
 -- Server does not support modifying multiple columns in a single statement.
 
 {{ define "alterTableColumns" }}
-ALTER TABLE {{$.Identifier}} ADD
+ALTER TABLE {{$.Identifier}}
+{{- range $ind, $col := $.ColumnTypeChanges }}
+	{{- if $ind }},{{ end }}
+	ALTER COLUMN {{ $col.Identifier }} {{$col.DDL}}
+{{- end }}
+{{- if and $.AddColumns $.ColumnTypeChanges}},{{ end }}
+{{- if $.AddColumns }} ADD{{ end }}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{$col.NullableDDL}}

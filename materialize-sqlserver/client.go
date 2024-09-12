@@ -93,7 +93,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	// SQL Server supports adding multiple columns in a single statement, but only a single
 	// modification per statement.
-	if len(ta.AddColumns) > 0 {
+	if len(ta.AddColumns) > 0 || len(ta.ColumnTypeChanges) > 0 {
 		var addColumnsStmt strings.Builder
 		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
