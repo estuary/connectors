@@ -79,6 +79,9 @@ var pgDialect = func() sql.Dialect {
 		TypeMapper:             mapper,
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
 		CaseInsensitiveColumns: false,
+		MigratableTypes: {
+			sql.STRING: {"numeric", "decimal", "integer", "bigint"},
+		},
 	}
 }()
 
@@ -137,6 +140,11 @@ ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
 	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
+{{- end }}
+{{- if and (or $.DropNotNulls $.AddColumns) $.ColumnTypeChanges}},{{ end }}
+{{- range $ind, $col := $.ColumnTypeChanges }}
+	{{- if $ind }},{{ end }}
+	ALTER COLUMN {{ $col.Identifier }} TYPE {{ $col.DDL }}
 {{- end }};
 {{ end }}
 
