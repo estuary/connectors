@@ -86,6 +86,9 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 	)
 
 	return sql.Dialect{
+		MigratableTypes: map[sql.FlatType][]string{
+			sql.STRING: {"decimal", "bigint", "double"},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
 			// database. This is sort of weird, since in most other systems the table_catalog is the
@@ -209,6 +212,11 @@ ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
 	MODIFY {{ ColumnIdentifier $col.Name }} {{$col.Type}}
+{{- end }}
+{{- if and (or $.DropNotNulls $.AddColumns) $.ColumnTypeChanges}},{{ end }}
+{{- range $ind, $col := $.ColumnTypeChanges }}
+	{{- if $ind }},{{ end }}
+	MODIFY {{ $col.Identifier }} {{$col.DDL}}
 {{- end }};
 {{ end }}
 
