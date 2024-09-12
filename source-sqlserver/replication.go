@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -666,9 +667,31 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		// change, and for deletions the change event (partially) records the state
 		// before the change.
 		var before, after map[string]any
-		if operation == sqlcapture.InsertOp || operation == sqlcapture.UpdateOp {
+		switch operation {
+		case sqlcapture.InsertOp, sqlcapture.UpdateOp:
 			after = fields
-		} else {
+		case sqlcapture.DeleteOp:
+			// According to https://learn.microsoft.com/en-us/sql/relational-databases/system-tables/cdc-capture-instance-ct-transact-sql#large-object-data-types
+			//
+			//     Columns of data type image, text, and ntext are always assigned a NULL value when __$operation = 1 or __$operation = 3.
+			//
+			// If we didn't do anything here, these nulls would be emitted as explicitly null properties, which
+			// for a non-nullable column would produce an invalid JSON document. Since we can't tell whether a
+			// null value of a text/image/ntext column here is real or just omitted, the only reasonable fix is
+			// to always omit null values of these column types when capturing a deletion.
+			//
+			// As an added safety check we also make sure this logic doesn't apply to key columns.
+			for colName, val := range fields {
+				if val == nil && !slices.Contains(info.KeyColumns, colName) {
+					if colType, ok := info.ColumnTypes[colName]; ok {
+						if textType, ok := colType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
+							delete(fields, colName)
+						} else if colType == "image" {
+							delete(fields, colName)
+						}
+					}
+				}
+			}
 			before = fields
 		}
 
