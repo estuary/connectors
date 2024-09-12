@@ -32,6 +32,11 @@ type TableAlter struct {
 	// materialized table and is required but is not included in the field selection for the
 	// materialization.
 	DropNotNulls []boilerplate.EndpointField
+
+	// ColumnTypeChanges is a list of columns that need their type changed. If the connector
+	// supports changing the column type, these columns will be altered, otherwise the projection will
+	// will be rejected as forbidden.
+	ColumnTypeChanges []Column
 }
 
 // MetaSpecsUpdate is an endpoint-specific parameterized query and parameters needed to persist a
@@ -226,9 +231,16 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		alter.AddColumns = append(alter.AddColumns, col)
 	}
 
-	// We only currently handle adding columns or dropping nullability constraints for SQL
-	// materializations.
-	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 {
+	for _, changedType := range bindingUpdate.ChangedFieldTypes {
+		col, err := getColumn(changedType.Field)
+		if err != nil {
+			return "", nil, err
+		}
+		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, col)
+	}
+
+	// If there is nothing to do, skip
+	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 && len(alter.ColumnTypeChanges) == 0 {
 		return "", nil, nil
 	}
 
