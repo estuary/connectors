@@ -1,0 +1,78 @@
+---
+collections:
+  acmeCo/ActionInquiries:
+    schema: ActionInquiries.schema.yaml
+    key:
+      - /Id
+  acmeCo/Actions:
+    schema: Actions.schema.yaml
+    key:
+      - /Id
+  acmeCo/Ads:
+    schema: Ads.schema.yaml
+    key:
+      - /Id
+  acmeCo/BlockRedirectRules:
+    schema: BlockRedirectRules.schema.yaml
+    key:
+      - /Id
+  acmeCo/Campaigns:
+    schema: Campaigns.schema.yaml
+    key:
+      - /Id
+  acmeCo/Catalogs:
+    schema: Catalogs.schema.yaml
+    key:
+      - /Id
+  acmeCo/Contracts:
+    schema: Contracts.schema.yaml
+    key:
+      - /Id
+  acmeCo/Deals:
+    schema: Deals.schema.yaml
+    key:
+      - /Id
+  acmeCo/ExceptionLists:
+    schema: ExceptionLists.schema.yaml
+    key:
+      - /Id
+  acmeCo/Invoices:
+    schema: Invoices.schema.yaml
+    key:
+      - /Id
+  acmeCo/Jobs:
+    schema: Jobs.schema.yaml
+    key:
+      - /Id
+  acmeCo/MediaPartnerGroups:
+    schema: MediaPartnerGroups.schema.yaml
+    key:
+      - /Id
+  acmeCo/Notes:
+    schema: Notes.schema.yaml
+    key:
+      - /Id
+  acmeCo/PhoneNumbers:
+    schema: PhoneNumbers.schema.yaml
+    key:
+      - /Id
+  acmeCo/PromoCodes:
+    schema: PromoCodes.schema.yaml
+    key:
+      - /Id
+  acmeCo/Reports:
+    schema: Reports.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/Tasks:
+    schema: Tasks.schema.yaml
+    key:
+      - /Id
+  acmeCo/TrackingValueRequests:
+    schema: TrackingValueRequests.schema.yaml
+    key:
+      - /Id
+  acmeCo/UniqueUrls:
+    schema: UniqueUrls.schema.yaml
+    key:
+      - /Id
