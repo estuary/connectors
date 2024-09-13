@@ -223,7 +223,6 @@ async def fetch_backfill_actions(
                         break
                     elif _s_to_dt(results[f"CreationDate"]) < cutoff:
                         doc = _cls.model_validate_json(json.dumps(results))
-                        log.error(f"{doc}")
                         yield doc
 
                 if result.get("@nextpageuri"):
