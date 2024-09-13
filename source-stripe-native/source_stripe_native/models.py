@@ -33,18 +33,22 @@ Item = TypeVar("Item")
 
 class EventResult(BaseModel,  Generic[Item], extra="forbid"):
     class Data(BaseModel):
+
         class CLSDATA(BaseModel):
             object: Item
             previous_attributes: Dict | None = None
+
         id: str
         object: Literal["event"]
         api_version: str
         created: int
         data: CLSDATA
+
     object: str
     url: str
     has_more: bool
     data: List[Data]
+
 
 class ListResult(BaseModel,  Generic[Item], extra="forbid"):
     object: str
@@ -52,12 +56,14 @@ class ListResult(BaseModel,  Generic[Item], extra="forbid"):
     has_more: bool
     data: List[Item]
 
+
 class BackfillResult(BaseModel, Generic[Item], extra="allow"):
     # Set extra as allow since Refunds has one aditional field
     object: str
     url: str
     has_more: bool
     data: List[Item]
+
 
 class Files(BaseDocument, extra="allow"):
     """
@@ -67,7 +73,7 @@ class Files(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "files"
 
     id: str
-    links: Dict | None = Field(exclude=True)
+
 
 class FilesLink(BaseDocument, extra="allow"):
     """
@@ -77,6 +83,7 @@ class FilesLink(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "file_links"
 
     id: str
+
 
 class BalanceTransactions(BaseDocument, extra="allow"):
     """
@@ -128,7 +135,6 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "external_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"bank_account"} 
 
-    
     id: str
 
 
@@ -138,7 +144,7 @@ class ApplicationFees(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "application_fees"
 
     id: str
-    refunds: Dict = Field(exclude=True)
+
 
 class ApplicationFeesRefunds(BaseDocument, extra="allow"):
     """
@@ -150,7 +156,6 @@ class ApplicationFeesRefunds(BaseDocument, extra="allow"):
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
-    parent_id: str | None = None # Custom Added Field
 
 
 class Authorizations(BaseDocument, extra="allow"):
@@ -179,8 +184,6 @@ class Cards(BaseDocument, extra="allow"):
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
-    parent_id: str | None = None # Custom Added Field
-
 
 
 class Bank_Accounts(BaseDocument, extra="allow"):
@@ -192,9 +195,7 @@ class Bank_Accounts(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "bank_accounts"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
-    
     id: str
-    parent_id: str | None = None # Custom Added Field
 
 
 class CustomerBalanceTransaction(BaseDocument, extra="allow"):
@@ -206,9 +207,7 @@ class CustomerBalanceTransaction(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
-
     id: str
-    parent_id: str | None = None # Custom Added Field
 
 
 class PaymentMethods(BaseDocument, extra="allow"):
@@ -240,13 +239,11 @@ class Charges(BaseDocument, extra="allow"):
 
 
 class CheckoutSessions(BaseDocument, extra="allow"):
-
     NAME: ClassVar[str] = "CheckoutSessions"
     TYPES: ClassVar[str] =  "checkout.session.*"
     SEARCH_NAME: ClassVar[str] = "checkout/sessions"
 
     id: str
-    client_secret: str | None = Field(exclude=True) # Sensible Field
 
 
 class CheckoutSessionsLine(BaseDocument, extra="allow"):
@@ -254,7 +251,6 @@ class CheckoutSessionsLine(BaseDocument, extra="allow"):
     Child Stream
     Parent Stream: CheckoutSessions
     """
-
     NAME: ClassVar[str] = "CheckoutSessionsLine"
     SEARCH_NAME: ClassVar[str] = "line_items"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
@@ -267,7 +263,6 @@ class Coupons(BaseDocument, extra="allow"):
     TYPES: ClassVar[str] =  "coupon.updated"
     SEARCH_NAME: ClassVar[str] = "coupons"
 
-
     id: str
 
 
@@ -277,7 +272,6 @@ class CreditNotes(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "credit_notes"
 
     id: str
-    lines: Dict = Field(exclude=True)
 
 
 class CreditNotesLines(BaseDocument, extra="allow"):
@@ -285,7 +279,6 @@ class CreditNotesLines(BaseDocument, extra="allow"):
     Child Stream
     Parent Stream: CreditNotes
     """
-
     NAME: ClassVar[str] = "CreditNotesLines"
     SEARCH_NAME: ClassVar[str] = "lines"
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
@@ -298,7 +291,6 @@ class Disputes(BaseDocument, extra="allow"):
     TYPES: ClassVar[str] =  "charge.dispute.updated"
     SEARCH_NAME: ClassVar[str] = "disputes"
 
-
     id: str
 
 
@@ -306,7 +298,6 @@ class EarlyFraudWarning(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "EarlyFraudWarning"
     TYPES: ClassVar[str] =  "radar.early_fraud_warning.*"
     SEARCH_NAME: ClassVar[str] = "radar/early_fraud_warnings"
-
 
     id: str
 
@@ -326,7 +317,7 @@ class Invoices(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "invoices"
 
     id: str
-    lines: Dict = Field(exclude=True)
+
 
 class InvoiceLineItems(BaseDocument, extra="allow"):
     """
@@ -338,7 +329,6 @@ class InvoiceLineItems(BaseDocument, extra="allow"):
     PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
-    parent_id: str | None = None # Custom Added Field
 
 
 class PaymentIntent(BaseDocument, extra="allow"):
@@ -347,7 +337,6 @@ class PaymentIntent(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "payment_intents"
 
     id: str
-    client_secret: str | None = Field(exclude=True) # Sensible Field
 
 
 class Payouts(BaseDocument, extra="allow"):
@@ -403,7 +392,6 @@ class SetupIntents(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "setup_intents"
 
     id: str
-    client_secret: str | None = Field(exclude=True) # Sensible Field
 
 
 class SetupAttempts(BaseDocument, extra="allow"):
@@ -418,51 +406,27 @@ class SetupAttempts(BaseDocument, extra="allow"):
     id: str
 
 
-
 class Subscriptions(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Subscriptions"
     TYPES: ClassVar[str] =  "customer.subscription.*"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
 
     id: str
-    items: Dict = Field(exclude=True)
 
 
 class SubscriptionItems(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "SubscriptionItems"
     TYPES: ClassVar[str] =  "customer.subscription.*"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
+
     class Items(BaseModel, extra="allow"):
         class Values(BaseModel, extra="allow"):
             id: str
-            parent_id: str | None = None
-            object: Literal["subscription_item"]
-            billing_thresholds: Dict | None = None
-            created: int
-            metadata: Dict | None = None
-            discounts: list[Dict] | None = None
-            plan: Dict | None = None
-            price: Dict
-            quantity: int | None = None
-            subscription: str
-            tax_rates: list[Dict] | None = None
 
-        object: Literal["list"]
         data: list[Values]
-        has_more: bool = Field(exclude=True)
-        total_count: int = Field(exclude=True)
-        url: str = Field(exclude=True)
 
     id: str
-    billing_cycle_anchor: int  = Field(exclude=True)
-    billing_cycle_anchor_config: Dict | None = Field(exclude=True)
-    billing_thresholds: Dict | None  = Field(exclude=True)
-    cancel_at: int | None  = Field(exclude=True)
-    cancel_at_period_end: bool  = Field(exclude=True)
-    discounts: list[str] | None = Field(exclude=True)
-    discount: Dict | None = Field(exclude=True)
     items: Items
-
 
 
 class UsageRecords(BaseDocument, extra="allow"):
@@ -501,13 +465,13 @@ class Transactions(BaseDocument, extra="allow"):
 
     id: str
 
+
 class Transfers(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Transfers"
     TYPES: ClassVar[str] =  "transfer.updated"
     SEARCH_NAME: ClassVar[str] = "transfers"
 
     id: str
-    reversals: Dict = Field(exclude=True)
 
 
 class TransferReversals(BaseDocument, extra="allow"):
