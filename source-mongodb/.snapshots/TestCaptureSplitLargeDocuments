@@ -10,5 +10,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"testDb%2FtestCollection":{"backfill":{"done":true}}},"databaseResumeTokens":{"testDb":"<TOKEN>"}}
+{"bindingStateV1":{"testDb%2FtestCollection":{"backfill":{"done":true,"last_poll_start":"<LAST_POLLED_TS>"}}},"databaseResumeTokens":{"testDb":"<TOKEN>"}}
 
