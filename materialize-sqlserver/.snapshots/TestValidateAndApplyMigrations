@@ -36,6 +36,10 @@ Migratable Changes Before Apply Schema:
 {"Name":"scalarValue","Nullable":"NO","Type":"varchar"}
 
 
+Migratable Changes Before Apply Data:
+key, _meta/flow_truncated, flow_published_at, multiple, nonScalarValue, numericString, optional, scalarValue, flow_document
+1 (NVARCHAR), false (BIT), 2024-09-13 01:01:01 +0000 UTC (DATETIME2), <nil> (NVARCHAR), <nil> (NVARCHAR), 123 (BIGINT), <nil> (NVARCHAR), test (NVARCHAR), {} (NVARCHAR)
+
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
@@ -60,4 +64,8 @@ Migratable Changes Applied Schema:
 {"Name":"optional","Nullable":"YES","Type":"varchar"}
 {"Name":"scalarValue","Nullable":"NO","Type":"varchar"}
 
+
+Migratable Changes Applied Data:
+key, _meta/flow_truncated, flow_published_at, multiple, nonScalarValue, numericString, optional, scalarValue, flow_document
+1 (NVARCHAR), false (BIT), 2024-09-13 01:01:01 +0000 UTC (DATETIME2), <nil> (NVARCHAR), <nil> (NVARCHAR), 123 (NVARCHAR), <nil> (NVARCHAR), test (NVARCHAR), {} (NVARCHAR)
 
