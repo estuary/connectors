@@ -109,7 +109,6 @@ class Persons(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "Persons"
     SEARCH_NAME: ClassVar[str] = "persons"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -121,7 +120,6 @@ class ExternalAccountCards(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "ExternalAccountCards"
     SEARCH_NAME: ClassVar[str] = "external_accounts"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"card"}   
 
     id: str
 
@@ -133,7 +131,6 @@ class ExternalBankAccount(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "ExternalBankAccount"
     SEARCH_NAME: ClassVar[str] = "external_accounts"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100, "object":"bank_account"} 
 
     id: str
 
@@ -153,7 +150,6 @@ class ApplicationFeesRefunds(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "ApplicationFeesRefunds"
     SEARCH_NAME: ClassVar[str] = "refunds"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -181,7 +177,6 @@ class Cards(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "Cards"
     SEARCH_NAME: ClassVar[str] = "cards"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -193,7 +188,6 @@ class Bank_Accounts(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "BankAccounts"
     SEARCH_NAME: ClassVar[str] = "bank_accounts"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -205,7 +199,6 @@ class CustomerBalanceTransaction(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "CustomerBalanceTransaction"
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -217,8 +210,7 @@ class PaymentMethods(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "PaymentMethods"
     SEARCH_NAME: ClassVar[str] = "payment_methods"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
-    
+
     id: str
 
 
@@ -253,7 +245,6 @@ class CheckoutSessionsLine(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "CheckoutSessionsLine"
     SEARCH_NAME: ClassVar[str] = "line_items"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -281,7 +272,6 @@ class CreditNotesLines(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "CreditNotesLines"
     SEARCH_NAME: ClassVar[str] = "lines"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -326,7 +316,6 @@ class InvoiceLineItems(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "InvoiceLineItems"
     SEARCH_NAME: ClassVar[str] = "lines"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
 
@@ -401,7 +390,6 @@ class SetupAttempts(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "SetupAttempts"
     SEARCH_NAME: ClassVar[str] = "setup_attempts"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100, "setup_intent": None}
 
     id: str
 
@@ -436,7 +424,6 @@ class UsageRecords(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "UsageRecords"
     SEARCH_NAME: ClassVar[str] = "usage_record_summaries"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
     subscription_item: str
@@ -481,6 +468,5 @@ class TransferReversals(BaseDocument, extra="allow"):
     """
     NAME: ClassVar[str] = "TransferReversals"
     SEARCH_NAME: ClassVar[str] = "reversals"
-    PARAMETERS: ClassVar[Dict] = {"limit": 100}
 
     id: str
