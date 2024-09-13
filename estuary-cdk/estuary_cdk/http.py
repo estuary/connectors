@@ -39,7 +39,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
-        headers: dict[str, Any] | None = {}
+        headers: dict[str, Any] = {}
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
