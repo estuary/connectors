@@ -57,6 +57,7 @@
               "$ref": "#/$defs/CatalogEnum"
             }
           ],
+          "description": "As of now, only BRAND catalogs are allowed",
           "title": "API Catalog (Brand, Agency, Partner)"
         },
         "stop_date": {
