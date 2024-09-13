@@ -8,6 +8,7 @@ import (
 
 	"github.com/segmentio/encoding/json"
 
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,6 +18,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// backfillBinding is the information needed to backfill a binding.
+type backfillBinding struct {
+	binding      bindingInfo
+	backfillDone chan struct{}
+}
+
 // backfillChangeStreamCollections backfills all capture collections until time runs out, or the backfill is
 // complete. Each round of backfilling the bindings will be randomized to provide some degree of
 // equality in how they are backfilled, but within a single round of backfilling a binding will be
@@ -24,24 +31,20 @@ import (
 func (c *capture) backfillChangeStreamCollections(
 	ctx context.Context,
 	coordinator *streamBackfillCoordinator,
-	bindings []bindingInfo,
+	changeStreamBindings []bindingInfo,
 	backfillFor time.Duration,
 ) error {
 	ts := time.Now()
 	log.WithField("backfillFor", backfillFor.String()).Info("backfilling collections")
 	defer func() { log.WithField("took", time.Since(ts).String()).Info("finished backfill round") }()
 
-	shuffledBindings := make([]bindingInfo, 0, len(bindings))
-	for _, b := range bindings {
-		if b.resource.getMode() == captureModeChangeStream {
-			shuffledBindings = append(shuffledBindings, b)
-		}
-	}
+	shuffledBindings := make([]bindingInfo, len(changeStreamBindings))
+	copy(shuffledBindings, changeStreamBindings)
 	rand.Shuffle(len(shuffledBindings), func(i, j int) {
 		shuffledBindings[i], shuffledBindings[j] = shuffledBindings[j], shuffledBindings[i]
 	})
 
-	backfillBindings := make(chan bindingInfo)
+	backfillBindings := make(chan backfillBinding)
 	stopBackfill := make(chan struct{})
 
 	go func() {
@@ -68,7 +71,7 @@ func (c *capture) backfillChangeStreamCollections(
 		}
 
 		select {
-		case backfillBindings <- b:
+		case backfillBindings <- backfillBinding{binding: b}:
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-groupCtx.Done():
@@ -82,24 +85,81 @@ func (c *capture) backfillChangeStreamCollections(
 	return group.Wait()
 }
 
+// backfillBatchCollections repeatedly backfills all batch collections according
+// to their schedules.
+func (c *capture) backfillBatchCollections(
+	ctx context.Context,
+	coordinator *streamBackfillCoordinator,
+	batchBindings []bindingInfo,
+) error {
+	backfillBindings := make(chan backfillBinding)
+	group, groupCtx := errgroup.WithContext(ctx)
+	for idx := 0; idx < concurrentBackfillLimit; idx++ {
+		group.Go(func() error {
+			return c.backfillWorker(groupCtx, coordinator, backfillBindings, make(chan struct{}))
+		})
+	}
+
+	for _, binding := range batchBindings {
+		binding := binding
+
+		group.Go(func() error {
+			for {
+				c.mu.Lock()
+				backfillState := c.state.Resources[binding.stateKey].Backfill
+				c.mu.Unlock()
+
+				if backfillState.done() {
+					next := binding.schedule.Next(*backfillState.LastPollStart)
+					if time.Until(next) > 0 {
+						log.WithFields(log.Fields{
+							"database":   binding.resource.Database,
+							"collection": binding.resource.Collection,
+							"next":       next.UTC().String(),
+							"mode":       binding.resource.getMode(),
+						}).Info("waiting to backfill batch collection")
+						if err := schedule.WaitForNext(groupCtx, binding.schedule, *backfillState.LastPollStart); err != nil {
+							return err
+						}
+					}
+				}
+
+				doneCh := make(chan struct{})
+				select {
+				case backfillBindings <- backfillBinding{binding: binding, backfillDone: doneCh}:
+					select {
+					case <-doneCh:
+					case <-groupCtx.Done():
+						return groupCtx.Err()
+					}
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				}
+			}
+		})
+	}
+
+	return group.Wait()
+}
+
 func (c *capture) backfillWorker(
 	ctx context.Context,
 	coordinator *streamBackfillCoordinator,
-	backfillBindings <-chan bindingInfo,
+	backfillBindings <-chan backfillBinding,
 	stopBackfill <-chan struct{},
 ) error {
 	for {
 		select {
-		case binding, ok := <-backfillBindings:
+		case bb, ok := <-backfillBindings:
 			if !ok {
 				return nil
 			}
 
-			if err := c.doBackfill(ctx, coordinator, binding, stopBackfill); err != nil {
+			if err := c.doBackfill(ctx, coordinator, bb.binding, bb.backfillDone, stopBackfill); err != nil {
 				return fmt.Errorf(
 					"backfilling collection %q in database %q: %w",
-					binding.resource.Collection,
-					binding.resource.Database,
+					bb.binding.resource.Collection,
+					bb.binding.resource.Database,
 					err,
 				)
 			}
@@ -112,20 +172,28 @@ func (c *capture) backfillWorker(
 }
 
 // doBackfill runs a backfill for a binding to completion, or until signalled to
-// stop by stopBackfill.
+// stop by stopBackfill. The backfillDone channel will be closed when the
+// backfill is completely done (cursor returns no more documents) if it is not
+// `nil`.
 func (c *capture) doBackfill(
 	ctx context.Context,
 	coordinator *streamBackfillCoordinator,
 	binding bindingInfo,
+	backfillDone chan struct{},
 	stopBackfill <-chan struct{},
 ) error {
-	var sk = binding.stateKey
-
 	c.mu.Lock()
-	lastId := c.state.Resources[sk].Backfill.LastId
-	initialDocsCaptured := c.state.Resources[sk].Backfill.BackfilledDocs
-	additionalDocsCaptured := 0
+	backfillState := c.state.Resources[binding.stateKey].Backfill
 	c.mu.Unlock()
+
+	lastId := backfillState.LastId
+	initialDocsCaptured := backfillState.BackfilledDocs
+	if backfillState.done() {
+		// Starting the backfill over.
+		lastId = nil
+		initialDocsCaptured = 0
+	}
+	additionalDocsCaptured := 0
 
 	collection := c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
 	// Not using the more precise `CountDocuments()` here since that requires a full collection
@@ -188,6 +256,9 @@ func (c *capture) doBackfill(
 			}
 
 			if docCount == 0 {
+				if backfillDone != nil {
+					close(backfillDone)
+				}
 				logEntry.WithField("totalDocsCaptured", initialDocsCaptured+additionalDocsCaptured).Info("completed backfill for collection")
 				return nil
 			}
@@ -218,14 +289,16 @@ func (c *capture) pullCursor(
 	emitDocs := func() error {
 		c.mu.Lock()
 		state := c.state.Resources[sk]
-		if state.Backfill.done() {
-			// First commit of a re-polled batch binding.
+		if state.Backfill.done() || state.Backfill.LastPollStart == nil {
+			// First commit of a re-polled batch binding, or the fist commit for
+			// a binding ever.
 			state.Backfill.Done = makePtr(false)
 			state.Backfill.BackfilledDocs = 0
-			state.Backfill.LastPollStart = makePtr(time.Now())
+			state.Backfill.LastPollStart = makePtr(time.Now().UTC())
 		}
 		state.Backfill.LastId = &lastId
 		state.Backfill.BackfilledDocs += len(docBatch)
+		c.state.Resources[sk] = state
 		checkpoint := captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				sk: {Backfill: state.Backfill},
@@ -290,13 +363,15 @@ func (c *capture) pullCursor(
 		c.mu.Lock()
 		state := c.state.Resources[sk]
 		state.Backfill.Done = makePtr(true)
+		if state.Backfill.LastPollStart == nil {
+			// Edge case of an initially empty collection.
+			state.Backfill.LastPollStart = makePtr(time.Now().UTC())
+		}
 		c.state.Resources[sk] = state
 		c.mu.Unlock()
 
 		checkpoint := captureState{
-			Resources: map[boilerplate.StateKey]resourceState{
-				sk: {Backfill: backfillState{Done: makePtr(true)}},
-			},
+			Resources: map[boilerplate.StateKey]resourceState{sk: state},
 		}
 
 		if cp, err := json.Marshal(checkpoint); err != nil {

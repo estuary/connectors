@@ -15,6 +15,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -62,7 +63,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("invalid default poll schedule: %w", err)
 	}
 
-	var allBindings = make([]bindingInfo, len(open.Capture.Bindings))
+	var changeStreamBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
+	var batchBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
 	var trackedChangeStreamBindings = make(map[string]bindingInfo)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
@@ -77,6 +79,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		if res.getMode() == captureModeChangeStream {
+			changeStreamBindings = append(changeStreamBindings, info)
 			trackedChangeStreamBindings[resourceId(res.Database, res.Collection)] = info
 		} else {
 			info.schedule = defaultSched
@@ -86,10 +89,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 					return fmt.Errorf("invalid poll schedule for %q: %w", binding.ResourcePath, err)
 				}
 			}
+			batchBindings = append(batchBindings, info)
 		}
-
-		allBindings[idx] = info
 	}
+	allBindings := append(changeStreamBindings, batchBindings...)
 
 	var ctx = stream.Context()
 
@@ -149,12 +152,12 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return nil
 	}
 
-	coordinator := newBatchStreamCoordinator(allBindings, func(ctx context.Context) (primitive.Timestamp, error) {
+	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
 		return getClusterOpTime(ctx, client)
 	})
 
 	didBackfill := false
-	for !prevState.isBackfillComplete(allBindings) {
+	for !prevState.isBackfillComplete(changeStreamBindings) {
 		if !didBackfill {
 			log.Info("backfilling incremental change stream collections")
 		}
@@ -163,13 +166,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
 		// backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, allBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+		if streams, err := c.initializeStreams(ctx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
 		} else if err := coordinator.startCatchingUp(ctx); err != nil {
 			return err
 		} else if err := c.streamChanges(ctx, coordinator, streams, true); err != nil {
 			return err
-		} else if err := c.backfillChangeStreamCollections(ctx, coordinator, allBindings, backfillFor); err != nil {
+		} else if err := c.backfillChangeStreamCollections(ctx, coordinator, changeStreamBindings, backfillFor); err != nil {
 			return err
 		}
 	}
@@ -177,16 +180,25 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if didBackfill {
 		log.Info("finished backfill of incremental change stream collections")
 	}
-	log.Info("streaming change events indefinitely")
+	group, groupCtx := errgroup.WithContext(ctx)
 
-	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, allBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
-		return err
-	} else if err := c.streamChanges(ctx, coordinator, streams, false); err != nil {
-		return fmt.Errorf("streaming changes forever: %w", err)
+	if len(changeStreamBindings) > 0 {
+		log.Info("streaming change events indefinitely")
+		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter)
+		if err != nil {
+			return err
+		}
+		group.Go(func() error { return c.streamChanges(groupCtx, coordinator, streams, false) })
+	}
+	if len(batchBindings) > 0 {
+		log.Info("processing scheduled batch collections indefinitely")
+		group.Go(func() error { return c.backfillBatchCollections(groupCtx, coordinator, batchBindings) })
+	}
+	if len(batchBindings) > 0 && len(changeStreamBindings) > 0 {
+		group.Go(func() error { return coordinator.startRepeatingStreamCatchups(groupCtx) })
 	}
 
-	return nil
+	return group.Wait()
 }
 
 type capture struct {
