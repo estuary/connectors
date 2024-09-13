@@ -1417,14 +1417,6 @@
         "Items": {
           "additionalProperties": true,
           "properties": {
-            "object": {
-              "const": "list",
-              "enum": [
-                "list"
-              ],
-              "title": "Object",
-              "type": "string"
-            },
             "data": {
               "items": {
                 "$ref": "#/$defs/Values"
@@ -1434,7 +1426,6 @@
             }
           },
           "required": [
-            "object",
             "data"
           ],
           "title": "Items",
@@ -1469,124 +1460,10 @@
             "id": {
               "title": "Id",
               "type": "string"
-            },
-            "parent_id": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Parent Id"
-            },
-            "object": {
-              "const": "subscription_item",
-              "enum": [
-                "subscription_item"
-              ],
-              "title": "Object",
-              "type": "string"
-            },
-            "billing_thresholds": {
-              "anyOf": [
-                {
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Billing Thresholds"
-            },
-            "created": {
-              "title": "Created",
-              "type": "integer"
-            },
-            "metadata": {
-              "anyOf": [
-                {
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Metadata"
-            },
-            "discounts": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Discounts"
-            },
-            "plan": {
-              "anyOf": [
-                {
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Plan"
-            },
-            "price": {
-              "title": "Price",
-              "type": "object"
-            },
-            "quantity": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Quantity"
-            },
-            "subscription": {
-              "title": "Subscription",
-              "type": "string"
-            },
-            "tax_rates": {
-              "anyOf": [
-                {
-                  "items": {
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Tax Rates"
             }
           },
           "required": [
-            "id",
-            "object",
-            "created",
-            "price",
-            "subscription"
+            "id"
           ],
           "title": "Values",
           "type": "object"
@@ -2047,18 +1924,6 @@
         "id": {
           "title": "Id",
           "type": "string"
-        },
-        "parent_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Parent Id"
         }
       },
       "required": [
@@ -2121,18 +1986,6 @@
         "id": {
           "title": "Id",
           "type": "string"
-        },
-        "parent_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Parent Id"
         }
       },
       "required": [
@@ -2195,18 +2048,6 @@
         "id": {
           "title": "Id",
           "type": "string"
-        },
-        "parent_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Parent Id"
         }
       },
       "required": [
@@ -2331,18 +2172,6 @@
         "id": {
           "title": "Id",
           "type": "string"
-        },
-        "parent_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Parent Id"
         }
       },
       "required": [
@@ -2529,18 +2358,6 @@
         "id": {
           "title": "Id",
           "type": "string"
-        },
-        "parent_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Parent Id"
         }
       },
       "required": [
