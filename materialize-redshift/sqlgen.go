@@ -97,6 +97,9 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 	}
 
 	return sql.Dialect{
+		MigratableTypes: map[sql.FlatType][]string{
+			sql.STRING: {"numeric", "bigint", "double precision"},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its

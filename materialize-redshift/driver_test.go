@@ -93,6 +93,74 @@ func TestValidateAndApply(t *testing.T) {
 	)
 }
 
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:  "target",
+		Schema: "public",
+	}
+
+	db, err := stdsql.Open("pgx", cfg.toURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newRedshiftDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, cols []string, values []string) {
+			t.Helper()
+
+			var keys = make([]string, len(cols))
+			for i, col := range cols {
+				keys[i] = pgDialect.Identifier(col)
+			}
+			keys = append(keys, pgDialect.Identifier("_meta/flow_truncated"))
+			values = append(values, "0")
+			keys = append(keys, pgDialect.Identifier("flow_published_at"))
+			values = append(values, "'2024-09-13 01:01:01'")
+			keys = append(keys, pgDialect.Identifier("flow_document"))
+			values = append(values, "'{}'")
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", pgDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			_, err = db.ExecContext(ctx, q)
+
+			require.NoError(t, err)
+		},
+		func(t *testing.T) string {
+			t.Helper()
+
+			rows, err := sql.DumpTestTable(t, db, pgDialect.Identifier(resourceConfig.Table), pgDialect.Identifier("key"))
+
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				testDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
 func TestFencingCases(t *testing.T) {
 	// Because of the number of round-trips required for this test to run it is not run normally.
 	// Enable it via the TESTDB environment variable. It will take several minutes for this test to
