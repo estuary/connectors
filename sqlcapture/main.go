@@ -187,6 +187,28 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, err
 	}
 
+	// Extract information about the previous state of various table bindings, so that we
+	// can more easily compare to the incoming to-be-validated state.
+	type previousBindingInfo struct {
+		Resource Resource
+		Backfill uint32
+	}
+	var previousBindings = make(map[StreamID]previousBindingInfo)
+	if req.LastCapture != nil {
+		for _, binding := range req.LastCapture.Bindings {
+			var res Resource
+			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+				return nil, fmt.Errorf("error parsing resource config: %w", err)
+			}
+			res.SetDefaults()
+			var streamID = JoinStreamID(res.Namespace, res.Stream)
+			previousBindings[streamID] = previousBindingInfo{
+				Resource: res,
+				Backfill: binding.Backfill,
+			}
+		}
+	}
+
 	var errs = db.SetupPrerequisites(ctx)
 	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
@@ -195,6 +217,13 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 		res.SetDefaults()
+
+		// If we have previous information about a resource and the backfill mode changes without
+		// a corresponding backfill counter increment, that's an error.
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+		if prevBinding, ok := previousBindings[streamID]; ok && res.Mode != prevBinding.Resource.Mode && binding.Backfill <= prevBinding.Backfill {
+			errs = append(errs, fmt.Errorf("must re-backfill when changing backfill mode: table %q changed from %q to %q", streamID, prevBinding.Resource.Mode, res.Mode))
+		}
 
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
 			errs = append(errs, err)
