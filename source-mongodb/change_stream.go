@@ -310,7 +310,7 @@ func (c *capture) readEvent(
 			return false, fmt.Errorf("assembling event from change stream event segments: %w", err)
 		}
 
-		if binding, trackedBinding = c.resourceBindingInfo[resourceId(s.db, ev.fields.Ns.Collection)]; !trackedBinding {
+		if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, ev.fields.Ns.Collection)]; !trackedBinding {
 			// Assembled event is not for a tracked collection. This is
 			// difficult to check prior to reading all the fragments for the
 			// event, since which fragment will contain the 'ns' field is
@@ -322,7 +322,7 @@ func (c *capture) readEvent(
 		ev.fragments = 1
 		if collRaw, lookupErr := s.ms.Current.LookupErr("ns", "coll"); lookupErr != nil {
 			return false, fmt.Errorf("looking up 'ns.coll' field: %w", lookupErr)
-		} else if binding, trackedBinding = c.resourceBindingInfo[resourceId(s.db, collRaw.StringValue())]; !trackedBinding {
+		} else if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, collRaw.StringValue())]; !trackedBinding {
 			// Event is not for a tracked collection. A quick check can be
 			// done prior to fully unmarshalling the change event BSON to
 			// fast-track bailing out on the very common case of events that

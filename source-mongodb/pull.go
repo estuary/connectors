@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -40,6 +41,9 @@ const (
 	// which provides a nice indication in the logs of what the capture is doing when it is reading
 	// change streams.
 	streamLoggerInterval = 5 * time.Minute
+
+	// The default polling schedule if none is supplied by the user.
+	defualtBatchPollingSchedule = "24h"
 )
 
 // Pull is a very long lived RPC through which the Flow runtime and a
@@ -50,20 +54,41 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
-	var bindings = make([]bindingInfo, len(open.Capture.Bindings))
-	var resourceBindingInfo = make(map[string]bindingInfo)
+	if cfg.PollSchedule == "" {
+		cfg.PollSchedule = defualtBatchPollingSchedule
+	}
+	defaultSched, err := schedule.Parse(cfg.PollSchedule)
+	if err != nil {
+		return fmt.Errorf("invalid default poll schedule: %w", err)
+	}
+
+	var allBindings = make([]bindingInfo, len(open.Capture.Bindings))
+	var trackedChangeStreamBindings = make(map[string]bindingInfo)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		var sk = boilerplate.StateKey(binding.StateKey)
-		bindings[idx] = bindingInfo{
+
+		info := bindingInfo{
 			resource: res,
 			index:    idx,
-			stateKey: sk,
+			stateKey: boilerplate.StateKey(binding.StateKey),
 		}
-		resourceBindingInfo[resourceId(res.Database, res.Collection)] = bindings[idx]
+
+		if res.getMode() == captureModeChangeStream {
+			trackedChangeStreamBindings[resourceId(res.Database, res.Collection)] = info
+		} else {
+			info.schedule = defaultSched
+			if res.PollSchedule != "" {
+				info.schedule, err = schedule.Parse(res.PollSchedule)
+				if err != nil {
+					return fmt.Errorf("invalid poll schedule for %q: %w", binding.ResourcePath, err)
+				}
+			}
+		}
+
+		allBindings[idx] = info
 	}
 
 	var ctx = stream.Context()
@@ -79,7 +104,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}()
 
-	serverInfo, err := getServerInfo(ctx, client, bindings[0].resource.Database)
+	serverInfo, err := getServerInfo(ctx, client, allBindings[0].resource.Database)
 	if err != nil {
 		return fmt.Errorf("checking server info: %w", err)
 	}
@@ -94,17 +119,17 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("unmarshalling previous state: %w", err)
 	}
 
-	prevState, err = updateResourceStates(prevState, bindings)
+	prevState, err = updateResourceStates(prevState, allBindings)
 	if err != nil {
 		return fmt.Errorf("updating resource states: %w", err)
 	}
 
 	var c = capture{
-		client:               client,
-		output:               stream,
-		state:                prevState,
-		resourceBindingInfo:  resourceBindingInfo,
-		lastEventClusterTime: make(map[string]primitive.Timestamp),
+		client:                      client,
+		output:                      stream,
+		state:                       prevState,
+		trackedChangeStreamBindings: trackedChangeStreamBindings,
+		lastEventClusterTime:        make(map[string]primitive.Timestamp),
 	}
 
 	if err := c.output.Ready(false); err != nil {
@@ -119,17 +144,17 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
-	if len(bindings) == 0 {
+	if len(allBindings) == 0 {
 		// No bindings to capture.
 		return nil
 	}
 
-	coordinator := newBatchStreamCoordinator(bindings, func(ctx context.Context) (primitive.Timestamp, error) {
+	coordinator := newBatchStreamCoordinator(allBindings, func(ctx context.Context) (primitive.Timestamp, error) {
 		return getClusterOpTime(ctx, client)
 	})
 
 	didBackfill := false
-	for !prevState.isBackfillComplete(bindings) {
+	for !prevState.isBackfillComplete(allBindings) {
 		if !didBackfill {
 			log.Info("backfilling incremental change stream collections")
 		}
@@ -138,13 +163,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
 		// backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, bindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+		if streams, err := c.initializeStreams(ctx, allBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
 		} else if err := coordinator.startCatchingUp(ctx); err != nil {
 			return err
 		} else if err := c.streamChanges(ctx, coordinator, streams, true); err != nil {
 			return err
-		} else if err := c.backfillCollections(ctx, bindings, backfillFor); err != nil {
+		} else if err := c.backfillChangeStreamCollections(ctx, coordinator, allBindings, backfillFor); err != nil {
 			return err
 		}
 	}
@@ -155,7 +180,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	log.Info("streaming change events indefinitely")
 
 	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, bindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+	if streams, err := c.initializeStreams(ctx, allBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 		return err
 	} else if err := c.streamChanges(ctx, coordinator, streams, false); err != nil {
 		return fmt.Errorf("streaming changes forever: %w", err)
@@ -165,9 +190,9 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 }
 
 type capture struct {
-	client              *mongo.Client
-	output              *boilerplate.PullOutput
-	resourceBindingInfo map[string]bindingInfo
+	client                      *mongo.Client
+	output                      *boilerplate.PullOutput
+	trackedChangeStreamBindings map[string]bindingInfo
 
 	// mu provides synchronization for values that are accessed by concurrent backfill and change
 	// stream goroutines.
@@ -198,6 +223,7 @@ type bindingInfo struct {
 	resource resource
 	index    int
 	stateKey boilerplate.StateKey
+	schedule schedule.Schedule
 }
 
 type captureState struct {
@@ -246,7 +272,7 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 
 func (s *captureState) isBackfillComplete(bindings []bindingInfo) bool {
 	for _, b := range bindings {
-		if !s.Resources[b.stateKey].Backfill.Done {
+		if !s.Resources[b.stateKey].Backfill.done() {
 			return false
 		}
 	}
@@ -258,9 +284,18 @@ func (s *captureState) Validate() error {
 }
 
 type backfillState struct {
-	Done           bool           `json:"done,omitempty"`
+	Done           *bool          `json:"done,omitempty"`
 	LastId         *bson.RawValue `json:"last_id,omitempty"`
 	BackfilledDocs int            `json:"backfilled_docs,omitempty"`
+	LastPollStart  *time.Time     `json:"last_poll_start,omitempty"`
+}
+
+func (s backfillState) done() bool {
+	return s.Done != nil && *s.Done
+}
+
+func makePtr[T any](in T) *T {
+	return &in
 }
 
 type resourceState struct {
