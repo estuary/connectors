@@ -65,13 +65,11 @@ from .models import (
     FilesLink,
     EndpointConfig,
     EventResult,
-    SubscriptionItems,
     )
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
-
 
     all_streams = [
         base_object(Accounts, http, config.stop_date),
@@ -115,8 +113,6 @@ async def all_resources(
         child_object(Transfers, TransferReversals, http, config.stop_date),
         child_object(SetupIntents, SetupAttempts, http, config.stop_date),
         usage_records(SubscriptionItems, UsageRecords, http, config.stop_date),
-
-
     ]
 
     # Stripe 'Issuing' is only available in certain countries and 
