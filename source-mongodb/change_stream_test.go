@@ -134,7 +134,7 @@ func TestPullStream(t *testing.T) {
 			c := capture{
 				client: client,
 				output: &boilerplate.PullOutput{Connector_CaptureServer: srv},
-				resourceBindingInfo: map[string]bindingInfo{
+				trackedChangeStreamBindings: map[string]bindingInfo{
 					resourceId(testDb, testColl1): bindings[0],
 					resourceId(testDb, testColl2): bindings[1],
 				},
