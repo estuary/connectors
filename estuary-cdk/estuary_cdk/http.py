@@ -39,12 +39,13 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
+        headers: dict[str, Any] = {}
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
         chunks: list[bytes] = []
         async for chunk in self._request_stream(
-            log, url, method, params, json, form, _with_token
+            log, url, method, params, json, form, _with_token, headers
         ):
             chunks.append(chunk)
 
@@ -91,6 +92,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
         _with_token: bool,
+        headers: dict[str, Any] = {}
     ) -> AsyncGenerator[bytes, None]: ...
 
     # TODO(johnny): This is an unstable API.
@@ -232,13 +234,13 @@ class HTTPMixin(Mixin, HTTPSession):
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
         _with_token: bool,
+        headers: dict[str, Any] = {},
     ) -> AsyncGenerator[bytes, None]:
         while True:
 
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
 
-            headers = {}
             if _with_token and self.token_source is not None:
                 token_type, token = await self.token_source.fetch_token(log, self)
                 header_value = f"{token_type} {token}" if self.token_source.authorization_header == DEFAULT_AUTHORIZATION_HEADER else f"{token}"
