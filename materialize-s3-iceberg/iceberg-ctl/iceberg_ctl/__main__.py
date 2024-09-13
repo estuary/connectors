@@ -353,9 +353,10 @@ def append_files(
     # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
     # at a lower level than PyIceberg currently makes available.
     checkpoints[materialization] = next_checkpoint
-    with tbl.transaction() as txn:
-        txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
-        txn.add_files(file_paths.split(","))
+    txn = tbl.transaction()
+    txn.add_files(file_paths.split(","))
+    txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
+    txn.commit_transaction()
 
     # TODO(whb): This additional logging should not really be necessary, but is
     # included for now to assist in troubleshooting potential errors.
