@@ -52,7 +52,7 @@ type changeEvent struct {
 // resume tokens stored in the capture's state.
 func (c *capture) initializeStreams(
 	ctx context.Context,
-	bindings []bindingInfo,
+	changeStreamBindings []bindingInfo,
 	requestPreImages bool,
 	exclusiveCollectionFilter bool,
 ) ([]changeStream, error) {
@@ -60,11 +60,11 @@ func (c *capture) initializeStreams(
 
 	// Used if exclusiveCollectionFilter is enabled.
 	var collsPerDb = make(map[string][]string)
-	for _, b := range bindings {
+	for _, b := range changeStreamBindings {
 		collsPerDb[b.resource.Database] = append(collsPerDb[b.resource.Database], b.resource.Collection)
 	}
 
-	for _, db := range databasesForBindings(bindings) {
+	for _, db := range databasesForBindings(changeStreamBindings) {
 		logEntry := log.WithField("db", db)
 
 		// Use a pipeline to project the fields we need from the change stream. Importantly, this
