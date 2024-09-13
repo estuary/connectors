@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -25,37 +26,24 @@ func TestCapture(t *testing.T) {
 	col1 := "collectionOne"
 	col2 := "collectionTwo"
 	col3 := "collectionThree"
+	batchCol1 := "batchCollection1"
+	batchCol2 := "batchCollection2"
 
 	ctx := context.Background()
 	client, cfg := testClient(t)
 
 	cleanup := func() {
-		dropCollection(ctx, t, client, database1, col1)
-		dropCollection(ctx, t, client, database1, col2)
-		dropCollection(ctx, t, client, database2, col3)
+		require.NoError(t, client.Database(database1).Drop(ctx))
+		require.NoError(t, client.Database(database2).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	stringPkVals := func(idx int) any {
-		return fmt.Sprintf("pk val %d", idx)
-	}
-
-	numberPkVals := func(idx int) any {
-		if idx%2 == 0 {
-			return idx
-		}
-
-		return float64(idx) + 0.5
-	}
-
-	binaryPkVals := func(idx int) any {
-		return []byte(fmt.Sprintf("pk val %d", idx))
-	}
-
 	addTestTableData(ctx, t, client, database1, col1, 5, 0, stringPkVals, "onlyColumn")
 	addTestTableData(ctx, t, client, database1, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
 	addTestTableData(ctx, t, client, database2, col3, 5, 0, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
+	addTestTableData(ctx, t, client, database1, batchCol1, 5, 0, stringPkVals, "batchColDb1")
+	addTestTableData(ctx, t, client, database2, batchCol2, 5, 0, stringPkVals, "batchColDb2")
 
 	cs := &st.CaptureSpec{
 		Driver:       &driver{},
@@ -64,9 +52,11 @@ func TestCapture(t *testing.T) {
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
 		Bindings: []*flow.CaptureSpec_Binding{
-			makeBinding(t, database1, col1),
-			makeBinding(t, database1, col2),
-			makeBinding(t, database2, col3),
+			makeBinding(t, database1, col1, ""), // empty is defaults to captureModeChangeStream
+			makeBinding(t, database1, col2, captureModeChangeStream),
+			makeBinding(t, database1, batchCol1, captureModeSnapshot),
+			makeBinding(t, database2, col3, captureModeChangeStream),
+			makeBinding(t, database2, batchCol2, captureModeSnapshot),
 		},
 	}
 
@@ -83,11 +73,13 @@ func TestCapture(t *testing.T) {
 	// Run the capture again and let it finish the backfill, resuming from the previous checkpoint.
 	advanceCapture(ctx, t, cs)
 
-	// Run the capture one more time, first adding more data that will be picked up from stream
-	// shards, to verify resumption from stream checkpoints.
+	// Run the capture one more time, first adding more data that will be picked up from change
+	// streams (but not batch collections), to verify resumption from stream checkpoints.
 	addTestTableData(ctx, t, client, database1, col1, 5, 5, stringPkVals, "onlyColumn")
 	addTestTableData(ctx, t, client, database1, col2, 5, 5, numberPkVals, "firstColumn", "secondColumn")
 	addTestTableData(ctx, t, client, database2, col3, 5, 5, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
+	addTestTableData(ctx, t, client, database1, batchCol1, 5, 5, stringPkVals, "batchColDb1")
+	addTestTableData(ctx, t, client, database2, batchCol2, 5, 5, stringPkVals, "batchColDb2")
 
 	advanceCapture(ctx, t, cs)
 
@@ -95,6 +87,8 @@ func TestCapture(t *testing.T) {
 	deleteData(ctx, t, client, database1, col1, stringPkVals(0))
 	deleteData(ctx, t, client, database1, col2, numberPkVals(0))
 	deleteData(ctx, t, client, database2, col3, binaryPkVals(0))
+	deleteData(ctx, t, client, database1, batchCol1, stringPkVals(0))
+	deleteData(ctx, t, client, database2, batchCol2, stringPkVals(0))
 
 	advanceCapture(ctx, t, cs)
 
@@ -102,7 +96,63 @@ func TestCapture(t *testing.T) {
 	updateData(ctx, t, client, database1, col1, stringPkVals(1), "onlyColumn_new")
 	updateData(ctx, t, client, database1, col2, numberPkVals(1), "thirdColumn_new")
 	updateData(ctx, t, client, database2, col3, binaryPkVals(1), "forthColumn_new")
+	updateData(ctx, t, client, database1, batchCol1, stringPkVals(1), "batchColDb1_new")
+	updateData(ctx, t, client, database2, batchCol2, stringPkVals(1), "batchColDb2_new")
 
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+func TestCaptureBatchSnapshotResumption(t *testing.T) {
+	database := "testDb"
+	collection := "collection"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	binding := makeBinding(t, database, collection, captureModeSnapshot)
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    &st.OrderedCaptureValidator{},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{binding},
+	}
+
+	// Initially empty collection
+	advanceCapture(ctx, t, cs)
+
+	backdateState := func() {
+		// Trigger another poll of the batch snapshot binding by manipulating its
+		// checkpoint to have a "last polled time" more than 24 hours in the past.
+		var state captureState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		resState := state.Resources[boilerplate.StateKey(binding.StateKey)]
+		backDate := resState.Backfill.LastPollStart.Add(-48 * time.Hour)
+		resState.Backfill.LastPollStart = &backDate
+		state.Resources[boilerplate.StateKey(binding.StateKey)] = resState
+		cp, err := json.Marshal(state)
+		require.NoError(t, err)
+		cs.Checkpoint = cp
+	}
+
+	// Simulate re-capturing the same collection after enough time has passed,
+	// this time with some documents.
+	addTestTableData(ctx, t, client, database, collection, 5, 0, stringPkVals, "onlyColumn")
+	backdateState()
+	advanceCapture(ctx, t, cs)
+
+	// Re-capture again with even more added documents.
+	addTestTableData(ctx, t, client, database, collection, 5, 5, stringPkVals, "onlyColumn")
+	backdateState()
 	advanceCapture(ctx, t, cs)
 
 	cupaloy.SnapshotT(t, cs.Summary())
@@ -116,7 +166,7 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 	client, cfg := testClient(t)
 
 	cleanup := func() {
-		dropCollection(ctx, t, client, database, col)
+		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
@@ -129,7 +179,7 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 		Checkpoint:   []byte("{}"),
 		Validator:    &st.OrderedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
-		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col)},
+		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col, captureModeChangeStream)},
 	}
 
 	collection := client.Database(database).Collection(col)
@@ -208,28 +258,11 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 	client, cfg := testClient(t)
 
 	cleanup := func() {
-		dropCollection(ctx, t, client, database1, col1)
-		dropCollection(ctx, t, client, database1, col2)
-		dropCollection(ctx, t, client, database2, col3)
+		require.NoError(t, client.Database(database1).Drop(ctx))
+		require.NoError(t, client.Database(database2).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
-
-	stringPkVals := func(idx int) any {
-		return fmt.Sprintf("pk val %d", idx)
-	}
-
-	numberPkVals := func(idx int) any {
-		if idx%2 == 0 {
-			return idx
-		}
-
-		return float64(idx) + 0.5
-	}
-
-	binaryPkVals := func(idx int) any {
-		return []byte(fmt.Sprintf("pk val %d", idx))
-	}
 
 	addTestTableData(ctx, t, client, database1, col1, 5, 0, stringPkVals, "onlyColumn")
 	addTestTableData(ctx, t, client, database1, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
@@ -242,9 +275,9 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
 		Bindings: []*flow.CaptureSpec_Binding{
-			makeBinding(t, database1, col1),
-			// makeBinding(t, database1, col2), Note: Binding disabled for this collection.
-			makeBinding(t, database2, col3),
+			makeBinding(t, database1, col1, captureModeChangeStream),
+			// makeBinding(t, database1, col2, captureModeChangeStream), Note: Binding disabled for this collection.
+			makeBinding(t, database2, col3, captureModeChangeStream),
 		},
 	}
 
@@ -265,6 +298,7 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 func commonSanitizers() map[string]*regexp.Regexp {
 	sanitizers := make(map[string]*regexp.Regexp)
 	sanitizers[`"<TOKEN>"`] = regexp.MustCompile(`"[A-Za-z0-9+/=]{32,}"`)
+	sanitizers[`"last_poll_start":"<LAST_POLLED_TS>"`] = regexp.MustCompile(`"last_poll_start":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z"`)
 
 	return sanitizers
 }
@@ -278,11 +312,11 @@ func resourceSpecJson(t *testing.T, r resource) json.RawMessage {
 	return out
 }
 
-func makeBinding(t *testing.T, database string, collection string) *flow.CaptureSpec_Binding {
+func makeBinding(t *testing.T, database string, collection string, mode captureMode) *flow.CaptureSpec_Binding {
 	t.Helper()
 
 	return &flow.CaptureSpec_Binding{
-		ResourceConfigJson: resourceSpecJson(t, resource{Collection: collection, Database: database}),
+		ResourceConfigJson: resourceSpecJson(t, resource{Collection: collection, Database: database, Mode: mode}),
 		ResourcePath:       []string{database, collection},
 		Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", collection))},
 		StateKey:           url.QueryEscape(database + "/" + collection),
@@ -308,4 +342,20 @@ func advanceCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	for _, e := range cs.Errors {
 		require.NoError(t, e)
 	}
+}
+
+func stringPkVals(idx int) any {
+	return fmt.Sprintf("pk val %d", idx)
+}
+
+func numberPkVals(idx int) any {
+	if idx%2 == 0 {
+		return idx
+	}
+
+	return float64(idx) + 0.5
+}
+
+func binaryPkVals(idx int) any {
+	return []byte(fmt.Sprintf("pk val %d", idx))
 }
