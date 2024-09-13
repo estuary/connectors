@@ -201,7 +201,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if batchSize == storeBatchSize {
 			if err := sendBatch(batch); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("sending batch: %w", err)
 			}
 			batch = make(map[string][]types.WriteRequest)
 			batchSize = 0
@@ -210,7 +210,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	if batchSize > 0 {
 		if err := sendBatch(batch); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("sending final batch: %w", err)
 		}
 	}
 
@@ -302,7 +302,7 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 				})
 				if err != nil {
 					log.WithField("batch", batch).Error("failed batch write")
-					return err
+					return fmt.Errorf("BatchWriteItem: %w", err)
 				}
 
 				if len(res.UnprocessedItems) == 0 {
@@ -315,7 +315,7 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 				batch = res.UnprocessedItems
 
 				if err := delay(ctx, attempt, "store"); err != nil {
-					return err
+					return fmt.Errorf("delay backoff: %w", err)
 				}
 			}
 		}
