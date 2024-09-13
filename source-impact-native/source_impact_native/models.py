@@ -28,6 +28,7 @@ class EndpointConfig(BaseModel, extra="allow"):
         title="API Key"        )
     api_catalog: CatalogEnum = Field(
         title="API Catalog (Brand, Agency, Partner)",
+        description="As of now, only BRAND catalogs are allowed"
         
     )
     stop_date: AwareDatetime = Field(
