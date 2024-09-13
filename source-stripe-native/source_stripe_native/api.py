@@ -15,6 +15,7 @@ from .models import EventResult, BackfillResult, ListResult
 
 
 API = "https://api.stripe.com/v1"
+MAX_PAGE_LIMIT = 100
 
 async def fetch_incremental(
     cls,
@@ -33,7 +34,7 @@ async def fetch_incremental(
     iterating = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": 100}
+    parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
 
     _cls: Any = cls  # Silence mypy false-positive
@@ -80,7 +81,7 @@ async def fetch_backfill(
     """
 
     url = f"{API}/{cls.SEARCH_NAME}"
-    parameters = {"limit": 100}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
 
     if page:
         parameters["starting_after"] = page
@@ -127,7 +128,7 @@ async def fetch_incremental_substreams(
     iterating = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": 100}
+    parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
 
 
@@ -156,7 +157,6 @@ async def fetch_incremental_substreams(
                 if child_data is None:
                     pass # move to next customer
                 async for doc in child_data:
-                    doc.parent_id = parent_data.id
                     doc.meta_ = cls_child.Meta(op="u")
                     yield doc 
         
@@ -189,7 +189,7 @@ async def fetch_backfill_substreams(
     _cls: Any = cls  # Silence mypy false-positive
 
     url = f"{API}/{_cls.SEARCH_NAME}"
-    parameters = {"limit": 100}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
 
     search_name = _cls.SEARCH_NAME
 
@@ -201,7 +201,6 @@ async def fetch_backfill_substreams(
         parameters["status"] = "all"
 
 
-    
     result = BackfillResult[_cls].model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
@@ -210,6 +209,7 @@ async def fetch_backfill_substreams(
         if _s_to_dt(doc.created) == stop_date:
             parent_data = doc
             id = parent_data.id
+
             child_data = _capture_substreams(
                             cls_child,
                             search_name,
@@ -222,7 +222,6 @@ async def fetch_backfill_substreams(
             if child_data is None:
                 return
             async for doc in child_data:
-                doc.parent_id = parent_data.id
                 doc.meta_ = cls_child.Meta(op="u")
                 yield doc 
             return
@@ -245,7 +244,6 @@ async def fetch_backfill_substreams(
             if child_data is None:
                 pass # move to next customer
             async for doc in child_data:
-                doc.parent_id = parent_data.id
                 doc.meta_ = cls_child.Meta(op="u")
                 yield doc 
 
@@ -267,27 +265,34 @@ async def _capture_substreams(
     """
 
     child_url = f"{API}/{search_name}/{id}/{cls_child.SEARCH_NAME}"
-    parameters = cls_child.PARAMETERS
-    if cls_child.NAME == "SetupAttempts":
-        parameters["setup_intent"] = id
-        child_url = f"{API}/{cls_child.SEARCH_NAME}"
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
 
-    elif cls_child.NAME == "UsageRecords":
-        child_url = f"{API}/subscription_items/{id}/{cls_child.SEARCH_NAME}"
+    # Use stream specific URLs and query parameters.
+    match cls_child.NAME:
+        case "SetupAttempts":
+            parameters.update({"setup_intent": id})
+            child_url = f"{API}/{cls_child.SEARCH_NAME}"
+        case "UsageRecords":
+            child_url = f"{API}/subscription_items/{id}/{cls_child.SEARCH_NAME}"
+        case "ExternalAccountCards":
+            parameters.update({"object": "card"})
+        case "ExternalBankAccount":
+            parameters.update({"object": "bank_account"})
 
+    # Fetch child records
     while True:
         if cls_child.NAME == "Persons" and parent_data.controller["requirement_collection"] == "stripe" :
             break
         result_child = ListResult[cls_child].model_validate_json(
-        await http.request(log, child_url, method="GET", params=parameters)
-    )
+            await http.request(log, child_url, method="GET", params=parameters)
+        )
 
         for doc in result_child.data:
             yield doc
 
-        if result_child.has_more is True:
+        if result_child.has_more:
             parameters["starting_after"] = result_child.data[-1].id
-        elif result_child.has_more is False:
+        else:
             break
 
 
@@ -307,7 +312,7 @@ async def fetch_incremental_no_events(
     iterating = True
 
     url = f"{API}/{cls.SEARCH_NAME}"
-    parameters = {"limit": 100}
+    parameters = {"limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
 
 
@@ -350,7 +355,7 @@ async def fetch_incremental_usage_records(
     iterating = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": 100}
+    parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
 
 
@@ -380,7 +385,6 @@ async def fetch_incremental_usage_records(
                     if child_data is None:
                         pass # move to next item
                     async for doc in child_data:
-                        doc.parent_id = parent_data.id
                         doc.meta_ = cls_child.Meta(op="u")
                         yield doc 
 
@@ -414,7 +418,7 @@ async def fetch_backfill_usage_records(
     _cls: Any = cls  # Silence mypy false-positive
 
     url = f"{API}/{_cls.SEARCH_NAME}"
-    parameters = {"limit": 100}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
 
     search_name = _cls.SEARCH_NAME
 
@@ -445,7 +449,6 @@ async def fetch_backfill_usage_records(
                 if child_data is None:
                     pass
                 async for doc in child_data:
-                    doc.parent_id = parent_data.id
                     doc.meta_ = cls_child.Meta(op="u")
                     yield doc 
             return
@@ -469,7 +472,6 @@ async def fetch_backfill_usage_records(
                 if child_data is None:
                     pass # move to next item
                 async for doc in child_data:
-                    doc.parent_id = parent_data.id
                     doc.meta_ = cls_child.Meta(op="u")
                     yield doc 
 
