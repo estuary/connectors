@@ -3,6 +3,7 @@ package sql
 import (
 	"bytes"
 	"context"
+	stdsql "database/sql"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -318,6 +319,8 @@ func RunValidateAndApplyMigrationsTests(
 	config any,
 	resourceConfig any,
 	dumpSchema func(t *testing.T) string,
+	insertData func(t *testing.T, cols []string, values []string),
+	dumpData func(t *testing.T) string,
 	cleanup func(t *testing.T, materialization pf.Materialization),
 ) {
 	ctx := context.Background()
@@ -354,6 +357,8 @@ func RunValidateAndApplyMigrationsTests(
 		snap.WriteString("\nBase Re-validated Constraints:\n")
 		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
+		insertData(t, []string{"key", "scalarValue", "numericString"}, []string{"'1'", "'test'", "123"})
+
 		// Apply again - this should be a no-op.
 		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
@@ -361,6 +366,8 @@ func RunValidateAndApplyMigrationsTests(
 
 		snap.WriteString("\nMigratable Changes Before Apply Schema:\n")
 		snap.WriteString(dumpSchema(t) + "\n")
+		snap.WriteString("\nMigratable Changes Before Apply Data:\n")
+		snap.WriteString(dumpData(t) + "\n")
 
 		// Validate with migratable changes
 		changed := loadValidateSpec(t, "migratable-changes.flow.proto")
@@ -375,6 +382,9 @@ func RunValidateAndApplyMigrationsTests(
 
 		snap.WriteString("\nMigratable Changes Applied Schema:\n")
 		snap.WriteString(dumpSchema(t) + "\n")
+
+		snap.WriteString("\nMigratable Changes Applied Data:\n")
+		snap.WriteString(dumpData(t) + "\n")
 	})
 
 	cupaloy.SnapshotT(t, snap.String())
@@ -478,4 +488,49 @@ func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 	}
 
 	return out.String()
+}
+
+func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string, ordering string) (string, error) {
+	t.Helper()
+	var b strings.Builder
+
+	var sql = fmt.Sprintf("select * from %s order by %s asc;", qualifiedTableName, ordering)
+
+	rows, err := db.Query(sql)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return "", err
+	}
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return "", err
+	}
+
+	b.WriteString(strings.Join(cols, ", "))
+
+	for rows.Next() {
+		var data = make([]anyColumn, len(cols))
+		var ptrs = make([]interface{}, len(cols))
+		for i := range data {
+			ptrs[i] = &data[i]
+		}
+		if err = rows.Scan(ptrs...); err != nil {
+			return "", err
+		}
+		b.WriteString("\n")
+		for i, v := range ptrs {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			var val = v.(*anyColumn)
+			b.WriteString(val.String())
+			b.WriteString(" (" + colTypes[i].DatabaseTypeName() + ")")
+		}
+	}
+	return b.String(), nil
 }

@@ -125,9 +125,45 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		))
 	}
 
+	if len(ta.ColumnTypeChanges) > 0 {
+		for _, ch := range ta.ColumnTypeChanges {
+			var tempColumnName = c.ep.Dialect.Identifier(fmt.Sprintf("%s_flowtmp1", ch.Field))
+			var tempOriginalRename = c.ep.Dialect.Identifier(fmt.Sprintf("%s_flowtmp2", ch.Field))
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s ADD COLUMN %s %s;",
+				ta.Identifier,
+				tempColumnName,
+				ch.DDL,
+			))
+			statements = append(statements, fmt.Sprintf(
+				"UPDATE %s SET %s = %s;",
+				ta.Identifier,
+				tempColumnName,
+				ch.Identifier,
+			))
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+				ta.Identifier,
+				ch.Identifier,
+				tempOriginalRename,
+			))
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+				ta.Identifier,
+				tempColumnName,
+				ch.Identifier,
+			))
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s DROP COLUMN %s;",
+				ta.Identifier,
+				tempOriginalRename,
+			))
+		}
+	}
+
 	// Each table column addition statement is a separate statement, but will be grouped
 	// together in a single multi-statement query.
-	alterStmt := strings.Join(statements, "\n")
+	alterStmt := "BEGIN; " + strings.Join(statements, "\n") + " END; "
 
 	return alterStmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, alterStmt)
