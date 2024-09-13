@@ -1,0 +1,70 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-impact-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_impact_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: Actions
+        target: acmeCo/Actions
+      - resource:
+          name: ActionInquiries
+        target: acmeCo/ActionInquiries
+      - resource:
+          name: Invoices
+        target: acmeCo/Invoices
+      - resource:
+          name: Jobs
+        target: acmeCo/Jobs
+      - resource:
+          name: PromoCodes
+        target: acmeCo/PromoCodes
+      - resource:
+          name: Deals
+        target: acmeCo/Deals
+      - resource:
+          name: ExceptionLists
+        target: acmeCo/ExceptionLists
+      - resource:
+          name: UniqueUrls
+        target: acmeCo/UniqueUrls
+      - resource:
+          name: TrackingValueRequests
+        target: acmeCo/TrackingValueRequests
+      - resource:
+          name: Campaigns
+        target: acmeCo/Campaigns
+      - resource:
+          name: Ads
+        target: acmeCo/Ads
+      - resource:
+          name: Catalogs
+        target: acmeCo/Catalogs
+      - resource:
+          name: Reports
+        target: acmeCo/Reports
+      - resource:
+          name: PhoneNumbers
+        target: acmeCo/PhoneNumbers
+      - resource:
+          name: Contracts
+        target: acmeCo/Contracts
+      - resource:
+          name: Tasks
+        target: acmeCo/Tasks
+      - resource:
+          name: Notes
+        target: acmeCo/Notes
+      - resource:
+          name: BlockRedirectRules
+        target: acmeCo/BlockRedirectRules
+      - resource:
+          name: MediaPartnerGroups
+        target: acmeCo/MediaPartnerGroups
