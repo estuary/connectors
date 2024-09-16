@@ -8,6 +8,7 @@ authors = ["Luis Salomao <luish1980@hotmail.com>"]
 estuary-cdk = {path="../estuary-cdk", develop = true}
 pydantic = "^2"
 python = "^3.12"
+requests = "^2.32.3"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

@@ -39,7 +39,7 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
-        resources = await all_resources(log, self, discover.config)
+        resources = await all_resources(log, self, discover.config, is_discover=True)
         return common.discovered(resources)
 
     async def validate(
