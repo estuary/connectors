@@ -37,8 +37,9 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key, _meta/flow_truncated, flow_published_at, multiple, nonScalarValue, numericString, optional, scalarValue, flow_document
-1 (TEXT), false (BOOL), 2024-09-13 01:01:01 +0000 +0000 (TIMESTAMPTZ), <nil> (JSON), <nil> (JSON), 123 (NUMERIC), <nil> (JSON), test (TEXT), {} (JSON)
+key (TEXT), _meta/flow_truncated (BOOL), flow_published_at (TIMESTAMPTZ), multiple (JSON), nonScalarValue (JSON), numericString (NUMERIC), optional (JSON), scalarValue (TEXT), flow_document (JSON)
+
+1, false, 2024-09-13 01:01:01 +0000 +0000, <nil>, <nil>, 123, <nil>, test, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -66,6 +67,7 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key, _meta/flow_truncated, flow_published_at, multiple, nonScalarValue, numericString, optional, scalarValue, flow_document
-1 (TEXT), false (BOOL), 2024-09-13 01:01:01 +0000 +0000 (TIMESTAMPTZ), <nil> (JSON), <nil> (JSON), 123 (TEXT), <nil> (JSON), test (TEXT), {} (JSON)
+key (TEXT), _meta/flow_truncated (BOOL), flow_published_at (TIMESTAMPTZ), multiple (JSON), nonScalarValue (JSON), numericString (TEXT), optional (JSON), scalarValue (TEXT), flow_document (JSON)
+
+1, false, 2024-09-13 01:01:01 +0000 +0000, <nil>, <nil>, 123, <nil>, test, {}
 
