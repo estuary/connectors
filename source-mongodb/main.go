@@ -327,14 +327,23 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 		var resourcePath = []string{res.Database, res.Collection}
 
-		// Validate changes to the resource spec. Changing the capture mode is not
-		// allowed, although theoretically going from change stream to a snapshot
-		// could work. It's just easier to not allow it for now unless the binding
-		// is being reset (backfill counter incremented) as well.
+		// Validate changes to the resource spec.
 		for idx, lastResource := range lastResources {
 			if lastResource.Database == res.Database && lastResource.Collection == res.Collection {
+				// Changing the capture mode is not allowed, although
+				// theoretically going from change stream to a snapshot could
+				// work. It's just easier to not allow it for now unless the
+				// binding is being reset (backfill counter incremented) as
+				// well.
 				if lastResource.getMode() != res.getMode() && binding.Backfill == lastBackfillCounters[idx] {
 					return nil, fmt.Errorf("cannot change mode from %s to %s for binding %q without backfilling the binding", lastResource.getMode(), res.getMode(), resourcePath)
+				}
+
+				// Change the cursor field is not allowed for batch bindings.
+				if lastResource.getMode() != captureModeChangeStream {
+					if lastResource.getCursorField() != res.getCursorField() && binding.Backfill == lastBackfillCounters[idx] {
+						return nil, fmt.Errorf("cannot change cursor field from %s to %s for binding %q without backfilling the binding", lastResource.getCursorField(), res.getCursorField(), resourcePath)
+					}
 				}
 			}
 		}
