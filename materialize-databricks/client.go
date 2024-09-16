@@ -59,6 +59,55 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+	// First check if there are any interrupted column migrations which must be resumed, before we
+	// construct the InfoSchema
+	migrationsTable := c.ep.Dialect.Identifier(c.cfg.CatalogName, c.cfg.SchemaName, "flow_migrations")
+	flowMigrationsExists, err := c.wsClient.Tables.ExistsByFullName(ctx, migrationsTable)
+	if err == nil && flowMigrationsExists.TableExists {
+		rows, err := c.db.QueryContext(ctx, fmt.Sprintf("SELECT table, step, col_identifier, col_field, col_ddl FROM %s", migrationsTable))
+		if err != nil {
+			return nil, fmt.Errorf("finding flow_migrations: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var stmts [][]string
+			var tableIdentifier, colIdentifier, colField, DDL string
+			var step int
+			if err := rows.Scan(&tableIdentifier, &step, &colIdentifier, &colField, &DDL); err != nil {
+				return nil, fmt.Errorf("reading flow_migrations row: %w", err)
+			}
+			var steps, acceptableErrors = c.columnChangeSteps(tableIdentifier, colField, colIdentifier, DDL)
+
+			for s := step; s < len(steps); s++ {
+				stmts = append(stmts, []string{steps[s], acceptableErrors[s]})
+				stmts = append(stmts, []string{fmt.Sprintf("UPDATE %s SET step = %d WHERE table='%s';", migrationsTable, s+1, tableIdentifier)})
+			}
+
+			stmts = append(stmts, []string{fmt.Sprintf("DELETE FROM %s WHERE table='%s';", migrationsTable, tableIdentifier)})
+
+			for _, stmt := range stmts {
+				query := stmt[0]
+				var acceptableError string
+				if len(stmt) > 1 {
+					acceptableError = stmt[1]
+				}
+
+				if _, err := c.db.ExecContext(ctx, query); err != nil {
+					if acceptableError != "" && strings.Contains(err.Error(), acceptableError) {
+						// This is an acceptable error for this step, so we do not throw an error
+					} else {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		if _, err := c.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", migrationsTable)); err != nil {
+			return nil, fmt.Errorf("dropping flow_migrations: %w", err)
+		}
+	}
+
+	// Construct the InfoSchema after migrations
 	is := boilerplate.NewInfoSchema(
 		sql.ToLocatePathFn(c.ep.Dialect.TableLocator),
 		c.ep.Dialect.ColumnLocator,
@@ -142,6 +191,52 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+const ColumnChangeLength = ""
+
+func (c *client) columnChangeSteps(tableIdentifier, colField, colIdentifier, DDL string) ([]string, []string) {
+	var tempColumnName = fmt.Sprintf("%s_flowtmp1", colField)
+	var tempColumnIdentifier = c.ep.Dialect.Identifier(tempColumnName)
+	var tempOriginalRename = fmt.Sprintf("%s_flowtmp2", colField)
+	var tempOriginalRenameIdentifier = c.ep.Dialect.Identifier(tempOriginalRename)
+	return []string{
+			fmt.Sprintf(
+				"ALTER TABLE %s ADD COLUMN %s %s;",
+				tableIdentifier,
+				tempColumnIdentifier,
+				DDL,
+			),
+			fmt.Sprintf(
+				"UPDATE %s SET %s = %s;",
+				tableIdentifier,
+				tempColumnIdentifier,
+				colIdentifier,
+			),
+			fmt.Sprintf(
+				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+				tableIdentifier,
+				colIdentifier,
+				tempOriginalRenameIdentifier,
+			),
+			fmt.Sprintf(
+				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+				tableIdentifier,
+				tempColumnIdentifier,
+				colIdentifier,
+			),
+			fmt.Sprintf(
+				"ALTER TABLE %s DROP COLUMN %s;",
+				tableIdentifier,
+				tempOriginalRenameIdentifier,
+			),
+		}, []string{
+			"FIELDS_ALREADY_EXISTS",
+			"",
+			fmt.Sprintf("Missing field %s", colField),
+			fmt.Sprintf("Missing field %s", tempColumnName),
+			fmt.Sprintf("Missing field %s", tempOriginalRename),
+		}
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
@@ -161,6 +256,31 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			ta.Identifier,
 			c.ep.Dialect.Identifier(f.Name),
 		))
+	}
+
+	if len(ta.ColumnTypeChanges) > 0 {
+		stmts = append(stmts, "CREATE OR REPLACE TABLE flow_migrations(table STRING, step INTEGER, col_identifier STRING, col_field STRING, col_ddl STRING);")
+
+		for _, ch := range ta.ColumnTypeChanges {
+			stmts = append(stmts, fmt.Sprintf(
+				"INSERT INTO flow_migrations(table, step, col_identifier, col_field, col_ddl) VALUES ('%s', 0, '%s', '%s', '%s');",
+				ta.Identifier,
+				ch.Identifier,
+				ch.Field,
+				ch.DDL,
+			))
+		}
+
+		for _, ch := range ta.ColumnTypeChanges {
+			var steps, _ = c.columnChangeSteps(ta.Identifier, ch.Field, ch.Identifier, ch.DDL)
+
+			for s := 0; s < len(steps); s++ {
+				stmts = append(stmts, steps[s])
+				stmts = append(stmts, fmt.Sprintf("UPDATE flow_migrations SET STEP=%d WHERE table='%s';", s+1, ta.Identifier))
+			}
+		}
+
+		stmts = append(stmts, "DROP TABLE IF EXISTS flow_migrations;")
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
