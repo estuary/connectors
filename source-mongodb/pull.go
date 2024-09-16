@@ -296,10 +296,13 @@ func (s *captureState) Validate() error {
 }
 
 type backfillState struct {
-	Done           *bool          `json:"done,omitempty"`
-	LastId         *bson.RawValue `json:"last_id,omitempty"`
-	BackfilledDocs int            `json:"backfilled_docs,omitempty"`
-	LastPollStart  *time.Time     `json:"last_poll_start,omitempty"`
+	Done *bool `json:"done,omitempty"`
+	// TODO(whb): LastCursorValue is serialized as "last_id" for backward
+	// compatibility. I may change this later with a state migration but am
+	// refraining from doing it right now.
+	LastCursorValue *bson.RawValue `json:"last_id,omitempty"`
+	BackfilledDocs  int            `json:"backfilled_docs,omitempty"`
+	LastPollStart   *time.Time     `json:"last_poll_start,omitempty"`
 }
 
 func (s backfillState) done() bool {

@@ -48,6 +48,7 @@ type resource struct {
 	Collection   string      `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"order=1"`
 	Mode         captureMode `json:"captureMode,omitempty" jsonschema:"title=Capture Mode,enum=Change Stream Incremental,enum=Batch Snapshot,enum=Batch Incremental" jsonschema_extras:"order=2"`
 	PollSchedule string      `json:"pollSchedule,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to poll batch collections (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=3"`
+	Cursor       string      `json:"cursorField,omitempty" jsonschema:"title=Cursor Field,description=The name of the field to use as a cursor for batch-mode bindings. For best performance this field should be indexed. When used with 'Batch Incremental' mode documents added to the collection are expected to always have the cursor field and for it to be strictly increasing." jsonschema_extras:"order=4"`
 }
 
 func (r resource) Validate() error {
@@ -68,6 +69,11 @@ func (r resource) Validate() error {
 		if err := r.Mode.validate(); err != nil {
 			return fmt.Errorf("validating capture mode for '%s.%s': %w", r.Database, r.Collection, err)
 		}
+		if r.Mode == captureModeIncremental || r.Mode == captureModeSnapshot {
+			if r.Cursor == "" {
+				return fmt.Errorf("cursor field is required for '%s.%s' with mode '%s'", r.Database, r.Collection, r.Mode)
+			}
+		}
 	}
 
 	return nil
@@ -78,6 +84,13 @@ func (r resource) getMode() captureMode {
 		return r.Mode
 	}
 	return captureModeChangeStream
+}
+
+func (r resource) getCursorField() string {
+	if r.Cursor != "" {
+		return r.Cursor
+	}
+	return idProperty
 }
 
 type sshForwarding struct {
