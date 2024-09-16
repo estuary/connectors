@@ -21,12 +21,12 @@ type mongoCollectionType string
 const (
 	mongoCollectionTypeCollection mongoCollectionType = "collection"
 	mongoCollectionTypeView       mongoCollectionType = "view"
-	mongoCollectionTimeTimeseries mongoCollectionType = "timeseries"
+	mongoCollectionTypeTimeseries mongoCollectionType = "timeseries"
 )
 
 func (m mongoCollectionType) validate() error {
 	switch m {
-	case mongoCollectionTypeCollection, mongoCollectionTypeView, mongoCollectionTimeTimeseries:
+	case mongoCollectionTypeCollection, mongoCollectionTypeView, mongoCollectionTypeTimeseries:
 		return nil
 	default:
 		return fmt.Errorf("invalid collection type: %s", m)
@@ -193,12 +193,31 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 				continue
 			}
 
-			mode := captureModeChangeStream
+			var mode = captureModeChangeStream
+			var cursor string
+			var pollSchedule string
 			if !collectionType.canChangeStream() {
 				mode = captureModeSnapshot
+				cursor = idProperty
 			}
 
-			resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name, Mode: mode})
+			if collectionType == mongoCollectionTypeTimeseries {
+				tfRaw, err := collection.Options.LookupErr("timeseries", "timeField")
+				if err != nil {
+					return nil, fmt.Errorf("looking up timeField: %w", err)
+				}
+				cursor = tfRaw.StringValue()
+				mode = captureModeIncremental
+				pollSchedule = "5m"
+			}
+
+			resourceJSON, err := json.Marshal(resource{
+				Database:     db.Name(),
+				Collection:   collection.Name,
+				Mode:         mode,
+				Cursor:       cursor,
+				PollSchedule: pollSchedule,
+			})
 			if err != nil {
 				return nil, fmt.Errorf("serializing resource json: %w", err)
 			}

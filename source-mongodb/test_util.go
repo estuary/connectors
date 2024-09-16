@@ -43,16 +43,6 @@ func testClient(t *testing.T) (*mongo.Client, config) {
 	return client, config
 }
 
-func dropCollection(ctx context.Context, t *testing.T, client *mongo.Client, database string, collection string) {
-	t.Helper()
-
-	var db = client.Database(database)
-	var col = db.Collection(collection)
-	err := col.Drop(ctx)
-
-	require.NoError(t, err)
-}
-
 func addTestTableData(
 	ctx context.Context,
 	t *testing.T,

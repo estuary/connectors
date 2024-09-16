@@ -52,11 +52,11 @@ func TestCapture(t *testing.T) {
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
 		Bindings: []*flow.CaptureSpec_Binding{
-			makeBinding(t, database1, col1, ""), // empty is defaults to captureModeChangeStream
-			makeBinding(t, database1, col2, captureModeChangeStream),
-			makeBinding(t, database1, batchCol1, captureModeSnapshot),
-			makeBinding(t, database2, col3, captureModeChangeStream),
-			makeBinding(t, database2, batchCol2, captureModeSnapshot),
+			makeBinding(t, database1, col1, "", ""), // empty mode defaults to captureModeChangeStream
+			makeBinding(t, database1, col2, captureModeChangeStream, ""),
+			makeBinding(t, database1, batchCol1, captureModeSnapshot, "_id"),
+			makeBinding(t, database2, col3, captureModeChangeStream, ""),
+			makeBinding(t, database2, batchCol2, captureModeSnapshot, "_id"),
 		},
 	}
 
@@ -117,7 +117,7 @@ func TestCaptureBatchSnapshotResumption(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	binding := makeBinding(t, database, collection, captureModeSnapshot)
+	binding := makeBinding(t, database, collection, captureModeSnapshot, "_id")
 	cs := &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
@@ -130,29 +130,126 @@ func TestCaptureBatchSnapshotResumption(t *testing.T) {
 	// Initially empty collection
 	advanceCapture(ctx, t, cs)
 
-	backdateState := func() {
-		// Trigger another poll of the batch snapshot binding by manipulating its
-		// checkpoint to have a "last polled time" more than 24 hours in the past.
-		var state captureState
-		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
-		resState := state.Resources[boilerplate.StateKey(binding.StateKey)]
-		backDate := resState.Backfill.LastPollStart.Add(-48 * time.Hour)
-		resState.Backfill.LastPollStart = &backDate
-		state.Resources[boilerplate.StateKey(binding.StateKey)] = resState
-		cp, err := json.Marshal(state)
-		require.NoError(t, err)
-		cs.Checkpoint = cp
-	}
-
 	// Simulate re-capturing the same collection after enough time has passed,
 	// this time with some documents.
 	addTestTableData(ctx, t, client, database, collection, 5, 0, stringPkVals, "onlyColumn")
-	backdateState()
+	backdateState(t, cs, boilerplate.StateKey(binding.StateKey))
 	advanceCapture(ctx, t, cs)
 
 	// Re-capture again with even more added documents.
 	addTestTableData(ctx, t, client, database, collection, 5, 5, stringPkVals, "onlyColumn")
-	backdateState()
+	backdateState(t, cs, boilerplate.StateKey(binding.StateKey))
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+func TestBatchIncrementalResumption(t *testing.T) {
+	database := "testDb"
+	defaultCursorCollection := "defaultCursorCollection"
+	customCursorCollection := "customCursorCollection"
+	timeseriesCollection := "timeseries"
+	refTime := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	defaultBinding := makeBinding(t, database, defaultCursorCollection, captureModeIncremental, "_id")
+	customBinding := makeBinding(t, database, customCursorCollection, captureModeIncremental, "updatedAt")
+	timeseriesBinding := makeBinding(t, database, timeseriesCollection, captureModeIncremental, "ts")
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    &st.OrderedCaptureValidator{},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{defaultBinding, customBinding, timeseriesBinding},
+	}
+
+	// Initially empty collection
+	advanceCapture(ctx, t, cs)
+
+	// Add some data and capture it.
+	for idx := 0; idx < 5; idx++ {
+		_, err := client.Database(database).Collection(defaultCursorCollection).InsertOne(ctx, map[string]any{
+			"_id":   idx,
+			"value": fmt.Sprintf("value %d", idx),
+		})
+		require.NoError(t, err)
+		_, err = client.Database(database).Collection(customCursorCollection).InsertOne(ctx, map[string]any{
+			"_id":       idx,
+			"value":     fmt.Sprintf("value %d", idx),
+			"updatedAt": refTime.Add(time.Duration(idx) * time.Second),
+		})
+		require.NoError(t, err)
+		_, err = client.Database(database).Collection(timeseriesCollection).InsertOne(ctx, map[string]any{
+			"_id":   idx,
+			"value": fmt.Sprintf("value %d", idx),
+			"ts":    refTime.Add(time.Duration(idx) * time.Second),
+		})
+		require.NoError(t, err)
+	}
+	backdateState(t, cs, boilerplate.StateKey(defaultBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(customBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(timeseriesBinding.StateKey))
+	advanceCapture(ctx, t, cs)
+
+	// Run again before the next incremental period is due and data is not re-captured.
+	advanceCapture(ctx, t, cs)
+
+	// Run again after the next incremental period is due and data is still not re-captured.
+	backdateState(t, cs, boilerplate.StateKey(defaultBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(customBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(timeseriesBinding.StateKey))
+	advanceCapture(ctx, t, cs)
+
+	// Deletions and updates "earlier" than the cursor are not captured.
+	for _, col := range []string{defaultCursorCollection, customCursorCollection, timeseriesCollection} {
+		res, err := client.Database(database).Collection(col).DeleteOne(ctx, bson.M{"_id": 0})
+		require.NoError(t, err)
+		require.Equal(t, int64(1), res.DeletedCount)
+		_, err = client.Database(database).Collection(col).UpdateOne(ctx, bson.M{"_id": 1}, bson.M{"$set": bson.M{"value": "new value"}})
+		require.NoError(t, err)
+	}
+	backdateState(t, cs, boilerplate.StateKey(defaultBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(customBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(timeseriesBinding.StateKey))
+	advanceCapture(ctx, t, cs)
+
+	// Add some new incremental data.
+	for idx := 5; idx < 10; idx++ {
+		_, err := client.Database(database).Collection(defaultCursorCollection).InsertOne(ctx, map[string]any{
+			"_id":   idx,
+			"value": fmt.Sprintf("value %d", idx),
+		})
+		require.NoError(t, err)
+		_, err = client.Database(database).Collection(customCursorCollection).InsertOne(ctx, map[string]any{
+			"_id":       idx,
+			"value":     fmt.Sprintf("value %d", idx),
+			"updatedAt": refTime.Add(time.Duration(idx) * time.Second),
+		})
+		require.NoError(t, err)
+		_, err = client.Database(database).Collection(timeseriesCollection).InsertOne(ctx, map[string]any{
+			"_id":   idx,
+			"value": fmt.Sprintf("value %d", idx),
+			"ts":    refTime.Add(time.Duration(idx) * time.Second),
+		})
+		require.NoError(t, err)
+	}
+
+	// The new incremental data is not captured yet.
+	advanceCapture(ctx, t, cs)
+
+	// But the new data is captured at the next scheduled time.
+	backdateState(t, cs, boilerplate.StateKey(defaultBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(customBinding.StateKey))
+	backdateState(t, cs, boilerplate.StateKey(timeseriesBinding.StateKey))
 	advanceCapture(ctx, t, cs)
 
 	cupaloy.SnapshotT(t, cs.Summary())
@@ -179,7 +276,7 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 		Checkpoint:   []byte("{}"),
 		Validator:    &st.OrderedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
-		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col, captureModeChangeStream)},
+		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col, captureModeChangeStream, "")},
 	}
 
 	collection := client.Database(database).Collection(col)
@@ -275,9 +372,9 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
 		Bindings: []*flow.CaptureSpec_Binding{
-			makeBinding(t, database1, col1, captureModeChangeStream),
+			makeBinding(t, database1, col1, captureModeChangeStream, ""),
 			// makeBinding(t, database1, col2, captureModeChangeStream), Note: Binding disabled for this collection.
-			makeBinding(t, database2, col3, captureModeChangeStream),
+			makeBinding(t, database2, col3, captureModeChangeStream, ""),
 		},
 	}
 
@@ -312,11 +409,11 @@ func resourceSpecJson(t *testing.T, r resource) json.RawMessage {
 	return out
 }
 
-func makeBinding(t *testing.T, database string, collection string, mode captureMode) *flow.CaptureSpec_Binding {
+func makeBinding(t *testing.T, database string, collection string, mode captureMode, cursor string) *flow.CaptureSpec_Binding {
 	t.Helper()
 
 	return &flow.CaptureSpec_Binding{
-		ResourceConfigJson: resourceSpecJson(t, resource{Collection: collection, Database: database, Mode: mode}),
+		ResourceConfigJson: resourceSpecJson(t, resource{Collection: collection, Database: database, Mode: mode, Cursor: cursor}),
 		ResourcePath:       []string{database, collection},
 		Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", collection))},
 		StateKey:           url.QueryEscape(database + "/" + collection),
@@ -358,4 +455,18 @@ func numberPkVals(idx int) any {
 
 func binaryPkVals(idx int) any {
 	return []byte(fmt.Sprintf("pk val %d", idx))
+}
+
+func backdateState(t *testing.T, cs *st.CaptureSpec, sk boilerplate.StateKey) {
+	// Trigger another poll of the batch snapshot binding by manipulating its
+	// checkpoint to have a "last polled time" more than 24 hours in the past.
+	var state captureState
+	require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+	resState := state.Resources[boilerplate.StateKey(sk)]
+	backDate := resState.Backfill.LastPollStart.Add(-48 * time.Hour)
+	resState.Backfill.LastPollStart = &backDate
+	state.Resources[boilerplate.StateKey(sk)] = resState
+	cp, err := json.Marshal(state)
+	require.NoError(t, err)
+	cs.Checkpoint = cp
 }
