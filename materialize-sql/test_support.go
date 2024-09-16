@@ -511,7 +511,14 @@ func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string, order
 		return "", err
 	}
 
-	b.WriteString(strings.Join(cols, ", "))
+	for i, col := range cols {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(col)
+		b.WriteString(" (" + colTypes[i].DatabaseTypeName() + ")")
+	}
+	b.WriteString("\n")
 
 	for rows.Next() {
 		var data = make([]anyColumn, len(cols))
@@ -529,7 +536,6 @@ func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string, order
 			}
 			var val = v.(*anyColumn)
 			b.WriteString(val.String())
-			b.WriteString(" (" + colTypes[i].DatabaseTypeName() + ")")
 		}
 	}
 	return b.String(), nil
