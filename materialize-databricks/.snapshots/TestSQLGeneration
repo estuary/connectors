@@ -23,7 +23,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
   `stringInteger66Chars` STRING COMMENT 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]',
   `stringNumber` DOUBLE COMMENT 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]',
   flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'
-) COMMENT 'Generated for materialization test/sqlite of collection key/value';
+) COMMENT 'Generated for materialization test/sqlite of collection key/value' TBLPROPERTIES ('delta.columnMapping.mode' = 'name');
 --- End `a-schema`.key_value createTargetTable ---
 
 --- Begin `a-schema`.delta_updates createTargetTable ---
@@ -35,7 +35,7 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]',
   flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
-) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
+) COMMENT 'Generated for materialization test/sqlite of collection delta/updates' TBLPROPERTIES ('delta.columnMapping.mode' = 'name');
 --- End `a-schema`.delta_updates createTargetTable ---
 
 --- Begin alter table add columns ---

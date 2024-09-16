@@ -59,6 +59,9 @@ var databricksDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
+		MigratableTypes: map[sql.FlatType][]string{
+			sql.STRING: {"long", "decimal", "double"},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
 				// Object names (including schemas and table names) are lowercased in Databricks.
@@ -113,7 +116,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
   {{- if $ind }},{{ end }}
   {{$col.Identifier}} {{$col.DDL}} COMMENT {{ Literal $col.Comment }}
   {{- end }}
-) COMMENT {{ Literal $.Comment }};
+) COMMENT {{ Literal $.Comment }} TBLPROPERTIES ('delta.columnMapping.mode' = 'name');
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns.

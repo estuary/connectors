@@ -7,6 +7,7 @@ import (
 	stdsql "database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -82,6 +83,74 @@ func TestValidateAndApply(t *testing.T) {
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
 				"delete from %s where materialization = %s",
 				databricksDialect.Identifier(cfg.SchemaName, sql.DefaultFlowMaterializations),
+				databricksDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:  "target",
+		Schema: cfg.SchemaName,
+	}
+
+	db, err := stdsql.Open("databricks", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newDatabricksDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.CatalogName, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, cols []string, values []string) {
+			t.Helper()
+
+			var keys = make([]string, len(cols))
+			for i, col := range cols {
+				keys[i] = databricksDialect.Identifier(col)
+			}
+			keys = append(keys, databricksDialect.Identifier("_meta/flow_truncated"))
+			values = append(values, "0")
+			keys = append(keys, databricksDialect.Identifier("flow_published_at"))
+			values = append(values, "'2024-09-13 01:01:01'")
+			keys = append(keys, databricksDialect.Identifier("flow_document"))
+			values = append(values, "'{}'")
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			_, err = db.ExecContext(ctx, q)
+
+			require.NoError(t, err)
+		},
+		func(t *testing.T) string {
+			t.Helper()
+
+			rows, err := sql.DumpTestTable(t, db, databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), databricksDialect.Identifier("key"))
+
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				databricksDialect.Identifier(sql.DefaultFlowMaterializations),
 				databricksDialect.Literal(materialization.String()),
 			))
 		},
