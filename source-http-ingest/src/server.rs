@@ -43,6 +43,7 @@ pub async fn run_server(
         // This layer applies to all routes defined _before_ it, so the max body size is
         // the size after decompression.
         .layer(RequestDecompressionLayer::new())
+        .route_layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(Arc::new(handler));
 
     let address = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen_on_port()));
