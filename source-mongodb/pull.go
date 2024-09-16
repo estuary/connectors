@@ -157,7 +157,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	})
 
 	didBackfill := false
-	for !prevState.isBackfillComplete(changeStreamBindings) {
+	for !prevState.isChangeStreamBackfillComplete(changeStreamBindings) {
 		if !didBackfill {
 			log.Info("backfilling incremental change stream collections")
 		}
@@ -243,7 +243,7 @@ type captureState struct {
 	DatabaseResumeTokens map[string]bson.Raw                    `json:"databaseResumeTokens,omitempty"`
 }
 
-func updateResourceStates(prevState captureState, bindings []bindingInfo) (captureState, error) {
+func updateResourceStates(prevState captureState, allBindings []bindingInfo) (captureState, error) {
 	var newState = captureState{
 		Resources:            make(map[boilerplate.StateKey]resourceState),
 		DatabaseResumeTokens: make(map[string]bson.Raw),
@@ -251,22 +251,26 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 
 	trackedDatabases := make(map[string]struct{})
 
-	// Only include bindings in the state that are currently active bindings. This is necessary
-	// because the Flow runtime does not yet automatically prune stateKeys that are no longer
-	// included as bindings. A binding becomes inconsistent once removed from the capture
-	// because its change events will begin to be filtered out, and must start over if ever
-	// re-added.
+	// Only include bindings in the state that are currently active bindings.
+	// This is necessary because the Flow runtime does not yet automatically
+	// prune stateKeys that are no longer included as bindings. Also, a change
+	// stream binding becomes inconsistent once removed from the capture because
+	// its change events will begin to be filtered out, and must start over if
+	// ever re-added.
 	if prevState.Resources != nil {
-		for _, binding := range bindings {
+		for _, binding := range allBindings {
 			var sk = binding.stateKey
 			if resState, ok := prevState.Resources[sk]; ok {
 				newState.Resources[sk] = resState
-				trackedDatabases[binding.resource.Database] = struct{}{}
+				if binding.resource.getMode() == captureModeChangeStream {
+					trackedDatabases[binding.resource.Database] = struct{}{}
+				}
 			}
 		}
 	}
 
-	// Reset the database resume tokens if there are no active bindings for a given database.
+	// Reset the database resume tokens if there are no active change stream
+	// bindings for a given database.
 	for db, tok := range prevState.DatabaseResumeTokens {
 		if _, ok := trackedDatabases[db]; !ok {
 			log.WithFields(log.Fields{
@@ -282,8 +286,8 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 	return newState, nil
 }
 
-func (s *captureState) isBackfillComplete(bindings []bindingInfo) bool {
-	for _, b := range bindings {
+func (s *captureState) isChangeStreamBackfillComplete(changeStreamBindings []bindingInfo) bool {
+	for _, b := range changeStreamBindings {
 		if !s.Resources[b.stateKey].Backfill.done() {
 			return false
 		}
