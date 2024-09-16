@@ -15,6 +15,8 @@ from .api import (fetch_incremental,
                   fetch_incremental_no_events,
                   fetch_backfill_usage_records,
                   fetch_incremental_usage_records,
+                  fetch_incremental_discounts,
+                  fetch_backfill_discounts,
                   )
 
 from .models import (
@@ -83,7 +85,7 @@ async def all_resources(
         base_object(CreditNotes, http, config.stop_date),
         base_object(Disputes, http, config.stop_date),
         base_object(EarlyFraudWarning, http, config.stop_date),
-        base_object(InvoiceItems, http, config.stop_date),
+        discounts_object(InvoiceItems, http, config.stop_date),
         base_object(Invoices, http, config.stop_date),
         base_object(PaymentIntent, http, config.stop_date),
         base_object(Payouts, http, config.stop_date),
@@ -97,7 +99,7 @@ async def all_resources(
         base_object(SubscriptionsSchedule, http, config.stop_date),
         base_object(TopUps, http, config.stop_date),
         base_object(Transfers, http, config.stop_date),
-        base_object(SubscriptionItems, http, config.stop_date),
+        discounts_object(SubscriptionItems, http, config.stop_date),
         no_events_object(Files, http, config.stop_date),
         no_events_object(FilesLink, http, config.stop_date),
         no_events_object(BalanceTransactions, http, config.stop_date),
@@ -317,6 +319,44 @@ def issuing_object(
             task,
             fetch_changes=functools.partial(fetch_incremental, cls, http),
             fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=cls.NAME,
+        key=["/id"],
+        model=cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+        ),
+        initial_config=ResourceConfig(name=cls.NAME),
+        schema_inference=True,
+    )
+
+def discounts_object(
+    cls, http: HTTPSession, stop_date: datetime
+) -> Resource:
+    """Discounts Object handles a specific case from source-stripe-native
+    It pre-processes bad incoming type discounts fields from stripe API
+    """
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_incremental_discounts, cls, http),
+            fetch_page=functools.partial(fetch_backfill_discounts, cls, stop_date, http),
         )
 
     started_at = datetime.now(tz=UTC)

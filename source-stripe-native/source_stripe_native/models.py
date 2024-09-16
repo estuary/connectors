@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum, auto
 from pydantic import BaseModel, Field, AwareDatetime, model_validator, AliasChoices
-from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Dict, List
+from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Dict, List, Any
 import urllib.parse
 
 from estuary_cdk.flow import AccessToken
@@ -317,6 +317,7 @@ class InvoiceItems(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "invoiceitems"
     
     id: str
+    discounts: List[str] | None
     created: int = Field(validation_alias=AliasChoices('date'))
 
 
@@ -440,12 +441,12 @@ class SubscriptionItems(BaseDocument, extra="allow"):
             billing_thresholds: Dict | None = None
             created: int
             metadata: Dict | None = None
-            discounts: list[Dict] | None = None
+            discounts: List[str] | None = None
             plan: Dict | None = None
             price: Dict
             quantity: int | None = None
             subscription: str
-            tax_rates: list[Dict] | None = None
+            tax_rates: List[Dict] | None = None
 
         object: Literal["list"]
         data: list[Values]
