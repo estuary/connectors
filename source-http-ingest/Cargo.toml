@@ -33,7 +33,7 @@ utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
 time = { version = "0.3", features = ["formatting"] }
 uuid = { version = "1.7", features = ["v4"] }
 lazy_static = "1.4"
-tower-http = { version = "0.5", features = ["decompression-full"] }
+tower-http = { version = "0.5", features = ["decompression-full", "trace"] }
 tower = "0.4"
 
 [dev-dependencies]
