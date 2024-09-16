@@ -125,15 +125,15 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			var keys = make([]string, len(cols))
 			for i, col := range cols {
-				keys[i] = pgDialect.Identifier(col)
+				keys[i] = testDialect.Identifier(col)
 			}
-			keys = append(keys, pgDialect.Identifier("_meta/flow_truncated"))
+			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "0")
-			keys = append(keys, pgDialect.Identifier("flow_published_at"))
+			keys = append(keys, testDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, pgDialect.Identifier("flow_document"))
+			keys = append(keys, testDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", pgDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
 			_, err = db.ExecContext(ctx, q)
 
 			require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, pgDialect.Identifier(resourceConfig.Table), pgDialect.Identifier("key"))
+			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Table), testDialect.Identifier("key"))
 
 			require.NoError(t, err)
 
