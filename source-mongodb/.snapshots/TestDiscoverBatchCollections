@@ -91,7 +91,9 @@ Binding 1:
     "resource_config_json": {
       "database": "db",
       "collection": "timeseries",
-      "captureMode": "Batch Snapshot"
+      "captureMode": "Batch Incremental",
+      "pollSchedule": "5m",
+      "cursorField": "ts"
     },
     "document_schema_json": {
       "if": {
@@ -178,7 +180,8 @@ Binding 2:
     "resource_config_json": {
       "database": "db",
       "collection": "view",
-      "captureMode": "Batch Snapshot"
+      "captureMode": "Batch Snapshot",
+      "cursorField": "_id"
     },
     "document_schema_json": {
       "if": {

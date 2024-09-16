@@ -186,11 +186,11 @@ func (c *capture) doBackfill(
 	backfillState := c.state.Resources[binding.stateKey].Backfill
 	c.mu.Unlock()
 
-	lastId := backfillState.LastId
+	lastCursorValue := backfillState.LastCursorValue
 	initialDocsCaptured := backfillState.BackfilledDocs
-	if backfillState.done() {
-		// Starting the backfill over.
-		lastId = nil
+	if backfillState.done() && binding.resource.getMode() == captureModeSnapshot {
+		// Starting the snapshot backfill over.
+		lastCursorValue = nil
 		initialDocsCaptured = 0
 	}
 	additionalDocsCaptured := 0
@@ -204,20 +204,27 @@ func (c *capture) doBackfill(
 		return fmt.Errorf("getting estimated document count: %w", err)
 	}
 
-	// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
-	// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
-	// index (an index that always exists) to speed up the process. Note that if we specify the sort
-	// explicitly by { $natural: 1 }, then the database will disregard any indices and do a full
-	// collection scan. See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
-	var opts = options.Find().SetHint(bson.M{"_id": 1})
+	cursorField := binding.resource.getCursorField()
+	var opts *options.FindOptions
+	if cursorField == idProperty {
+		// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
+		// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
+		// index (an index that always exists) to speed up the process. Note that if we specify the sort
+		// explicitly by { $natural: 1 }, then the database will disregard any indices and do a full
+		// collection scan. See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
+		opts = options.Find().SetHint(bson.M{idProperty: 1})
+	} else {
+		// Other cursor fields require a sort.
+		opts = options.Find().SetSort(bson.D{{Key: cursorField, Value: 1}})
+	}
 
 	var filter = bson.D{}
-	if lastId != nil {
+	if lastCursorValue != nil {
 		var v any
-		if err := lastId.Unmarshal(&v); err != nil {
+		if err := lastCursorValue.Unmarshal(&v); err != nil {
 			return fmt.Errorf("unmarshalling last_id: %w", err)
 		}
-		filter = bson.D{{Key: idProperty, Value: bson.D{{Key: "$gt", Value: v}}}}
+		filter = bson.D{{Key: cursorField, Value: bson.D{{Key: "$gt", Value: v}}}}
 	}
 
 	cursor, err := collection.Find(ctx, filter, opts)
@@ -231,7 +238,6 @@ func (c *capture) doBackfill(
 		"collection":         binding.resource.Collection,
 		"estimatedTotalDocs": estimatedTotalDocs,
 	})
-	logEntry.Debug("starting backfill for collection")
 
 	for {
 		select {
@@ -279,24 +285,32 @@ func (c *capture) pullCursor(
 	binding bindingInfo,
 ) (int, error) {
 	var sk = binding.stateKey
+	var cursorField = binding.resource.getCursorField()
 	// TODO(whb): Revisit this batching strategy as part of a more holistic
 	// memory optimization effort.
 	var docBatch []json.RawMessage
-	var lastId bson.RawValue
+	var lastCursor bson.RawValue
 	var batchBytes int
 	var docsRead int
+
+	c.mu.Lock()
+	state := c.state.Resources[sk]
+	if state.Backfill.LastPollStart == nil || state.Backfill.done() {
+		// First time ever polling this collection, or doing a scheduled re-poll
+		// of a previously completed collection.
+		state.Backfill.LastPollStart = makePtr(time.Now().UTC())
+	}
+	if state.Backfill.done() && binding.resource.getMode() == captureModeSnapshot {
+		state.Backfill.BackfilledDocs = 0
+	}
+	state.Backfill.Done = makePtr(false)
+	c.state.Resources[sk] = state
+	c.mu.Unlock()
 
 	emitDocs := func() error {
 		c.mu.Lock()
 		state := c.state.Resources[sk]
-		if state.Backfill.done() || state.Backfill.LastPollStart == nil {
-			// First commit of a re-polled batch binding, or the fist commit for
-			// a binding ever.
-			state.Backfill.Done = makePtr(false)
-			state.Backfill.BackfilledDocs = 0
-			state.Backfill.LastPollStart = makePtr(time.Now().UTC())
-		}
-		state.Backfill.LastId = &lastId
+		state.Backfill.LastCursorValue = &lastCursor
 		state.Backfill.BackfilledDocs += len(docBatch)
 		c.state.Resources[sk] = state
 		checkpoint := captureState{
@@ -324,7 +338,7 @@ func (c *capture) pullCursor(
 	for cursor.Next(ctx) {
 		var doc bson.M
 		var err error
-		if lastId, err = cursor.Current.LookupErr(idProperty); err != nil {
+		if lastCursor, err = cursor.Current.LookupErr(cursorField); err != nil {
 			return 0, fmt.Errorf("looking up idProperty: %w", err)
 		} else if err = cursor.Decode(&doc); err != nil {
 			return 0, fmt.Errorf("backfill decoding document: %w", err)
@@ -363,10 +377,6 @@ func (c *capture) pullCursor(
 		c.mu.Lock()
 		state := c.state.Resources[sk]
 		state.Backfill.Done = makePtr(true)
-		if state.Backfill.LastPollStart == nil {
-			// Edge case of an initially empty collection.
-			state.Backfill.LastPollStart = makePtr(time.Now().UTC())
-		}
 		c.state.Resources[sk] = state
 		c.mu.Unlock()
 
