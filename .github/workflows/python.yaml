@@ -26,6 +26,7 @@ on:
       - "source-twilio/**"
       - "source-jira-native/**"
       - "source-mixpanel-native/**"
+      - "source-brevo/**"
       - "source-impact-native/**"
 
   pull_request:
@@ -56,6 +57,7 @@ on:
       - "source-twilio/**"
       - "source-jira-native/**"
       - "source-mixpanel-native/**"
+      - "source-brevo/**"
       - "source-impact-native/**"
 
 concurrency:
@@ -155,6 +157,10 @@ jobs:
           - name: source-mixpanel-native
             type: capture
             version: v2
+            usage_rate: "1.0"
+          - name: source-brevo
+            type: capture
+            version: v1
             usage_rate: "1.0"
           - name: source-impact-native
             type: capture
