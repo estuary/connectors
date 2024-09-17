@@ -755,9 +755,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	// Flush the final binding.
-	var b = d.bindings[lastBinding]
-	if err := flushStagedFile(ctx, b); err != nil {
-		return nil, fmt.Errorf("final binding flushing staged files for collection %q: %w", b.target.Source.String(), err)
+	if lastBinding != -1 {
+		var b = d.bindings[lastBinding]
+		if err := flushStagedFile(ctx, b); err != nil {
+			return nil, fmt.Errorf("final binding flushing staged files for collection %q: %w", b.target.Source.String(), err)
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
