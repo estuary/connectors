@@ -470,3 +470,78 @@ class TransferReversals(BaseDocument, extra="allow"):
     SEARCH_NAME: ClassVar[str] = "reversals"
 
     id: str
+
+# Streams can have 0 or more children. In most cases, child streams are accessible if their parent stream is accessible,
+# and they are inaccessible if their parent is inaccessible. 
+# However, some child streams can be inaccessible when their parent stream is accessible. In these situations, the discoverPath
+# property is set on the child stream. discoverPath must be structured correctly but should use an invalid parent id. Since the
+# Stripe API checks whether the stream is accessible before checking if the parent & child resources actually exist, we can
+# determine if the child stream is accessible by the API response's status code.
+STREAMS = [
+    {"stream": Accounts, "children": [
+            {"stream": Persons},
+            {"stream": ExternalAccountCards},
+            {"stream": ExternalBankAccount},
+        ]
+    },
+    {"stream": ApplicationFees, "children": [
+            {"stream": ApplicationFeesRefunds},
+        ]
+    },
+    {"stream": Customers, "children": [
+            {"stream": Bank_Accounts},
+            {"stream": Cards},
+            {"stream": CustomerBalanceTransaction},
+            {"stream": PaymentMethods},
+        ]
+    },
+    {"stream": Charges},
+    {"stream": CheckoutSessions, "children": [
+            {"stream": CheckoutSessionsLine},
+        ]
+    },
+    {"stream": Coupons},
+    {"stream": CreditNotes, "children": [
+            {"stream": CreditNotesLines},
+        ]
+    },
+    {"stream": Disputes},
+    {"stream": EarlyFraudWarning},
+    {"stream": InvoiceItems},
+    {"stream": Invoices, "children": [
+            {"stream": InvoiceLineItems},
+        ]
+    },
+    {"stream": PaymentIntent},
+    {"stream": Payouts},
+    {"stream": Plans},
+    {"stream": Products},
+    {"stream": PromotionCode},
+    {"stream": Refunds},
+    {"stream": Reviews},
+    {"stream": SetupIntents, "children": [
+            {"stream": SetupAttempts},
+        ]
+    },
+    {"stream": Subscriptions},
+    {"stream": SubscriptionsSchedule},
+    {"stream": SubscriptionItems, "children": [
+            {"stream": UsageRecords, "discoverPath": f"subscription_items/invalid_id/{UsageRecords.SEARCH_NAME}"},
+        ]
+    }, 
+    {"stream": TopUps},
+    {"stream": Transfers, "children": [
+        {"stream": TransferReversals},
+    ]},
+    {"stream": Files},
+    {"stream": FilesLink},
+    {"stream": BalanceTransactions},
+]
+
+# Regional streams are streams that don't have any children and are only accessible in certain regions.
+# This means we always have to check if these streams are accessible during discovery.
+REGIONAL_STREAMS = [
+    Authorizations,
+    CardHolders,
+    Transactions,
+]
