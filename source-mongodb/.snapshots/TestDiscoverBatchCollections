@@ -92,8 +92,8 @@ Binding 1:
       "database": "db",
       "collection": "timeseries",
       "captureMode": "Batch Incremental",
-      "pollSchedule": "5m",
-      "cursorField": "ts"
+      "cursorField": "ts",
+      "pollSchedule": "5m"
     },
     "document_schema_json": {
       "if": {

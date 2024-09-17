@@ -107,16 +107,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}()
 
-	serverInfo, err := getServerInfo(ctx, client, allBindings[0].resource.Database)
-	if err != nil {
-		return fmt.Errorf("checking server info: %w", err)
-	}
-	log.WithFields(log.Fields{
-		"version":               serverInfo.version,
-		"supportsChangeStreams": serverInfo.supportsChangeStreams,
-		"supportsPreImages":     serverInfo.supportsPreImages,
-	}).Info("connected to database")
-
 	var prevState captureState
 	if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
 		return fmt.Errorf("unmarshalling previous state: %w", err)
@@ -151,6 +141,16 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// No bindings to capture.
 		return nil
 	}
+
+	serverInfo, err := getServerInfo(ctx, client, allBindings[0].resource.Database)
+	if err != nil {
+		return fmt.Errorf("checking server info: %w", err)
+	}
+	log.WithFields(log.Fields{
+		"version":               serverInfo.version,
+		"supportsChangeStreams": serverInfo.supportsChangeStreams,
+		"supportsPreImages":     serverInfo.supportsPreImages,
+	}).Info("connected to database")
 
 	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
 		return getClusterOpTime(ctx, client)
