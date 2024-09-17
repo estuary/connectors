@@ -2,7 +2,7 @@
 import:
   - acmeCo/flow.yaml
 captures:
-  acmeCo/source-linkedin-ads-2024:
+  acmeCo/source-linkedin-ads-v2:
     endpoint:
       local:
         command:
