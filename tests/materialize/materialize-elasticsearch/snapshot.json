@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "create index \"flow_materializations_v2\"\ncreate index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\ncreate index \"index-deletions\"\nupdate stored materialization spec and set version = 0101010101010101"
+  "create index \"flow_materializations_v2\"\ncreate index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\ncreate index \"index-deletions\"\nupdate stored materialization spec and set version = ffffffffffffffff"
 ]
 [
   "connectorState",
@@ -1002,7 +1002,7 @@
 }
 [
   "applied.actionDescription",
-  "create index \"flow_materializations_v2\"\nupdate stored materialization spec and set version = 0101010101010101"
+  "create index \"flow_materializations_v2\"\nupdate stored materialization spec and set version = ffffffffffffffff"
 ]
 [
   "connectorState",
