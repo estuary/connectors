@@ -1,0 +1,10 @@
+# ================================
+# Invariant Violations
+# ================================
+no invariant violations observed
+
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"stressdb1%2Fstressdb1collection1":{"backfill":{"done":true,"last_poll_start":"<LAST_POLLED_TS>"}},"stressdb1%2Fstressdb1collection2":{"backfill":{"done":true,"last_poll_start":"<LAST_POLLED_TS>"}},"stressdb2%2Fstressdb2collection1":{"backfill":{"done":true,"last_poll_start":"<LAST_POLLED_TS>"}},"stressdb2%2Fstressdb2collection2":{"backfill":{"done":true,"last_poll_start":"<LAST_POLLED_TS>"}},"stressdb3%2Fstressdb3collection1":{"backfill":{"done":true,"last_poll_start":"<LAST_POLLED_TS>"}}},"databaseResumeTokens":{"stressdb1":"<TOKEN>","stressdb2":"<TOKEN>","stressdb3":"<TOKEN>"}}
+
