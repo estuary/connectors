@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"math/rand"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestCapture(t *testing.T) {
@@ -392,6 +397,187 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+// TestCaptureStressChangeStreamCorrectness is based on the sqlcapture
+// testStressCorrectness test. It is simpler in some ways since MongoDB doesn't
+// have a concept of a "precise" backfill so backfilling is not part of the
+// test, but also more complicated in that it exercises processing several
+// change streams concurrently.
+//
+// The dataset for this test is a collection of (id, counter) tuples which will
+// progress through the following states:
+//
+//	(id, 1) ->  (id, 2) ->  (id, 3) -> (id, 4) -> deleted
+//	     ->  (id, 6) ->  (id, 7) -> (id, 8)
+//
+// The specific ordering of changes is randomly generated on every test run and
+// the capture introduces more variation depending on the precise timing of the
+// pull batches from change stream cursors. However it is still possible to
+// verify many correctness properties by observing the output event stream. For
+// instance, when the capture completes, we know exactly how many IDs should
+// exist and that they should all be in the final state with counter=8. If this
+// is not the case then some data has been lost.
+func TestCaptureStressChangeStreamCorrectness(t *testing.T) {
+	const loadGenTime = 90 * time.Second // run the load generator for this long
+	const numActiveIDs = 1000
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	dbsAndCollections := [][]string{
+		{"stressdb1", "stressdb1collection1"},
+		{"stressdb1", "stressdb1collection2"},
+		{"stressdb2", "stressdb2collection1"},
+		{"stressdb2", "stressdb2collection2"},
+		{"stressdb3", "stressdb3collection1"},
+	}
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		for _, dbcol := range dbsAndCollections {
+			require.NoError(t, client.Database(dbcol[0]).Collection(dbcol[1]).Drop(ctx))
+		}
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Because the Full Document lookup option looks up the _current_ document
+	// and not necessarily the document at the time of the change event, the
+	// test collection will use pre-images and the "counter" value from the
+	// pre-image will be used to verify that events are captured correctly.
+	for _, dbcol := range dbsAndCollections {
+		require.NoError(
+			t,
+			client.Database(dbcol[0]).CreateCollection(ctx, dbcol[1], &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}),
+		)
+	}
+
+	bindings := make([]*flow.CaptureSpec_Binding, 0, len(dbsAndCollections))
+	for _, dbcol := range dbsAndCollections {
+		bindings = append(bindings, makeBinding(t, dbcol[0], dbcol[1], captureModeChangeStream, ""))
+	}
+
+	validator := &correctnessInvariantsCaptureValidator{}
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    validator,
+		Sanitizers:   commonSanitizers(),
+		Bindings:     bindings,
+	}
+	cs.Reset()
+
+	// The initial backfill is a no-op, so only change events are captured.
+	advanceCapture(ctx, t, cs)
+
+	var loadgenDeadline = time.Now().Add(loadGenTime)
+
+	var mu sync.Mutex
+	bindingExpectedIDs := make(map[string]int) // updated concurrently by the goroutines below
+
+	group, groupCtx := errgroup.WithContext(ctx)
+
+	for _, dbcol := range dbsAndCollections {
+		dbcol := dbcol
+		col := client.Database(dbcol[0]).Collection(dbcol[1])
+
+		group.Go(func() error {
+			ll := log.WithFields(log.Fields{"db": dbcol[0], "collection": dbcol[1]})
+
+			ll.WithField("runtime", loadGenTime.String()).Info("load generator started")
+			var eventCount int
+			var nextID int
+			var activeIDs = make(map[int]int) // Map from ID to counter value
+			for {
+				// There should always be N active IDs (until we reach the end of the test)
+				for len(activeIDs) < numActiveIDs && time.Now().Before(loadgenDeadline) {
+					if nextID%1000 == 0 {
+						ll.WithField("id", nextID).Info("load generator progress")
+					}
+					activeIDs[nextID] = 1
+					nextID++
+				}
+				// Thus if we run out of active IDs we must be done
+				if len(activeIDs) == 0 {
+					break
+				}
+
+				// Randomly select an entry from the active set
+				var selected int
+				var sampleIndex int
+				for id := range activeIDs {
+					if sampleIndex == 0 || rand.Intn(sampleIndex) == 0 {
+						selected = id
+					}
+					sampleIndex++
+				}
+				var counter = activeIDs[selected]
+
+				// Issue an update/insert/delete depending on the counter value
+				switch counter {
+				case 1, 6:
+					_, err := col.InsertOne(groupCtx, map[string]any{"_id": selected, "counter": counter})
+					require.NoError(t, err)
+				case 5:
+					_, err := col.DeleteOne(groupCtx, bson.D{{Key: "_id", Value: selected}})
+					require.NoError(t, err)
+				default:
+					_, err := col.UpdateOne(groupCtx, bson.D{{Key: "_id", Value: selected}}, bson.D{{Key: "$set", Value: bson.D{{Key: "counter", Value: counter}}}})
+					require.NoError(t, err)
+				}
+				eventCount++
+
+				// Increment the counter state or delete the entry if we're done with it.
+				if counter := activeIDs[selected]; counter >= 8 {
+					delete(activeIDs, selected)
+				} else {
+					activeIDs[selected] = counter + 1
+				}
+			}
+
+			ll.WithField("id count", nextID).WithField("event count", eventCount).Info("load generator finished")
+			mu.Lock()
+			bindingExpectedIDs[validator.bindingIdentifier(dbcol[0], dbcol[1])] = nextID
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	go func() {
+		group.Wait()
+	}()
+
+	// Let the load generator run a while to build up a backlog of change stream
+	// events. After that, small tailing batches will be read for the remainder
+	// of the test.
+	time.Sleep(20 * time.Second)
+
+	// Repeatedly run the capture in parallel with the ongoing database load,
+	// killing and restarting it regularly, until the load generator is done.
+loop:
+	for {
+		select {
+		case <-groupCtx.Done():
+			require.NoError(t, group.Wait())
+			break loop
+		default:
+			var captureCtx, cancelCapture = context.WithCancel(ctx)
+			time.AfterFunc(5*time.Second, cancelCapture)
+			cs.Capture(captureCtx, t, nil)
+		}
+	}
+
+	// Run the capture once more and verify the overall results this time.
+	validator.BindingExpectedIDs = bindingExpectedIDs
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func commonSanitizers() map[string]*regexp.Regexp {
 	sanitizers := make(map[string]*regexp.Regexp)
 	sanitizers[`"<TOKEN>"`] = regexp.MustCompile(`"[A-Za-z0-9+/=]{32,}"`)
@@ -469,4 +655,144 @@ func backdateState(t *testing.T, cs *st.CaptureSpec, sk boilerplate.StateKey) {
 	cp, err := json.Marshal(state)
 	require.NoError(t, err)
 	cs.Checkpoint = cp
+}
+
+type correctnessInvariantsCaptureValidator struct {
+	BindingExpectedIDs map[string]int               // binding -> number of expected ids
+	states             map[string]map[string]string // binding -> event id -> prior state
+	violations         *strings.Builder
+}
+
+var correctnessInvariantsStateTransitions = map[string]string{
+	// Typical state transitions that one would expect.
+	"New:Create(1)":     "1",
+	"1:Update(2)":       "2",
+	"2:Update(3)":       "3",
+	"3:Update(4)":       "4",
+	"4:Delete()":        "Deleted",
+	"Deleted:Create(6)": "6",
+	"6:Update(7)":       "7",
+	"7:Update(8)":       "Finished",
+
+	// Change events with a `nil` Full Document are discarded, and this is
+	// possible if there is a later change event that deletes the document. So
+	// technically a deletion may be observed from any prior state.
+	"1:Delete()": "Deleted",
+	"2:Delete()": "Deleted",
+	"3:Delete()": "Deleted",
+
+	// MongoDB change streams appear to do some kind of on-line compaction,
+	// where rapid updates to the same document will be condensed into a single
+	// update. This makes it appear as though intermediate updates are
+	// "skipped", although the final state is the same.
+	"1:Update(3)": "3",
+	"1:Update(4)": "4",
+	"2:Update(4)": "4",
+	"6:Update(8)": "8",
+}
+
+func (v *correctnessInvariantsCaptureValidator) Output(collection string, data json.RawMessage) {
+	var event struct {
+		ID      string `json:"_id"`
+		Counter int    `json:"counter"`
+		Meta    struct {
+			Operation string `json:"op"`
+			Before    struct {
+				Counter int `json:"counter"`
+			} `json:"before"`
+			Source struct {
+				Database   string `json:"db"`
+				Collection string `json:"collection"`
+			} `json:"source"`
+		} `json:"_meta"`
+	}
+	if err := json.Unmarshal(data, &event); err != nil {
+		fmt.Fprintf(v.violations, "error parsing change event: %v\n", err)
+		return
+	}
+
+	var binding = v.bindingIdentifier(event.Meta.Source.Database, event.Meta.Source.Collection)
+
+	// Compute a string represent the change event and validate that it is a
+	// valid transition compared to the previous change event for this binding.
+	var change string
+	switch event.Meta.Operation {
+	case "c":
+		change = fmt.Sprintf("Create(%d)", event.Counter)
+	case "u":
+		if event.Meta.Before.Counter+1 != event.Counter {
+			log.WithField("event", event).Trace("full document lookup counter exceeded pre-image counter by more than 1")
+		}
+		change = fmt.Sprintf("Update(%d)", event.Meta.Before.Counter+1)
+	case "d":
+		change = "Delete()"
+	default:
+		change = fmt.Sprintf("UnknownOperation(%q)", event.Meta.Operation)
+	}
+
+	if v.states[binding] == nil {
+		v.states[binding] = make(map[string]string)
+	}
+
+	var prevState = v.states[binding][event.ID]
+	if prevState == "" {
+		prevState = "New"
+	} else if prevState == "Error" {
+		return // Ignore documents once they enter an error state
+	}
+	var edge = prevState + ":" + change
+
+	if nextState, ok := correctnessInvariantsStateTransitions[edge]; ok {
+		log.WithFields(log.Fields{
+			"binding": binding,
+			"id":      event.ID,
+			"edge":    edge,
+			"prev":    prevState,
+			"next":    nextState,
+		}).Trace("validated transition")
+		v.states[binding][event.ID] = nextState
+	} else {
+		fmt.Fprintf(v.violations, "id %s of binding %s: invalid state transition %q\n", event.ID, binding, edge)
+		v.states[binding][event.ID] = "Error"
+	}
+
+}
+
+func (v *correctnessInvariantsCaptureValidator) Checkpoint(data json.RawMessage) {}
+
+func (v *correctnessInvariantsCaptureValidator) Reset() {
+	v.violations = new(strings.Builder)
+	v.states = make(map[string]map[string]string)
+}
+
+func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
+	fmt.Fprintf(w, "# ================================\n")
+	fmt.Fprintf(w, "# Invariant Violations\n")
+	fmt.Fprintf(w, "# ================================\n")
+
+	for binding, numExpectedIDs := range v.BindingExpectedIDs {
+		for id := 0; id < numExpectedIDs; id++ {
+			id := strconv.Itoa(id)
+			var state = v.states[binding][id]
+			log.WithFields(log.Fields{
+				"binding": binding,
+				"id":      id,
+				"state":   state,
+			}).Trace("final state")
+			if state != "Finished" && state != "Error" {
+				fmt.Fprintf(v.violations, "id %s of binding %s in state %q (expected \"Finished\")\n", id, binding, state)
+			}
+		}
+	}
+
+	if str := v.violations.String(); len(str) == 0 {
+		fmt.Fprintf(w, "no invariant violations observed\n\n")
+	} else {
+		fmt.Fprintf(w, "%s\n", str)
+	}
+	return nil
+}
+
+func (v *correctnessInvariantsCaptureValidator) bindingIdentifier(database, collection string) string {
+	return database + "." + collection
 }
