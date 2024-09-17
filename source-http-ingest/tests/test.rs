@@ -56,7 +56,7 @@ async fn test_http_request_processing() -> Result<(), anyhow::Error> {
         // This is just easier than having it listen on a random port and then
         // needing to figure out what it is by parsing log output.
         .env("SOURCE_HTTP_INGEST_PORT", "27172")
-        .env("LOG_LEVEL", "info")
+        .env("LOG_LEVEL", "debug")
         .spawn()?;
 
     let stdin = child.stdin.take().unwrap();
@@ -113,8 +113,9 @@ async fn run_http_request_processing(
         headers_b,
     ));
 
-    // We'll re-use this value to write acknowledgements as we read commits
-    let ack_request = serde_json::json!({"acknowledge": {}});
+    // We'll re-use this value to write acknowledgements as we read commits.
+    // See comment below about only sending every other ACK.
+    let ack_request = serde_json::json!({"acknowledge": {"checkpoints": 2}});
 
     // Expect to read 256 documents in total, each followed immediately by a checkpoint.
     // As checkpoints are read, write an ack to unblock responses.
@@ -123,6 +124,10 @@ async fn run_http_request_processing(
     for i in 0..512 {
         let expect_commit = i % 2 == 1;
         let expect_document = !expect_commit;
+        // Skip every other acknowledgement in order to exercise the behavior of acknowledging multiple
+        // checkpoints in a single message. This works because 511 % 4 == 3, so the final iteration
+        // will send the final ACK.
+        let send_ack = i % 4 == 3;
 
         let response = read_response(&mut reader).await?;
         let Response {
@@ -132,11 +137,12 @@ async fn run_http_request_processing(
         } = &response;
 
         match (checkpoint.as_ref(), captured.as_ref()) {
-            (Some(_), None) if expect_commit => {
+            (Some(_), None) if send_ack => {
                 write_capture_request(&ack_request, &mut stdin)
                     .await
                     .context("writing acknowledge")?;
             }
+            (Some(_), None) if expect_commit && !send_ack => { /* pass */ }
             (None, Some(Captured { binding, doc_json })) if expect_document => {
                 if *binding == 0 {
                     a_docs += 1;
