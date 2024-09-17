@@ -47,8 +47,8 @@ type resource struct {
 	Database     string      `json:"database" jsonschema:"title=Database name" jsonschema_extras:"order=0"`
 	Collection   string      `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"order=1"`
 	Mode         captureMode `json:"captureMode,omitempty" jsonschema:"title=Capture Mode,enum=Change Stream Incremental,enum=Batch Snapshot,enum=Batch Incremental" jsonschema_extras:"order=2"`
-	PollSchedule string      `json:"pollSchedule,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to poll batch collections (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=3"`
-	Cursor       string      `json:"cursorField,omitempty" jsonschema:"title=Cursor Field,description=The name of the field to use as a cursor for batch-mode bindings. For best performance this field should be indexed. When used with 'Batch Incremental' mode documents added to the collection are expected to always have the cursor field and for it to be strictly increasing." jsonschema_extras:"order=4"`
+	Cursor       string      `json:"cursorField,omitempty" jsonschema:"title=Cursor Field,description=The name of the field to use as a cursor for batch-mode bindings. For best performance this field should be indexed. When used with 'Batch Incremental' mode documents added to the collection are expected to always have the cursor field and for it to be strictly increasing." jsonschema_extras:"order=3"`
+	PollSchedule string      `json:"pollSchedule,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to poll batch collections (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=4"`
 }
 
 func (r resource) Validate() error {
@@ -298,11 +298,6 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("getting list of databases: %w", err)
 	}
 
-	serverInfo, err := getServerInfo(ctx, client, existingDatabases[0])
-	if err != nil {
-		return nil, fmt.Errorf("getting server info: %w", err)
-	}
-
 	var lastResources []resource
 	var lastBackfillCounters []uint32
 	if req.LastCapture != nil {
@@ -318,11 +313,19 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 	var dbCollectionSpecs = make(map[string][]*mongo.CollectionSpecification)
 	var bindings = []*pc.Response_Validated_Binding{}
+	var servInf *serverInfo
 
 	for _, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		}
+
+		if servInf == nil {
+			servInf, err = getServerInfo(ctx, client, res.Database)
+			if err != nil {
+				return nil, fmt.Errorf("getting server info: %w", err)
+			}
 		}
 
 		var resourcePath = []string{res.Database, res.Collection}
@@ -374,10 +377,10 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("unsupported collection type: %w", err)
 		}
 
-		if !serverInfo.supportsChangeStreams && res.Mode == captureModeChangeStream {
-			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the server does not support change streams", resourcePath, res.Mode)
-		} else if res.Mode == captureModeChangeStream && !collectionType.canChangeStream() {
-			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the collection type '%s' does not support change streams", resourcePath, res.Mode, collectionType)
+		if !servInf.supportsChangeStreams && res.getMode() == captureModeChangeStream {
+			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the server does not support change streams", resourcePath, res.getMode())
+		} else if res.getMode() == captureModeChangeStream && !collectionType.canChangeStream() {
+			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the collection type '%s' does not support change streams", resourcePath, res.getMode(), collectionType)
 		}
 
 		bindings = append(bindings, &pc.Response_Validated_Binding{

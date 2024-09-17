@@ -196,7 +196,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 			var mode = captureModeChangeStream
 			var cursor string
 			var pollSchedule string
-			if !collectionType.canChangeStream() {
+			if !collectionType.canChangeStream() || !serverInfo.supportsChangeStreams {
 				mode = captureModeSnapshot
 				cursor = idProperty
 			}
