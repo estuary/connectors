@@ -37,7 +37,8 @@ type config struct {
 	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
 
@@ -99,12 +100,17 @@ func (c *config) ToURI() string {
 }
 
 type tableConfig struct {
-	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
-	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{}
+	return &tableConfig{
+		// Default to an explicit endpoint configuration schema, if set.
+		// This will be over-written by a present `schema` property within `raw`.
+		Schema: ep.Config.(*config).Schema,
+	}
 }
 
 // Validate the resource configuration.
@@ -116,6 +122,9 @@ func (r tableConfig) Validate() error {
 }
 
 func (c tableConfig) Path() sql.TablePath {
+	if c.Schema != "" {
+		return []string{c.Schema, c.Table}
+	}
 	return []string{c.Table}
 }
 
@@ -169,6 +178,9 @@ func newSqlServerDriver() *sql.Driver {
 			}).Info("opening database")
 
 			var metaBase sql.TablePath
+			if cfg.Schema != "" {
+				metaBase = append(metaBase, cfg.Schema)
+			}
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			db, err := stdsql.Open("sqlserver", cfg.ToURI())
@@ -182,11 +194,13 @@ func newSqlServerDriver() *sql.Driver {
 				return nil, fmt.Errorf("check collations: %w", err)
 			}
 
-			// We don't (yet) allow setting a schema for the endpoint or resources, so we need to get the
-			// default schema for the configured user.
-			var schema string
-			if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
-				return nil, fmt.Errorf("querying schema for current user: %w", err)
+			// If an explicit schema is not configured, query the default schema
+			// for the configured user.
+			schema := cfg.Schema
+			if schema == "" {
+				if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
+					return nil, fmt.Errorf("querying schema for current user: %w", err)
+				}
 			}
 
 			var dialect = sqlServerDialect(collation, schema)

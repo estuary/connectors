@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMySQLConfig(t *testing.T) {
+func TestConfig(t *testing.T) {
 	var validConfig = config{
 		Address:  "post.toast:1234",
 		User:     "youser",

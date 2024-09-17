@@ -222,7 +222,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Database = "wrong" + cfg.Database
 				return &cfg
 			},
-			want: []string{"Cannot open database \"wrongflow\" that was requested by the login."},
+			want: []string{"Cannot open database \"wrongmaster\" that was requested by the login."},
 		},
 		{
 			name: "wrong address",
