@@ -24,7 +24,7 @@ asyncio.run(
                 "refresh_token": "/refresh_token",
             },
         ),
-        schema_inference=False,
+        schema_inference=True,
     ).serve()
 )
 

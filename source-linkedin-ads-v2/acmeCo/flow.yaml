@@ -5,7 +5,31 @@ collections:
     key:
       - /account
   acmeCo/accounts:
-    schema: accounts.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Accounts
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          description: The unique identifier for the account.
+          type: integer
+        lastModified:
+          description: The date and time when the user account was last modified
+          type:
+            - "null"
+            - string
+          format: date-time
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/ad_campaign_analytics:
@@ -72,10 +96,51 @@ collections:
     key:
       - /id
   acmeCo/conversions:
-    schema: conversions.schema.yaml
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      title: Conversions
+      required:
+        - id
+      properties:
+        id:
+          description: Unique identifier for the conversion.
+          type: integer
+        lastModified:
+          description: The date and time when the user account was last modified
+          type:
+            - "null"
+            - string
+          format: date-time
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/creatives:
-    schema: creatives.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Creatives
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          description: The unique identifier of the creative.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
