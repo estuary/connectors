@@ -24,7 +24,7 @@ definitions:
           type: RecordSelector
           extractor:
             type: DpathExtractor
-            field_path: []
+            field_path: [contacts]
       incremental_sync:
         type: DatetimeBasedCursor
         cursor_field: createdSince
@@ -58,7 +58,7 @@ definitions:
           type: RecordSelector
           extractor:
             type: DpathExtractor
-            field_path: []
+            field_path: [attributes]
       schema_loader:
         type: InlineSchemaLoader
         schema:
@@ -78,7 +78,7 @@ definitions:
           type: RecordSelector
           extractor:
             type: DpathExtractor
-            field_path: []
+            field_path: [lists]
       schema_loader:
         type: InlineSchemaLoader
         schema:
@@ -133,7 +133,7 @@ schemas:
     $schema: http://json-schema.org/schema#
     properties:
       id:
-        type: string
+        type: integer
         description: The unique id of a contact
     additionalProperties: true
   ContactsAttributes:
@@ -149,7 +149,7 @@ schemas:
     $schema: http://json-schema.org/schema#
     properties:
       id:
-        type: string
+        type: integer
         description: The unique id of a contact list
     additionalProperties: true
 
