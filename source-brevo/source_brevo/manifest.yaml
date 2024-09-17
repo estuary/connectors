@@ -12,6 +12,8 @@ definitions:
     Contacts:
       type: DeclarativeStream
       name: Contacts
+      primary_key:
+        - id
       retriever:
         type: SimpleRetriever
         requester:
@@ -23,6 +25,20 @@ definitions:
           extractor:
             type: DpathExtractor
             field_path: []
+      incremental_sync:
+        type: DatetimeBasedCursor
+        cursor_field: createdSince
+        cursor_datetime_formats:
+          - "%Y-%m-%dT%H:%M:%S.%fZ"
+        datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
+        start_datetime:
+          type: MinMaxDatetime
+          datetime: '{{ config["start_date"] }}'
+          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
+        end_datetime:
+          type: MinMaxDatetime
+          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%S.%fZ') }}"
+          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"  
       schema_loader:
         type: InlineSchemaLoader
         schema:
@@ -30,6 +46,8 @@ definitions:
     ContactsAttributes:
       type: DeclarativeStream
       name: ContactsAttributes
+      primary_key:
+        - name
       retriever:
         type: SimpleRetriever
         requester:
@@ -48,6 +66,8 @@ definitions:
     ContactsLists:
       type: DeclarativeStream
       name: ContactsLists
+      primary_key:
+        - id
       retriever:
         type: SimpleRetriever
         requester:
@@ -93,6 +113,12 @@ spec:
         order: 0
         title: API Key
         airbyte_secret: true
+      start_date:
+        type: string
+        description: Earliest date to read data from.
+        pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}Z$
+        examples:
+          - YYYY-MM-DDT00:00:00.000Z
     additionalProperties: true
 
 metadata:

@@ -1,4 +1,6 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-brevo:
     endpoint:
@@ -7,5 +9,20 @@ captures:
           - python
           - "-m"
           - source_brevo
-        config: {}
-    bindings: []
+        config:
+          start_date: "2024-08-27T00:00:00.000Z"
+    bindings:
+      - resource:
+          stream: Contacts
+          syncMode: incremental
+          cursorField:
+            - createdSince
+        target: acmeCo/Contacts
+      - resource:
+          stream: ContactsAttributes
+          syncMode: full_refresh
+        target: acmeCo/ContactsAttributes
+      - resource:
+          stream: ContactsLists
+          syncMode: full_refresh
+        target: acmeCo/ContactsLists
